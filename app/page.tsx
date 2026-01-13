@@ -47,7 +47,7 @@ export default function Home() {
       {/* CTA BUTTONS */}
       <div className="flex flex-col sm:flex-row gap-4 mb-8">
         <a
-          href="https://forms.gle/rNWypufodudZe46MA"
+          href="https://viaplatform.carrd.co"
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-lg bg-white text-black px-8 py-4 font-medium hover:bg-gray-200 transition"
