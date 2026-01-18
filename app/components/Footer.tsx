@@ -5,8 +5,14 @@ export default function Footer() {
           <p>© {new Date().getFullYear()} VIA</p>
   
           <div className="space-x-6">
-            <a href="#" className="hover:text-white">Instagram</a>
-            <a href="#" className="hover:text-white">Contact</a>
+          <a
+  href="https://www.instagram.com/theviaplatform/"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="hover:text-white"
+>
+  Instagram
+</a>
           </div>
         </div>
       </footer>
