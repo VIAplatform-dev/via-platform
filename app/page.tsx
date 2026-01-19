@@ -248,7 +248,7 @@ export default function HomePage() {
 
           <p className="max-w-2xl mx-auto mb-20 text-gray-300">
             VIA brings together the best independent vintage and resale stores
-            into one seamless browsing experience — while keeping checkout
+            into one seamless browsing experience, while keeping checkout
             with the store you love.
           </p>
 
@@ -270,7 +270,7 @@ export default function HomePage() {
             <div>
               <h3 className="text-xl font-serif mb-3">Checkout with confidence</h3>
               <p className="text-gray-300">
-                Purchase directly from the original store — no middlemen.
+                Purchase directly from the original store, no middlemen.
               </p>
             </div>
           </div>

@@ -21,63 +21,110 @@ export default async function StorePage({
   return (
     <main className="bg-white min-h-screen">
 
-      {/* ================= STORE HERO ================= */}
-      <section className="bg-[#f7f6f3] py-24 sm:py-32">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <p className="text-xs uppercase tracking-[0.25em] text-gray-500 mb-4">
-            Independent Store
+      {/* ================= STORE HEADER ================= */}
+      <section className="border-b border-neutral-200">
+        <div className="max-w-7xl mx-auto px-6 py-28">
+
+          {/* breadcrumb */}
+          <Link
+            href="/stores"
+            className="inline-block mb-12 text-xs tracking-[0.25em] uppercase text-neutral-500 hover:text-black transition"
+          >
+            ← All Stores
+          </Link>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-start">
+
+            {/* LEFT: STORE INFO */}
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.35em] text-neutral-500 mb-5">
+                Curated Store
+              </p>
+
+              <h1 className="text-4xl sm:text-5xl font-serif mb-6">
+                {store.name}
+              </h1>
+
+              <p className="text-sm text-neutral-600 mb-8">
+                {store.location}
+              </p>
+
+              <p className="text-neutral-700 leading-relaxed max-w-lg">
+                {store.description}
+              </p>
+
+              {/* categories */}
+              {store.categories && (
+                <div className="mt-10 flex flex-wrap gap-x-8 gap-y-4">
+                  {store.categories.map((cat) => (
+                    <span
+                      key={cat}
+                      className="text-xs uppercase tracking-wide text-neutral-500"
+                    >
+                      {cat}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* RIGHT: EDITORIAL IMAGE (SMALLER) */}
+<div className="flex md:justify-end">
+  <div className="w-full md:w-[70%] aspect-[3/4] bg-neutral-100">
+    {/* later: store hero image */}
+  </div>
+</div>
+</div>
+        </div>
+      </section>
+
+      {/* ================= PRODUCT BAR ================= */}
+      <section className="border-b border-neutral-200">
+        <div className="max-w-7xl mx-auto px-6 py-12 flex items-center justify-between">
+
+          <p className="text-sm text-neutral-600">
+            {storeProducts.length} pieces available
           </p>
 
-          <h1 className="text-5xl sm:text-6xl font-serif mb-4">
-            {store.name}
-          </h1>
+          <div className="flex gap-8">
+            <button className="text-xs uppercase tracking-[0.2em] text-neutral-600 hover:text-black transition">
+              Featured
+            </button>
+            <button className="text-xs uppercase tracking-[0.2em] text-neutral-600 hover:text-black transition">
+              New
+            </button>
+            <button className="text-xs uppercase tracking-[0.2em] text-neutral-600 hover:text-black transition">
+              Price
+            </button>
+          </div>
 
-          <p className="text-gray-600 mb-6">
-            {store.location}
-          </p>
-
-          <p className="text-lg text-gray-700 max-w-2xl mx-auto">
-            {store.description}
-          </p>
         </div>
       </section>
 
       {/* ================= PRODUCTS ================= */}
-      <section className="py-24">
+      <section className="py-28">
         <div className="max-w-7xl mx-auto px-6">
 
-          <div className="flex items-end justify-between mb-12">
-            <h2 className="text-3xl font-serif">
-              Available from {store.name}
-            </h2>
-
-            <Link
-              href="/stores"
-              className="text-sm uppercase tracking-wide underline"
-            >
-              Back to stores
-            </Link>
-          </div>
-
           {storeProducts.length === 0 ? (
-            <p className="text-gray-500">
+            <p className="text-neutral-500">
               Products coming soon.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-8 gap-y-16">
               {storeProducts.map((product) => (
                 <ProductCard
-                key={product.id}
-                name={product.name}
-                price={product.price}
-                category={product.category}
-                storeName={store.name}
-                storeSlug={store.slug}
-                externalId={product.id}
-              />              
+                  key={product.id}
+                  name={product.name}
+                  price={product.price}
+                  category={product.category}
+                  storeName={store.name}
+                  storeSlug={store.slug}
+                  externalId={product.id}
+                />
               ))}
             </div>
           )}
+
         </div>
       </section>
 

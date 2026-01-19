@@ -9,6 +9,13 @@ import { useRouter } from "next/navigation";
 import { products } from "../stores/productData";
 import { stores } from "../stores/storeData";
 
+const categories = [
+  { slug: "clothes", label: "Clothing" },
+  { slug: "bags", label: "Bags" },
+  { slug: "shoes", label: "Shoes" },
+  { slug: "accessories", label: "Accessories" },
+];
+
 type SearchResult =
   | { type: "store"; name: string; href: string }
   | { type: "product"; name: string; href: string; meta: string };
@@ -105,17 +112,81 @@ export default function Header() {
 
           {/* NAV + SEARCH */}
           <div className="flex items-center gap-10">
-            <nav className="hidden md:flex items-center gap-10 text-sm uppercase tracking-wide text-white/80">
-              <Link href="/stores" className="hover:text-white transition">
-                Stores
-              </Link>
-              <Link href="/categories" className="hover:text-white transition">
-                Categories
-              </Link>
-              <Link href="/for-stores" className="hover:text-white transition">
-                Partner With VIA
-              </Link>
-            </nav>
+          <nav className="hidden md:flex items-center gap-10 text-sm uppercase tracking-wide text-white/80">
+
+{/* STORES DROPDOWN */}
+<div className="relative group">
+  <Link
+    href="/stores"
+    className="hover:text-white transition"
+  >
+    Stores
+  </Link>
+
+  <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
+  <div className="bg-white text-black w-72 px-6 py-5 shadow-xl pointer-events-auto">
+      <ul className="space-y-3">
+        {stores.map((store) => (
+          <li key={store.slug}>
+            <Link
+  href={`/stores/${store.slug}`}
+  className="grid grid-cols-[1fr_auto] gap-6 items-baseline text-sm hover:underline underline-offset-4"
+>
+
+              <span>{store.name}</span>
+              <span className="text-xs text-neutral-400">
+                {store.location}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      <Link
+        href="/stores"
+        className="block mt-5 text-xs uppercase tracking-wide text-neutral-500 hover:text-black"
+      >
+        View all stores
+      </Link>
+    </div>
+  </div>
+</div>
+
+{/* CATEGORIES DROPDOWN */}
+<div className="relative group">
+  <Link
+    href="/categories"
+    className="hover:text-white transition"
+  >
+    Categories
+  </Link>
+
+  <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
+    <div className="bg-white text-black w-56 px-6 py-5 shadow-xl">
+      <ul className="space-y-3">
+        {categories.map((cat) => (
+          <li key={cat.slug}>
+            <Link
+              href={`/categories/${cat.slug}`}
+              className="text-sm hover:underline underline-offset-4"
+            >
+              {cat.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</div>
+
+{/* STATIC LINK */}
+<Link
+  href="/for-stores"
+  className="hover:text-white transition"
+>
+  Partner With VIA
+</Link>
+</nav>
 
             <button
               aria-label="Search"

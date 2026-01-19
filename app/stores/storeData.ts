@@ -2,6 +2,7 @@ export const stores = [
   {
     slug: "lei",
     name: "LEI",
+    image: "/stores/lei.jpg",
     baseUrl: "https://leivintage.com",
     location: "Boston, MA",
     description:
@@ -11,6 +12,7 @@ export const stores = [
   {
     slug: "sourced-by-scottie",
     name: "Sourced by Scottie",
+    image: "/stores/sourced-by-scottie.jpg",
     baseUrl: "https://sourcedbyscottie.com",
     location: "Washington, DC",
     description:
@@ -20,6 +22,7 @@ export const stores = [
   {
     slug: "re-park-city",
     name: "RE Park City",
+    image: "/stores/re-park-city.jpg",
     baseUrl: "https://reparkcity.com",
     location: "Park City, UT",
     description:

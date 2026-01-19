@@ -21,24 +21,26 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${cormorant.className} bg-white text-black`}>
-        <Header />
+      <Header />
 
-        <main>{children}</main>
+      <main className="pt-20">
+  {children}
+</main>
 
-        <footer className="mt-24 py-8 text-sm text-black">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row gap-4 items-center justify-between text-center sm:text-left">
-            <span>© 2026 VIA — Curated vintage & resale, nationwide.</span>
+<footer className="mt-32 py-12 border-t border-neutral-200">
+  <div className="max-w-7xl mx-auto px-6">
+    <span>© 2026 VIA — Curated vintage & resale, nationwide.</span>
 
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white"
-            >
-              Instagram
-            </a>
-          </div>
-        </footer>
+    <a
+      href="https://instagram/theviaplatform.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:underline underline-offset-4"
+    >
+      Instagram
+    </a>
+  </div>
+</footer>
       </body>
     </html>
   );
