@@ -2,7 +2,7 @@ export const stores = [
   {
     slug: "lei",
     name: "LEI",
-    image: "/stores/lei.jpg",
+    image: "/stores/lei-vintage.jpg",
     baseUrl: "https://leivintage.com",
     location: "Boston, MA",
     description:

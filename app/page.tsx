@@ -90,9 +90,9 @@ export default function HomePage() {
       {[
         {
           name: "LEI",
-          slug: "lei",
+          slug: "lei-vintage",
           location: "Boston, MA",
-          image: "/stores/LEI.jpg",
+          image: "/stores/lei-vintage.jpg",
         },
         {
           name: "Sourced by Scottie",

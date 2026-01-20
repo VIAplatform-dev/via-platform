@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { stores } from "./storeData";
+import { stores } from "@/app/lib/stores";
 
 export default function StoresPage() {
   return (
@@ -22,44 +22,45 @@ export default function StoresPage() {
       {/* ================= STORES GRID ================= */}
       <section className="py-28">
         <div className="max-w-7xl mx-auto px-6">
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-24">
+
             {stores.map((store) => (
-              <Link
-                key={store.slug}
-                href={`/stores/${store.slug}`}
-                className="group"
-              >
-                {/* IMAGE */}
-                <div className="relative aspect-[4/5] bg-neutral-100 overflow-hidden mb-6">
-  <Image
-    src={store.image}
-    alt={store.name}
-    fill
-    sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
-    className="object-cover transition-transform duration-500 group-hover:scale-105"
-  />
-</div>
+              <div key={store.slug} className="group">
 
+                {/* IMAGE (CLICKABLE) */}
+                <Link href={`/stores/${store.slug}`} className="block mb-6">
+                  <div className="relative aspect-[3/4] bg-neutral-100 overflow-hidden">
+                    {store.image && (
+                      <Image
+                        src={store.image}
+                        alt={store.name}
+                        fill
+                        sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    )}
+                  </div>
+                </Link>
 
-                {/* TEXT */}
-                <div>
+                {/* TEXT (ALSO CLICKABLE) */}
+                <Link href={`/stores/${store.slug}`} className="block">
                   <h2 className="text-xl font-serif mb-1 group-hover:underline underline-offset-4">
                     {store.name}
                   </h2>
+                </Link>
 
-                  <p className="text-sm text-neutral-500 mb-3">
-                    {store.location}
-                  </p>
+                <p className="text-sm text-neutral-500 mb-3">
+                  {store.location}
+                </p>
 
-                  <p className="text-neutral-700 leading-relaxed line-clamp-3">
-                    {store.description}
-                  </p>
-                </div>
-              </Link>
+                <p className="text-neutral-700 leading-relaxed line-clamp-3">
+                  {store.description}
+                </p>
+
+              </div>
             ))}
-          </div>
 
+          </div>
         </div>
       </section>
 

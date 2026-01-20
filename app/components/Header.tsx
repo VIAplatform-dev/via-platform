@@ -6,8 +6,9 @@ import Image from "next/image";
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { products } from "../stores/productData";
-import { stores } from "../stores/storeData";
+// ✅ USE CANONICAL DATA SOURCES
+import { stores } from "@/app/lib/stores";
+import { products } from "@/app/stores/productData";
 
 const categories = [
   { slug: "clothes", label: "Clothing" },
@@ -27,7 +28,7 @@ export default function Header() {
   const router = useRouter();
 
   // -----------------------------
-  // SEARCH LOGIC
+  // SEARCH RESULTS
   // -----------------------------
   const results: SearchResult[] = useMemo(() => {
     if (!query.trim()) return [];
@@ -40,7 +41,7 @@ export default function Header() {
       .map((s) => ({
         type: "store" as const,
         name: s.name,
-        href: `/stores/${s.slug}`,
+        href: `/stores/${s.slug}`, // ✅ CORRECT ROUTE
       }));
 
     const productResults = products
@@ -49,7 +50,7 @@ export default function Header() {
       .map((p) => ({
         type: "product" as const,
         name: p.name,
-        href: `/stores/${p.storeSlug}`,
+        href: `/stores/${p.storeSlug}`, // ✅ GO TO STORE PAGE
         meta: p.category,
       }));
 
@@ -64,28 +65,24 @@ export default function Header() {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSearchOpen(false);
-
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setActiveIndex((i) => Math.min(i + 1, results.length - 1));
       }
-
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setActiveIndex((i) => Math.max(i - 1, 0));
       }
-
       if (e.key === "Enter" && results[activeIndex]) {
         setSearchOpen(false);
         router.push(results[activeIndex].href);
-      }      
+      }
     };
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [searchOpen, results, activeIndex]);
+  }, [searchOpen, results, activeIndex, router]);
 
-  // Reset state when closing
   useEffect(() => {
     if (!searchOpen) {
       setQuery("");
@@ -95,7 +92,6 @@ export default function Header() {
 
   return (
     <>
-      {/* HEADER */}
       <header className="fixed top-0 z-50 w-full bg-black">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
 
@@ -110,88 +106,76 @@ export default function Header() {
             />
           </Link>
 
-          {/* NAV + SEARCH */}
           <div className="flex items-center gap-10">
-          <nav className="hidden md:flex items-center gap-10 text-sm uppercase tracking-wide text-white/80">
+            <nav className="hidden md:flex items-center gap-10 text-sm uppercase tracking-wide text-white/80">
 
-{/* STORES DROPDOWN */}
-<div className="relative group">
-  <Link
-    href="/stores"
-    className="hover:text-white transition"
-  >
-    Stores
-  </Link>
+              {/* STORES */}
+              <div className="relative group">
+                <Link href="/stores" className="hover:text-white">
+                  Stores
+                </Link>
 
-  <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
-  <div className="bg-white text-black w-72 px-6 py-5 shadow-xl pointer-events-auto">
-      <ul className="space-y-3">
-        {stores.map((store) => (
-          <li key={store.slug}>
-            <Link
-  href={`/stores/${store.slug}`}
-  className="grid grid-cols-[1fr_auto] gap-6 items-baseline text-sm hover:underline underline-offset-4"
->
+                <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
+                  <div className="bg-white text-black w-72 px-6 py-5 shadow-xl">
+                    <ul className="space-y-3">
+                      {stores.map((store) => (
+                        <li key={store.slug}>
+                          <Link
+                            href={`/stores/${store.slug}`} // ✅ FIXED
+                            className="grid grid-cols-[1fr_auto] gap-6 text-sm hover:underline"
+                          >
+                            <span>{store.name}</span>
+                            <span className="text-xs text-neutral-400">
+                              {store.location}
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
 
-              <span>{store.name}</span>
-              <span className="text-xs text-neutral-400">
-                {store.location}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+                    <Link
+                      href="/stores"
+                      className="block mt-5 text-xs uppercase text-neutral-500 hover:text-black"
+                    >
+                      View all stores
+                    </Link>
+                  </div>
+                </div>
+              </div>
 
-      <Link
-        href="/stores"
-        className="block mt-5 text-xs uppercase tracking-wide text-neutral-500 hover:text-black"
-      >
-        View all stores
-      </Link>
-    </div>
-  </div>
-</div>
+              {/* CATEGORIES */}
+              <div className="relative group">
+                <Link href="/categories" className="hover:text-white">
+                  Categories
+                </Link>
 
-{/* CATEGORIES DROPDOWN */}
-<div className="relative group">
-  <Link
-    href="/categories"
-    className="hover:text-white transition"
-  >
-    Categories
-  </Link>
+                <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
+                  <div className="bg-white text-black w-56 px-6 py-5 shadow-xl">
+                    <ul className="space-y-3">
+                      {categories.map((cat) => (
+                        <li key={cat.slug}>
+                          <Link
+                            href={`/categories/${cat.slug}`}
+                            className="text-sm hover:underline"
+                          >
+                            {cat.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
 
-  <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
-    <div className="bg-white text-black w-56 px-6 py-5 shadow-xl">
-      <ul className="space-y-3">
-        {categories.map((cat) => (
-          <li key={cat.slug}>
-            <Link
-              href={`/categories/${cat.slug}`}
-              className="text-sm hover:underline underline-offset-4"
-            >
-              {cat.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  </div>
-</div>
-
-{/* STATIC LINK */}
-<Link
-  href="/for-stores"
-  className="hover:text-white transition"
->
-  Partner With VIA
-</Link>
-</nav>
+              <Link href="/for-stores" className="hover:text-white">
+                Partner With VIA
+              </Link>
+            </nav>
 
             <button
               aria-label="Search"
               onClick={() => setSearchOpen(true)}
-              className="p-2 text-white hover:opacity-70 transition"
+              className="p-2 text-white"
             >
               <Search size={20} />
             </button>
@@ -199,62 +183,45 @@ export default function Header() {
         </div>
       </header>
 
-      {/* SEARCH OVERLAY (DESKTOP + MOBILE) */}
+      {/* SEARCH OVERLAY */}
       {searchOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center md:pt-24">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-2xl md:mx-6 p-6 relative shadow-lg">
-
-            {/* CLOSE */}
+          <div className="bg-white w-full h-full md:h-auto md:max-w-2xl p-6 relative">
             <button
               onClick={() => setSearchOpen(false)}
-              className="absolute top-4 right-4 text-xs uppercase tracking-wide"
+              className="absolute top-4 right-4 text-xs uppercase"
             >
               Close
             </button>
 
-            {/* INPUT */}
             <input
               autoFocus
-              type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search items, stores, categories…"
+              placeholder="Search items or stores…"
               className="w-full border-b border-black pb-3 text-lg outline-none"
             />
 
-            {/* RESULTS */}
-            <div className="mt-6 space-y-1">
-              {results.length === 0 && query && (
-                <p className="text-sm text-gray-500">
-                  No results found.
-                </p>
-              )}
-
+            <div className="mt-6">
               {results.map((r, i) => (
                 <button
-                key={`${r.type}-${i}`}
-                onClick={() => {
-                  setSearchOpen(false);
-                  router.push(r.href);
-                }}
-                className={`w-full text-left block px-3 py-2 rounded ${
-                  i === activeIndex
-                    ? "bg-black text-white"
-                    : "hover:bg-gray-100"
-                }`}
-              >              
-                  <div className="flex justify-between items-center">
+                  key={i}
+                  onClick={() => {
+                    setSearchOpen(false);
+                    router.push(r.href);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded ${
+                    i === activeIndex
+                      ? "bg-black text-white"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  <div className="flex justify-between">
                     <span>{r.name}</span>
                     {r.type === "product" && (
-                      <span className="text-xs opacity-70">
-                        {r.meta}
-                      </span>
+                      <span className="text-xs opacity-70">{r.meta}</span>
                     )}
                   </div>
-
-                  <p className="text-xs opacity-70 uppercase mt-1">
-                    {r.type === "store" ? "Store" : "Product"}
-                  </p>
                 </button>
               ))}
             </div>

@@ -5,8 +5,8 @@ type ProductCardProps = {
   price: string;
   category: string;
   storeName: string;
-  storeSlug: string;
-  externalId: string;
+  externalUrl?: string;
+  image?: string;
 };
 
 export default function ProductCard({
@@ -14,15 +14,25 @@ export default function ProductCard({
   price,
   category,
   storeName,
-  storeSlug,
-  externalId,
+  externalUrl,
+  image,
 }: ProductCardProps) {
-  return (
-    <Link
-      href={`/out/${storeSlug}/${externalId}`}
-      className="group cursor-pointer text-black block"
-    >
-      <div className="aspect-[3/4] bg-neutral-200 mb-4 overflow-hidden relative border border-black transition-transform duration-300 group-hover:-translate-y-1 group-hover:scale-[1.01]">
+  // If the product has an external URL, we link out.
+  // Otherwise this is where an internal route could go later.
+  const isExternal = Boolean(externalUrl);
+
+  const CardInner = (
+    <>
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-transparent">
+  <img
+    src={image ?? "/placeholder.jpg"}
+    alt={name}
+    className="w-full h-full object-cover object-top"
+        />
+        {!image ? (
+          <div className="w-full h-full bg-neutral-200" />
+        ) : null}
+
         <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition" />
       </div>
 
@@ -41,6 +51,30 @@ export default function ProductCard({
       <p className="text-sm mt-1 text-black">
         {price}
       </p>
+    </>
+  );
+
+  // 🔹 External product (Squarespace / Shopify store)
+  if (isExternal && externalUrl) {
+    return (
+      <a
+        href={externalUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group cursor-pointer text-black block"
+      >
+        {CardInner}
+      </a>
+    );
+  }
+
+  // 🔹 Internal product (future-proofing)
+  return (
+    <Link
+      href="#"
+      className="group cursor-pointer text-black block"
+    >
+      {CardInner}
     </Link>
   );
 }
