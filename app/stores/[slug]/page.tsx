@@ -4,7 +4,14 @@ import { stores } from "@/app/lib/stores";
 import ProductCard from "@/app/components/ProductCard";
 import { loadStoreProducts } from "@/app/lib/loadStoreProducts";
 import { StoreProduct } from "@/app/lib/types";
+import { categoryMap } from "@/app/lib/categoryMap";
 
+const CATEGORY_LABEL_MAP: Record<string, "Clothing" | "Bags" | "Shoes" | "Accessories"> = {
+  clothes: "Clothing",
+  bags: "Bags",
+  shoes: "Shoes",
+  accessories: "Accessories",
+};
 type StorePageProps = {
   params: Promise<{
     slug: string;
@@ -59,14 +66,15 @@ export default async function StorePage({ params }: StorePageProps) {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
               {storeProducts.map((product) => (
                 <ProductCard
-                  key={product.id}
-                  name={product.name}
-                  price={product.price}
-                  category={product.category}
-                  storeName={store.name}
-                  externalUrl={product.externalUrl}
-                  image={product.image}
-                />
+                key={product.id}
+                name={product.name}
+                price={product.price}
+                category={categoryMap[product.category]}
+                storeName={store.name}
+                storeSlug={store.slug}
+                externalId={product.id}
+                image={product.image ?? ""}
+              />              
               ))}
             </div>
           )}

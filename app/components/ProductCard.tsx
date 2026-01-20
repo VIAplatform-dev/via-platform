@@ -1,9 +1,10 @@
 import Link from "next/link";
+import type { CategoryLabel } from "@/app/lib/categoryMap";
 
 type ProductCardProps = {
   name: string;
   price: string;
-  category: "Clothing" | "Bags" | "Shoes" | "Accessories";
+  category: CategoryLabel;
   storeName: string;
   storeSlug: string; // ✅ ADD THIS
   externalId: string;

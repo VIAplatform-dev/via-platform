@@ -1,19 +1,10 @@
-import type { CategorySlug } from "./categories";
-
-export const categoryMap: Record<string, CategorySlug> = {
-  // clothing
-  top: "clothes",
-  blouse: "clothes",
-  jacket: "clothes",
-  coat: "clothes",
-
-  // shoes
-  heels: "shoes",
-  boots: "shoes",
-
-  // bags
-  bag: "bags",
-  clutch: "bags",
-
-  // accessories (expand later)
-};
+export const categoryMap = {
+    clothes: "Clothing",
+    bags: "Bags",
+    shoes: "Shoes",
+    accessories: "Accessories",
+  } as const;
+  
+  export type CategorySlug = keyof typeof categoryMap;
+  export type CategoryLabel = (typeof categoryMap)[CategorySlug];
+  

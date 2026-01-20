@@ -6,6 +6,13 @@ import { inventory } from "@/app/lib/inventory";
 import { categories } from "@/app/lib/categories";
 import ProductCard from "@/app/components/ProductCard";
 
+const CATEGORY_LABEL_MAP: Record<string, "Clothing" | "Bags" | "Shoes" | "Accessories"> = {
+  clothes: "Clothing",
+  bags: "Bags",
+  shoes: "Shoes",
+  accessories: "Accessories",
+};
+
 export default async function CategoryPage({
   params,
 }: {
