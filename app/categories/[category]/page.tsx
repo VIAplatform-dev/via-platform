@@ -1,28 +1,28 @@
+export const dynamic = "force-dynamic";
+
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { products } from "../../stores/productData";
-import { stores } from "../../stores/storeData";
-import ProductCard from "../../components/ProductCard";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  clothes: "Clothes",
-  bags: "Bags",
-  shoes: "Shoes",
-  accessories: "Accessories",
-};
+import { inventory } from "@/app/lib/inventory";
+import { categories } from "@/app/lib/categories";
+import ProductCard from "@/app/components/ProductCard";
 
 export default async function CategoryPage({
   params,
 }: {
-  params: Promise<{ category: string }>;
+  params: { category: string };
 }) {
-  const { category } = await params;
-  const label = CATEGORY_LABELS[category];
+  const category  = (await params).category;
 
-  if (!label) return notFound();
+  // 1️⃣ validate category
+  const categoryMeta = categories.find(c => c.slug === category);
+    if (!categoryMeta) {
+      return notFound();
+    }
 
-  const filteredProducts = products.filter(
-    (p) => p.category === label
+
+  // 2️⃣ filter CANONICAL inventory (LEI, future stores, etc.)
+  const filteredProducts = inventory.filter(
+    (item) => item.category === category
   );
 
   return (
@@ -36,11 +36,11 @@ export default async function CategoryPage({
           </p>
 
           <h1 className="text-5xl sm:text-6xl font-serif mb-6">
-            {label}
+            {categoryMeta.label}
           </h1>
 
           <p className="text-lg text-neutral-700 max-w-2xl mx-auto">
-            Curated {label.toLowerCase()} from independent vintage and resale stores.
+            Curated {categoryMeta.label.toLowerCase()} from independent vintage and resale stores.
           </p>
         </div>
       </section>
@@ -68,27 +68,22 @@ export default async function CategoryPage({
             </p>
           ) : (
             <div className="flex md:grid md:grid-cols-4 gap-6 overflow-x-auto md:overflow-visible pb-4">
-              {filteredProducts.map((product) => {
-                const store = stores.find(
-                  (s) => s.slug === product.storeSlug
-                );
-
-                return (
-                  <div
-  key={product.id}
-  className="group min-w-[70%] sm:min-w-[45%] md:min-w-0"
->
-<ProductCard
-  name={product.name}
-  price={product.price}
-  category={product.category}
-  storeName={store?.name ?? ""}
-  storeSlug={product.storeSlug}
+              {filteredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  className="group min-w-[70%] sm:min-w-[45%] md:min-w-0"
+                >
+                  <ProductCard
+  name={product.title}
+  price={`$${product.price}`}
+  category={categoryMeta.label}
+  storeName={product.store}
+  storeSlug={product.store.toLowerCase().replace(/\s+/g, "-")}
   externalId={product.id}
+  image={product.image}
 />
-                  </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -97,4 +92,3 @@ export default async function CategoryPage({
     </main>
   );
 }
-

@@ -1,4 +1,4 @@
-import leiProducts from "@/data/lei-vintage.json";
+import leiProducts from "@/app/data/lei-vintage.json";
 
 export default function TestLeiPage() {
   return (

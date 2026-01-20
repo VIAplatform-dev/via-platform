@@ -3,10 +3,11 @@ import Link from "next/link";
 type ProductCardProps = {
   name: string;
   price: string;
-  category: string;
+  category: "Clothing" | "Bags" | "Shoes" | "Accessories";
   storeName: string;
-  externalUrl?: string;
-  image?: string;
+  storeSlug: string; // ✅ ADD THIS
+  externalId: string;
+  image: string;
 };
 
 export default function ProductCard({
@@ -14,12 +15,13 @@ export default function ProductCard({
   price,
   category,
   storeName,
-  externalUrl,
+  storeSlug,
+  externalId,
   image,
 }: ProductCardProps) {
   // If the product has an external URL, we link out.
   // Otherwise this is where an internal route could go later.
-  const isExternal = Boolean(externalUrl);
+  const isExternal = Boolean(storeSlug);
 
   const CardInner = (
     <>
@@ -55,10 +57,10 @@ export default function ProductCard({
   );
 
   // 🔹 External product (Squarespace / Shopify store)
-  if (isExternal && externalUrl) {
+  if (isExternal && storeSlug) {
     return (
       <a
-        href={externalUrl}
+        href={storeSlug}
         target="_blank"
         rel="noopener noreferrer"
         className="group cursor-pointer text-black block"
