@@ -1,6 +1,7 @@
 import leiVintage from "@/app/data/lei-vintage.json";
 import { categoryMap } from "./categoryMap";
-import type { CategorySlug } from "./categories";
+import type { CategorySlug, CategoryLabel } from "./categoryMap";
+
 
 export type InventoryItem = {
   id: string;
@@ -23,12 +24,12 @@ export const inventory: InventoryItem[] = (leiVintage as any[])
     // 🔑 infer category from title keywords
     let normalizedCategory: CategorySlug | undefined;
 
-    for (const keyword in categoryMap) {
-      if (title.includes(keyword)) {
-        normalizedCategory = categoryMap[keyword];
-        break;
+    for (const keyword of Object.keys(categoryMap) as CategorySlug[]) {
+        if (title.includes(keyword)) {
+          normalizedCategory = keyword as CategorySlug;
+          break;
+        }
       }
-    }
 
     if (!normalizedCategory) {
       console.warn("Could not infer category from title:", item.title);
