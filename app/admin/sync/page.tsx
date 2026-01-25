@@ -130,19 +130,26 @@ export default function SyncAdminPage() {
     <main className="bg-white min-h-screen text-black">
       {/* Header */}
       <section className="border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-6 py-20">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="max-w-7xl mx-auto px-6 py-12 sm:py-20">
+          <div className="flex items-center gap-4 mb-4 text-sm flex-wrap">
             <span className="text-black">Sync</span>
             <span className="text-neutral-300">/</span>
             <Link
               href="/admin/analytics"
-              className="text-neutral-400 hover:text-black transition-colors"
+              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
             >
               Analytics
             </Link>
+            <span className="text-neutral-300">/</span>
+            <Link
+              href="/admin/emails"
+              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+            >
+              Emails
+            </Link>
           </div>
-          <h1 className="text-5xl font-serif mb-4">Inventory Sync</h1>
-          <p className="text-neutral-600 text-lg">
+          <h1 className="text-3xl sm:text-5xl font-serif mb-3 sm:mb-4">Inventory Sync</h1>
+          <p className="text-neutral-600 text-base sm:text-lg">
             Sync products from Squarespace and Shopify partner stores.
           </p>
         </div>
@@ -150,10 +157,10 @@ export default function SyncAdminPage() {
 
       {/* Sync All Button */}
       <section className="border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex justify-end">
+        <div className="max-w-7xl mx-auto px-6 py-4 sm:py-6 flex justify-center sm:justify-end">
           <button
             onClick={handleSyncAll}
-            className="px-6 py-3 bg-black text-white text-sm tracking-wide hover:bg-neutral-800 transition-colors"
+            className="w-full sm:w-auto px-6 py-3 min-h-[48px] bg-black text-white text-sm tracking-wide hover:bg-neutral-800 transition-colors"
           >
             Sync All Stores
           </button>
@@ -162,10 +169,10 @@ export default function SyncAdminPage() {
 
       {/* Squarespace Stores */}
       {SQUARESPACE_STORES.length > 0 && (
-        <section className="py-16 border-b border-neutral-200">
+        <section className="py-10 sm:py-16 border-b border-neutral-200">
           <div className="max-w-7xl mx-auto px-6">
-            <h2 className="text-2xl font-serif mb-8">Squarespace Stores</h2>
-            <div className="space-y-6">
+            <h2 className="text-xl sm:text-2xl font-serif mb-6 sm:mb-8">Squarespace Stores</h2>
+            <div className="space-y-4 sm:space-y-6">
               {SQUARESPACE_STORES.map((store) => {
                 const status = statuses[store.slug];
                 const isLoading = status?.loading;
@@ -174,19 +181,30 @@ export default function SyncAdminPage() {
                 return (
                   <div
                     key={store.slug}
-                    className="border border-neutral-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="border border-neutral-200 p-4 sm:p-6"
                   >
-                    {/* Store Info */}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-serif mb-1">{store.name}</h3>
-                      <p className="text-sm text-neutral-500 break-all">
-                        {store.rssUrl}
-                      </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      {/* Store Info */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg sm:text-xl font-serif mb-1">{store.name}</h3>
+                        <p className="text-xs sm:text-sm text-neutral-500 break-all">
+                          {store.rssUrl}
+                        </p>
+                      </div>
+
+                      {/* Sync Button */}
+                      <button
+                        onClick={() => handleSync(store)}
+                        disabled={isLoading}
+                        className="w-full sm:w-auto px-5 py-3 min-h-[48px] border border-black text-sm tracking-wide hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {isLoading ? "Syncing..." : "Sync"}
+                      </button>
                     </div>
 
                     {/* Result */}
                     {result && (
-                      <div className="sm:text-right">
+                      <div className="mt-3 pt-3 border-t border-neutral-100">
                         {result.success ? (
                           <p className="text-green-700 text-sm">
                             {result.productCount} products synced
@@ -195,7 +213,7 @@ export default function SyncAdminPage() {
                           <p className="text-red-700 text-sm">
                             {result.error}
                             {result.details && (
-                              <span className="block text-neutral-500">
+                              <span className="block text-neutral-500 mt-1">
                                 {result.details}
                               </span>
                             )}
@@ -203,15 +221,6 @@ export default function SyncAdminPage() {
                         )}
                       </div>
                     )}
-
-                    {/* Sync Button */}
-                    <button
-                      onClick={() => handleSync(store)}
-                      disabled={isLoading}
-                      className="px-5 py-2 border border-black text-sm tracking-wide hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                      {isLoading ? "Syncing..." : "Sync"}
-                    </button>
                   </div>
                 );
               })}
@@ -221,11 +230,11 @@ export default function SyncAdminPage() {
       )}
 
       {/* Shopify Stores */}
-      <section className="py-16">
+      <section className="py-10 sm:py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-2xl font-serif mb-8">Shopify Stores</h2>
+          <h2 className="text-xl sm:text-2xl font-serif mb-6 sm:mb-8">Shopify Stores</h2>
           {SHOPIFY_STORES.length > 0 ? (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {SHOPIFY_STORES.map((store) => {
                 const status = statuses[store.slug];
                 const isLoading = status?.loading;
@@ -234,29 +243,40 @@ export default function SyncAdminPage() {
                 return (
                   <div
                     key={store.slug}
-                    className="border border-neutral-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    className="border border-neutral-200 p-4 sm:p-6"
                   >
-                    {/* Store Info */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-xl font-serif">{store.name}</h3>
-                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded">
-                          Shopify
-                        </span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      {/* Store Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <h3 className="text-lg sm:text-xl font-serif">{store.name}</h3>
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded">
+                            Shopify
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-neutral-500 break-all">
+                          {store.storeDomain}
+                        </p>
                       </div>
-                      <p className="text-sm text-neutral-500 break-all">
-                        {store.storeDomain}
-                      </p>
+
+                      {/* Sync Button */}
+                      <button
+                        onClick={() => handleSync(store)}
+                        disabled={isLoading}
+                        className="w-full sm:w-auto px-5 py-3 min-h-[48px] border border-black text-sm tracking-wide hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {isLoading ? "Syncing..." : "Sync"}
+                      </button>
                     </div>
 
                     {/* Result */}
                     {result && (
-                      <div className="sm:text-right">
+                      <div className="mt-3 pt-3 border-t border-neutral-100">
                         {result.success ? (
                           <p className="text-green-700 text-sm">
                             {result.productCount} products synced
                             {result.shopName && (
-                              <span className="block text-neutral-500">
+                              <span className="block text-neutral-500 mt-1">
                                 from {result.shopName}
                               </span>
                             )}
@@ -265,7 +285,7 @@ export default function SyncAdminPage() {
                           <p className="text-red-700 text-sm">
                             {result.error}
                             {result.details && (
-                              <span className="block text-neutral-500">
+                              <span className="block text-neutral-500 mt-1">
                                 {result.details}
                               </span>
                             )}
@@ -273,26 +293,17 @@ export default function SyncAdminPage() {
                         )}
                       </div>
                     )}
-
-                    {/* Sync Button */}
-                    <button
-                      onClick={() => handleSync(store)}
-                      disabled={isLoading}
-                      className="px-5 py-2 border border-black text-sm tracking-wide hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-                    >
-                      {isLoading ? "Syncing..." : "Sync"}
-                    </button>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="border border-dashed border-neutral-300 p-8 text-center">
-              <p className="text-neutral-500 mb-4">
+            <div className="border border-dashed border-neutral-300 p-6 sm:p-8 text-center">
+              <p className="text-neutral-500 mb-3 sm:mb-4">
                 No Shopify stores configured yet.
               </p>
-              <p className="text-sm text-neutral-400">
-                Add stores in <code className="bg-neutral-100 px-1">app/admin/sync/page.tsx</code>
+              <p className="text-xs sm:text-sm text-neutral-400">
+                Add stores in <code className="bg-neutral-100 px-1 text-xs">app/admin/sync/page.tsx</code>
               </p>
             </div>
           )}
@@ -300,19 +311,19 @@ export default function SyncAdminPage() {
       </section>
 
       {/* Help Section */}
-      <section className="border-t border-neutral-200 py-16">
+      <section className="border-t border-neutral-200 py-10 sm:py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12">
             <div>
-              <h3 className="text-lg font-serif mb-4">Squarespace Setup</h3>
+              <h3 className="text-base sm:text-lg font-serif mb-3 sm:mb-4">Squarespace Setup</h3>
               <div className="text-sm text-neutral-600 space-y-2">
                 <p>
                   <span className="text-black">Products RSS:</span>{" "}
-                  /products?format=rss
+                  <code className="text-xs bg-neutral-100 px-1">/products?format=rss</code>
                 </p>
                 <p>
                   <span className="text-black">Blog RSS:</span>{" "}
-                  /blog?format=rss
+                  <code className="text-xs bg-neutral-100 px-1">/blog?format=rss</code>
                 </p>
                 <p className="mt-4 text-neutral-500">
                   Squarespace stores use RSS feeds which are publicly accessible.
@@ -321,10 +332,10 @@ export default function SyncAdminPage() {
             </div>
 
             <div>
-              <h3 className="text-lg font-serif mb-4">Shopify Setup</h3>
+              <h3 className="text-base sm:text-lg font-serif mb-3 sm:mb-4">Shopify Setup</h3>
               <div className="text-sm text-neutral-600 space-y-3">
                 <p>To get your Storefront Access Token:</p>
-                <ol className="list-decimal list-inside space-y-1 text-neutral-500">
+                <ol className="list-decimal list-inside space-y-1 text-neutral-500 text-sm">
                   <li>Go to Shopify Admin → Settings</li>
                   <li>Click &quot;Apps and sales channels&quot;</li>
                   <li>Click &quot;Develop apps&quot; → Create an app</li>
@@ -333,7 +344,7 @@ export default function SyncAdminPage() {
                 </ol>
                 <p className="mt-4">
                   <span className="text-black">Required scopes:</span>{" "}
-                  <code className="bg-neutral-100 px-1 text-xs">unauthenticated_read_product_listings</code>
+                  <code className="bg-neutral-100 px-1 text-xs break-all">unauthenticated_read_product_listings</code>
                 </p>
               </div>
             </div>
@@ -342,15 +353,21 @@ export default function SyncAdminPage() {
       </section>
 
       {/* Admin Navigation */}
-      <section className="border-t border-neutral-200 py-8">
+      <section className="border-t border-neutral-200 py-6 sm:py-8">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-6 text-sm">
-            <span className="text-black">Inventory Sync</span>
+          <div className="flex flex-wrap gap-4 sm:gap-6 text-sm">
+            <span className="text-black min-h-[44px] flex items-center">Inventory Sync</span>
             <Link
               href="/admin/analytics"
-              className="text-neutral-500 hover:text-black transition-colors"
+              className="text-neutral-500 hover:text-black transition-colors min-h-[44px] flex items-center"
             >
               Analytics
+            </Link>
+            <Link
+              href="/admin/emails"
+              className="text-neutral-500 hover:text-black transition-colors min-h-[44px] flex items-center"
+            >
+              Emails
             </Link>
           </div>
         </div>

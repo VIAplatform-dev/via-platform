@@ -25,25 +25,32 @@ export default function ProductCard({
 }: ProductCardProps) {
   const CardInner = (
     <>
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-transparent">
+      {/* Image container with consistent aspect ratio */}
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-neutral-100">
         <img
           src={image || "/placeholder.jpg"}
           alt={name}
           className="w-full h-full object-cover object-top"
+          loading="lazy"
         />
-        {!image && <div className="w-full h-full bg-neutral-200" />}
+        {!image && <div className="absolute inset-0 bg-neutral-200" />}
         <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition" />
       </div>
 
-      <p className="text-xs uppercase tracking-wide text-black/60 mb-1">
-        {storeName}
-      </p>
+      {/* Product info with mobile-friendly text sizes */}
+      <div className="pt-3 pb-2">
+        <p className="text-[11px] sm:text-xs uppercase tracking-wide text-black/60 mb-1">
+          {storeName}
+        </p>
 
-      <h3 className="font-serif text-lg text-black leading-snug">{name}</h3>
+        <h3 className="font-serif text-base sm:text-lg text-black leading-snug line-clamp-2">
+          {name}
+        </h3>
 
-      <p className="text-sm text-black/70">{category}</p>
+        <p className="text-xs sm:text-sm text-black/70 mt-0.5">{category}</p>
 
-      <p className="text-sm mt-1 text-black">{price}</p>
+        <p className="text-sm sm:text-base mt-1 text-black font-medium">{price}</p>
+      </div>
     </>
   );
 

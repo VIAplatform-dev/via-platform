@@ -70,19 +70,26 @@ export default function AnalyticsPage() {
     <main className="bg-white min-h-screen text-black">
       {/* Header */}
       <section className="border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-6 py-20">
-          <div className="flex items-center gap-4 mb-4">
+        <div className="max-w-7xl mx-auto px-6 py-12 sm:py-20">
+          <div className="flex items-center gap-4 mb-4 text-sm flex-wrap">
             <Link
               href="/admin/sync"
-              className="text-neutral-400 hover:text-black transition-colors"
+              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
             >
               Sync
             </Link>
             <span className="text-neutral-300">/</span>
             <span className="text-black">Analytics</span>
+            <span className="text-neutral-300">/</span>
+            <Link
+              href="/admin/emails"
+              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+            >
+              Emails
+            </Link>
           </div>
-          <h1 className="text-5xl font-serif mb-4">Click Analytics</h1>
-          <p className="text-neutral-600 text-lg">
+          <h1 className="text-3xl sm:text-5xl font-serif mb-3 sm:mb-4">Click Analytics</h1>
+          <p className="text-neutral-600 text-base sm:text-lg">
             Track product clicks and store performance.
           </p>
         </div>
@@ -90,13 +97,13 @@ export default function AnalyticsPage() {
 
       {/* Date Range Filter */}
       <section className="border-b border-neutral-200">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-          <div className="flex gap-2">
+        <div className="max-w-7xl mx-auto px-6 py-4 sm:py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
             {(["7d", "30d", "all"] as DateRange[]).map((r) => (
               <button
                 key={r}
                 onClick={() => setRange(r)}
-                className={`px-4 py-2 text-sm tracking-wide transition-colors ${
+                className={`px-4 py-2.5 text-sm tracking-wide transition-colors whitespace-nowrap min-h-[44px] ${
                   range === r
                     ? "bg-black text-white"
                     : "border border-neutral-200 hover:border-black"
@@ -130,21 +137,23 @@ export default function AnalyticsPage() {
       ) : (
         <>
           {/* Clicks by Store */}
-          <section className="py-16 border-b border-neutral-200">
+          <section className="py-12 sm:py-16 border-b border-neutral-200">
             <div className="max-w-7xl mx-auto px-6">
-              <h2 className="text-2xl font-serif mb-8">Clicks by Store</h2>
+              <h2 className="text-xl sm:text-2xl font-serif mb-6 sm:mb-8">Clicks by Store</h2>
               <div className="space-y-4">
                 {Object.entries(data.clicksByStore).map(([store, count]) => (
-                  <div key={store} className="flex items-center gap-4">
-                    <div className="w-40 text-sm truncate">{store}</div>
-                    <div className="flex-1 h-8 bg-neutral-100 relative">
-                      <div
-                        className="h-full bg-black transition-all duration-300"
-                        style={{ width: `${(count / maxStoreClicks) * 100}%` }}
-                      />
-                    </div>
-                    <div className="w-16 text-right text-sm tabular-nums">
-                      {count.toLocaleString()}
+                  <div key={store} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                    <div className="sm:w-40 text-sm font-medium sm:font-normal truncate">{store}</div>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="flex-1 h-6 sm:h-8 bg-neutral-100 relative">
+                        <div
+                          className="h-full bg-black transition-all duration-300"
+                          style={{ width: `${(count / maxStoreClicks) * 100}%` }}
+                        />
+                      </div>
+                      <div className="w-12 sm:w-16 text-right text-sm tabular-nums">
+                        {count.toLocaleString()}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -153,12 +162,13 @@ export default function AnalyticsPage() {
           </section>
 
           {/* Top Products */}
-          <section className="py-16 border-b border-neutral-200">
+          <section className="py-12 sm:py-16 border-b border-neutral-200">
             <div className="max-w-7xl mx-auto px-6">
-              <h2 className="text-2xl font-serif mb-8">Top 10 Products</h2>
+              <h2 className="text-xl sm:text-2xl font-serif mb-6 sm:mb-8">Top 10 Products</h2>
               {data.topProducts.length > 0 ? (
                 <div className="border border-neutral-200">
-                  <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-50 text-sm text-neutral-500 border-b border-neutral-200">
+                  {/* Desktop Header */}
+                  <div className="hidden sm:grid grid-cols-12 gap-4 px-4 sm:px-6 py-3 bg-neutral-50 text-sm text-neutral-500 border-b border-neutral-200">
                     <div className="col-span-1">#</div>
                     <div className="col-span-6">Product</div>
                     <div className="col-span-3">Store</div>
@@ -167,15 +177,33 @@ export default function AnalyticsPage() {
                   {data.topProducts.map((product, index) => (
                     <div
                       key={product.id}
-                      className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50"
+                      className="px-4 sm:px-6 py-4 border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50"
                     >
-                      <div className="col-span-1 text-neutral-400">{index + 1}</div>
-                      <div className="col-span-6 truncate">{product.name}</div>
-                      <div className="col-span-3 text-sm text-neutral-500 truncate">
-                        {product.store}
+                      {/* Mobile Layout */}
+                      <div className="sm:hidden">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{product.name}</p>
+                            <p className="text-xs text-neutral-500 mt-1">{product.store}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-medium tabular-nums">
+                              {product.count.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-neutral-400 ml-1">clicks</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="col-span-2 text-right tabular-nums font-medium">
-                        {product.count.toLocaleString()}
+                      {/* Desktop Layout */}
+                      <div className="hidden sm:grid grid-cols-12 gap-4">
+                        <div className="col-span-1 text-neutral-400">{index + 1}</div>
+                        <div className="col-span-6 truncate">{product.name}</div>
+                        <div className="col-span-3 text-sm text-neutral-500 truncate">
+                          {product.store}
+                        </div>
+                        <div className="col-span-2 text-right tabular-nums font-medium">
+                          {product.count.toLocaleString()}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -187,28 +215,42 @@ export default function AnalyticsPage() {
           </section>
 
           {/* Recent Activity */}
-          <section className="py-16">
+          <section className="py-12 sm:py-16">
             <div className="max-w-7xl mx-auto px-6">
-              <h2 className="text-2xl font-serif mb-8">Recent Activity</h2>
+              <h2 className="text-xl sm:text-2xl font-serif mb-6 sm:mb-8">Recent Activity</h2>
               {data.recentClicks.length > 0 ? (
                 <div className="border border-neutral-200">
-                  <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-50 text-sm text-neutral-500 border-b border-neutral-200">
+                  {/* Desktop Header */}
+                  <div className="hidden sm:grid grid-cols-12 gap-4 px-4 sm:px-6 py-3 bg-neutral-50 text-sm text-neutral-500 border-b border-neutral-200">
                     <div className="col-span-3">Time</div>
                     <div className="col-span-5">Product</div>
                     <div className="col-span-4">Store</div>
                   </div>
-                  <div className="max-h-[600px] overflow-y-auto">
+                  <div className="max-h-[400px] sm:max-h-[600px] overflow-y-auto">
                     {data.recentClicks.map((click) => (
                       <div
                         key={click.clickId}
-                        className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50 text-sm"
+                        className="px-4 sm:px-6 py-3 border-b border-neutral-100 last:border-b-0 hover:bg-neutral-50 text-sm"
                       >
-                        <div className="col-span-3 text-neutral-500">
-                          {formatDate(click.timestamp)}
+                        {/* Mobile Layout */}
+                        <div className="sm:hidden">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium truncate flex-1">{click.productName}</p>
+                          </div>
+                          <div className="flex items-center justify-between mt-1 text-xs text-neutral-500">
+                            <span>{click.store}</span>
+                            <span>{formatDate(click.timestamp)}</span>
+                          </div>
                         </div>
-                        <div className="col-span-5 truncate">{click.productName}</div>
-                        <div className="col-span-4 text-neutral-500 truncate">
-                          {click.store}
+                        {/* Desktop Layout */}
+                        <div className="hidden sm:grid grid-cols-12 gap-4">
+                          <div className="col-span-3 text-neutral-500">
+                            {formatDate(click.timestamp)}
+                          </div>
+                          <div className="col-span-5 truncate">{click.productName}</div>
+                          <div className="col-span-4 text-neutral-500 truncate">
+                            {click.store}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -223,16 +265,22 @@ export default function AnalyticsPage() {
       )}
 
       {/* Admin Navigation */}
-      <section className="border-t border-neutral-200 py-8">
+      <section className="border-t border-neutral-200 py-6 sm:py-8">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap gap-4 sm:gap-6 text-sm">
             <Link
               href="/admin/sync"
-              className="text-neutral-500 hover:text-black transition-colors"
+              className="text-neutral-500 hover:text-black transition-colors min-h-[44px] flex items-center"
             >
               Inventory Sync
             </Link>
-            <span className="text-black">Analytics</span>
+            <span className="text-black min-h-[44px] flex items-center">Analytics</span>
+            <Link
+              href="/admin/emails"
+              className="text-neutral-500 hover:text-black transition-colors min-h-[44px] flex items-center"
+            >
+              Emails
+            </Link>
           </div>
         </div>
       </section>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search } from "lucide-react";
+import { Search, Menu, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { stores } from "@/app/lib/stores";
@@ -24,9 +24,33 @@ export default function HeaderClient({
   categories: { slug: string; label: string }[];
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const router = useRouter();
+
+  // Close mobile menu on route change or resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   // -----------------------------
   // SEARCH RESULTS
@@ -106,8 +130,12 @@ export default function HeaderClient({
             />
           </Link>
 
-          <div className="flex items-center gap-10">
+          <div className="flex items-center gap-4 md:gap-10">
+            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-10 text-sm uppercase tracking-wide text-white/80">
+              <Link href="/browse" className="hover:text-white">
+                Browse
+              </Link>
 
               <Link href="/stores" className="hover:text-white">
                 Stores
@@ -142,16 +170,104 @@ export default function HeaderClient({
               </Link>
             </nav>
 
+            {/* Search Button */}
             <button
               aria-label="Search"
               onClick={() => setSearchOpen(true)}
-              className="p-2 text-white"
+              className="p-2 text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <Search size={20} />
+            </button>
+
+            {/* Mobile Menu Button */}
+            <button
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
       </header>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          {/* Menu Panel */}
+          <nav className="absolute top-20 left-0 right-0 bottom-0 bg-black overflow-y-auto">
+            <div className="px-6 py-8">
+              {/* Main Links */}
+              <ul className="space-y-1">
+                <li>
+                  <Link
+                    href="/browse"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block py-4 text-lg text-white border-b border-white/10"
+                  >
+                    Browse All
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/stores"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block py-4 text-lg text-white border-b border-white/10"
+                  >
+                    Stores
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/categories"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block py-4 text-lg text-white border-b border-white/10"
+                  >
+                    All Categories
+                  </Link>
+                </li>
+              </ul>
+
+              {/* Category Links */}
+              <div className="mt-8">
+                <p className="text-xs uppercase tracking-[0.25em] text-white/50 mb-4">
+                  Shop by Category
+                </p>
+                <ul className="space-y-1">
+                  {categories.map((cat) => (
+                    <li key={cat.slug}>
+                      <Link
+                        href={`/categories/${cat.slug}`}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block py-3 text-white/80 hover:text-white"
+                      >
+                        {cat.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Partner Link */}
+              <div className="mt-8 pt-8 border-t border-white/10">
+                <Link
+                  href="/for-stores"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block py-3 text-white/80 hover:text-white"
+                >
+                  Partner With VIA
+                </Link>
+              </div>
+            </div>
+          </nav>
+        </div>
+      )}
 
       {/* SEARCH OVERLAY */}
       {searchOpen && (
