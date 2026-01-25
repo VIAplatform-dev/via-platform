@@ -12,19 +12,47 @@ type EmailsData = {
   emails: EmailEntry[];
 };
 
-const DATA_FILE = path.join(process.cwd(), "app/data/emails.json");
+const DATA_DIR = path.join(process.cwd(), "app/data");
+const DATA_FILE = path.join(DATA_DIR, "emails.json");
 
 function ensureDataFile(): EmailsData {
   try {
+    // Ensure directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+
+    // Create file if it doesn't exist
     if (!fs.existsSync(DATA_FILE)) {
       const initialData: EmailsData = { emails: [] };
       fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
       return initialData;
     }
+
+    // Read and parse existing file
     const content = fs.readFileSync(DATA_FILE, "utf-8");
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+
+    // Validate structure
+    if (!parsed || !Array.isArray(parsed.emails)) {
+      const initialData: EmailsData = { emails: [] };
+      fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
+      return initialData;
+    }
+
+    return parsed;
   } catch {
-    return { emails: [] };
+    // If all else fails, create fresh file
+    const initialData: EmailsData = { emails: [] };
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
+    } catch {
+      // Silently fail if we can't write
+    }
+    return initialData;
   }
 }
 

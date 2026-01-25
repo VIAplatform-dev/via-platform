@@ -4,6 +4,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Cormorant_Garamond } from "next/font/google";
 import Header from "./components/Header";
+import Footer from "./components/Footer";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -26,23 +27,9 @@ export default function RootLayout({
       <Header />
 
       <main className="pt-20">
-  {children}
-</main>
-
-<footer className="mt-32 py-12 border-t border-neutral-200">
-  <div className="max-w-7xl mx-auto px-6">
-    <span>© 2026 VIA — Curated vintage & resale, nationwide.</span>
-
-    <a
-      href="https://instagram/theviaplatform.com"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="hover:underline underline-offset-4"
-    >
-      Instagram
-    </a>
-  </div>
-</footer>
+        {children}
+      </main>
+      <Footer />
       </body>
     </html>
   );
