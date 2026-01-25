@@ -12,7 +12,8 @@ type EmailsData = {
   emails: EmailEntry[];
 };
 
-const DATA_DIR = path.join(process.cwd(), "app/data");
+// Use absolute path from project root
+const DATA_DIR = path.join(process.cwd(), "app", "data");
 const DATA_FILE = path.join(DATA_DIR, "emails.json");
 
 function ensureDataFile(): EmailsData {
@@ -41,16 +42,16 @@ function ensureDataFile(): EmailsData {
     }
 
     return parsed;
-  } catch {
-    // If all else fails, create fresh file
+  } catch (err) {
+    console.error("[Newsletter] ensureDataFile error:", err);
     const initialData: EmailsData = { emails: [] };
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
       }
       fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-    } catch {
-      // Silently fail if we can't write
+    } catch (writeErr) {
+      console.error("[Newsletter] Failed to create file:", writeErr);
     }
     return initialData;
   }
@@ -113,12 +114,14 @@ export async function POST(request: NextRequest) {
     data.emails.push(newEntry);
     saveData(data);
 
+    console.log(`[Newsletter] New signup: ${normalizedEmail} (total: ${data.emails.length})`);
+
     return NextResponse.json(
       { message: "Welcome to VIA! We'll keep you updated." },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Newsletter signup error:", error);
+    console.error("[Newsletter] Error:", error);
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 }
