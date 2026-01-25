@@ -8,6 +8,11 @@ export type RSSProduct = {
   store: string;
 };
 
+export type RSSFetchResult = {
+  products: RSSProduct[];
+  skippedCount: number;
+};
+
 type RSSItem = {
   title?: string[];
   link?: string[];
@@ -36,6 +41,27 @@ function isBlogPost(url: string): boolean {
     /\/journal\//i,
   ];
   return blogPatterns.some((pattern) => pattern.test(url));
+}
+
+/**
+ * Checks if a product appears to be sold out based on title/description
+ * Common indicators: "SOLD", "Sold Out", "Out of Stock", "Unavailable"
+ */
+function isSoldOut(title: string, description: string): boolean {
+  const text = `${title} ${description}`.toLowerCase();
+
+  // Patterns that indicate sold out status
+  const soldOutPatterns = [
+    /\bsold\b/i, // "SOLD" or "Sold" as a word
+    /\bsold\s*out\b/i, // "Sold Out", "Sold out"
+    /\bout\s*of\s*stock\b/i, // "Out of Stock"
+    /\bunavailable\b/i, // "Unavailable"
+    /\bno\s*longer\s*available\b/i, // "No longer available"
+    /\[sold\]/i, // "[SOLD]" in title
+    /\(sold\)/i, // "(SOLD)" in title
+  ];
+
+  return soldOutPatterns.some((pattern) => pattern.test(text));
 }
 
 /**
@@ -112,14 +138,15 @@ function extractImage(item: RSSItem): string | null {
 
 /**
  * Fetches and parses an RSS feed from a Squarespace store
+ * Filters out products that appear to be sold out based on title/description
  * @param rssUrl - The RSS feed URL (e.g., "https://www.leivintage.com/products?format=rss")
  * @param storeName - The store name to tag products with
- * @returns Array of parsed products
+ * @returns Object with products array and skipped count
  */
 export async function parseRSSFeed(
   rssUrl: string,
   storeName: string
-): Promise<RSSProduct[]> {
+): Promise<RSSFetchResult> {
   const response = await fetch(rssUrl, {
     headers: {
       "User-Agent": "VIA-RSS-Parser/1.0",
@@ -136,6 +163,7 @@ export async function parseRSSFeed(
 
   const items = parsed.rss?.channel?.[0]?.item || [];
   const products: RSSProduct[] = [];
+  let skippedCount = 0;
 
   for (const item of items) {
     const title = item.title?.[0]?.trim() || "";
@@ -154,6 +182,12 @@ export async function parseRSSFeed(
     // Skip items without a price (likely not products)
     if (price === null) continue;
 
+    // Skip sold-out products
+    if (isSoldOut(title, description)) {
+      skippedCount++;
+      continue;
+    }
+
     // Extract image
     const image = extractImage(item);
 
@@ -166,5 +200,5 @@ export async function parseRSSFeed(
     });
   }
 
-  return products;
+  return { products, skippedCount };
 }

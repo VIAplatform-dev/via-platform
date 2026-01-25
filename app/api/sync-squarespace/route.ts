@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the RSS feed
-    const products = await parseRSSFeed(rssUrl, storeName);
+    const { products, skippedCount } = await parseRSSFeed(rssUrl, storeName);
 
     // Create filename from store name (kebab-case)
     const fileName = storeName
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       success: true,
       message: `Synced ${products.length} products from ${storeName}`,
       productCount: products.length,
+      skippedCount,
       filePath: `app/data/${fileName}.json`,
       products,
     });

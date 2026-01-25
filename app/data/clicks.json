@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "clickId": "713a63f1c7a7064a",
+    "timestamp": "2026-01-25T21:26:07.488Z",
+    "productId": "scottie-3",
+    "productName": "Chanel 2011 CC Quilted Mule Clogs - EU 38",
+    "store": "Sourced by Scottie",
+    "storeSlug": "sourced-by-scottie",
+    "externalUrl": "https://sourcedbyscottie.com/products/chanel-2010s-quilted-mule-clogs-eu-38",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  },
+  {
+    "clickId": "65dd0763c67f7e7a",
+    "timestamp": "2026-01-25T21:26:16.524Z",
+    "productId": "scottie-33",
+    "productName": "Roberto Cavalli 2000s Multicolor Abstract Silk Maxi Dress",
+    "store": "Sourced by Scottie",
+    "storeSlug": "sourced-by-scottie",
+    "externalUrl": "https://sourcedbyscottie.com/products/roberto-cavalli-2000s-multicolor-abstract-silk-maxi-dress",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+  }
+]

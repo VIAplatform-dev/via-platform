@@ -1,5 +1,4 @@
 import leiVintage from "@/app/data/lei-vintage.json";
-import { categoryMap } from "./categoryMap";
 import type { CategorySlug } from "./categoryMap";
 
 export type InventoryItem = {
@@ -13,10 +12,20 @@ export type InventoryItem = {
   externalUrl?: string;
 };
 
-const inferCategoryFromTitle = (title: string): CategorySlug | null => {
+const inferCategoryFromTitle = (title: string): CategorySlug => {
   const t = title.toLowerCase();
 
-  if (t.includes("heel") || t.includes("shoe") || t.includes("boot")) {
+  if (
+    t.includes("heel") ||
+    t.includes("shoe") ||
+    t.includes("boot") ||
+    t.includes("pump") ||
+    t.includes("sandal") ||
+    t.includes("mule") ||
+    t.includes("clog") ||
+    t.includes("loafer") ||
+    t.includes("sneaker")
+  ) {
     return "shoes";
   }
 
@@ -24,53 +33,43 @@ const inferCategoryFromTitle = (title: string): CategorySlug | null => {
     t.includes("bag") ||
     t.includes("clutch") ||
     t.includes("tote") ||
-    t.includes("purse")
+    t.includes("purse") ||
+    t.includes("handbag")
   ) {
     return "bags";
-  }
-
-  if (
-    t.includes("jacket") ||
-    t.includes("coat") ||
-    t.includes("top") ||
-    t.includes("blouse") ||
-    t.includes("shirt")
-  ) {
-    return "clothes";
   }
 
   if (
     t.includes("belt") ||
     t.includes("scarf") ||
     t.includes("hat") ||
-    t.includes("accessory")
+    t.includes("sunglasses") ||
+    t.includes("jewelry") ||
+    t.includes("necklace") ||
+    t.includes("bracelet") ||
+    t.includes("earring") ||
+    t.includes("watch")
   ) {
     return "accessories";
   }
 
-  return null;
+  // Default to clothes for everything else
+  return "clothes";
 };
 
-export const inventory: InventoryItem[] = (leiVintage as any[])
-  .map((item, idx) => {
-    if (!item.title) return null;
+// Process LEI Vintage products
+const leiProducts: InventoryItem[] = (leiVintage as any[])
+  .filter((item) => item.title && item.price !== null && item.price !== undefined)
+  .map((item, idx) => ({
+    id: `lei-${idx}`,
+    title: item.title,
+    category: inferCategoryFromTitle(item.title),
+    price: Number(item.price),
+    image: item.image ?? "/placeholder.jpg",
+    store: item.store ?? "LEI Vintage",
+    storeSlug: "lei-vintage",
+    externalUrl: item.externalUrl,
+  }));
 
-    const category = inferCategoryFromTitle(item.title);
-
-    if (!category) {
-      console.warn("❌ Could not infer category:", item.title);
-      return null;
-    }
-
-    return {
-      id: `lei-${idx}`,
-      title: item.title,
-      category,
-      price: Number(item.price),
-      image: item.image ?? "/placeholder.jpg",
-      store: item.store ?? "LEI Vintage",
-      storeSlug: "lei-vintage",
-      externalUrl: item.externalUrl,
-    };
-  })
-  .filter(Boolean) as InventoryItem[];
+// Export inventory (dynamically loads from JSON files in app/data/)
+export const inventory: InventoryItem[] = [...leiProducts];

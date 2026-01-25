@@ -19,6 +19,11 @@ export type ShopifyProduct = {
   availableForSale: boolean;
 };
 
+export type ShopifyFetchResult = {
+  products: ShopifyProduct[];
+  skippedCount: number;
+};
+
 type ShopifyImageNode = {
   url: string;
   altText: string | null;
@@ -41,6 +46,7 @@ type ShopifyProductNode = {
   vendor: string;
   productType: string;
   availableForSale: boolean;
+  totalInventory: number;
   priceRange: {
     minVariantPrice: ShopifyPriceV2;
   };
@@ -77,6 +83,7 @@ const PRODUCTS_QUERY = `
           vendor
           productType
           availableForSale
+          totalInventory
           priceRange {
             minVariantPrice {
               amount
@@ -134,23 +141,30 @@ function getProductUrl(storeDomain: string, handle: string): string {
 
 /**
  * Fetches products from a Shopify store using the Storefront API
+ * Filters out sold-out products using CONSERVATIVE logic.
+ *
+ * CONSERVATIVE APPROACH: Only skip products that are DEFINITELY sold out.
+ * - availableForSale must be explicitly false
+ * - If totalInventory is 0 but availableForSale is true, include it (may allow overselling)
+ * - If data is unclear, include the product
  *
  * @param storeDomain - The Shopify store domain (e.g., "mystore.myshopify.com")
  * @param storefrontAccessToken - The Storefront API access token
  * @param storeName - Display name for the store
  * @param maxProducts - Maximum number of products to fetch (default: 250)
- * @returns Array of parsed products
+ * @returns Object with products array and skipped count
  */
 export async function fetchShopifyProducts(
   storeDomain: string,
   storefrontAccessToken: string,
   storeName: string,
   maxProducts: number = 250
-): Promise<ShopifyProduct[]> {
+): Promise<ShopifyFetchResult> {
   const normalizedDomain = normalizeStoreDomain(storeDomain);
   const endpoint = `https://${normalizedDomain}/api/2024-01/graphql.json`;
 
   const products: ShopifyProduct[] = [];
+  let skippedCount = 0;
   let hasNextPage = true;
   let cursor: string | null = null;
 
@@ -193,6 +207,15 @@ export async function fetchShopifyProducts(
     const productEdges = data.data.products.edges;
 
     for (const { node } of productEdges) {
+      // CONSERVATIVE: Only skip if availableForSale is explicitly false
+      // Don't rely on totalInventory alone - some stores don't track inventory
+      // or allow overselling
+      if (node.availableForSale === false) {
+        console.log(`[Shopify API] Skipping "${node.title}" - availableForSale is false`);
+        skippedCount++;
+        continue;
+      }
+
       const price = parseFloat(node.priceRange.minVariantPrice.amount);
       const currency = node.priceRange.minVariantPrice.currencyCode;
       const imageUrl = node.images.edges[0]?.node.url || null;
@@ -214,7 +237,8 @@ export async function fetchShopifyProducts(
     cursor = data.data.products.pageInfo.endCursor;
   }
 
-  return products;
+  console.log(`[Shopify API] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)`);
+  return { products, skippedCount };
 }
 
 /**
@@ -275,6 +299,131 @@ export async function testShopifyConnection(
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
+}
+
+/**
+ * Fetches products from a Shopify store using the public products.json endpoint
+ * This doesn't require an access token but may not work for all stores
+ * Filters out sold-out products based on available flag and inventory
+ *
+ * CONSERVATIVE APPROACH: Only skip products that are DEFINITELY sold out.
+ * When inventory data is missing or unclear, include the product.
+ *
+ * @param storeDomain - The Shopify store domain
+ * @param storeName - Display name for the store
+ * @param maxProducts - Maximum number of products to fetch (default: 250)
+ * @returns Object with products array and skipped count
+ */
+export async function fetchShopifyProductsPublic(
+  storeDomain: string,
+  storeName: string,
+  maxProducts: number = 250
+): Promise<ShopifyFetchResult> {
+  const normalizedDomain = normalizeStoreDomain(storeDomain);
+  const products: ShopifyProduct[] = [];
+  let skippedCount = 0;
+  let page = 1;
+  const limit = 250; // Shopify's max per page
+
+  while (products.length < maxProducts) {
+    const url = `https://${normalizedDomain}/products.json?limit=${limit}&page=${page}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(
+          "Store requires authentication. Please provide a Storefront Access Token."
+        );
+      }
+      throw new Error(
+        `Failed to fetch products: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.products || data.products.length === 0) {
+      break;
+    }
+
+    for (const product of data.products) {
+      if (products.length >= maxProducts) break;
+
+      const variants = product.variants || [];
+
+      // CONSERVATIVE sold-out detection:
+      // Only skip if we have EXPLICIT evidence the product is unavailable.
+      //
+      // Check 1: product.available === false (explicitly unavailable)
+      // Check 2: ALL variants have available === false
+      //
+      // If data is null/undefined, assume product IS available (conservative)
+
+      let isSoldOut = false;
+
+      // If product.available is explicitly false, it's sold out
+      if (product.available === false) {
+        isSoldOut = true;
+        console.log(`[Shopify] Skipping "${product.title}" - product.available is false`);
+      }
+      // If product.available is null/undefined, check variant availability
+      else if (product.available === null || product.available === undefined) {
+        // Check if ALL variants are explicitly unavailable
+        const hasVariants = variants.length > 0;
+        const allVariantsUnavailable = hasVariants && variants.every(
+          (v: { available?: boolean }) => v.available === false
+        );
+
+        if (allVariantsUnavailable) {
+          isSoldOut = true;
+          console.log(`[Shopify] Skipping "${product.title}" - all variants unavailable`);
+        }
+      }
+
+      if (isSoldOut) {
+        skippedCount++;
+        continue;
+      }
+
+      const variant = variants[0];
+      const price = variant?.price ? parseFloat(variant.price) : null;
+      const imageUrl = product.images?.[0]?.src || null;
+
+      // Determine availability for the product record
+      // If any variant is available, or if we don't have clear data, assume available
+      const anyVariantAvailable = variants.some(
+        (v: { available?: boolean }) => v.available === true
+      );
+      const isAvailable = product.available === true || anyVariantAvailable ||
+        (product.available !== false && !variants.every((v: { available?: boolean }) => v.available === false));
+
+      products.push({
+        title: product.title,
+        price: isNaN(price as number) ? null : price,
+        currency: "USD", // Public endpoint doesn't include currency, default to USD
+        image: imageUrl,
+        externalUrl: `https://${normalizedDomain}/products/${product.handle}`,
+        store: storeName,
+        vendor: product.vendor || null,
+        productType: product.product_type || null,
+        availableForSale: isAvailable,
+      });
+    }
+
+    if (data.products.length < limit) {
+      break;
+    }
+
+    page++;
+  }
+
+  console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)`);
+  return { products, skippedCount };
 }
 
 /**

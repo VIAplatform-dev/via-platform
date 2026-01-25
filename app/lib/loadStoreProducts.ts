@@ -39,7 +39,7 @@ export function loadStoreProducts(storeSlug: string): StoreProduct[] {
       });
   }
 
-  // ================= ALL OTHER STORES (internal data) =================
+  // ================= ALL OTHER STORES (including synced JSON files) =================
   return staticProducts
     .filter((p) => p.storeSlug === storeSlug)
     .map((p) => ({

@@ -15,7 +15,7 @@ type ShopifyStore = {
   name: string;
   slug: string;
   storeDomain: string;
-  storefrontAccessToken: string;
+  storefrontAccessToken?: string; // Optional - will try public endpoint first
 };
 
 type Store = SquarespaceStore | ShopifyStore;
@@ -24,6 +24,7 @@ type SyncResult = {
   success?: boolean;
   message?: string;
   productCount?: number;
+  skippedCount?: number;
   shopName?: string;
   error?: string;
   details?: string;
@@ -42,13 +43,7 @@ const SQUARESPACE_STORES: SquarespaceStore[] = [
     slug: "lei-vintage",
     rssUrl: "https://www.leivintage.com/blog?format=rss",
   },
-  {
-    type: "squarespace",
-    name: "Sourced by Scottie",
-    slug: "sourced-by-scottie",
-    rssUrl: "https://www.sourcedbyscottie.com/products?format=rss",
-  },
-  {
+    {
     type: "squarespace",
     name: "RE Park City",
     slug: "re-park-city",
@@ -59,14 +54,12 @@ const SQUARESPACE_STORES: SquarespaceStore[] = [
 // Shopify stores (Storefront API)
 // Add your Shopify stores here with their storefront access tokens
 const SHOPIFY_STORES: ShopifyStore[] = [
-  // Example:
-  // {
-  //   type: "shopify",
-  //   name: "My Shopify Store",
-  //   slug: "my-shopify-store",
-  //   storeDomain: "mystore.myshopify.com",
-  //   storefrontAccessToken: "your-storefront-access-token",
-  // },
+  {
+    type: "shopify",
+    name: "Sourced by Scottie",
+    slug: "sourced-by-scottie",
+    storeDomain: "sourcedbyscottie.com",
+  },
 ];
 
 const ALL_STORES: Store[] = [...SQUARESPACE_STORES, ...SHOPIFY_STORES];
@@ -206,9 +199,16 @@ export default function SyncAdminPage() {
                     {result && (
                       <div className="mt-3 pt-3 border-t border-neutral-100">
                         {result.success ? (
-                          <p className="text-green-700 text-sm">
-                            {result.productCount} products synced
-                          </p>
+                          <div className="text-sm">
+                            <p className="text-green-700">
+                              {result.productCount} products synced
+                            </p>
+                            {result.skippedCount !== undefined && result.skippedCount > 0 && (
+                              <p className="text-neutral-500 mt-1">
+                                {result.skippedCount} skipped (sold out)
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <p className="text-red-700 text-sm">
                             {result.error}
@@ -273,14 +273,21 @@ export default function SyncAdminPage() {
                     {result && (
                       <div className="mt-3 pt-3 border-t border-neutral-100">
                         {result.success ? (
-                          <p className="text-green-700 text-sm">
-                            {result.productCount} products synced
-                            {result.shopName && (
-                              <span className="block text-neutral-500 mt-1">
-                                from {result.shopName}
-                              </span>
+                          <div className="text-sm">
+                            <p className="text-green-700">
+                              {result.productCount} products synced
+                            </p>
+                            {result.skippedCount !== undefined && result.skippedCount > 0 && (
+                              <p className="text-neutral-500 mt-1">
+                                {result.skippedCount} skipped (sold out)
+                              </p>
                             )}
-                          </p>
+                            {result.shopName && (
+                              <p className="text-neutral-500 mt-1">
+                                from {result.shopName}
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <p className="text-red-700 text-sm">
                             {result.error}
