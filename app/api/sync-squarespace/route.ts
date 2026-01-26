@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseRSSFeed } from "@/app/lib/rssFeedParser";
-import fs from "fs/promises";
-import path from "path";
+import { syncProducts, initDatabase } from "@/app/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,28 +32,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse the RSS feed
-    const { products, skippedCount } = await parseRSSFeed(rssUrl, storeName);
+    // Ensure database table exists
+    await initDatabase();
 
-    // Create filename from store name (kebab-case)
-    const fileName = storeName
+    // Parse the RSS feed
+    const { products: rawProducts, skippedCount } = await parseRSSFeed(rssUrl, storeName);
+
+    // Filter out products with null prices and transform for database
+    const products = rawProducts
+      .filter((p) => p.price !== null)
+      .map((p) => ({
+        title: p.title,
+        price: p.price as number,
+        image: p.image ?? undefined,
+        externalUrl: p.externalUrl,
+      }));
+
+    // Create store slug from store name (kebab-case)
+    const storeSlug = storeName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
-    // Write to app/data directory
-    const dataDir = path.join(process.cwd(), "app", "data");
-    await fs.mkdir(dataDir, { recursive: true });
-
-    const filePath = path.join(dataDir, `${fileName}.json`);
-    await fs.writeFile(filePath, JSON.stringify(products, null, 2));
+    // Sync products to database
+    const productCount = await syncProducts(storeSlug, storeName, products);
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${products.length} products from ${storeName}`,
-      productCount: products.length,
+      message: `Synced ${productCount} products from ${storeName}`,
+      productCount,
       skippedCount,
-      filePath: `app/data/${fileName}.json`,
+      storeSlug,
       products,
     });
   } catch (error) {

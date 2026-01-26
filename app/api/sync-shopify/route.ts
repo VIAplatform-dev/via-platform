@@ -5,8 +5,7 @@ import {
   testShopifyConnection,
   toRSSProductFormat,
 } from "@/app/lib/shopifyClient";
-import fs from "fs/promises";
-import path from "path";
+import { syncProducts, initDatabase } from "@/app/lib/db";
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +26,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Ensure database table exists
+    await initDatabase();
 
     let fetchResult: { products: any[]; skippedCount: number };
     let shopName: string | undefined;
@@ -80,29 +82,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convert to standard format for storage
-    const products = fetchResult.products.map(toRSSProductFormat);
+    // Convert to standard format for storage, filtering out null prices
+    const rawProducts = fetchResult.products.map(toRSSProductFormat);
+    const products = rawProducts
+      .filter((p) => p.price !== null)
+      .map((p) => ({
+        title: p.title,
+        price: p.price as number,
+        image: p.image ?? undefined,
+        externalUrl: p.externalUrl,
+      }));
     const skippedCount = fetchResult.skippedCount;
 
-    // Create filename from store name (kebab-case)
-    const fileName = storeName
+    // Create store slug from store name (kebab-case)
+    const storeSlug = storeName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
-    // Write to app/data directory
-    const dataDir = path.join(process.cwd(), "app", "data");
-    await fs.mkdir(dataDir, { recursive: true });
-
-    const filePath = path.join(dataDir, `${fileName}.json`);
-    await fs.writeFile(filePath, JSON.stringify(products, null, 2));
+    // Sync products to database
+    const productCount = await syncProducts(storeSlug, storeName, products);
 
     return NextResponse.json({
       success: true,
-      message: `Synced ${products.length} products from ${storeName}`,
-      productCount: products.length,
+      message: `Synced ${productCount} products from ${storeName}`,
+      productCount,
       skippedCount,
-      filePath: `app/data/${fileName}.json`,
+      storeSlug,
       shopName,
       products,
     });

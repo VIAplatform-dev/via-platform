@@ -25,7 +25,7 @@ export default async function StorePage({ params }: StorePageProps) {
   const store = stores.find((s) => s.slug === slug);
   if (!store) return notFound();
 
-  const storeProducts: StoreProduct[] = loadStoreProducts(slug);
+  const storeProducts: StoreProduct[] = await loadStoreProducts(slug);
 
   // Transform to FilterableProduct format
   const products: FilterableProduct[] = storeProducts.map((product, idx) => ({

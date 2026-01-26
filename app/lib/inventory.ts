@@ -1,5 +1,5 @@
-import leiVintage from "@/app/data/lei-vintage.json";
 import type { CategorySlug } from "./categoryMap";
+import { getAllProducts, type DBProduct } from "./db";
 
 export type InventoryItem = {
   id: string;
@@ -57,19 +57,32 @@ const inferCategoryFromTitle = (title: string): CategorySlug => {
   return "clothes";
 };
 
-// Process LEI Vintage products
-const leiProducts: InventoryItem[] = (leiVintage as any[])
-  .filter((item) => item.title && item.price !== null && item.price !== undefined)
-  .map((item, idx) => ({
-    id: `lei-${idx}`,
-    title: item.title,
-    category: inferCategoryFromTitle(item.title),
-    price: Number(item.price),
-    image: item.image ?? "/placeholder.jpg",
-    store: item.store ?? "LEI Vintage",
-    storeSlug: "lei-vintage",
-    externalUrl: item.externalUrl,
-  }));
+// Transform database products to InventoryItem format
+function transformDBProduct(product: DBProduct, idx: number): InventoryItem {
+  return {
+    id: `${product.store_slug}-${product.id}`,
+    title: product.title,
+    category: inferCategoryFromTitle(product.title),
+    price: Number(product.price),
+    image: product.image ?? "/placeholder.jpg",
+    store: product.store_name,
+    storeSlug: product.store_slug,
+    externalUrl: product.external_url ?? undefined,
+  };
+}
 
-// Export inventory (dynamically loads from JSON files in app/data/)
-export const inventory: InventoryItem[] = [...leiProducts];
+/**
+ * Fetch all inventory from the database
+ */
+export async function getInventory(): Promise<InventoryItem[]> {
+  try {
+    const products = await getAllProducts();
+    return products.map(transformDBProduct);
+  } catch (error) {
+    console.error("Failed to fetch inventory from database:", error);
+    return [];
+  }
+}
+
+// Legacy export for backwards compatibility (returns empty array, use getInventory() instead)
+export const inventory: InventoryItem[] = [];

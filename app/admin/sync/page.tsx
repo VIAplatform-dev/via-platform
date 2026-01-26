@@ -146,7 +146,7 @@ export default function SyncAdminPage() {
           </div>
           <h1 className="text-3xl sm:text-5xl font-serif mb-3 sm:mb-4">Inventory Sync</h1>
           <p className="text-neutral-600 text-base sm:text-lg">
-            Sync products from Squarespace and Shopify partner stores.
+            Sync products from Squarespace and Shopify partner stores to the database.
           </p>
         </div>
       </section>

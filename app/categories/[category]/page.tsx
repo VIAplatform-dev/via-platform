@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { inventory } from "@/app/lib/inventory";
+import { getInventory } from "@/app/lib/inventory";
 import { categories } from "@/app/lib/categories";
 import { stores } from "@/app/lib/stores";
 import FilteredProductGrid from "@/app/components/FilteredProductGrid";
@@ -20,6 +20,8 @@ export default async function CategoryPage({
   if (!categoryMeta) {
     return notFound();
   }
+
+  const inventory = await getInventory();
 
   // Filter inventory by category and transform for FilteredProductGrid
   const filteredProducts: FilterableProduct[] = inventory

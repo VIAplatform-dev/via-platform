@@ -1,14 +1,16 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { inventory } from "@/app/lib/inventory";
+import { getInventory } from "@/app/lib/inventory";
 import { stores } from "@/app/lib/stores";
 import { categories } from "@/app/lib/categories";
 import { categoryMap } from "@/app/lib/categoryMap";
 import FilteredProductGrid from "@/app/components/FilteredProductGrid";
 import type { FilterableProduct } from "@/app/components/FilteredProductGrid";
 
-export default function BrowsePage() {
+export default async function BrowsePage() {
+  const inventory = await getInventory();
+
   // Transform inventory to FilterableProduct format
   const products: FilterableProduct[] = inventory.map((item, idx) => ({
     id: item.id,

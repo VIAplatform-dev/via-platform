@@ -1,20 +1,20 @@
-import leiProducts from "@/app/data/lei-vintage.json";
+import { getProductsByStore } from "@/app/lib/db";
 
-export default function TestLeiPage() {
+export default async function TestLeiPage() {
+  const products = await getProductsByStore("lei-vintage");
+
   return (
     <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-6">
-      {leiProducts.map((p: any) => (
+      {products.map((p) => (
         <a
-          key={p.productUrl}
-          href={p.productUrl}
+          key={p.id}
+          href={p.external_url || "#"}
           target="_blank"
           className="border p-3"
         >
-          <img src={p.image} alt={p.title} />
+          {p.image && <img src={p.image} alt={p.title} />}
           <p className="mt-2 text-sm">{p.title}</p>
-          <p className="text-xs opacity-70">
-            ${p.price}
-          </p>
+          <p className="text-xs opacity-70">${Number(p.price)}</p>
         </a>
       ))}
     </div>

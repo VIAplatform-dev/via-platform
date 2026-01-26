@@ -14,6 +14,16 @@
       "email": "helster@me.com",
       "signupDate": "2026-01-25T19:32:38.017Z",
       "source": "website"
+    },
+    {
+      "email": "test-mobile@example.com",
+      "signupDate": "2026-01-26T18:54:38.000Z",
+      "source": "website"
+    },
+    {
+      "email": "mobile-test-2@example.com",
+      "signupDate": "2026-01-26T21:43:19.991Z",
+      "source": "website"
     }
   ]
 }
