@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Menu, X } from "lucide-react";
+import { Search, Menu, X, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { stores } from "@/app/lib/stores";
@@ -27,7 +27,28 @@ export default function HeaderClient({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [storesDropdownOpen, setStoresDropdownOpen] = useState(false);
+  const [categoriesDropdownOpen, setCategoriesDropdownOpen] = useState(false);
+  const [mobileStoresExpanded, setMobileStoresExpanded] = useState(false);
+  const [mobileCategoriesExpanded, setMobileCategoriesExpanded] = useState(false);
   const router = useRouter();
+
+  const storesDropdownRef = useRef<HTMLDivElement>(null);
+  const categoriesDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (storesDropdownRef.current && !storesDropdownRef.current.contains(e.target as Node)) {
+        setStoresDropdownOpen(false);
+      }
+      if (categoriesDropdownRef.current && !categoriesDropdownRef.current.contains(e.target as Node)) {
+        setCategoriesDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Close mobile menu on route change or resize
   useEffect(() => {
@@ -133,40 +154,107 @@ export default function HeaderClient({
           <div className="flex items-center gap-4 md:gap-10">
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-10 text-sm uppercase tracking-wide text-white/80">
-              <Link href="/browse" className="hover:text-white">
-                Browse
-              </Link>
+              {/* STORES DROPDOWN */}
+              <div className="relative" ref={storesDropdownRef}>
+                <button
+                  onClick={() => {
+                    setStoresDropdownOpen(!storesDropdownOpen);
+                    setCategoriesDropdownOpen(false);
+                  }}
+                  className="flex items-center gap-1 hover:text-white transition-colors"
+                >
+                  Stores
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-200 ${storesDropdownOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
 
-              <Link href="/stores" className="hover:text-white">
-                Stores
-              </Link>
-
-              {/* CATEGORIES */}
-              <div className="relative group">
-                <Link href="/categories" className="hover:text-white">
-                  Categories
-                </Link>
-
-                <div className="absolute left-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition">
-                  <div className="bg-white text-black w-56 px-6 py-5 shadow-xl">
-                    <ul className="space-y-3">
-                      {categories.map((cat) => (
-                        <li key={cat.slug}>
-                          <Link
-                            href={`/categories/${cat.slug}`}
-                            className="text-sm hover:underline"
-                          >
-                            {cat.label}
-                          </Link>
-                        </li>
+                <div
+                  className={`absolute left-1/2 -translate-x-1/2 top-full pt-4 transition-all duration-200 ease-out ${
+                    storesDropdownOpen
+                      ? 'opacity-100 visible translate-y-0'
+                      : 'opacity-0 invisible -translate-y-2'
+                  }`}
+                >
+                  <div className="bg-white text-black min-w-[220px] shadow-xl">
+                    <div className="py-2">
+                      {stores.map((store) => (
+                        <Link
+                          key={store.slug}
+                          href={`/stores/${store.slug}`}
+                          onClick={() => setStoresDropdownOpen(false)}
+                          className="block px-6 py-3 text-sm normal-case tracking-normal hover:bg-neutral-50 transition-colors"
+                        >
+                          <span className="font-medium">{store.name}</span>
+                          <span className="block text-xs text-neutral-500 mt-0.5">{store.location}</span>
+                        </Link>
                       ))}
-                    </ul>
+                    </div>
+                    <div className="border-t border-neutral-100">
+                      <Link
+                        href="/stores"
+                        onClick={() => setStoresDropdownOpen(false)}
+                        className="block px-6 py-3 text-xs uppercase tracking-wide text-neutral-500 hover:text-black hover:bg-neutral-50 transition-colors"
+                      >
+                        View All Stores
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <Link href="/for-stores" className="hover:text-white">
-                Partner With VIA
+              {/* CATEGORIES DROPDOWN */}
+              <div className="relative" ref={categoriesDropdownRef}>
+                <button
+                  onClick={() => {
+                    setCategoriesDropdownOpen(!categoriesDropdownOpen);
+                    setStoresDropdownOpen(false);
+                  }}
+                  className="flex items-center gap-1 hover:text-white transition-colors"
+                >
+                  Shop All
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform duration-200 ${categoriesDropdownOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                <div
+                  className={`absolute left-1/2 -translate-x-1/2 top-full pt-4 transition-all duration-200 ease-out ${
+                    categoriesDropdownOpen
+                      ? 'opacity-100 visible translate-y-0'
+                      : 'opacity-0 invisible -translate-y-2'
+                  }`}
+                >
+                  <div className="bg-white text-black min-w-[200px] shadow-xl">
+                    <div className="py-2">
+                      {categories.map((cat) => (
+                        <Link
+                          key={cat.slug}
+                          href={`/categories/${cat.slug}`}
+                          onClick={() => setCategoriesDropdownOpen(false)}
+                          className="block px-6 py-3 text-sm normal-case tracking-normal hover:bg-neutral-50 transition-colors"
+                        >
+                          {cat.label}
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="border-t border-neutral-100">
+                      <Link
+                        href="/categories"
+                        onClick={() => setCategoriesDropdownOpen(false)}
+                        className="block px-6 py-3 text-xs uppercase tracking-wide text-neutral-500 hover:text-black hover:bg-neutral-50 transition-colors"
+                      >
+                        All Categories
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Link href="/for-stores" className="hover:text-white transition-colors normal-case">
+                Partner with VIA
               </Link>
             </nav>
 
@@ -205,54 +293,84 @@ export default function HeaderClient({
             <div className="px-6 py-8">
               {/* Main Links */}
               <ul className="space-y-1">
-                <li>
-                  <Link
-                    href="/browse"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block py-4 text-lg text-white border-b border-white/10"
-                  >
-                    Browse All
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/stores"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block py-4 text-lg text-white border-b border-white/10"
+                {/* Mobile Stores Accordion */}
+                <li className="border-b border-white/10">
+                  <button
+                    onClick={() => setMobileStoresExpanded(!mobileStoresExpanded)}
+                    className="w-full flex items-center justify-between py-4 text-lg text-white"
                   >
                     Stores
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/categories"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block py-4 text-lg text-white border-b border-white/10"
+                    <ChevronDown
+                      size={20}
+                      className={`transition-transform duration-200 ${mobileStoresExpanded ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  <div
+                    className={`overflow-hidden transition-all duration-200 ease-out ${
+                      mobileStoresExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
                   >
-                    All Categories
-                  </Link>
+                    <div className="pb-4 pl-4 space-y-1">
+                      {stores.map((store) => (
+                        <Link
+                          key={store.slug}
+                          href={`/stores/${store.slug}`}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="block py-2 text-white/70 hover:text-white transition-colors"
+                        >
+                          {store.name}
+                        </Link>
+                      ))}
+                      <Link
+                        href="/stores"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block py-2 text-xs uppercase tracking-wide text-white/50 hover:text-white transition-colors"
+                      >
+                        View All Stores
+                      </Link>
+                    </div>
+                  </div>
+                </li>
+
+                {/* Mobile Categories Accordion */}
+                <li className="border-b border-white/10">
+                  <button
+                    onClick={() => setMobileCategoriesExpanded(!mobileCategoriesExpanded)}
+                    className="w-full flex items-center justify-between py-4 text-lg text-white"
+                  >
+                    Shop All
+                    <ChevronDown
+                      size={20}
+                      className={`transition-transform duration-200 ${mobileCategoriesExpanded ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+                  <div
+                    className={`overflow-hidden transition-all duration-200 ease-out ${
+                      mobileCategoriesExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="pb-4 pl-4 space-y-1">
+                      {categories.map((cat) => (
+                        <Link
+                          key={cat.slug}
+                          href={`/categories/${cat.slug}`}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="block py-2 text-white/70 hover:text-white transition-colors"
+                        >
+                          {cat.label}
+                        </Link>
+                      ))}
+                      <Link
+                        href="/categories"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block py-2 text-xs uppercase tracking-wide text-white/50 hover:text-white transition-colors"
+                      >
+                        All Categories
+                      </Link>
+                    </div>
+                  </div>
                 </li>
               </ul>
-
-              {/* Category Links */}
-              <div className="mt-8">
-                <p className="text-xs uppercase tracking-[0.25em] text-white/50 mb-4">
-                  Shop by Category
-                </p>
-                <ul className="space-y-1">
-                  {categories.map((cat) => (
-                    <li key={cat.slug}>
-                      <Link
-                        href={`/categories/${cat.slug}`}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="block py-3 text-white/80 hover:text-white"
-                      >
-                        {cat.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
 
               {/* Partner Link */}
               <div className="mt-8 pt-8 border-t border-white/10">
@@ -284,7 +402,7 @@ export default function HeaderClient({
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search items or stores…"
+              placeholder="Search items or stores..."
               className="w-full border-b border-black pb-3 text-lg outline-none"
             />
 

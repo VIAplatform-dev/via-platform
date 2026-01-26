@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type SquarespaceStore = {
   type: "squarespace";
@@ -43,29 +44,23 @@ const SQUARESPACE_STORES: SquarespaceStore[] = [
     slug: "lei-vintage",
     rssUrl: "https://www.leivintage.com/blog?format=rss",
   },
-    {
-    type: "squarespace",
-    name: "RE Park City",
-    slug: "re-park-city",
-    rssUrl: "https://www.re-parkcity.com/products?format=rss",
-  },
 ];
 
 // Shopify stores (Storefront API)
 // Add your Shopify stores here with their storefront access tokens
-const SHOPIFY_STORES: ShopifyStore[] = [
-  {
-    type: "shopify",
-    name: "Sourced by Scottie",
-    slug: "sourced-by-scottie",
-    storeDomain: "sourcedbyscottie.com",
-  },
-];
+const SHOPIFY_STORES: ShopifyStore[] = [];
 
 const ALL_STORES: Store[] = [...SQUARESPACE_STORES, ...SHOPIFY_STORES];
 
 export default function SyncAdminPage() {
   const [statuses, setStatuses] = useState<Record<string, StoreStatus>>({});
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    router.push("/admin/login");
+    router.refresh();
+  }
 
   async function handleSync(store: Store) {
     setStatuses((prev) => ({
@@ -124,22 +119,30 @@ export default function SyncAdminPage() {
       {/* Header */}
       <section className="border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 py-12 sm:py-20">
-          <div className="flex items-center gap-4 mb-4 text-sm flex-wrap">
-            <span className="text-black">Sync</span>
-            <span className="text-neutral-300">/</span>
-            <Link
-              href="/admin/analytics"
-              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
+              <span className="text-black">Sync</span>
+              <span className="text-neutral-300">/</span>
+              <Link
+                href="/admin/analytics"
+                className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+              >
+                Analytics
+              </Link>
+              <span className="text-neutral-300">/</span>
+              <Link
+                href="/admin/emails"
+                className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+              >
+                Emails
+              </Link>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-neutral-400 hover:text-black transition-colors"
             >
-              Analytics
-            </Link>
-            <span className="text-neutral-300">/</span>
-            <Link
-              href="/admin/emails"
-              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
-            >
-              Emails
-            </Link>
+              Logout
+            </button>
           </div>
           <h1 className="text-3xl sm:text-5xl font-serif mb-3 sm:mb-4">Inventory Sync</h1>
           <p className="text-neutral-600 text-base sm:text-lg">

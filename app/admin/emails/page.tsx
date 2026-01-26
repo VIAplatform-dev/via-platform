@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type EmailEntry = {
   email: string;
@@ -13,6 +14,13 @@ export default function EmailsAdminPage() {
   const [emails, setEmails] = useState<EmailEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function handleLogout() {
+    await fetch("/api/admin/auth", { method: "DELETE" });
+    router.push("/admin/login");
+    router.refresh();
+  }
 
   useEffect(() => {
     async function fetchEmails() {
@@ -69,22 +77,30 @@ export default function EmailsAdminPage() {
       {/* Header */}
       <section className="border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-6 py-12 sm:py-20">
-          <div className="flex items-center gap-4 mb-4 text-sm">
-            <Link
-              href="/admin/sync"
-              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
+              <Link
+                href="/admin/sync"
+                className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+              >
+                Sync
+              </Link>
+              <span className="text-neutral-300">/</span>
+              <Link
+                href="/admin/analytics"
+                className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
+              >
+                Analytics
+              </Link>
+              <span className="text-neutral-300">/</span>
+              <span className="text-black">Emails</span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-neutral-400 hover:text-black transition-colors"
             >
-              Sync
-            </Link>
-            <span className="text-neutral-300">/</span>
-            <Link
-              href="/admin/analytics"
-              className="text-neutral-400 hover:text-black transition-colors min-h-[44px] flex items-center"
-            >
-              Analytics
-            </Link>
-            <span className="text-neutral-300">/</span>
-            <span className="text-black">Emails</span>
+              Logout
+            </button>
           </div>
           <h1 className="text-3xl sm:text-5xl font-serif mb-3 sm:mb-4">
             Email Signups
