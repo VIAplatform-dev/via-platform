@@ -8,10 +8,10 @@ export default function ShopifySetupPage() {
         <div className="max-w-4xl mx-auto px-6 py-12 sm:py-20">
           <div className="flex items-center gap-4 mb-4 text-sm">
             <Link
-              href="/admin/analytics"
+              href="/"
               className="text-neutral-400 hover:text-black transition-colors"
             >
-              ← Back to Analytics
+              ← Back to VIA
             </Link>
           </div>
           <h1 className="text-3xl sm:text-5xl font-serif mb-3 sm:mb-4">
@@ -103,7 +103,7 @@ export default function ShopifySetupPage() {
                     <li>Enter VIA&apos;s affiliate email:</li>
                   </ol>
                   <div className="bg-neutral-100 p-3 font-mono text-sm select-all">
-                    affiliates@viaplatform.com
+                    partnerships@theviaplatform.com
                   </div>
                   <p className="text-sm">Click <strong>Send Invite</strong>. We&apos;ll accept within 24 hours.</p>
                 </div>
@@ -118,10 +118,26 @@ export default function ShopifySetupPage() {
                   <h3 className="text-lg font-medium">Set Commission Rate</h3>
                 </div>
                 <div className="text-neutral-600 space-y-3">
-                  <p>Configure the commission VIA earns on referred sales:</p>
+                  <p>Configure the commission VIA earns on referred sales. We use a tiered commission structure:</p>
+
+                  <div className="bg-neutral-50 border border-neutral-200 p-4 space-y-3">
+                    <div className="flex justify-between items-center py-2 border-b border-neutral-200">
+                      <span className="text-sm font-medium">Sales under $1,000</span>
+                      <span className="text-sm font-medium bg-black text-white px-3 py-1">7% commission</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-neutral-200">
+                      <span className="text-sm font-medium">Sales $1,000 - $5,000</span>
+                      <span className="text-sm font-medium bg-neutral-700 text-white px-3 py-1">5% commission</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-sm font-medium">Sales above $5,000</span>
+                      <span className="text-sm font-medium bg-neutral-500 text-white px-3 py-1">3% commission</span>
+                    </div>
+                  </div>
+
                   <ol className="list-decimal list-inside space-y-1 text-sm">
                     <li>In Collabs, go to <strong>Settings → Commission</strong></li>
-                    <li>Set your commission percentage (we recommend 10-15%)</li>
+                    <li>Set the appropriate commission percentage based on your typical order value</li>
                     <li>Choose <strong>All products</strong> or select specific collections</li>
                     <li>Set cookie duration (we recommend 30 days)</li>
                   </ol>
@@ -219,8 +235,8 @@ export default function ShopifySetupPage() {
           <div className="border-t border-neutral-200 pt-8">
             <p className="text-neutral-600 text-sm">
               Need help? Email us at{" "}
-              <a href="mailto:stores@viaplatform.com" className="text-black underline">
-                stores@viaplatform.com
+              <a href="mailto:partnerships@theviaplatform.com" className="text-black underline">
+                partnerships@theviaplatform.com
               </a>
             </p>
           </div>

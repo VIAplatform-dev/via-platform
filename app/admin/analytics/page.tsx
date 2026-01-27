@@ -386,7 +386,7 @@ export default function AnalyticsPage() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <Link
-                    href="/admin/shopify-setup"
+                    href="/for-stores/shopify-setup"
                     className="px-6 py-3 bg-black text-white text-sm hover:bg-neutral-800 transition"
                   >
                     Shopify Setup Guide
@@ -543,7 +543,7 @@ export default function AnalyticsPage() {
           <h3 className="text-sm font-medium mb-4">Store Integration Guides</h3>
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/shopify-setup"
+              href="/for-stores/shopify-setup"
               className="px-4 py-2 bg-white border border-neutral-200 text-sm hover:border-black transition"
             >
               Shopify (Collabs)
