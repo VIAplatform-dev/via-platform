@@ -6,6 +6,7 @@ import { Cormorant_Garamond } from "next/font/google";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Script from "next/script";
+import { TasteMatchProvider } from "./components/TasteMatchTrigger";
 
 const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
@@ -59,9 +60,11 @@ export default function RootLayout({
       </Script>
 
       <body className={`${cormorant.className} bg-white text-black`}>
-        <Header />
-        <main className="pt-20">{children}</main>
-        <Footer />
+        <TasteMatchProvider>
+          <Header />
+          <main className="pt-20">{children}</main>
+          <Footer />
+        </TasteMatchProvider>
       </body>
     </html>
   );
