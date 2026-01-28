@@ -27,6 +27,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      {/* Google Analytics */}
+      <Script
+        src="https://www.googletagmanager.com/gtag/js?id=G-ZDBBYJCNVT"
+        strategy="afterInteractive"
+      />
+      <Script id="ga4" strategy="afterInteractive">
+        {`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-ZDBBYJCNVT');
+        `}
+      </Script>
+
+      {/* Pinterest Tag */}
       <Script id="pinterest-tag" strategy="afterInteractive">
         {`
           !function(e){if(!window.pintrk){window.pintrk=function(){
