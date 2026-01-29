@@ -6,28 +6,53 @@ import Link from "next/link";
 import TasteCard from "@/app/components/taste-match/TasteCard";
 import ShareButton from "@/app/components/taste-match/ShareButton";
 import ReferralProgress from "@/app/components/taste-match/ReferralProgress";
-import TasteComparison from "@/app/components/taste-match/TasteComparison";
 import UnlockCelebration from "@/app/components/taste-match/UnlockCelebration";
-import type { TasteProfile, ReferralStatus } from "@/app/lib/taste-types";
+import type { TasteProfile } from "@/app/lib/taste-types";
 
 interface ResultsPageProps {
   params: Promise<{ userId: string }>;
+}
+
+function getShareCount(userId: string): number {
+  const stored = localStorage.getItem(`via_taste_shares_${userId}`);
+  return stored ? parseInt(stored, 10) : 0;
+}
+
+function incrementShareCount(userId: string): number {
+  const current = getShareCount(userId);
+  const next = current + 1;
+  localStorage.setItem(`via_taste_shares_${userId}`, String(next));
+  if (next >= 2) {
+    localStorage.setItem(`via_taste_unlocked_${userId}`, "true");
+  }
+  return next;
+}
+
+function checkUnlocked(userId: string): boolean {
+  return localStorage.getItem(`via_taste_unlocked_${userId}`) === "true";
 }
 
 export default function ResultsPage({ params }: ResultsPageProps) {
   const { userId } = use(params);
   const router = useRouter();
   const [profile, setProfile] = useState<TasteProfile | null>(null);
-  const [referrals, setReferrals] = useState<ReferralStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [shareCount, setShareCount] = useState(0);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [justUnlocked, setJustUnlocked] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Check if this is the user's own profile
         const storedUserId = localStorage.getItem("via_taste_user_id");
-        setIsOwnProfile(storedUserId === userId);
+        const ownProfile = storedUserId === userId;
+        setIsOwnProfile(ownProfile);
+
+        if (ownProfile) {
+          setShareCount(getShareCount(userId));
+          setIsUnlocked(checkUnlocked(userId));
+        }
 
         // Try to fetch profile from API first
         let profileData = null;
@@ -41,7 +66,7 @@ export default function ResultsPage({ params }: ResultsPageProps) {
           console.warn("API unavailable, checking localStorage");
         }
 
-        // Fallback to localStorage if API failed
+        // Fallback to localStorage
         if (!profileData) {
           const storedProfile = localStorage.getItem(`via_taste_profile_${userId}`);
           if (storedProfile) {
@@ -59,19 +84,6 @@ export default function ResultsPage({ params }: ResultsPageProps) {
         }
 
         setProfile(profileData);
-
-        // Fetch referral status
-        try {
-          const referralsRes = await fetch(
-            `/api/taste-match/referrals/${userId}`
-          );
-          if (referralsRes.ok) {
-            const referralsData = await referralsRes.json();
-            setReferrals(referralsData.referrals);
-          }
-        } catch {
-          // Referrals unavailable, continue without them
-        }
       } catch (error) {
         console.error("Failed to fetch data:", error);
       } finally {
@@ -81,6 +93,15 @@ export default function ResultsPage({ params }: ResultsPageProps) {
 
     fetchData();
   }, [userId, router]);
+
+  const handleShareComplete = () => {
+    const newCount = incrementShareCount(userId);
+    setShareCount(newCount);
+    if (newCount >= 2 && !isUnlocked) {
+      setIsUnlocked(true);
+      setJustUnlocked(true);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,9 +127,6 @@ export default function ResultsPage({ params }: ResultsPageProps) {
     );
   }
 
-  const isUnlocked = referrals?.isUnlocked || false;
-  const completedCount = referrals?.completedCount || 0;
-
   return (
     <main className="min-h-screen bg-[#f7f6f3]">
       <div className="max-w-lg mx-auto px-6 py-12">
@@ -120,7 +138,7 @@ export default function ResultsPage({ params }: ResultsPageProps) {
           <h1 className="text-3xl font-serif">VIA Taste Match</h1>
         </div>
 
-        {/* Own profile - Locked state */}
+        {/* Own profile - Locked */}
         {isOwnProfile && !isUnlocked && (
           <div className="text-center mb-8">
             <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-black/5 flex items-center justify-center">
@@ -130,63 +148,59 @@ export default function ResultsPage({ params }: ResultsPageProps) {
             </div>
 
             <h2 className="text-2xl sm:text-3xl font-serif mb-3 text-black">
-              Invite 2 friends to unlock
+              Share with 2 friends
               <br />
-              your results
+              to unlock your results
             </h2>
 
             <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">
-              Share the quiz with friends. When 2 complete it, your full taste profile unlocks.
+              Tap the button below to share, then come back to see your full taste profile.
             </p>
 
             <div className="mb-8">
               <ReferralProgress
-                completedCount={completedCount}
-                isUnlocked={isUnlocked}
+                completedCount={shareCount}
+                isUnlocked={false}
               />
             </div>
 
-            <ShareButton userId={userId} />
+            <ShareButton
+              userId={userId}
+              onShareComplete={handleShareComplete}
+            />
           </div>
         )}
 
-        {/* Own profile - Unlocked state */}
+        {/* Own profile - Unlocked */}
         {isOwnProfile && isUnlocked && (
           <>
             <div className="mb-8">
-              <TasteCard
-                primaryTag={profile.primaryTag}
-                primaryPercentage={profile.primaryPercentage}
-                secondaryTag={profile.secondaryTag}
-                secondaryPercentage={profile.secondaryPercentage}
-                tertiaryTag={profile.tertiaryTag}
-                tertiaryPercentage={profile.tertiaryPercentage}
-              />
+              {justUnlocked ? (
+                <UnlockCelebration>
+                  <TasteCard
+                    primaryTag={profile.primaryTag}
+                    primaryPercentage={profile.primaryPercentage}
+                    secondaryTag={profile.secondaryTag}
+                    secondaryPercentage={profile.secondaryPercentage}
+                    tertiaryTag={profile.tertiaryTag}
+                    tertiaryPercentage={profile.tertiaryPercentage}
+                  />
+                </UnlockCelebration>
+              ) : (
+                <TasteCard
+                  primaryTag={profile.primaryTag}
+                  primaryPercentage={profile.primaryPercentage}
+                  secondaryTag={profile.secondaryTag}
+                  secondaryPercentage={profile.secondaryPercentage}
+                  tertiaryTag={profile.tertiaryTag}
+                  tertiaryPercentage={profile.tertiaryPercentage}
+                />
+              )}
             </div>
 
             <div className="mb-8">
               <ShareButton userId={userId} />
-
-              <div className="mt-4 text-center">
-                <ReferralProgress
-                  completedCount={completedCount}
-                  isUnlocked={isUnlocked}
-                />
-              </div>
             </div>
-
-            {referrals && referrals.friends.length > 0 && (
-              <div className="border-t border-gray-200 pt-8">
-                <UnlockCelebration>
-                  <div className="bg-white rounded-lg p-6 border border-gray-200">
-                    <TasteComparison
-                      userProfile={profile}
-                      friendProfiles={referrals.friends}
-                    />
-                  </div>
-                </UnlockCelebration>
-              </div>
-            )}
           </>
         )}
 

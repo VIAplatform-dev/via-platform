@@ -6,12 +6,13 @@ interface ShareButtonProps {
   userId: string;
   onShareStart?: () => void;
   onShareEnd?: () => void;
+  onShareComplete?: () => void;
 }
 
-export default function ShareButton({ userId, onShareStart, onShareEnd }: ShareButtonProps) {
+export default function ShareButton({ userId, onShareStart, onShareEnd, onShareComplete }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = `https://thevia.co/taste-match?ref=${userId}`;
+  const shareUrl = `https://theviaplatform.com/taste-match?ref=${userId}`;
   const shareText = `I just discovered my VIA taste! Take the quiz and see yours: ${shareUrl}`;
 
   const handleShare = async () => {
@@ -24,10 +25,13 @@ export default function ShareButton({ userId, onShareStart, onShareEnd }: ShareB
           text: "I just discovered my VIA taste! Take the quiz and see yours:",
           url: shareUrl,
         });
+        onShareComplete?.();
         onShareEnd?.();
         return;
       } catch {
+        // User cancelled share — don't count it
         onShareEnd?.();
+        return;
       }
     }
 
@@ -36,6 +40,7 @@ export default function ShareButton({ userId, onShareStart, onShareEnd }: ShareB
       await navigator.clipboard.writeText(shareText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      onShareComplete?.();
     } catch {
       console.error("Failed to copy to clipboard");
     }

@@ -7,10 +7,9 @@ import QuizProgress from "./QuizProgress";
 import TasteCard from "./TasteCard";
 import ShareButton from "./ShareButton";
 import ReferralProgress from "./ReferralProgress";
-import TasteComparison from "./TasteComparison";
 import UnlockCelebration from "./UnlockCelebration";
 import { QUIZ_QUESTIONS, generateUserId } from "@/app/lib/taste-scoring";
-import type { QuizAnswers, TasteTag, TasteProfile, ReferralStatus } from "@/app/lib/taste-types";
+import type { QuizAnswers, TasteTag } from "@/app/lib/taste-types";
 
 interface TasteMatchModalProps {
   isOpen: boolean;
@@ -32,6 +31,25 @@ interface ProfileData {
   createdAt?: Date;
 }
 
+function getShareCount(userId: string): number {
+  const stored = localStorage.getItem(`via_taste_shares_${userId}`);
+  return stored ? parseInt(stored, 10) : 0;
+}
+
+function incrementShareCount(userId: string): number {
+  const current = getShareCount(userId);
+  const next = current + 1;
+  localStorage.setItem(`via_taste_shares_${userId}`, String(next));
+  if (next >= 2) {
+    localStorage.setItem(`via_taste_unlocked_${userId}`, "true");
+  }
+  return next;
+}
+
+function checkUnlocked(userId: string): boolean {
+  return localStorage.getItem(`via_taste_unlocked_${userId}`) === "true";
+}
+
 export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProps) {
   const router = useRouter();
   const [step, setStep] = useState<ModalStep>("landing");
@@ -40,7 +58,9 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [referrals, setReferrals] = useState<ReferralStatus | null>(null);
+  const [shareCount, setShareCount] = useState(0);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [justUnlocked, setJustUnlocked] = useState(false);
   const [isShareBlurred, setIsShareBlurred] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [quizTransition, setQuizTransition] = useState(false);
@@ -48,7 +68,6 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
   // Animate modal entrance
   useEffect(() => {
     if (isOpen) {
-      // Trigger entrance animation on next frame
       requestAnimationFrame(() => setShowModal(true));
     } else {
       setShowModal(false);
@@ -60,20 +79,19 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
     if (isOpen) {
       let storedUserId = localStorage.getItem("via_taste_user_id");
 
-      // Check if user already has a profile
       if (storedUserId) {
         const storedProfile = localStorage.getItem(`via_taste_profile_${storedUserId}`);
         if (storedProfile) {
           const parsed = JSON.parse(storedProfile);
           setProfile(parsed);
           setUserId(storedUserId);
+          setShareCount(getShareCount(storedUserId));
+          setIsUnlocked(checkUnlocked(storedUserId));
           setStep("results");
-          fetchReferralStatus(storedUserId);
           return;
         }
       }
 
-      // Create new user ID if needed
       if (!storedUserId) {
         storedUserId = generateUserId();
         localStorage.setItem("via_taste_user_id", storedUserId);
@@ -82,19 +100,6 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
     }
   }, [isOpen]);
 
-  const fetchReferralStatus = async (uid: string) => {
-    try {
-      const res = await fetch(`/api/taste-match/referrals/${uid}`);
-      if (res.ok) {
-        const data = await res.json();
-        setReferrals(data.referrals);
-      }
-    } catch {
-      // Referrals unavailable, continue without them
-    }
-  };
-
-  // Reset state when modal closes
   const handleClose = useCallback(() => {
     if (step !== "results") {
       setStep("landing");
@@ -102,11 +107,9 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
       setAnswers({});
     }
     setShowModal(false);
-    // Wait for exit animation before unmounting
     setTimeout(() => onClose(), 200);
   }, [step, onClose]);
 
-  // Handle escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
@@ -117,7 +120,6 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, handleClose]);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -152,7 +154,6 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
     };
     setAnswers(newAnswers);
 
-    // Trigger transition animation
     setQuizTransition(true);
     await new Promise((resolve) => setTimeout(resolve, 250));
 
@@ -161,7 +162,6 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
       await handleSubmit(newAnswers);
     } else {
       setCurrentIndex((prev) => prev + 1);
-      // Reset transition for new question fade-in
       setTimeout(() => setQuizTransition(false), 50);
     }
   };
@@ -190,8 +190,9 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
           );
           setProfile(data.profile);
         }
+        setShareCount(getShareCount(userId));
+        setIsUnlocked(checkUnlocked(userId));
         setStep("results");
-        fetchReferralStatus(userId);
       } else {
         console.error("Failed to submit quiz");
       }
@@ -199,6 +200,16 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
       console.error("Submit error:", error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleShareComplete = () => {
+    if (!userId) return;
+    const newCount = incrementShareCount(userId);
+    setShareCount(newCount);
+    if (newCount >= 2 && !isUnlocked) {
+      setIsUnlocked(true);
+      setJustUnlocked(true);
     }
   };
 
@@ -223,18 +234,18 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
     if (userId) {
       localStorage.removeItem(`via_taste_profile_${userId}`);
       localStorage.removeItem(`via_taste_unlocked_${userId}`);
+      localStorage.removeItem(`via_taste_shares_${userId}`);
     }
     setProfile(null);
-    setReferrals(null);
+    setShareCount(0);
+    setIsUnlocked(false);
+    setJustUnlocked(false);
     setAnswers({});
     setCurrentIndex(0);
     setStep("landing");
   };
 
   if (!isOpen) return null;
-
-  const isUnlocked = referrals?.isUnlocked || false;
-  const completedCount = referrals?.completedCount || 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -246,7 +257,7 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
         onClick={handleClose}
       />
 
-      {/* Modal with entrance animation */}
+      {/* Modal */}
       <div
         className={`relative w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto bg-[#f7f6f3] rounded-lg shadow-2xl transition-all duration-300 ease-out ${
           showModal
@@ -342,7 +353,7 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
           </div>
         )}
 
-        {/* Results Step - Locked */}
+        {/* Results - Locked */}
         {step === "results" && profile && !isUnlocked && (
           <div className="p-8 sm:p-12 animate-[fadeSlideUp_0.4s_ease-out_both]">
             <div className="text-center">
@@ -353,19 +364,19 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
               </div>
 
               <h2 className="text-2xl sm:text-3xl font-serif mb-3 text-black">
-                Invite 2 friends to unlock
+                Share with 2 friends
                 <br />
-                your results
+                to unlock your results
               </h2>
 
               <p className="text-gray-500 text-sm mb-8 max-w-xs mx-auto">
-                Share the quiz with friends. When 2 complete it, your full taste profile unlocks.
+                Tap the button below to share, then come back to see your full taste profile.
               </p>
 
               <div className="mb-8">
                 <ReferralProgress
-                  completedCount={completedCount}
-                  isUnlocked={isUnlocked}
+                  completedCount={shareCount}
+                  isUnlocked={false}
                 />
               </div>
 
@@ -374,6 +385,7 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
                   userId={userId}
                   onShareStart={() => setIsShareBlurred(true)}
                   onShareEnd={() => setIsShareBlurred(false)}
+                  onShareComplete={handleShareComplete}
                 />
               )}
 
@@ -387,7 +399,7 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
           </div>
         )}
 
-        {/* Results Step - Unlocked */}
+        {/* Results - Unlocked */}
         {step === "results" && profile && isUnlocked && (
           <div className="p-6 sm:p-8">
             <div className="animate-[fadeSlideUp_0.4s_ease-out_both]">
@@ -397,17 +409,29 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
                 </p>
               </div>
 
-              <TasteCard
-                primaryTag={profile.primaryTag}
-                primaryPercentage={profile.primaryPercentage}
-                secondaryTag={profile.secondaryTag}
-                secondaryPercentage={profile.secondaryPercentage}
-                tertiaryTag={profile.tertiaryTag}
-                tertiaryPercentage={profile.tertiaryPercentage}
-              />
+              {justUnlocked ? (
+                <UnlockCelebration>
+                  <TasteCard
+                    primaryTag={profile.primaryTag}
+                    primaryPercentage={profile.primaryPercentage}
+                    secondaryTag={profile.secondaryTag}
+                    secondaryPercentage={profile.secondaryPercentage}
+                    tertiaryTag={profile.tertiaryTag}
+                    tertiaryPercentage={profile.tertiaryPercentage}
+                  />
+                </UnlockCelebration>
+              ) : (
+                <TasteCard
+                  primaryTag={profile.primaryTag}
+                  primaryPercentage={profile.primaryPercentage}
+                  secondaryTag={profile.secondaryTag}
+                  secondaryPercentage={profile.secondaryPercentage}
+                  tertiaryTag={profile.tertiaryTag}
+                  tertiaryPercentage={profile.tertiaryPercentage}
+                />
+              )}
             </div>
 
-            {/* Share + Referral Section */}
             <div className="mt-6 animate-[fadeSlideUp_0.4s_ease-out_0.15s_both]">
               {userId && (
                 <ShareButton
@@ -416,27 +440,8 @@ export default function TasteMatchModal({ isOpen, onClose }: TasteMatchModalProp
                   onShareEnd={() => setIsShareBlurred(false)}
                 />
               )}
-
-              <div className="mt-6 text-center">
-                <ReferralProgress
-                  completedCount={completedCount}
-                  isUnlocked={isUnlocked}
-                />
-              </div>
-
-              {referrals && referrals.friends.length > 0 && (
-                <div className="mt-6 animate-[fadeSlideUp_0.4s_ease-out_both]">
-                  <UnlockCelebration>
-                    <TasteComparison
-                      userProfile={profile as unknown as TasteProfile}
-                      friendProfiles={referrals.friends}
-                    />
-                  </UnlockCelebration>
-                </div>
-              )}
             </div>
 
-            {/* Action buttons */}
             <div className="mt-6 space-y-3 animate-[fadeSlideUp_0.4s_ease-out_0.3s_both]">
               <button
                 onClick={handleViewFullResults}

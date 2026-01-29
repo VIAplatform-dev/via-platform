@@ -36,7 +36,7 @@ export default function ReferralProgress({
           <span className="text-black font-medium">Unlocked!</span>
         ) : (
           <span>
-            {completedCount}/2 friends completed
+            {completedCount}/2 shares
           </span>
         )}
       </p>
