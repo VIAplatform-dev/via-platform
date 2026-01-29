@@ -116,6 +116,22 @@ export default function Footer() {
                   FAQs
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/terms"
+                  className="text-neutral-300 hover:text-white transition-colors duration-200 text-sm"
+                >
+                  Terms &amp; Conditions
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/privacy"
+                  className="text-neutral-300 hover:text-white transition-colors duration-200 text-sm"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
