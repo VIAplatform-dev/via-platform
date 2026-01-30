@@ -1,59 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { neon } from "@neondatabase/serverless";
 
-type EmailEntry = {
-  email: string;
-  signupDate: string;
-  source?: string;
-};
-
-type WaitlistData = {
-  emails: EmailEntry[];
-};
-
-const DATA_DIR = path.join(process.cwd(), "app", "data");
-const DATA_FILE = path.join(DATA_DIR, "waitlist.json");
-
-function ensureDataFile(): WaitlistData {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    if (!fs.existsSync(DATA_FILE)) {
-      const initialData: WaitlistData = { emails: [] };
-      fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-      return initialData;
-    }
-
-    const content = fs.readFileSync(DATA_FILE, "utf-8");
-    const parsed = JSON.parse(content);
-
-    if (!parsed || !Array.isArray(parsed.emails)) {
-      const initialData: WaitlistData = { emails: [] };
-      fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-      return initialData;
-    }
-
-    return parsed;
-  } catch (err) {
-    console.error("[Waitlist] ensureDataFile error:", err);
-    const initialData: WaitlistData = { emails: [] };
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
-    } catch (writeErr) {
-      console.error("[Waitlist] Failed to create file:", writeErr);
-    }
-    return initialData;
+function getDatabaseUrl() {
+  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL or POSTGRES_URL environment variable is not set."
+    );
   }
+  return url;
 }
 
-function saveData(data: WaitlistData): void {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+async function ensureTable() {
+  const sql = neon(getDatabaseUrl());
+  await sql`
+    CREATE TABLE IF NOT EXISTS waitlist (
+      id SERIAL PRIMARY KEY,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      signup_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      source VARCHAR(50) DEFAULT 'waitlist'
+    )
+  `;
 }
 
 function isValidEmail(email: string): boolean {
@@ -82,29 +49,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = ensureDataFile();
+    await ensureTable();
+    const sql = neon(getDatabaseUrl());
 
-    const existingEmail = data.emails.find(
-      (entry) => entry.email === normalizedEmail
-    );
+    // Check for duplicate
+    const existing = await sql`
+      SELECT email FROM waitlist WHERE email = ${normalizedEmail}
+    `;
 
-    if (existingEmail) {
+    if (existing.length > 0) {
       return NextResponse.json(
         { message: "You're already on the waitlist!" },
         { status: 200 }
       );
     }
 
-    const newEntry: EmailEntry = {
-      email: normalizedEmail,
-      signupDate: new Date().toISOString(),
-      source: source || "waitlist",
-    };
+    await sql`
+      INSERT INTO waitlist (email, signup_date, source)
+      VALUES (${normalizedEmail}, NOW(), ${source || "waitlist"})
+    `;
 
-    data.emails.push(newEntry);
-    saveData(data);
-
-    console.log(`[Waitlist] New signup: ${normalizedEmail} (total: ${data.emails.length})`);
+    console.log(`[Waitlist] New signup: ${normalizedEmail}`);
 
     return NextResponse.json(
       { message: "You're on the list! We'll be in touch soon." },
@@ -121,10 +86,22 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const data = ensureDataFile();
+    await ensureTable();
+    const sql = neon(getDatabaseUrl());
+
+    const rows = await sql`
+      SELECT email, signup_date, source FROM waitlist ORDER BY signup_date ASC
+    `;
+
+    const emails = rows.map((row) => ({
+      email: row.email,
+      signupDate: row.signup_date,
+      source: row.source,
+    }));
+
     return NextResponse.json({
-      count: data.emails.length,
-      emails: data.emails,
+      count: emails.length,
+      emails,
     });
   } catch (error) {
     console.error("[Waitlist] Error fetching emails:", error);
