@@ -10,7 +10,7 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/admin/sync";
+  const redirect = searchParams.get("redirect") || "/";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
