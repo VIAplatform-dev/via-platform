@@ -1,0 +1,424 @@
+{
+  "emails": [
+    {
+      "email": "test@example.com",
+      "signupDate": "2026-01-30T00:27:37.173Z",
+      "source": "waitlist"
+    },
+    {
+      "email": "helster@bu.edu",
+      "signupDate": "2026-01-30T00:30:25.539Z",
+      "source": "waitlist"
+    },
+    {
+      "email": "hanaelsterr@gmail.com",
+      "signupDate": "2026-01-30T00:37:54.243Z",
+      "source": "waitlist"
+    },
+    {
+      "email": "reagle@bu.edu",
+      "signupDate": "2026-01-20T21:21:55.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "dana.mansori@gmail.com",
+      "signupDate": "2026-01-11T19:03:37.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "aangelaadiaz@gmail.com",
+      "signupDate": "2026-01-14T13:01:59.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "jlgoldberg2@yahoo.com",
+      "signupDate": "2026-01-12T23:07:41.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "jacquelyne.rankin@gmail.com",
+      "signupDate": "2026-01-23T09:17:21.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "carinaciampi@gmail.com",
+      "signupDate": "2026-01-26T22:51:36.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "bellamayr1@gmail.com",
+      "signupDate": "2026-01-11T18:57:35.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "jgrosber@bu.edu",
+      "signupDate": "2026-01-23T19:05:17.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "mbaghadjian@gmail.com",
+      "signupDate": "2026-01-11T20:17:59.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "tasia_young30@yahoo.com",
+      "signupDate": "2026-01-12T11:25:14.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "jolieyablon17@gmail.com",
+      "signupDate": "2026-01-11T19:57:14.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "skenary84@gmail.com",
+      "signupDate": "2026-01-11T18:47:12.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "amandarosenzweig01@gmail.com",
+      "signupDate": "2026-01-11T21:23:01.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "rushil.nagarsheth@gmail.com",
+      "signupDate": "2026-01-11T18:49:55.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "emmaplotkin@icloud.com",
+      "signupDate": "2026-01-11T19:56:42.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "mfainbraun@gmail.com",
+      "signupDate": "2026-01-11T19:54:06.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "kirandavis29@outlook.com",
+      "signupDate": "2026-01-26T11:58:02.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "taramport@hotmail.com",
+      "signupDate": "2026-01-13T19:37:19.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "vivianvendt@gmail.com",
+      "signupDate": "2026-01-21T19:07:12.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "gmpowers@bu.edu",
+      "signupDate": "2026-01-27T18:47:53.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "nadine.hirsh@gmail.com",
+      "signupDate": "2026-01-11T20:40:40.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "nkumar716@gmail.com",
+      "signupDate": "2026-01-11T20:29:16.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "agnes.edwin@gmail.com",
+      "signupDate": "2026-01-22T14:00:16.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "jhamptonhill@gmail.com",
+      "signupDate": "2026-01-14T19:49:59.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "tessanellis14@gmail.com",
+      "signupDate": "2026-01-11T18:44:50.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "rachelkanter1012@gmail.com",
+      "signupDate": "2026-01-11T19:35:18.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "classicsimplepure@yahoo.com",
+      "signupDate": "2026-01-14T11:06:28.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "shari.schwartz12@gmail.com",
+      "signupDate": "2026-01-20T16:58:02.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "bermanaliza4@gmail.com",
+      "signupDate": "2026-01-20T21:20:13.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "gaitmanjordyn@gmail.com",
+      "signupDate": "2026-01-11T19:57:35.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "katiekoster4@gmail.com",
+      "signupDate": "2026-01-21T13:17:45.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "a.d.elliott@me.com",
+      "signupDate": "2026-01-13T09:38:09.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "hgobell@verizon.net",
+      "signupDate": "2026-01-11T18:45:35.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ameliahamm3@gmail.com",
+      "signupDate": "2026-01-11T20:45:17.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "apb2207@icloud.com",
+      "signupDate": "2026-01-11T19:58:32.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "load.throws.3m@icloud.com",
+      "signupDate": "2026-01-11T19:19:52.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "telster@me.com",
+      "signupDate": "2026-01-11T18:43:16.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ashleye2003@yahoo.com",
+      "signupDate": "2026-01-22T16:47:18.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "mrtang508@gmail.com",
+      "signupDate": "2026-01-26T14:11:15.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "emily.j.regan@icloud.com",
+      "signupDate": "2026-01-11T19:58:06.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "qae12@aol.com",
+      "signupDate": "2026-01-11T19:42:20.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "luisavazquezusa@gmail.com",
+      "signupDate": "2026-01-22T16:37:52.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "pattirehfield@gmail.com",
+      "signupDate": "2026-01-12T06:32:30.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "madinah08@icloud.com",
+      "signupDate": "2026-01-29T16:13:45.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "gnmarraccini@gmail.com",
+      "signupDate": "2026-01-11T21:45:50.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "jrpackman@yahoo.com",
+      "signupDate": "2026-01-11T18:48:30.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "10210 parkwood dr",
+      "signupDate": "2026-01-30T00:40:32.097Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "kensington",
+      "signupDate": "2026-01-30T00:40:32.097Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "usa          us,,,,,2,2026-01-11 18:21:12,73.128.21.114,2026-01-11 18:21:12,,,,,,,2026-01-11 18:21:12,411630369,8653243d35,,",
+      "signupDate": "2026-01-30T00:40:32.097Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "darwin0406@hotmail.com",
+      "signupDate": "2026-01-11T19:14:20.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "leximarchesano@gmail.com",
+      "signupDate": "2026-01-11T18:51:12.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "sammilex@icloud.com",
+      "signupDate": "2026-01-11T19:54:47.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "chantalcoelho7@gmail.com",
+      "signupDate": "2026-01-11T18:49:19.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "skylermaui@optonline.net",
+      "signupDate": "2026-01-22T10:56:18.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "kelleyshops49@gmail.com",
+      "signupDate": "2026-01-25T11:24:08.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "cristina.terlaje@gmail.com",
+      "signupDate": "2026-01-14T15:28:34.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "celine.odegard@gmail.com",
+      "signupDate": "2026-01-11T19:05:43.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "livirich1018@gmail.com",
+      "signupDate": "2026-01-11T20:58:02.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "renakhoury02@gmail.com",
+      "signupDate": "2026-01-12T09:49:16.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ljordanich@gmail.com",
+      "signupDate": "2026-01-21T15:55:47.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "benvolchok@gmail.com",
+      "signupDate": "2026-01-20T23:44:34.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ehuban24@gmail.com",
+      "signupDate": "2026-01-12T02:01:39.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "sofikhoury03@gmail.com",
+      "signupDate": "2026-01-11T18:44:25.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "mporta@bu.edu",
+      "signupDate": "2026-01-13T16:51:55.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "22sampsonm@gmail.com",
+      "signupDate": "2026-01-11T19:38:07.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "katipolimeno@gmail.com",
+      "signupDate": "2026-01-11T18:51:36.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "alexakipnis18@gmail.com",
+      "signupDate": "2026-01-11T22:47:13.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "dmsy79@gmail.com",
+      "signupDate": "2026-01-11T18:45:58.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ilanajt@gmail.com",
+      "signupDate": "2026-01-11T18:48:22.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "laura.c.tilley1@gmail.com",
+      "signupDate": "2026-01-14T09:23:55.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "elliepurnell1122@gmail.com",
+      "signupDate": "2026-01-21T10:59:55.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ericelster@mac.com",
+      "signupDate": "2026-01-11T18:45:33.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "helster@me.com",
+      "signupDate": "2026-01-11T18:42:42.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ashleyalbert319@gmail.com",
+      "signupDate": "2026-01-11T19:54:23.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "ibella1111@icloud.com",
+      "signupDate": "2026-01-22T14:02:21.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "piperhughes2004@gmail.com",
+      "signupDate": "2026-01-11T19:57:18.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "sophie.marston7@gmail.com",
+      "signupDate": "2026-01-21T13:29:30.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "himmelsteina@icloud.com",
+      "signupDate": "2026-01-13T09:39:49.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "joyceyoung@hotmail.com",
+      "signupDate": "2026-01-11T18:58:21.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "carolinebloom07@icloud.com",
+      "signupDate": "2026-01-11T20:00:29.000Z",
+      "source": "mailchimp"
+    },
+    {
+      "email": "eslagle82@gmail.com",
+      "signupDate": "2026-01-14T09:35:33.000Z",
+      "source": "mailchimp"
+    }
+  ]
+}
