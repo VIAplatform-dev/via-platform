@@ -135,6 +135,7 @@ export async function GET(request: Request) {
  size: p.size ?? undefined,
  productType: p.productType ?? undefined,
  brand: (p as any).vendor ?? undefined,
+ available: p.available, // sold-out items (only fetched when skipSoldOutFilter) → preserved in sold_items, not the catalog
  compareAtPrice: p.compareAtPrice != null
  ? convertCurrencyToUSD(p.compareAtPrice as number, storeCurrency)
  : undefined,

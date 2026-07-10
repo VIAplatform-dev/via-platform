@@ -82,12 +82,21 @@ async function ebaySoldStats(brand: string): Promise<{ soldCount: number; median
  return { soldCount, medianCents: median(rows.map((row) => priceToCents(row.price) ?? 0)) };
 }
 
-// Median ASKING price across resale sites Google Shopping indexes (Vestiaire, Grailed, RealReal,
-// eBay listings, etc.) — a broad multi-site price read to complement eBay's SOLD price.
+// Actual resale marketplaces — a bare-brand Google Shopping query otherwise returns cosmetics,
+// perfume, new-retail and accessories (e.g. "Dior" → $66 lip balm), which is not a resale signal.
+const RESALE_SOURCES = ["vestiaire", "grailed", "realreal", "the real real", "poshmark", "depop", "ebay", "mercari", "rebag", "fashionphile", "thredup", "tradesy", "vinted", "1stdibs", "1st dibs"];
+
+// Median ASKING price for the brand across actual resale sites Google Shopping indexes — a broad
+// multi-site read to complement eBay's SOLD price. Filtered to resale sources so retail/beauty
+// listings don't poison the median.
 async function webAskingMedian(brand: string): Promise<number | null> {
- const r = await serp({ engine: "google_shopping", q: brand, gl: "us" });
+ const r = await serp({ engine: "google_shopping", q: `${brand} preowned`, gl: "us" });
  const rows: any[] = r?.shopping_results || [];
- return median(rows.map((row) => priceToCents(row.extracted_price ?? row.price) ?? 0));
+ const resale = rows.filter((row) => {
+ const hay = `${row.source ?? ""} ${row.link ?? ""}`.toLowerCase();
+ return RESALE_SOURCES.some((s) => hay.includes(s));
+ });
+ return median(resale.map((row) => priceToCents(row.extracted_price ?? row.price) ?? 0));
 }
 
 // Run fn over items with bounded concurrency — SerpApi is the bottleneck, so parallelize the

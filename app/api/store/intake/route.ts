@@ -153,6 +153,7 @@ export async function POST(request: NextRequest) {
  mainUrl,
  extraComps: reverseComps,
  reverseTitles,
+ embedding: embedding ?? undefined,
  knowledgeHintCents: draft?.priceHint ? draft.priceHint * 100 : null,
  runwaySoFar: runway,
  draftRanFull: needDraft,

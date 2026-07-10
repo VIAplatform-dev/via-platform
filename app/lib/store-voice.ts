@@ -1,3 +1,4 @@
+import { neon } from "@neondatabase/serverless";
 import { getListingsByStore } from "./listings-db";
 import { saveVoice, getVoice, type StoreVoice } from "./store-voice-db";
 import { AI_MODELS } from "./ai-models";
@@ -39,6 +40,20 @@ export async function buildStoreVoice(storeSlug: string): Promise<StoreVoice | n
  const cleaned = listings
  .map((l) => stripHtml(l.description || ""))
  .filter((d) => d.length > 30);
+
+ // Synced stores keep their descriptions in `products`, not the native `items` table — pull from
+ // there when the native corpus is thin, so EVERY store learns a voice, not just Add-a-listing users.
+ if (cleaned.length < 6) {
+ const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+ if (url) {
+ const rows = (await neon(url)`
+  SELECT description FROM products
+  WHERE store_slug = ${storeSlug} AND description IS NOT NULL AND description <> ''
+  ORDER BY synced_at DESC LIMIT 40
+ `.catch(() => [])) as { description: string }[];
+ for (const r of rows) { const d = stripHtml(r.description || ""); if (d.length > 30) cleaned.push(d); }
+ }
+ }
  if (cleaned.length < 2) return null; // not enough of their own writing yet
 
  const guide = await extractVoiceGuide(cleaned);

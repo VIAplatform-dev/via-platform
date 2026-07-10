@@ -308,6 +308,7 @@ export async function syncProducts(
  compareAtPrice?: number | null;
  brand?: string;
  productType?: string;
+ available?: boolean; // false = sold out at the source. Preserved in sold_items, kept out of the live catalog.
  }>,
  options?: { excludeKeywords?: string[]; excludeTitles?: string[] }
 ): Promise<{ count: number; inserted: number; updated: number; priceDrops: PriceDrop[] }> {
@@ -397,6 +398,25 @@ export async function syncProducts(
  let updatedCount = 0;
  for (const product of products) {
  if (isBlocked(product.title)) continue;
+
+ // Sold out at the source: preserve its listing data (feeds pricing comps + demand) but keep it
+ // OUT of the live catalog. If it was already live on VYA, the stale-product sweep below captures
+ // the transition with real dwell time; here we only capture pieces NEW to us — a store's existing
+ // sold history at import. Don't push its title, so the sweep removes any stale live row. Deduped
+ // by store+title so repeated imports/syncs don't pile up.
+ if (product.available === false) {
+ if (!oldByTitle.has(product.title)) {
+ await sql`
+ INSERT INTO sold_items (store_slug, store_name, product_id, title, designer, final_price, original_price, currency, image, size, product_type, source_id, sold_at)
+ SELECT ${storeSlug}, ${storeName}, ${product.shopifyProductId ? `${storeSlug}-shopify-${product.shopifyProductId}` : null}, ${product.title},
+  ${(product.brand || product.productType || "").trim() || null}, ${product.price}, ${product.compareAtPrice ?? product.price}, ${product.currency || "USD"},
+  ${product.image || (product.images && product.images[0]) || null}, ${product.size || null}, ${product.productType || null}, ${product.shopifyProductId || null}, NOW()
+ WHERE NOT EXISTS (SELECT 1 FROM sold_items s WHERE s.store_slug = ${storeSlug} AND lower(s.title) = lower(${product.title}))
+ `.catch(() => {});
+ }
+ continue;
+ }
+
  titles.push(product.title);
  // VYA is a visual marketplace — never add a product with no image (it renders a
  // broken card and is filtered out of every grid anyway). Video-only products
@@ -492,14 +512,18 @@ export async function syncProducts(
 
  // Capture sold items (products dropping off the feed) before deleting them
  if (titles.length > 0) {
+ // Column list MUST match the sold_items table exactly — the previous list referenced
+ // shopify_product_id/collabs_link/first_seen_at (which don't exist), so every insert threw and
+ // the swallowed catch left sold_items frozen for months, starving the data layer. Log, don't hide.
+ try {
  await sql`
  INSERT INTO sold_items
- (store_slug, store_name, title, designer, final_price, original_price, currency,
- image, size, shopify_product_id, collabs_link, click_count, favorite_count,
- days_listed, first_seen_at, sold_at)
+ (store_slug, store_name, product_id, title, designer, final_price, original_price, currency,
+ image, size, product_type, source_id, click_count, favorite_count, days_listed, sold_at)
  SELECT
  p.store_slug,
  p.store_name,
+ p.store_slug || '-' || p.id::text,
  p.title,
  COALESCE(NULLIF(p.brand, ''), NULLIF(p.product_type, '')),
  p.price,
@@ -507,21 +531,23 @@ export async function syncProducts(
  p.currency,
  p.image,
  p.size,
+ p.product_type,
  p.shopify_product_id,
- p.collabs_link,
  COALESCE((SELECT COUNT(*) FROM clicks c WHERE c.product_id = p.store_slug || '-' || p.id::text), 0)::integer,
  COALESCE((SELECT COUNT(*) FROM product_favorites pf WHERE pf.product_id = p.id), 0)::integer,
  CASE WHEN p.created_at IS NOT NULL
  THEN GREATEST(0, EXTRACT(day FROM (NOW() - p.created_at))::integer)
  ELSE NULL
  END,
- p.created_at,
  NOW()
  FROM products p
  WHERE p.store_slug = ${storeSlug}
  AND p.title != ALL(${titles})
  AND p.price > 0
- `.catch(() => {}); // non-fatal on first run
+ `;
+ } catch (e) {
+ console.error(`[sync] sold_items capture failed for ${storeSlug}:`, e);
+ }
  }
 
  // Preserve product identity (id + composite key) BEFORE deletion so the events ETL can

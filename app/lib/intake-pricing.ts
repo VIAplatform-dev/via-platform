@@ -1,6 +1,6 @@
 import { estimatePrice, getMarketReferenceFast, computePriceFlag, type PriceEstimate, type PriceFlag } from "./price-engine";
 import { getMinMarkupBps } from "./store-pricing-db";
-import { getStorePriceMultiplier } from "./intake-memory-db";
+import { getStorePriceMultiplier, getVisualVyaComps } from "./intake-memory-db";
 import { fetchResaleTrend, type Comp } from "./comps";
 import { identifyRunway, isIntakeConfigured } from "./ai-intake";
 import { getPieceRunway, savePieceRunway } from "./comp-cache-db";
@@ -57,6 +57,7 @@ export async function computeListingPricing(opts: {
  mainUrl: string;
  extraComps: Comp[]; // reverse-image comps for the valuation
  reverseTitles: string[]; // reverse-image match titles, for runway mining
+ embedding?: number[]; // the intake photo embedding — for VYA visual price comps (already computed, no extra cost)
  knowledgeHintCents: number | null;
  runwaySoFar: string | null; // runway the seller/draft already provided
  draftRanFull: boolean; // did the full vision draft run? gates the proactive runway pass
@@ -65,6 +66,11 @@ export async function computeListingPricing(opts: {
  const baseTitle = opts.title || [opts.era, opts.material, opts.category].filter(Boolean).join(" ");
  const query = brandVal && !baseTitle.toLowerCase().includes(brandVal.toLowerCase()) ? `${brandVal} ${baseTitle}` : baseTitle;
  const needPrice = !opts.price || !opts.price.trim();
+
+ // VYA pieces that LOOK like this one → strong comps, even when the brand is unknown/wrong.
+ // Reuses the intake embedding, so no extra Voyage cost. Merged into the reverse-image comps.
+ const visualComps = opts.embedding?.length ? await getVisualVyaComps(opts.embedding).catch(() => []) : [];
+ const comps = [...opts.extraComps, ...visualComps];
 
  let estimate: PriceEstimate | null = null;
  let priceFlag: PriceFlag | null = null;
@@ -78,7 +84,7 @@ export async function computeListingPricing(opts: {
  photoUrl: opts.mainUrl,
  minMarkupBps,
  knowledgeHintCents: opts.knowledgeHintCents,
- extraComps: opts.extraComps,
+ extraComps: comps,
  context: { brand: brandVal || null, era: opts.era || null, runway: opts.runwaySoFar, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
  })).catch(() => null);
  if (estimate && trend?.trending) estimate.rationale += ` · 🔥 ${brandVal} trending (${trend.note})`;

@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
-import { cosine } from "./embeddings";
+import { cosine, embedImage, isEmbeddingConfigured } from "./embeddings";
+import type { Comp } from "./comps";
 
 // The intake "correction memory" — v1 of the learning loop.
 //
@@ -219,6 +220,76 @@ export async function getVisualHints(storeSlug: string, embedding: number[]): Pr
 }
 
 /**
+ * Visual PRICE comps: VYA pieces (ANY store) whose photo looks like this one, returned as comps for
+ * the price engine. Reuses embeddings we already stored at intake — so NO new embedding cost. Unlike
+ * the brand-text `getVyaComps`, this matches on how the piece LOOKS, so it still finds comps when the
+ * brand is unknown or mis-identified. Corpus grows with every intake; thin until it builds up.
+ */
+const parseVec = (s: string): number[] => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; } };
+const VISUAL_MATCH_MIN = 0.72; // tighter than the label-hint threshold — pricing needs close matches
+
+export async function getVisualVyaComps(embedding: number[], limit = 8): Promise<Comp[]> {
+ if (!embedding || embedding.length === 0) return [];
+ await ensureItemsTable();
+ await ensureSoldEmbeddingCol();
+ const scored: { score: number; comp: Comp }[] = [];
+
+ // Corpus 1 — REAL sold pieces (actual realized price + how fast it sold). The strongest comp.
+ const sold = (await db()`
+  SELECT designer, final_price, embedding FROM sold_items
+  WHERE embedding IS NOT NULL AND embedding <> '[]' AND final_price > 0
+  ORDER BY sold_at DESC LIMIT 1500
+ `.catch(() => [])) as { designer: string | null; final_price: number; embedding: string }[];
+ for (const r of sold) {
+ const v = parseVec(r.embedding); if (!v.length) continue;
+ const score = cosine(embedding, v); if (score < VISUAL_MATCH_MIN) continue;
+ scored.push({ score, comp: { title: r.designer || "similar VYA piece", priceCents: Math.round(Number(r.final_price) * 100), currency: "USD", sold: true, source: "VYA (sold)" } });
+ }
+
+ // Corpus 2 — currently/previously LISTED intake pieces (asking references).
+ const listed = (await db()`
+  SELECT brand, category, market_cents, price_cents, embedding FROM intake_memory_items
+  WHERE embedding IS NOT NULL AND embedding <> '[]' AND (market_cents > 0 OR price_cents > 0)
+  ORDER BY created_at DESC LIMIT 1500
+ `.catch(() => [])) as { brand: string | null; category: string | null; market_cents: number | null; price_cents: number | null; embedding: string }[];
+ for (const r of listed) {
+ const v = parseVec(r.embedding); if (!v.length) continue;
+ const score = cosine(embedding, v); if (score < VISUAL_MATCH_MIN) continue;
+ scored.push({ score, comp: { title: [r.brand, r.category].filter(Boolean).join(" ") || "similar VYA piece", priceCents: r.market_cents || r.price_cents || 0, currency: "USD", sold: false, source: "VYA (visual match)" } });
+ }
+
+ return scored.filter((s) => s.comp.priceCents > 0).sort((a, b) => b.score - a.score).slice(0, limit).map((s) => s.comp);
+}
+
+// ── Embed-on-sale: build the visual comp corpus from REAL sales ──
+// sold_items gets an embedding of its photo so getVisualVyaComps can match against actual
+// transactions. Cheap: ~a few sold items/day, one Voyage call each. Run by a daily cron.
+
+let soldColEnsured = false;
+async function ensureSoldEmbeddingCol() {
+ if (soldColEnsured) return;
+ await db()`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS embedding TEXT`.catch(() => {});
+ soldColEnsured = true;
+}
+
+export async function embedPendingSoldItems(limit = 60): Promise<{ embedded: number; remaining: number }> {
+ if (!isEmbeddingConfigured()) return { embedded: 0, remaining: 0 };
+ await ensureSoldEmbeddingCol();
+ const rows = (await db()`
+  SELECT id, image FROM sold_items
+  WHERE embedding IS NULL AND image IS NOT NULL AND image <> ''
+  ORDER BY sold_at DESC LIMIT ${limit}
+ `.catch(() => [])) as { id: number; image: string }[];
+ let embedded = 0;
+ for (const r of rows) {
+ const v = await embedImage(r.image).catch(() => null);
+ if (v && v.length) { await db()`UPDATE sold_items SET embedding = ${JSON.stringify(v)} WHERE id = ${r.id}`.catch(() => {}); embedded++; }
+ }
+ const left = (await db()`SELECT count(*)::int AS n FROM sold_items WHERE embedding IS NULL AND image IS NOT NULL AND image <> ''`.catch(() => [{ n: 0 }])) as { n: number }[];
+ return { embedded, remaining: left[0]?.n ?? 0 };
+}
+
+/**
  * How this store prices relative to market comps — the median of (final price ÷
  * comp market value) across past listings. >1 means they price ABOVE market
  * (premium positioning), <1 below. Defaults to 1 until there's enough history,
@@ -226,6 +297,8 @@ export async function getVisualHints(storeSlug: string, embedding: number[]): Pr
  */
 export async function getStorePriceMultiplier(storeSlug: string): Promise<number> {
  await ensureItemsTable();
+ // 1) Native-intake signal (most direct): the seller's final price vs the comp market value we
+ //    computed at intake. Only exists for stores that use Add-a-listing.
  const rows = (await db()`
   SELECT price_cents::float / market_cents AS ratio
   FROM intake_memory_items
@@ -233,8 +306,30 @@ export async function getStorePriceMultiplier(storeSlug: string): Promise<number
   ORDER BY created_at DESC LIMIT 100
  `.catch(() => [])) as { ratio: number }[];
  const ratios = rows.map((r) => Number(r.ratio)).filter((n) => Number.isFinite(n) && n > 0).sort((a, b) => a - b);
- if (ratios.length < 3) return 1; // not enough signal yet — trust the comps as-is
+ if (ratios.length >= 3) {
  const mid = Math.floor(ratios.length / 2);
  const median = ratios.length % 2 ? ratios[mid] : (ratios[mid - 1] + ratios[mid]) / 2;
- return Math.min(2.5, Math.max(0.6, median)); // clamp to a sane band
+ return Math.min(2.5, Math.max(0.6, median));
+ }
+ // 2) SYNCED-catalog fallback (every store): how the store's OWN prices compare to the marketplace
+ //    median for the SAME category — controlled for category mix. >1 = this store prices above market
+ //    (e.g. 1.15 ≈ +15%), <1 = below. This is how we learn a synced store's pricing pattern.
+ const syn = (await db()`
+  WITH cat_market AS (
+   SELECT product_type c, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) med
+   FROM products WHERE price > 0 AND product_type IS NOT NULL AND product_type <> ''
+   GROUP BY product_type HAVING count(*) >= 5
+  ), store_cat AS (
+   SELECT product_type c, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) smed
+   FROM products WHERE store_slug = ${storeSlug} AND price > 0 AND product_type IS NOT NULL AND product_type <> ''
+   GROUP BY product_type
+  )
+  SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY s.smed / m.med) AS ratio, count(*)::int AS cats
+  FROM store_cat s JOIN cat_market m ON s.c = m.c WHERE m.med > 0 AND s.smed > 0
+ `.catch(() => [])) as { ratio: number | null; cats: number }[];
+ const r = syn[0];
+ if (r && r.cats >= 2 && r.ratio != null && Number.isFinite(Number(r.ratio)) && Number(r.ratio) > 0) {
+ return Math.min(2.5, Math.max(0.6, Number(r.ratio)));
+ }
+ return 1; // not enough signal yet — trust the comps as-is
 }

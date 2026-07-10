@@ -1184,6 +1184,7 @@ export function toRSSProductFormat(product: ShopifyProduct): {
  size: string | null;
  productType: string | null;
  vendor: string | null;
+ available: boolean;
 } {
  return {
  title: product.title,
@@ -1201,5 +1202,6 @@ export function toRSSProductFormat(product: ShopifyProduct): {
  size: product.size,
  productType: product.productType,
  vendor: product.vendor ?? null,
+ available: product.availableForSale !== false, // false only when the source explicitly marks it sold out
  };
 }
