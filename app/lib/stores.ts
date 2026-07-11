@@ -854,6 +854,28 @@ export const stores = [
  "All sales are final. Due to the vintage and pre-loved nature of items, returns are not accepted. If there is a quality or condition issue, use the form below within 2 business days of delivery.",
  },
  {
+ slug: "reine-revival",
+ dashboardToken: "rr-6b2f8d4a1e9c",
+ name: "Reine Revival",
+ location: "Los Angeles, CA",
+ description:
+ "Reine Revival was born from a lifelong love of thrifting and finding unique vintage pieces — for myself, my friends, and my family. Vintage clothing tells a story, and I love giving those pieces a second life, helping others discover the quality, craftsmanship, and character that make vintage so special. The name 'Reine' is close to my heart: it's my sister's middle name and a nod to my hometown of Seattle, the 'Rain City' — and in French, reine means 'queen,' which is what those close to me call me, the 'vintage queen.' Based in Los Angeles.",
+ website: "https://reinerevival.com",
+ contactEmail: "kaylendbusiness@gmail.com",
+ dataSource: "reine-revival",
+ image: "/stores/reine-revival.png",
+ logo: "/stores/reine-revival.png",
+ logoBg: "#ffffff",
+ currency: "USD",
+ commissionType: "shopify-collabs" as const,
+ collabsStoreId: "248725",
+ authenticityPolicy:
+ "Every piece is carefully sourced, inspected, and accurately described before listing.",
+ shippingPolicy: "Shipping rates are calculated at checkout.",
+ returnPolicy:
+ "All sales are final. As a vintage shop of one-of-a-kind pieces, please review all item details and photos carefully before purchasing.",
+ },
+ {
  slug: "rejects-only-vintage",
  dashboardToken: "rov-3a7e2c9d1f8b",
  name: "Rejects Only Vintage",
@@ -1470,6 +1492,7 @@ export const storeContactEmails: Record<string, string> = {
  "mookie-studios": "madeleine@mookiestudios.com",
  "california-boho-studio": "hello@californiabohostudio.com",
  "shiranka-vintage": "info@shirankavintage.com",
+ "reine-revival": "kaylendbusiness@gmail.com",
  // VYA admin test account — sees all requests
  "via-admin": "hana@theviaplatform.com",
 };
