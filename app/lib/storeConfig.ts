@@ -477,6 +477,12 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  storeDomain: "blummier.com",
  scrapeProductPage: true,
  },
+ {
+ type: "shopify",
+ name: "Reine Revival",
+ slug: "reine-revival",
+ storeDomain: "reinerevival.com",
+ },
 ];
 
 // Big Cartel stores (public JSON API — no token required)
