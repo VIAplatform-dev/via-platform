@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VYA — Building the infrastructure for one-of-one commerce</title>
+<meta name="description" content="VYA is the first purpose-built infrastructure for the one-of-one economy. The e-commerce platform for stores where every item exists only once." />
+<meta name="theme-color" content="#ffffff" />
+<meta property="og:title" content="VYA — Infrastructure for the one-of-one economy" />
+<meta property="og:description" content="The e-commerce platform for stores where every item exists only once. Catalog, list, and sell every unique item in seconds." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/infra/styles.css" />
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav theme-dark" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="brand" aria-label="VYA home">
+      <svg class="brand-logo" viewBox="0 0 228 132" role="img" aria-label="VYA"><path pathLength="1" d="M 139.960938 130.339844 L 139.960938 131.914062 L 118.601562 131.914062 C 118.375 131.089844 118.417969 130.566406 119.261719 129.894531 C 120.171875 129.167969 120.859375 127.957031 121.285156 126.820312 C 122.492188 123.597656 122.667969 120.175781 122.679688 116.765625 C 122.710938 107.546875 122.699219 98.328125 122.679688 89.109375 C 122.679688 88.632812 122.53125 88.113281 122.3125 87.695312 C 112.851562 69.824219 103.375 51.964844 93.902344 34.105469 C 92.738281 31.90625 91.578125 29.703125 90.410156 27.503906 C 90.292969 27.273438 90.144531 27.0625 89.921875 26.699219 C 89.28125 28.585938 88.683594 30.335938 88.09375 32.09375 C 79.054688 58.910156 70.019531 85.726562 60.980469 112.542969 C 60.085938 115.1875 59.160156 117.824219 58.324219 120.488281 C 58.140625 121.070312 58.132812 121.808594 58.3125 122.386719 C 59.191406 125.210938 60.167969 128.007812 61.105469 130.8125 C 61.214844 131.148438 61.304688 131.492188 61.425781 131.921875 C 61.03125 131.945312 60.75 131.980469 60.464844 131.980469 C 56.5 131.980469 52.539062 131.96875 48.574219 132 C 47.917969 132.003906 47.617188 131.835938 47.394531 131.164062 C 36.519531 98.753906 25.65625 66.347656 14.695312 33.96875 C 12 26.003906 9.046875 18.128906 6.054688 10.273438 C 5.1875 7.992188 3.847656 5.890625 2.585938 3.792969 C 2.132812 3.039062 1.207031 2.597656 0.632812 1.902344 C 0.304688 1.503906 0.234375 0.871094 0 0.207031 L 22.0625 0.207031 C 21.804688 0.992188 21.457031 1.648438 21.394531 2.335938 C 21.246094 3.882812 21.070312 5.460938 21.203125 6.996094 C 21.742188 13.183594 23.554688 19.0625 25.546875 24.910156 C 30.375 39.109375 35.136719 53.328125 39.917969 67.542969 C 45.507812 84.148438 51.101562 100.757812 56.695312 117.363281 C 56.84375 117.800781 57.007812 118.222656 57.261719 118.898438 C 57.566406 118.054688 57.804688 117.429688 58.015625 116.792969 C 65.953125 93.078125 73.882812 69.363281 81.816406 45.652344 C 84.019531 39.0625 86.222656 32.472656 88.457031 25.890625 C 88.730469 25.085938 88.664062 24.484375 88.167969 23.78125 C 84.308594 18.308594 80.519531 12.78125 76.648438 7.320312 C 75.773438 6.085938 74.675781 5 73.609375 3.921875 C 72.484375 2.792969 71.210938 1.851562 69.535156 1.589844 L 69.535156 0.03125 L 96.867188 0.03125 C 96.9375 0.765625 96.742188 1.351562 96.5 2.058594 C 96.121094 3.15625 96.125 4.488281 96.285156 5.675781 C 96.820312 9.679688 98.171875 13.457031 99.984375 17.011719 C 103.726562 24.34375 107.609375 31.605469 111.457031 38.882812 C 118.542969 52.296875 125.632812 65.714844 132.726562 79.125 C 133.40625 80.40625 134.089844 81.683594 134.855469 83.121094 C 135.921875 80.921875 136.917969 78.875 137.90625 76.816406 C 142.4375 67.386719 146.972656 57.960938 151.488281 48.519531 C 156.332031 38.394531 161.199219 28.277344 165.972656 18.113281 C 167.570312 14.710938 168.859375 11.160156 169.164062 7.347656 C 169.25 6.246094 169.117188 5.074219 168.835938 4.003906 C 168.5 2.71875 167.511719 1.976562 166.207031 1.742188 C 165.339844 1.589844 165.003906 1.007812 165.199219 0 L 180.65625 0 C 181.789062 3.390625 182.894531 6.722656 184.015625 10.054688 C 189.449219 26.222656 194.882812 42.386719 200.324219 58.550781 C 206.011719 75.445312 211.683594 92.339844 217.429688 109.214844 C 219.378906 114.941406 221.4375 120.644531 224.300781 125.980469 C 225.054688 127.390625 225.996094 128.804688 227.171875 129.84375 C 227.933594 130.515625 228.105469 131.007812 227.945312 131.914062 L 206.273438 131.914062 C 206.492188 131.171875 206.703125 130.550781 206.84375 129.917969 C 207 129.207031 207.191406 128.484375 207.195312 127.765625 C 207.210938 123.355469 206.417969 119.050781 205.113281 114.882812 C 202.472656 106.4375 199.757812 98.019531 196.855469 89.667969 C 195.132812 84.710938 191.988281 80.898438 186.761719 79.414062 C 183.160156 78.390625 179.550781 78.753906 175.996094 79.710938 C 169.429688 81.484375 164.039062 85.273438 159.253906 90.054688 C 158.691406 90.617188 158.257812 91.402344 157.988281 92.164062 C 157.746094 92.824219 157.464844 93.019531 156.789062 92.816406 L 156.789062 77.492188 C 157.40625 77.230469 157.746094 77.320312 157.878906 78.136719 C 158.21875 80.148438 159.441406 81.277344 161.460938 81.53125 C 163.890625 81.835938 166.203125 81.253906 168.507812 80.5625 C 171.792969 79.570312 175.035156 78.347656 178.382812 77.671875 C 183.292969 76.679688 188.046875 77.257812 192.210938 80.449219 C 192.902344 80.980469 193.527344 81.59375 194.421875 82.375 C 186.511719 59.066406 178.699219 36.039062 170.886719 13.015625 C 170.792969 13 170.707031 12.988281 170.613281 12.972656 C 168.660156 16.855469 166.660156 20.710938 164.765625 24.621094 C 159.792969 34.90625 154.867188 45.21875 149.917969 55.515625 C 145.316406 65.097656 140.707031 74.675781 136.128906 84.265625 C 135.894531 84.753906 135.78125 85.351562 135.78125 85.894531 C 135.765625 96.015625 135.746094 106.136719 135.78125 116.253906 C 135.792969 119.757812 135.953125 123.273438 137.085938 126.632812 C 137.605469 128.179688 138.214844 129.730469 139.980469 130.328125 Z M 139.960938 130.339844 "/></svg>
+      <span class="brand-text" style="display:none">VYA</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">Platform</a>
+      <a href="#capabilities">Capabilities</a>
+      <a href="/infrastructure/company">Company</a>
+      <a href="/infrastructure/contact">Contact</a>
+    </nav>
+    <div class="nav-right">
+      <a href="/store/login" class="btn btn-soft">Log in</a>
+      <a href="https://calendar.app.google/mVC2qvrgX6mdmL1N6" target="_blank" rel="noopener" class="btn btn-dark">Book a demo</a>
+      <button class="nav-toggle" aria-label="Menu">☰</button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top" data-theme="dark">
+  <div class="hero-media">
+    <video autoplay muted loop playsinline poster="/infra/videos/hero-poster.jpg">
+      <source src="/infra/videos/hero.mp4" type="video/mp4" />
+    </video>
+    <div class="fallback dark" aria-hidden="true"><span>videos/hero.mp4</span></div>
+  </div>
+  <div class="hero-content">
+    <div class="wrap hero-grid">
+      <div>
+        <h1>Powering one-of-one commerce</h1>
+        <div class="cta-row">
+          <a href="https://calendar.app.google/mVC2qvrgX6mdmL1N6" target="_blank" rel="noopener" class="btn btn-glass btn-lg">Book a demo
+            <svg class="arw" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        </div>
+        <p class="micro"><span id="tw" aria-live="polite"></span><span class="tw-caret" aria-hidden="true"></span></p>
+      </div>
+      <nav class="hero-links">
+        <a href="#features">Instant intake <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+        <a href="#features">Sell everywhere <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+        <a href="/infrastructure/company">Built for one of one <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+        <a href="https://vyaplatform.com" target="_blank" rel="noopener">The marketplace <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></a>
+      </nav>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES (Flora-style) ============ -->
+<section class="fx" id="features" data-theme="dark">
+  <div class="wrap">
+    <div class="fx-head reveal">
+      <h2 class="fx-title">Everything your store needs.</h2>
+      <p class="fx-sub">From the first photo to the final payout, VYA runs it all for you.</p>
+    </div>
+    <div class="fx-grid">
+
+      <article class="fx-card reveal" id="intake">
+        <span class="grid-bg"></span><span class="glow"></span>
+        <div class="fx-num"><span class="n">01</span><span class="w">Intake</span></div>
+        <div class="fx-stage plat-stage">
+          <div class="plat state-menu">
+            <div class="plat-inner">
+              <div class="plat-menu">
+                <div class="plat-h">Add item</div>
+                <div class="plat-row">
+                  <span class="ri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 8h3l1.6-2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.1"/></svg></span>
+                  <span class="rt"><b>Add photo</b><i>Snap or upload an item</i></span><span class="rk">P</span>
+                </div>
+                <div class="plat-row">
+                  <span class="ri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 4h7l9 9-7 7-9-9z"/><circle cx="8.4" cy="8.4" r="1.3" fill="currentColor" stroke="none"/></svg></span>
+                  <span class="rt"><b>Scan tag</b><i>Read a barcode or care label</i></span><span class="rk">S</span>
+                </div>
+                <div class="plat-row">
+                  <span class="ri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10M8 11l4 4 4-4M5 20h14"/></svg></span>
+                  <span class="rt"><b>Import listing</b><i>Pull from eBay or Depop</i></span><span class="rk">I</span>
+                </div>
+                <div class="plat-h">Add source</div>
+                <div class="plat-row" id="rowUpload">
+                  <span class="ri"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M8 8l4-4 4 4M5 16v4h14v-4"/></svg></span>
+                  <span class="rt"><b>Upload</b><i>Choose from your library</i></span><span class="rk">U</span>
+                </div>
+                <div class="plat-foot"><span>&#8597; Navigate</span><span>&#8629; Select</span></div>
+              </div>
+              <div class="plat-result">
+                <div class="pr-top">
+                  <div class="pr-thumb"><img src="/infra/assets/item.jpg" alt="" onerror="this.style.display='none'" /></div>
+                  <div class="pr-info">
+                    <div class="pr-title">Analyzing photo&hellip;</div>
+                    <div class="pr-sub">Detecting brand, condition &amp; value</div>
+                    <div class="pr-bar"><span></span></div>
+                  </div>
+                </div>
+                <div class="pr-fields">
+                  <div class="an-row pending" data-val="Fendi"><span class="lbl">Brand</span><span class="val"><span class="sk"></span><span class="txt"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="#8fe6cc" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span></div>
+                  <div class="an-row pending" data-val="Zucca Crescent Bag"><span class="lbl">Model</span><span class="val"><span class="sk"></span><span class="txt"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="#8fe6cc" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span></div>
+                  <div class="an-row pending" data-val="Excellent"><span class="lbl">Condition</span><span class="val"><span class="sk"></span><span class="txt"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="#8fe6cc" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span></div>
+                  <div class="an-row pending" data-val="Not on runway"><span class="lbl">On the runway</span><span class="val"><span class="sk"></span><span class="txt"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="#8fe6cc" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span></div>
+                  <div class="an-row an-big pending" data-val="$600"><span class="lbl">Est. market value</span><span class="val"><span class="sk"></span><span class="txt"></span><svg class="chk" viewBox="0 0 24 24" fill="none" stroke="#8fe6cc" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4L19 7"/></svg></span></div>
+                </div>
+              </div>
+            </div>
+            <span class="plat-cursor" aria-hidden="true"><svg width="20" height="22" viewBox="0 0 20 22"><path d="M2 1.4 L2 17.8 L6.4 13.9 L9.2 20.5 L11.9 19.2 L9.1 12.9 L14.9 12.9 Z" fill="#fff" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+          </div>
+        </div>
+        <div class="fx-foot">
+          <h3>Snap a photo. It's listed in seconds.</h3>
+          <p>Point, shoot, done &mdash; identified, described, and priced automatically.</p>
+          <div class="fx-more">Bring the whole back room online in a single afternoon.</div>
+        </div>
+      </article>
+
+      <article class="fx-card reveal" id="reach">
+        <span class="grid-bg"></span><span class="glow"></span>
+        <div class="fx-num"><span class="n">02</span><span class="w">Sell everywhere</span></div>
+        <div class="fx-stage sell-stage">
+          <div class="sell">
+            <span class="sell-glow"></span>
+            <svg class="sell-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M50,40 V52"/>
+              <path d="M22,86 V55 Q22,52 25,52 H75 Q78,52 78,55 V86"/>
+              <path d="M38,52 V66"/>
+              <path d="M62,52 V66"/>
+              <path d="M50,52 V86"/>
+            </svg>
+            <svg class="sell-flow" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M50,40 V52"/>
+              <path d="M22,86 V55 Q22,52 25,52 H75 Q78,52 78,55 V86"/>
+              <path d="M38,52 V66"/>
+              <path d="M62,52 V66"/>
+              <path d="M50,52 V86"/>
+            </svg>
+            <div class="sell-node sell-card" style="left:50%;top:12%;transition-delay:.05s">
+              <div class="sc-thumb"><img src="/infra/assets/item-top.jpg" alt="" /></div>
+              <div class="sc-meta"><div class="sc-name">Valentino Suede Bag</div><div class="sc-price">$680.00</div></div>
+            </div>
+            <div class="sell-node sell-hub" style="left:50%;top:40%;transition-delay:.16s"><img src="/infra/brand/vya-logo.svg" alt="VYA" /></div>
+            <div class="sell-node ch" style="left:38%;top:66%;transition-delay:.50s"><div class="ch-in"><img src="/infra/logos/ebay.png" alt="eBay" /></div></div>
+            <div class="sell-node ch" style="left:62%;top:66%;transition-delay:.55s"><div class="ch-in"><img src="/infra/logos/depop.png" alt="Depop" /></div></div>
+            <div class="sell-node ch" style="left:22%;top:86%;transition-delay:.60s"><div class="ch-in"><img src="/infra/logos/vestiaire.png" alt="Vestiaire" /></div></div>
+            <div class="sell-node ch" style="left:50%;top:86%;transition-delay:.65s"><div class="ch-in"><img src="/infra/logos/instagram.png" alt="Instagram" /></div></div>
+            <div class="sell-node ch" style="left:78%;top:86%;transition-delay:.70s"><div class="ch-in"><img src="/infra/logos/google.png" alt="Google" /></div></div>
+          </div>
+        </div>
+        <div class="fx-foot">
+          <h3>Your store, with the reach of the entire internet.</h3>
+          <p>One living record everywhere. Sell it once, it clears itself.</p>
+          <div class="fx-more">A neighborhood shop that sells like a national brand.</div>
+        </div>
+      </article>
+
+      <article class="fx-card reveal" id="inventory">
+        <span class="grid-bg"></span><span class="glow"></span>
+        <div class="fx-num"><span class="n">03</span><span class="w">Get paid</span></div>
+        <div class="fx-stage">
+          <div class="mk mk-ledger mkcard anim d1">
+            <div class="led-top"><span class="h">Payouts</span><span class="chip teal" id="ledTotal">$4,120 this week</span></div>
+            <div class="led-row anim d2">
+              <span class="av" style="background:#9fe1cb">JM</span>
+              <span><span class="led-name">Jill M. <span class="led-tag">Consignor</span></span><span class="led-item">Zucca bag &middot; sold $600 &middot; split 50/50</span></span>
+              <span class="led-pay">+$300</span>
+            </div>
+            <div class="led-row anim d3">
+              <span class="av" style="background:#f4c0d1">YOU</span>
+              <span><span class="led-name">Your store <span class="led-tag own">Direct</span></span><span class="led-item">Denim jacket &middot; sold $120</span></span>
+              <span class="led-pay">+$120</span>
+            </div>
+            <div class="led-row anim d4">
+              <span class="av" style="background:#fac775">LK</span>
+              <span><span class="led-name">Lena K. <span class="led-tag">Consignor</span></span><span class="led-item">Leather boots &middot; sold $95 &middot; split 60/40</span></span>
+              <span class="led-pay" id="ledPending" style="color:#f0c27a">Pending</span>
+            </div>
+            <div class="led-note anim d5"><span class="chip"><span class="dot"></span>Splits and payouts, settled for you</span></div>
+          </div>
+        </div>
+        <div class="fx-foot">
+          <h3>Get paid the moment it sells.</h3>
+          <p>Your own sales and consignor splits, tracked and paid out automatically.</p>
+          <div class="fx-more">Consignment is built in, not the whole story.</div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCROLL-REVEAL STATEMENT ============ -->
+<section class="bigtext" data-theme="dark">
+  <div class="bt-sticky">
+    <p class="bt-copy" id="btCopy">The first purpose-built infrastructure for the one-of-one economy: one system to run your store, list your products, and sell everywhere.</p>
+  </div>
+</section>
+
+<!-- ============ CAPABILITIES (scroll-pinned, light) ============ -->
+<section class="caps" id="capabilities" data-theme="light">
+  <div class="caps-head">
+    <h2>Capabilities</h2>
+  </div>
+  <div class="caps-stack">
+
+    <!-- 01 Text to list -->
+    <article class="cap-row" data-i="0">
+      <div class="cap-copy">
+        <div class="cap-tag">Listing, without the busywork.</div>
+        <div class="cap-btm">
+          <div class="cap-idx">01</div>
+          <h3>Text to list</h3>
+          <p>Snap a photo and text it in like you would a friend. VYA reads the item, writes the title and description, prices it against hundreds of recent comps, and publishes it across every channel in seconds.</p>
+        </div>
+      </div>
+      <div class="cap-vis is-phone">
+        <div class="pop-marks" id="popMarks">
+          <div class="pop-mark"><img src="/infra/logos/ebay.png" alt="eBay" /><span class="pm-check"></span></div>
+          <div class="pop-mark"><img src="/infra/logos/depop.png" alt="Depop" /><span class="pm-check"></span></div>
+        </div>
+        <div class="ph-wrap">
+          <div class="cap-phone-ph"></div>
+          <div class="ph-screen">
+            <div class="im-island"></div>
+            <div class="im-status"><span>9:41</span><span class="sig">&#9646;&#9646;&#9646; &#9670; &#9636;</span></div>
+            <div class="im-nav"><span class="chev">&#8249;</span><span class="im-av"><img src="/infra/brand/vya-logo.svg" alt="" /></span><span class="im-nm">VYA</span></div>
+            <div class="im-body" id="imBody">
+              <div class="im-tstamp im-msg"><b>Today</b> 9:41 AM</div>
+              <div class="im-photo im-msg"><img src="/infra/assets/fendi.jpg" alt="" /></div>
+              <div class="im-b im-out im-msg">Just got this Fendi crescent bag, excellent condition. Paid $350.</div>
+              <div class="im-typing im-msg" id="imType"><span></span><span></span><span></span></div>
+              <div class="im-b im-in im-msg" id="imAgent" data-val="Priced at $600 from comps. Fendi Zucca, FF logo, gold buckle. Ready to publish?"></div>
+              <div class="im-b im-out im-msg" id="imYes">Yes, publish it</div>
+              <div class="im-b im-in im-msg" id="imDone">Listed on your site, Depop &amp; eBay in 38s.</div>
+            </div>
+            <div class="im-compose">
+              <span class="im-icn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+              <span class="im-icn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm3.9 13.2-1.4.4-1.1-1.9h-4.3l-.6 1.1a1 1 0 0 1-1.7-1l3-5.2a1 1 0 0 1 1.7 0l1.6 2.8 1-1.7 1.7 1-1 1.7 1.5 2.6a1 1 0 0 1-.6.9z"/></svg></span>
+              <span class="im-field">iMessage<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/><path d="M6 11a6 6 0 0 0 12 0M12 18v3"/></svg></span>
+            </div>
+            <div class="im-home"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 02 Industry Trends -->
+    <article class="cap-row" data-i="1">
+      <div class="cap-copy">
+        <div class="cap-tag">Source with conviction.</div>
+        <div class="cap-btm">
+          <div class="cap-idx">02</div>
+          <h3>Industry Trends</h3>
+          <p>VYA tracks real resale demand across every marketplace and tells you what's heating up and what's cooling off, so you buy the pieces that sell fast and skip the ones that sit on your shelf.</p>
+        </div>
+      </div>
+      <div class="cap-vis">
+        <div class="cap-panel" id="trPanel">
+          <div class="tr-h"><span class="tt">What to source</span><span class="sb">Live demand &middot; this week</span></div>
+          <div class="tr-item"><span class="tr-nm">Roberto Cavalli</span><span class="tr-chg up">&#9650; Surging</span></div>
+          <div class="tr-item"><span class="tr-nm">Dior</span><span class="tr-chg up">&#9650; Rising</span></div>
+          <div class="tr-item"><span class="tr-nm">Gucci</span><span class="tr-chg up">&#9650; Rising</span></div>
+          <div class="tr-item"><span class="tr-nm">Escada</span><span class="tr-chg up">&#9650; Warming</span></div>
+          <div class="tr-item"><span class="tr-nm">Cache</span><span class="tr-chg down">&#9660; Cooling</span></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 03 Offers -->
+    <article class="cap-row" data-i="2">
+      <div class="cap-copy">
+        <div class="cap-tag">See what buyers will actually pay.</div>
+        <div class="cap-btm">
+          <div class="cap-idx">03</div>
+          <h3>Offers</h3>
+          <p>Buyers send their offers straight to you in one place. Accept, decline, or counter with a tap, and always see exactly what each person is willing to pay before you decide.</p>
+        </div>
+      </div>
+      <div class="cap-vis">
+        <div class="cap-panel" id="ofPanel">
+          <div class="of-item">
+            <div class="of-thumb"><img src="/infra/assets/item-top.jpg" alt="" /></div>
+            <div><div class="of-nm">Valentino Suede Bag</div><div class="of-sub">Listed $680 &middot; 3 offers</div></div>
+          </div>
+          <div class="of-row"><div class="of-l"><span class="of-buyer">Maya R.</span><span class="of-time">2h ago</span></div><div class="of-r"><span class="of-amt">$620</span><span class="of-pill of-acc">Accepted</span></div></div>
+          <div class="of-row"><div class="of-l"><span class="of-buyer">Dev P.</span><span class="of-time">8h ago</span></div><div class="of-r"><span class="of-amt">$585</span><span class="of-pill of-wait">Countered</span></div></div>
+          <div class="of-row"><div class="of-l"><span class="of-buyer">Lena K.</span><span class="of-time">1d ago</span></div><div class="of-r"><span class="of-amt">$540</span><span class="of-pill of-wait">Waiting</span></div></div>
+        </div>
+      </div>
+    </article>
+
+    <!-- 04 Messaging -->
+    <article class="cap-row" data-i="3">
+      <div class="cap-copy">
+        <div class="cap-tag">Own the conversation.</div>
+        <div class="cap-btm">
+          <div class="cap-idx">04</div>
+          <h3>Messaging</h3>
+          <p>When a buyer asks about a product on your site, VYA texts the question straight to you. You reply in your own words, so every conversation lives in one place instead of scattered Instagram DMs.</p>
+        </div>
+      </div>
+      <div class="cap-vis">
+        <div class="cap-panel">
+          <div class="ms-hd"><span class="ms-av">MR</span><div><div class="ms-nm">Maya R.</div><div class="ms-on">Fendi Zucca Baguette</div></div></div>
+          <div class="ms-thread" id="msThread">
+            <div class="ms-b ms-in">hi! are there any stains?</div>
+            <div class="ms-b ms-out" id="msReply" data-val="there's a minor stain on the inside of the bag, but the outside is clean"></div>
+            <div class="ms-b ms-in">perfect, i'll take it 🙌</div>
+          </div>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ============ SOLUTION RESEARCH PANEL ============ -->
+<section class="band-tight" id="solution" data-theme="light">
+  <div class="wrap reveal">
+    <div class="panel">
+      <div class="panel-inner">
+        <div>
+          <p class="lead">Built for sellers at <span class="em">every stage</span>, from your first listing to a full storefront. Payments, shipping, and cross-posting built right in.</p>
+          <div class="panel-actions">
+            <a href="https://calendar.app.google/mVC2qvrgX6mdmL1N6" target="_blank" rel="noopener" class="btn btn-glass btn-lg">Book a demo
+              <svg class="arw" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          </div>
+        </div>
+        <div class="rlist">
+          <a class="ritem" href="#intake">
+            <svg class="up" viewBox="0 0 24 24"><path d="M7 17L17 7M8 7h9v9"/></svg>
+            <h4>Start from scratch</h4>
+            <p>No website yet? Launch a full storefront in minutes, no code and no setup required.</p>
+          </a>
+          <a class="ritem" href="#reach">
+            <svg class="up" viewBox="0 0 24 24"><path d="M7 17L17 7M8 7h9v9"/></svg>
+            <h4>Bring your own site</h4>
+            <p>Already have a website? Seamlessly integrate every page and all your listings with one click.</p>
+          </a>
+          <a class="ritem" href="#inventory">
+            <svg class="up" viewBox="0 0 24 24"><path d="M7 17L17 7M8 7h9v9"/></svg>
+            <h4>Payments &amp; shipping built in</h4>
+            <p>Checkout, payments, and shipping labels all live inside VYA, so you never leave to get paid or ship an order.</p>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA ============ -->
+<section class="band cta" id="cta" data-theme="light">
+  <div class="wrap reveal">
+    <p class="display cta-big">What are you waiting for?</p>
+    <p>List it once, sell it everywhere, and run your whole store from one place.</p>
+    <div class="cta-row">
+      <a href="https://calendar.app.google/mVC2qvrgX6mdmL1N6" target="_blank" rel="noopener" class="btn btn-dark btn-lg">Book a demo
+        <svg class="arw" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a href="/infrastructure/contact" class="btn btn-outline-d btn-lg">Talk to us</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site" data-theme="dark">
+  <div class="wrap">
+    <div class="foot-cols">
+      <div class="foot-col">
+        <h5>Product</h5>
+        <a href="#features">Platform</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="https://calendar.app.google/mVC2qvrgX6mdmL1N6" target="_blank" rel="noopener">Book a demo</a>
+      </div>
+      <div class="foot-col">
+        <h5>Company</h5>
+        <a href="/infrastructure/company">About</a>
+        <a href="/infrastructure/company#mission">Mission</a>
+        <a href="/infrastructure/contact">Contact</a>
+        <a href="/infrastructure/faq">FAQ</a>
+      </div>
+      <div class="foot-col">
+        <h5>Get started</h5>
+        <a href="https://calendar.app.google/mVC2qvrgX6mdmL1N6" target="_blank" rel="noopener">Book a demo</a>
+        <a href="/store/login">Log in</a>
+        <a href="/infrastructure/contact">Talk to us</a>
+      </div>
+      <div class="foot-col">
+        <h5>Connect</h5>
+        <a href="#">Instagram <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17L17 7M8 7h9v9"/></svg></a>
+        <a href="#">Twitter <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17L17 7M8 7h9v9"/></svg></a>
+        <a href="#">TikTok <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17L17 7M8 7h9v9"/></svg></a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <div class="mark">
+        <svg class="mark-logo" viewBox="0 0 228 132" role="img" aria-label="VYA"><path pathLength="1" d="M 139.960938 130.339844 L 139.960938 131.914062 L 118.601562 131.914062 C 118.375 131.089844 118.417969 130.566406 119.261719 129.894531 C 120.171875 129.167969 120.859375 127.957031 121.285156 126.820312 C 122.492188 123.597656 122.667969 120.175781 122.679688 116.765625 C 122.710938 107.546875 122.699219 98.328125 122.679688 89.109375 C 122.679688 88.632812 122.53125 88.113281 122.3125 87.695312 C 112.851562 69.824219 103.375 51.964844 93.902344 34.105469 C 92.738281 31.90625 91.578125 29.703125 90.410156 27.503906 C 90.292969 27.273438 90.144531 27.0625 89.921875 26.699219 C 89.28125 28.585938 88.683594 30.335938 88.09375 32.09375 C 79.054688 58.910156 70.019531 85.726562 60.980469 112.542969 C 60.085938 115.1875 59.160156 117.824219 58.324219 120.488281 C 58.140625 121.070312 58.132812 121.808594 58.3125 122.386719 C 59.191406 125.210938 60.167969 128.007812 61.105469 130.8125 C 61.214844 131.148438 61.304688 131.492188 61.425781 131.921875 C 61.03125 131.945312 60.75 131.980469 60.464844 131.980469 C 56.5 131.980469 52.539062 131.96875 48.574219 132 C 47.917969 132.003906 47.617188 131.835938 47.394531 131.164062 C 36.519531 98.753906 25.65625 66.347656 14.695312 33.96875 C 12 26.003906 9.046875 18.128906 6.054688 10.273438 C 5.1875 7.992188 3.847656 5.890625 2.585938 3.792969 C 2.132812 3.039062 1.207031 2.597656 0.632812 1.902344 C 0.304688 1.503906 0.234375 0.871094 0 0.207031 L 22.0625 0.207031 C 21.804688 0.992188 21.457031 1.648438 21.394531 2.335938 C 21.246094 3.882812 21.070312 5.460938 21.203125 6.996094 C 21.742188 13.183594 23.554688 19.0625 25.546875 24.910156 C 30.375 39.109375 35.136719 53.328125 39.917969 67.542969 C 45.507812 84.148438 51.101562 100.757812 56.695312 117.363281 C 56.84375 117.800781 57.007812 118.222656 57.261719 118.898438 C 57.566406 118.054688 57.804688 117.429688 58.015625 116.792969 C 65.953125 93.078125 73.882812 69.363281 81.816406 45.652344 C 84.019531 39.0625 86.222656 32.472656 88.457031 25.890625 C 88.730469 25.085938 88.664062 24.484375 88.167969 23.78125 C 84.308594 18.308594 80.519531 12.78125 76.648438 7.320312 C 75.773438 6.085938 74.675781 5 73.609375 3.921875 C 72.484375 2.792969 71.210938 1.851562 69.535156 1.589844 L 69.535156 0.03125 L 96.867188 0.03125 C 96.9375 0.765625 96.742188 1.351562 96.5 2.058594 C 96.121094 3.15625 96.125 4.488281 96.285156 5.675781 C 96.820312 9.679688 98.171875 13.457031 99.984375 17.011719 C 103.726562 24.34375 107.609375 31.605469 111.457031 38.882812 C 118.542969 52.296875 125.632812 65.714844 132.726562 79.125 C 133.40625 80.40625 134.089844 81.683594 134.855469 83.121094 C 135.921875 80.921875 136.917969 78.875 137.90625 76.816406 C 142.4375 67.386719 146.972656 57.960938 151.488281 48.519531 C 156.332031 38.394531 161.199219 28.277344 165.972656 18.113281 C 167.570312 14.710938 168.859375 11.160156 169.164062 7.347656 C 169.25 6.246094 169.117188 5.074219 168.835938 4.003906 C 168.5 2.71875 167.511719 1.976562 166.207031 1.742188 C 165.339844 1.589844 165.003906 1.007812 165.199219 0 L 180.65625 0 C 181.789062 3.390625 182.894531 6.722656 184.015625 10.054688 C 189.449219 26.222656 194.882812 42.386719 200.324219 58.550781 C 206.011719 75.445312 211.683594 92.339844 217.429688 109.214844 C 219.378906 114.941406 221.4375 120.644531 224.300781 125.980469 C 225.054688 127.390625 225.996094 128.804688 227.171875 129.84375 C 227.933594 130.515625 228.105469 131.007812 227.945312 131.914062 L 206.273438 131.914062 C 206.492188 131.171875 206.703125 130.550781 206.84375 129.917969 C 207 129.207031 207.191406 128.484375 207.195312 127.765625 C 207.210938 123.355469 206.417969 119.050781 205.113281 114.882812 C 202.472656 106.4375 199.757812 98.019531 196.855469 89.667969 C 195.132812 84.710938 191.988281 80.898438 186.761719 79.414062 C 183.160156 78.390625 179.550781 78.753906 175.996094 79.710938 C 169.429688 81.484375 164.039062 85.273438 159.253906 90.054688 C 158.691406 90.617188 158.257812 91.402344 157.988281 92.164062 C 157.746094 92.824219 157.464844 93.019531 156.789062 92.816406 L 156.789062 77.492188 C 157.40625 77.230469 157.746094 77.320312 157.878906 78.136719 C 158.21875 80.148438 159.441406 81.277344 161.460938 81.53125 C 163.890625 81.835938 166.203125 81.253906 168.507812 80.5625 C 171.792969 79.570312 175.035156 78.347656 178.382812 77.671875 C 183.292969 76.679688 188.046875 77.257812 192.210938 80.449219 C 192.902344 80.980469 193.527344 81.59375 194.421875 82.375 C 186.511719 59.066406 178.699219 36.039062 170.886719 13.015625 C 170.792969 13 170.707031 12.988281 170.613281 12.972656 C 168.660156 16.855469 166.660156 20.710938 164.765625 24.621094 C 159.792969 34.90625 154.867188 45.21875 149.917969 55.515625 C 145.316406 65.097656 140.707031 74.675781 136.128906 84.265625 C 135.894531 84.753906 135.78125 85.351562 135.78125 85.894531 C 135.765625 96.015625 135.746094 106.136719 135.78125 116.253906 C 135.792969 119.757812 135.953125 123.273438 137.085938 126.632812 C 137.605469 128.179688 138.214844 129.730469 139.980469 130.328125 Z M 139.960938 130.339844 "/></svg>
+        <span class="mark-text" style="display:none">VYA</span>
+      </div>
+      <div class="foot-legal">
+        © 2026 VYA, Inc. / <a href="#">Terms of Use</a> / <a href="#">Privacy Policy</a><br>
+        Infrastructure for one-of-one commerce
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  var nav=document.getElementById('nav');
+  var sections=[].slice.call(document.querySelectorAll('[data-theme]'));
+
+  function updateNav(){
+    var y=window.scrollY;
+    nav.classList.toggle('scrolled', y>20);
+    // find the section currently under the nav bar
+    var line=y+36, theme='light';
+    for(var i=0;i<sections.length;i++){
+      var s=sections[i], top=s.offsetTop, bot=top+s.offsetHeight;
+      if(line>=top && line<bot){ theme=s.getAttribute('data-theme'); break; }
+    }
+    nav.classList.toggle('theme-dark', theme==='dark');
+    nav.classList.toggle('theme-light', theme!=='dark');
+  }
+  window.addEventListener('scroll',updateNav,{passive:true});
+  window.addEventListener('resize',updateNav);
+  updateNav();
+
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+
+  // hide placeholder wells once a real video actually loads frames
+  document.querySelectorAll('video').forEach(function(v){
+    v.addEventListener('loadeddata',function(){
+      if(v.readyState>=2 && v.videoWidth>0){
+        var fb=v.parentElement.querySelector('.fallback');
+        if(fb) fb.style.display='none';
+      }
+    });
+  });
+
+  var toggle=document.querySelector('.nav-toggle');
+  if(toggle) toggle.addEventListener('click',function(){
+    document.getElementById('features').scrollIntoView({behavior:'smooth'});
+  });
+
+  // Flora-style expand-on-hover: all three cards stay visible with their demos;
+  // hovering one expands it wider (and shrinks the others) and reveals its extra
+  // line. A default card stays expanded when nothing is hovered. The demos
+  // assemble once when the section first scrolls into view.
+  (function(){
+    var sec=document.querySelector('.fx'); if(!sec) return;
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){ sec.classList.add('seen'); io.disconnect(); }
+    });},{threshold:0.25});
+    io.observe(sec);
+  })();
+
+  // Feature 01 — its own cursor clicks Upload, then the detected data types in. Loops.
+  (function(){
+    var plat=document.querySelector('.plat'); if(!plat) return;
+    var cursor=plat.querySelector('.plat-cursor');
+    var rowUp=plat.querySelector('#rowUpload');
+    var bar=plat.querySelector('.pr-bar span'), title=plat.querySelector('.pr-title'), sub=plat.querySelector('.pr-sub');
+    var rows=[].slice.call(plat.querySelectorAll('.pr-fields .an-row'));
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var timers=[],started=false,curIv=null;
+    function at(ms,fn){timers.push(setTimeout(fn,ms));}
+    function stopAll(){timers.forEach(clearTimeout);timers=[];if(curIv){clearInterval(curIv);curIv=null;}}
+    function moveTo(xp,yp){ cursor.style.left=xp; cursor.style.top=yp; }
+    function moveToEl(el){ var pr=plat.getBoundingClientRect(), er=el.getBoundingClientRect(); moveTo(((er.left-pr.left)+16)/pr.width*100+'%', ((er.top-pr.top)+er.height*0.5)/pr.height*100+'%'); }
+    function typeOut(row,done){ var el=row.querySelector('.txt'), fin=row.getAttribute('data-val'), i=0; row.classList.remove('pending'); row.classList.add('typing'); (function step(){ i++; el.textContent=fin.slice(0,i); if(i<fin.length){ timers.push(setTimeout(step,32+Math.random()*30)); } else{ row.classList.remove('typing'); row.classList.add('done'); if(done)done(); } })(); }
+    function finalize(){ plat.classList.remove('state-menu'); if(bar)bar.style.width='100%'; if(title)title.textContent='Detected'; if(sub)sub.textContent='5 attributes · priced from 240 comps'; rows.forEach(function(r){r.classList.remove('pending','typing');r.classList.add('done');r.querySelector('.txt').textContent=r.getAttribute('data-val');}); }
+    if(reduce){ finalize(); return; }
+    function run(){
+      stopAll();
+      plat.classList.add('state-menu');
+      rows.forEach(function(r){r.classList.remove('done','typing');r.classList.add('pending');r.querySelector('.txt').textContent='';});
+      if(bar)bar.style.width='0'; if(title)title.textContent='Analyzing photo…'; if(sub)sub.textContent='Detecting brand, condition & value';
+      rowUp.classList.remove('hover','click'); cursor.classList.remove('down');
+      moveTo('76%','88%');
+      at(500,function(){ moveToEl(rowUp); });
+      at(1300,function(){ rowUp.classList.add('hover'); });
+      at(1700,function(){ cursor.classList.add('down'); rowUp.classList.add('click'); });
+      at(1870,function(){ cursor.classList.remove('down'); });
+      at(2050,function(){ plat.classList.remove('state-menu'); moveTo('58%','30%'); });
+      at(2200,function(){ var p=0; curIv=setInterval(function(){ p+=4+Math.floor(Math.random()*8); if(p>=100){p=100;clearInterval(curIv);curIv=null;} if(bar)bar.style.width=p+'%'; },95); });
+      at(3500,function(){ if(title)title.textContent='Detected'; if(sub)sub.textContent='5 attributes · priced from 240 comps'; });
+      at(3650,function(){ (function chain(k){ if(k>=rows.length){ at(3000,run); return; } typeOut(rows[k],function(){ at(200,function(){chain(k+1);}); }); })(0); });
+    }
+    var io2=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting&&!started){started=true;run();} }); },{threshold:0.3});
+    io2.observe(plat);
+  })();
+
+  // Feature 02 — product card thrown into the logo, then the signal sweeps to the channels. Loops.
+  (function(){
+    var sell=document.querySelector('.sell'); if(!sell) return;
+    var hub=sell.querySelector('.sell-hub');
+    var tiles=[].slice.call(sell.querySelectorAll('.ch'));
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if(reduce) return;
+    var timers=[],started=false;
+    function at(ms,fn){timers.push(setTimeout(fn,ms));}
+    function reset(){ timers.forEach(clearTimeout); timers=[]; sell.classList.remove('collapsed','merge','signal'); hub.classList.remove('lit'); tiles.forEach(function(t){t.classList.remove('lit');}); }
+    function run(){
+      reset();
+      at(1500,function(){ sell.classList.add('collapsed'); });
+      at(2100,function(){ sell.classList.add('merge'); });
+      at(2400,function(){ hub.classList.add('lit'); });
+      at(2560,function(){ sell.classList.add('signal'); });
+      var lit=[3180,3180,3480,3480,3480];
+      tiles.forEach(function(t,i){ at(lit[i],function(){ t.classList.add('lit'); }); });
+      at(5800,run);
+    }
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting&&!started){started=true;run();} }); },{threshold:0.4});
+    io.observe(sell);
+  })();
+
+  // Hero — type and delete rotating taglines
+  (function(){
+    var el=document.getElementById('tw');
+    if(!el) return;
+    var phrases=[
+      "The commerce platform where every item sells once.",
+      "Launch your vintage store and manage inventory in one click.",
+      "Help someone find their next one-of-a-kind favorite.",
+      "Grow your consignment business in a few taps."
+    ];
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if(reduce){ el.textContent=phrases[0]; return; }
+    var i=0,ci=0,deleting=false;
+    function tick(){
+      var full=phrases[i];
+      if(!deleting){
+        ci++; el.textContent=full.slice(0,ci);
+        if(ci===full.length){ deleting=true; return setTimeout(tick,1700); }
+        setTimeout(tick,40+Math.random()*45);
+      } else {
+        ci--; el.textContent=full.slice(0,ci);
+        if(ci===0){ deleting=false; i=(i+1)%phrases.length; return setTimeout(tick,360); }
+        setTimeout(tick,22);
+      }
+    }
+    setTimeout(tick,600);
+  })();
+
+  // Text-to-list phone — a real iMessage thread that plays out: photo + intro,
+  // the assistant types its pricing reply, then the confirmation. Loops in view.
+  (function(){
+    var body=document.getElementById('imBody'); if(!body) return;
+    var msgs=[].slice.call(body.querySelectorAll('.im-msg'));
+    var type=document.getElementById('imType');
+    var agent=document.getElementById('imAgent');
+    var yes=document.getElementById('imYes');
+    var done=document.getElementById('imDone');
+    var popMarks=document.getElementById('popMarks');
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var timers=[],started=false;
+    function at(ms,fn){timers.push(setTimeout(fn,ms));}
+    function stop(){timers.forEach(clearTimeout);timers=[];}
+    function scrollB(){ body.scrollTop=body.scrollHeight; }
+    function typeInto(el,cb){ var v=el.getAttribute('data-val'),i=0; el.textContent=''; (function s(){ i++; el.textContent=v.slice(0,i); scrollB(); if(i<v.length){timers.push(setTimeout(s,20+Math.random()*28));} else if(cb)cb(); })(); }
+    function fill(){ msgs.forEach(function(m){m.classList.remove('hide');}); type.classList.add('hide'); agent.textContent=agent.getAttribute('data-val'); }
+    if(reduce){ fill(); return; }
+    function run(){
+      stop();
+      msgs.forEach(function(m){m.classList.add('hide');});
+      if(popMarks)popMarks.classList.remove('show');
+      agent.textContent='';
+      at(400,function(){ show(0); });                 // timestamp
+      at(650,function(){ show(1); });                 // photo
+      at(1250,function(){ show(2); });                // outgoing intro
+      at(2000,function(){ type.classList.remove('hide'); scrollB(); });   // typing dots
+      at(3100,function(){ type.classList.add('hide'); agent.classList.remove('hide'); typeInto(agent,function(){
+        at(700,function(){ yes.classList.remove('hide'); scrollB(); });
+        at(1500,function(){ done.classList.remove('hide'); scrollB(); if(popMarks)popMarks.classList.add('show'); });
+        at(4200,run);
+      }); });
+    }
+    function show(i){ msgs[i].classList.remove('hide'); scrollB(); }
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting&&!started){started=true;run();} });},{threshold:0.35});
+    io.observe(body.closest('.cap-row'));
+  })();
+
+  // Get paid — ledger payouts loop: rows land one by one, total ticks up,
+  // pending settles to a payout. Keeps subtle movement in the panel.
+  (function(){
+    var card=document.querySelector('.mk-ledger'); if(!card) return;
+    var rows=[].slice.call(card.querySelectorAll('.led-row'));
+    var total=document.getElementById('ledTotal');
+    var pending=document.getElementById('ledPending');
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    if(reduce) return;
+    var timers=[],started=false,raf=null;
+    function at(ms,fn){timers.push(setTimeout(fn,ms));}
+    function stop(){timers.forEach(clearTimeout);timers=[];if(raf)cancelAnimationFrame(raf);}
+    function tickTo(from,to,ms){
+      var t0=performance.now();
+      (function step(now){
+        var p=Math.min(1,(now-t0)/ms); p=1-Math.pow(1-p,3);
+        var v=Math.round(from+(to-from)*p);
+        if(total) total.textContent='$'+v.toLocaleString()+' this week';
+        if(p<1) raf=requestAnimationFrame(step);
+      })(performance.now());
+    }
+    function run(){
+      stop();
+      rows.forEach(function(r){r.classList.remove('pop');});
+      if(pending){ pending.textContent='Pending'; pending.classList.remove('settled'); pending.style.color='#f0c27a'; }
+      if(total) total.textContent='$3,700 this week';
+      at(450,function(){ rows[0].classList.add('pop'); tickTo(3700,4000,900); });
+      at(1150,function(){ rows[1].classList.add('pop'); tickTo(4000,4120,700); });
+      at(1850,function(){ rows[2].classList.add('pop'); });
+      at(3050,function(){ if(pending){ pending.style.color=''; pending.classList.add('settled'); pending.textContent='+$38'; } tickTo(4120,4158,650); if(total){ total.classList.add('bump'); setTimeout(function(){total.classList.remove('bump');},400);} });
+      at(6000,run);
+    }
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting&&!started){started=true;run();} });},{threshold:0.3});
+    io.observe(card.closest('.fx-card')||card);
+  })();
+
+  // Capabilities — filter.im-style stacked cards. Each card pins; as the next
+  // one rises over it, the covered card scales down and tilts back.
+  (function(){
+    var rows=[].slice.call(document.querySelectorAll('.caps-stack .cap-row'));
+    if(!rows.length) return;
+    var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var base=100, ticking=false;
+    function layout(){
+      base=Math.min(20,Math.max(8,window.innerHeight*0.016));
+      rows.forEach(function(r,i){ r.style.top=(base+i*7)+'px'; r.style.zIndex=String(i+1); });
+    }
+    function frame(){
+      ticking=false;
+      for(var i=0;i<rows.length;i++){
+        var next=rows[i+1], p=0;
+        if(next){
+          var stickyTop=base+i*7, H=rows[i].offsetHeight;
+          var nt=next.getBoundingClientRect().top;
+          p=(stickyTop+H-nt)/H; p=p<0?0:p>1?1:p;
+        }
+        var ty=-p*46, tz=-p*120, rot=p*22;
+        rows[i].style.transform='perspective(1150px) translateY('+ty.toFixed(1)+'px) translateZ('+tz.toFixed(1)+'px) rotateX('+rot.toFixed(2)+'deg)';
+        rows[i].style.filter='brightness('+(1-0.4*p).toFixed(3)+')';
+      }
+    }
+    function onScroll(){ if(!ticking){ ticking=true; requestAnimationFrame(frame); } }
+    if(reduce){ layout(); return; }
+    layout(); frame();
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',function(){ layout(); frame(); });
+  })();
+
+  // Helper: run a routine once the element scrolls into view
+  function onView(el,cb){
+    if(!el) return;
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ cb(); io.disconnect(); } });},{threshold:0.35});
+    io.observe(el);
+  }
+  var reduceFx=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  // Industry Trends — rows reveal, then a live highlight scans the list
+  (function(){
+    var panel=document.getElementById('trPanel'); if(!panel||reduceFx) return;
+    var items=[].slice.call(panel.querySelectorAll('.tr-item'));
+    var t=[];
+    function at(ms,fn){t.push(setTimeout(fn,ms));}
+    onView(panel,function(){
+      items.forEach(function(it,k){ at(150+k*130,function(){ it.classList.add('show'); }); });
+      var base=150+items.length*130+500;
+      (function scan(k){ at(base,function(){
+        items.forEach(function(x){x.classList.remove('hot');});
+        items[k].classList.add('hot'); base=0;
+        t.push(setTimeout(function(){ scan((k+1)%items.length); },850));
+      }); })(0);
+    });
+  })();
+
+  // Offers — each offer lands one by one, the accepted pill pops. Loops.
+  (function(){
+    var panel=document.getElementById('ofPanel'); if(!panel||reduceFx) return;
+    var rows=[].slice.call(panel.querySelectorAll('.of-row'));
+    var t=[];
+    function at(ms,fn){t.push(setTimeout(fn,ms));}
+    function stop(){t.forEach(clearTimeout);t=[];}
+    function run(){
+      stop();
+      rows.forEach(function(r){r.classList.remove('show','pop');});
+      rows.forEach(function(r,k){ at(500+k*750,function(){ r.classList.add('show','pop'); }); });
+      at(500+rows.length*750+3200,run);
+    }
+    onView(panel,run);
+  })();
+
+  // Messaging — the buyer asks, the store owner types out a reply, buyer confirms. Loops.
+  (function(){
+    var thread=document.getElementById('msThread'); if(!thread||reduceFx) return;
+    var bubbles=[].slice.call(thread.querySelectorAll('.ms-b'));
+    var reply=document.getElementById('msReply');
+    var t=[];
+    function at(ms,fn){t.push(setTimeout(fn,ms));}
+    function stop(){t.forEach(clearTimeout);t=[];}
+    function typeInto(el,cb){ var v=el.getAttribute('data-val'),i=0; el.textContent=''; (function s(){ i++; el.textContent=v.slice(0,i); if(i<v.length){t.push(setTimeout(s,26+Math.random()*30));} else if(cb)cb(); })(); }
+    function run(){
+      stop();
+      bubbles.forEach(function(b){b.classList.remove('show');}); reply.textContent='';
+      at(500,function(){ bubbles[0].classList.add('show'); });
+      at(1700,function(){ reply.classList.add('show'); typeInto(reply,function(){ at(750,function(){ bubbles[2].classList.add('show'); }); }); });
+      at(7200,run);
+    }
+    onView(thread,run);
+  })();
+
+  // Scroll-reveal statement — words fill grey to white as the pinned text scrolls
+  (function(){
+    var el=document.getElementById('btCopy'); if(!el) return;
+    var sec=el.closest('.bigtext');
+    var words=el.textContent.trim().split(/\s+/);
+    el.innerHTML=words.map(function(w){ var s=document.createElement('span'); s.className='rw'; s.textContent=w; return s.outerHTML; }).join(' ');
+    var spans=[].slice.call(el.querySelectorAll('.rw'));
+    if(reduceFx){ spans.forEach(function(s){s.classList.add('on');}); return; }
+    var ticking=false;
+    function frame(){
+      ticking=false;
+      var top=sec.offsetTop, vh=window.innerHeight, h=sec.offsetHeight;
+      var p=(window.scrollY-top+vh*0.5)/(h-vh*0.5); p=p<0?0:p>1?1:p;
+      var n=Math.round(p*spans.length);
+      for(var i=0;i<spans.length;i++){ spans[i].classList.toggle('on', i<n); }
+    }
+    function onScroll(){ if(!ticking){ticking=true;requestAnimationFrame(frame);} }
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',frame);
+    frame();
+  })();
+
+  // Footer VYA mark — draws itself in when it scrolls into frame
+  (function(){
+    var el=document.querySelector('.mark-logo'); if(!el) return;
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('draw'); io.disconnect(); } });},{threshold:0.5});
+    io.observe(el);
+  })();
+
+</script>
+</body>
+</html>

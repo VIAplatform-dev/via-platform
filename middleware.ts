@@ -263,6 +263,17 @@ export async function middleware(request: NextRequest) {
     return attachEid(NextResponse.next());
   }
 
+  // Serve the static marketing site (public/infra) at /infrastructure/* — the admin workspace is
+  // handled above, so this only covers the public pages. URLs are extensionless
+  // (/infrastructure/company → /infra/company.html); static assets are referenced absolutely at
+  // /infra/* and bypass middleware entirely (the matcher excludes dotted paths).
+  if (pathname === "/infrastructure" || pathname.startsWith("/infrastructure/")) {
+    const rest = pathname.slice("/infrastructure".length).replace(/\/$/, "");
+    const url = request.nextUrl.clone();
+    url.pathname = rest === "" ? "/infra/index.html" : `/infra${rest}.html`;
+    return NextResponse.rewrite(url);
+  }
+
   // Allow public routes unconditionally
   if (isPublicRoute(pathname)) {
     return attachEid(NextResponse.next());
