@@ -250,6 +250,19 @@ export async function middleware(request: NextRequest) {
     return res;
   }
 
+  // The owner workspace at /infrastructure/admin is admin-only — gate it behind the VYA admin
+  // login (the admin_users list). Must run BEFORE the public-route check, because /infrastructure
+  // (the public landing page) is a public route and would otherwise let /infrastructure/admin/*
+  // through too.
+  if (pathname === "/infrastructure/admin" || pathname.startsWith("/infrastructure/admin/")) {
+    if (!(await isAdminAuthenticated(request))) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("redirect", fullPath);
+      return attachEid(NextResponse.redirect(loginUrl));
+    }
+    return attachEid(NextResponse.next());
+  }
+
   // Allow public routes unconditionally
   if (isPublicRoute(pathname)) {
     return attachEid(NextResponse.next());
