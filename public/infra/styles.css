@@ -458,7 +458,13 @@
   @keyframes ledPayIn{0%{transform:translateX(8px) scale(.9);opacity:0}60%{transform:translateX(-1px) scale(1.06)}100%{transform:none;opacity:1}}
   @keyframes ledAv{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:none;opacity:1}}
   @media (prefers-reduced-motion:reduce){.led-row.pop,.led-row.pop .led-pay,.led-row.pop .av,#ledPending.settled{animation:none}}
-  @media (max-width:900px){.fx-grid{flex-direction:column;gap:16px}.fx-card{min-height:auto}.fx-num{transform:none}.fx-more{max-height:6em;opacity:1;margin-top:14px}.fx-card .fx-num .w{color:#fff}}
+  @media (max-width:900px){.fx-grid{flex-direction:column;gap:16px}.fx-card{min-height:auto;flex:0 0 auto}.fx-num{transform:none}.fx-more{max-height:6em;opacity:1;margin-top:14px}.fx-card .fx-num .w{color:#fff}
+    /* fx demos: the mock panels are position:absolute — contain them on mobile */
+    #reach .fx-stage{min-height:240px}
+    #reach .sell{height:240px}
+    #inventory .fx-stage{min-height:0}
+    #inventory .mk-ledger{position:relative;left:auto;top:auto;margin:0 auto;width:100%;max-width:300px}
+  }
 
   /* ---------------- FALLBACK PLACEHOLDERS ---------------- */
   .fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
@@ -493,6 +499,14 @@
     .foot-cols{grid-template-columns:1fr 1fr}
     .nav-right .btn-soft{display:none}
     .hero{min-height:580px}
+  }
+  /* mobile nav dropdown menu */
+  @media (max-width:900px){
+    header.nav.nav-open{background:rgba(10,10,11,0.97);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);color:#fff;border-bottom-color:rgba(255,255,255,0.1)}
+    header.nav.nav-open .brand-logo,header.nav.nav-open .nav-toggle{color:#fff}
+    header.nav.nav-open .nav-links{display:flex;flex-direction:column;align-items:stretch;gap:0;position:absolute;top:100%;left:0;right:0;background:rgba(10,10,11,0.97);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);padding:2px 24px 20px}
+    header.nav.nav-open .nav-links a{color:#fff;opacity:.9;font-size:17px;font-weight:400;letter-spacing:-0.01em;padding:15px 2px;border-top:1px solid rgba(255,255,255,0.09)}
+    .nav-toggle{line-height:1;width:26px}
   }
 
   /* ============ SCROLL-REVEAL STATEMENT ============ */
@@ -635,7 +649,7 @@
     .cap-copy{order:2;padding:26px 26px 34px}
     .cap-vis{order:1;padding:30px 26px 4px;min-height:340px}
     .cap-vis.is-phone{min-height:420px}
-    .ph-wrap{height:auto;width:min(210px,60vw)}
+    .ph-wrap{height:auto;max-height:none;width:min(210px,60vw)}
     .pop-marks{display:none}
   }
 
@@ -797,7 +811,7 @@ header.nav.theme-dark .brand-mark{filter:invert(1) brightness(2)}
 .who-line::before{content:"";position:absolute;left:0;top:-3px;width:7px;height:7px;background:#fff}
 .who-ring{flex:none;width:min(46%,360px);height:60px;display:block}
 @keyframes whoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-@media (max-width:860px){.who-txt{width:auto}.who-line,.who-ring{display:none}.who-glow{justify-content:center;margin-bottom:10px}.who-glow svg{width:220px}}
+@media (max-width:860px){.who-txt{width:auto}.who-line,.who-ring,.who-glow{display:none}}
 @media (prefers-reduced-motion:reduce){.who-glow svg{animation:none}}
 
 

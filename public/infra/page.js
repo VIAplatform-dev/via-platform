@@ -16,6 +16,19 @@
   window.addEventListener('resize',updateNav);
   updateNav();
 
+  // Mobile nav dropdown — the hamburger opens/closes the link list
+  var toggle=document.querySelector('.nav-toggle');
+  if(toggle&&nav){
+    toggle.addEventListener('click',function(){
+      var open=nav.classList.toggle('nav-open');
+      toggle.textContent=open?'✕':'☰';
+      toggle.setAttribute('aria-expanded',open?'true':'false');
+    });
+    nav.querySelectorAll('.nav-links a').forEach(function(a){
+      a.addEventListener('click',function(){ nav.classList.remove('nav-open'); toggle.textContent='☰'; toggle.setAttribute('aria-expanded','false'); });
+    });
+  }
+
   var io=new IntersectionObserver(function(entries){
     entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
   },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
