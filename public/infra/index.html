@@ -8,7 +8,7 @@
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="VYA" />
 <meta property="og:url" content="https://vyaplatform.com/infrastructure" />
-<meta property="og:title" content="VYA — Infrastructure for the one-of-one economy" />
+<meta property="og:title" content="VYA — Purpose-built infrastructure for secondhand" />
 <meta property="og:description" content="The e-commerce platform for stores where every item exists only once. Catalog, list, and sell every unique item in seconds." />
 <meta property="og:image" content="https://vyaplatform.com/infra/og/card.gif" />
 <meta property="og:image:secure_url" content="https://vyaplatform.com/infra/og/card.gif" />
@@ -17,7 +17,7 @@
 <meta property="og:image:height" content="630" />
 <meta property="og:image:alt" content="VYA — Powering one-of-one commerce" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="VYA — Infrastructure for the one-of-one economy" />
+<meta name="twitter:title" content="VYA — Purpose-built infrastructure for secondhand" />
 <meta name="twitter:description" content="The e-commerce platform for stores where every item exists only once. Catalog, list, and sell every unique item in seconds." />
 <meta name="twitter:image" content="https://vyaplatform.com/infra/og/card.png" />
 <meta name="theme-color" content="#ffffff" />
@@ -52,10 +52,9 @@
 <!-- ============ HERO ============ -->
 <section class="hero" id="top" data-theme="dark">
   <div class="hero-media">
-    <video autoplay muted loop playsinline poster="/infra/videos/hero-poster.jpg">
+    <video autoplay muted loop playsinline preload="auto" poster="/infra/videos/hero-poster.jpg">
       <source src="/infra/videos/hero.mp4" type="video/mp4" />
     </video>
-    <div class="fallback dark" aria-hidden="true"><span>videos/hero.mp4</span></div>
   </div>
   <div class="hero-content">
     <div class="wrap hero-grid">
@@ -455,15 +454,20 @@
   },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
   document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
 
-  // hide placeholder wells once a real video actually loads frames
-  document.querySelectorAll('video').forEach(function(v){
-    v.addEventListener('loadeddata',function(){
-      if(v.readyState>=2 && v.videoWidth>0){
-        var fb=v.parentElement.querySelector('.fallback');
-        if(fb) fb.style.display='none';
-      }
-    });
-  });
+  // Hero video — the poster is the .hero-media background, so it degrades to a
+  // clean still if the video can't play. Nudge autoplay so it reliably starts.
+  (function(){
+    var v=document.querySelector('.hero-media video');
+    if(!v) return;
+    v.muted=true; v.setAttribute('muted','');
+    function play(){ var p=v.play(); if(p&&p.catch) p.catch(function(){}); }
+    play();
+    ['loadeddata','canplay','canplaythrough'].forEach(function(ev){ v.addEventListener(ev,play); });
+    document.addEventListener('visibilitychange',function(){ if(!document.hidden) play(); });
+    window.addEventListener('pageshow',play);
+    // last resort if autoplay was blocked: start on the first interaction
+    ['touchstart','pointerdown','scroll'].forEach(function(ev){ window.addEventListener(ev,play,{once:true,passive:true}); });
+  })();
 
   (function(){
     var nav=document.getElementById('nav'), toggle=document.querySelector('.nav-toggle');

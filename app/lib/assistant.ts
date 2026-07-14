@@ -41,6 +41,7 @@ const templateIds = STOREFRONT_TEMPLATES.map((t) => t.id);
 const TOOLS = [
  { name: "get_storefront", description: "Read the store's current storefront: design (template, colors, fonts), handle, tagline, hero image, and whether it's live.", input_schema: { type: "object", properties: {} } },
  { name: "update_storefront_design", description: "Change the storefront look. Provide any of: a starter template id, colors (hex like #1a1a1a), fonts. Confirm with the seller before calling this.", input_schema: { type: "object", properties: { template: { type: "string", enum: templateIds }, colors: { type: "object", properties: { bg: { type: "string" }, text: { type: "string" }, accent: { type: "string" } } }, fonts: { type: "object", properties: { heading: { type: "string", enum: HEADING_FONTS }, body: { type: "string", enum: BODY_FONTS } } } } } },
+ { name: "style_storefront", description: "Apply raw custom CSS to the block-based storefront, layered over the theme site-wide — for ANY styling or layout change the section fields can't do: repositioning, alignment, spacing, sizing, per-element colors, borders, hover effects, etc. This is how you fulfill open-ended design requests. Pass the FULL CSS to set (it REPLACES the previous custom CSS — include everything you want kept); pass empty css to clear. Target these stable classes the storefront outputs: each section is `.vya-sec` + `.vya-<type>` (`.vya-hero`, `.vya-featured`, `.vya-text`, `.vya-newsletter`, `.vya-announcement`, `.vya-image`, `.vya-gallery`, `.vya-video`) + `.vya-b-<id>` to target ONE section by id (from list_sections). Inside a section: `.vya-heading` (heading), `.vya-sub` (subtext), `.vya-body` (text body), `.vya-cta` (button), `.vya-img` (image), and `.vya-hero-inner` (the hero's content box — change its flex to move content). Example — move the hero heading to the bottom-left: `.vya-hero .vya-hero-inner{align-items:flex-start;justify-content:flex-end;text-align:left}`. State the change and confirm before calling.", input_schema: { type: "object", properties: { css: { type: "string" } }, required: ["css"] } },
  { name: "list_photos", description: "List the photo URLs in the store's media library.", input_schema: { type: "object", properties: {} } },
  { name: "set_hero_photo", description: "Set the storefront hero banner image to a URL (usually from the library). Confirm first.", input_schema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
  { name: "list_inventory", description: "List the store's listings: id, title, price, status, and whether it has a description.", input_schema: { type: "object", properties: { activeOnly: { type: "boolean" } } } },
@@ -53,7 +54,7 @@ const TOOLS = [
  { name: "move_section", description: "Move a section up or down by id. Confirm first.", input_schema: { type: "object", properties: { id: { type: "string" }, direction: { type: "string", enum: ["up", "down"] } }, required: ["id", "direction"] } },
  { name: "list_pages", description: "List the storefront's pages — the home page plus any extra pages (About, FAQ, etc.) with slug, title, and section count.", input_schema: { type: "object", properties: {} } },
  { name: "create_page", description: "Create a new storefront page (e.g. About, FAQ, Shipping & Returns). Provide a title and optionally initial blocks (same types/props/style as set_layout). It's linked in the nav automatically. Write real copy. Confirm first.", input_schema: { type: "object", properties: { title: { type: "string" }, blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["title"] } },
- { name: "set_page_layout", description: "Replace all sections on an extra page (by slug) with a new set of blocks. Confirm first.", input_schema: { type: "object", properties: { slug: { type: "string" }, blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["slug", "blocks"] } },
+ { name: "set_page_layout", description: "Replace all sections on a page (by slug) with a new set of blocks. Use slug 'shop' to edit the SHOP page's intro content — sections (heading, text, image, gallery, etc.) shown ABOVE the store's auto product grid; the products list themselves below automatically, so don't add a products/featured section there. For any other slug it's an extra page (About, FAQ…). Confirm first.", input_schema: { type: "object", properties: { slug: { type: "string" }, blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["slug", "blocks"] } },
  { name: "delete_page", description: "Delete an extra page by slug. Confirm first.", input_schema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
  { name: "list_captured_pages", description: "List the pages of the seller's CAPTURED site (their real existing site, hosted on VYA) by path. Only relevant if they brought their own site over rather than building from sections.", input_schema: { type: "object", properties: {} } },
  { name: "edit_captured_page", description: "Edit copy on one page of the captured site: replace every occurrence of `find` with `replace` in that page's HTML (path from list_captured_pages). Use for wording changes, fixing a typo, updating a banner/announcement. `find` must be exact visible text. Confirm first.", input_schema: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"] } },
@@ -73,7 +74,14 @@ async function runTool(slug: string, name: string, input: any): Promise<any> {
  switch (name) {
  case "get_storefront": {
  const sf = await getStorefrontBySlug(slug);
- return { template: sf?.theme?.template ?? null, colors: sf?.theme?.colors ?? null, fonts: sf?.theme?.fonts ?? null, handle: sf?.handle ?? null, tagline: sf?.tagline ?? null, heroImage: sf?.heroImage ?? null, live: !!sf?.enabled, templatesAvailable: templateIds };
+ return { template: sf?.theme?.template ?? null, colors: sf?.theme?.colors ?? null, fonts: sf?.theme?.fonts ?? null, customCss: sf?.theme?.customCss ?? null, handle: sf?.handle ?? null, tagline: sf?.tagline ?? null, heroImage: sf?.heroImage ?? null, live: !!sf?.enabled, templatesAvailable: templateIds };
+ }
+ case "style_storefront": {
+ const css = String(input.css ?? "").slice(0, 20000);
+ const theme = await loadTheme(slug);
+ theme.customCss = css;
+ await setStorefrontTheme(slug, theme);
+ return { ok: true, applied: css.trim() ? `${css.length} chars of CSS` : "cleared" };
  }
  case "update_storefront_design": {
  const sf = (await getStorefrontBySlug(slug)) ?? (await upsertStorefront(slug, { handle: slug, enabled: false, tagline: "", accentColor: "#5D0F17", heroImage: "", about: "" }));
@@ -189,7 +197,7 @@ async function runTool(slug: string, name: string, input: any): Promise<any> {
  case "list_pages": {
  const sf = await getStorefrontBySlug(slug);
  const pages = sanitizePages(sf?.theme?.extraPages ?? []);
- return { home: { sections: sanitizeBlocks(sf?.theme?.blocks ?? []).length }, pages: pages.map((p) => ({ slug: p.slug, title: p.title, sections: p.blocks.length })) };
+ return { home: { sections: sanitizeBlocks(sf?.theme?.blocks ?? []).length }, shop: { introSections: sanitizeBlocks(sf?.theme?.shopBlocks ?? []).length, note: "The Shop page auto-lists products; set_page_layout with slug 'shop' edits the intro content shown above the grid." }, pages: pages.map((p) => ({ slug: p.slug, title: p.title, sections: p.blocks.length })) };
  }
  case "create_page": {
  const theme = await loadTheme(slug);
@@ -203,10 +211,16 @@ async function runTool(slug: string, name: string, input: any): Promise<any> {
  }
  case "set_page_layout": {
  const theme = await loadTheme(slug);
+ const incoming = Array.isArray(input.blocks) ? input.blocks.map((b: any) => ({ id: "", type: b.type, props: typeof b.props === "object" && b.props ? b.props : {}, style: b.style })) : [];
+ // "shop" is the built-in catalogue page: its blocks are intro content shown ABOVE the auto product grid.
+ if (input.slug === "shop") {
+ theme.shopBlocks = sanitizeBlocks(incoming);
+ await setStorefrontTheme(slug, theme);
+ return { ok: true, slug: "shop", sections: theme.shopBlocks.length };
+ }
  const pages = sanitizePages(theme.extraPages ?? []);
  const pg = pages.find((p) => p.slug === input.slug);
  if (!pg) return { error: "No page with that slug." };
- const incoming = Array.isArray(input.blocks) ? input.blocks.map((b: any) => ({ id: "", type: b.type, props: typeof b.props === "object" && b.props ? b.props : {}, style: b.style })) : [];
  pg.blocks = sanitizeBlocks(incoming);
  theme.extraPages = pages;
  await setStorefrontTheme(slug, theme);
@@ -252,11 +266,13 @@ You can also answer questions, not just take actions — resale and vintage expe
 
 When a seller asks you to build or change part of their page, prefer the section tools (add_section / update_section / move_section / remove_section). Check the current layout with list_sections first when it helps.
 
+For any OPEN-ENDED design or layout request that the section fields don't cover — repositioning an element, alignment, spacing, sizing, custom colors, borders, hover effects, "move the heading to the bottom left", "make the buttons rounded", "add more space above the products", etc. — use style_storefront to write real CSS targeting the .vya-* classes. Never say you "can't" make a design change: if it's expressible in CSS, do it with style_storefront. It replaces the whole custom-CSS block, so when adding to existing styling, read the current CSS with get_storefront first and include it. Confirm the change in one line before applying.
+
 When a seller asks you to build or redesign their WHOLE storefront ("build me a storefront", "design my homepage", "make me a store for X"), do it in one move: first call update_storefront_design to set a fitting template/colors/fonts, then call set_layout with a complete page — usually a hero, a featured-products grid, a short about/text section, and a newsletter. Write real, specific copy in their voice (use their store name and what they sell); never leave placeholder text. Briefly preview the plan and confirm before applying.
 
 Rules:
 - For READ actions (get_storefront, list_photos, list_inventory, write_description, list_sections) just do it, no need to ask.
-- For any CHANGE (update_storefront_design, set_hero_photo, update_listing, add_section, update_section, remove_section, move_section) first state in one short line exactly what you'll change, and ask the seller to confirm. Only call the write tool AFTER they confirm in their next message.
+- For any CHANGE (update_storefront_design, style_storefront, set_hero_photo, update_listing, add_section, update_section, remove_section, move_section) first state in one short line exactly what you'll change, and ask the seller to confirm. Only call the write tool AFTER they confirm in their next message.
 - Be concise and friendly — prefer doing over explaining. After a change, confirm what changed in one line.
 - You only ever take ACTIONS on THIS seller's own store. For an action you genuinely can't perform yet (e.g. orders, shipping, payouts), say it's on the way — but still answer the underlying question if you can.`;
 

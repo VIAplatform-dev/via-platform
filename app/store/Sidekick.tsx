@@ -19,14 +19,14 @@ const PAGE_LABEL: Record<string, string> = {
  "/infrastructure/admin/connect": "Connect", "/infrastructure/admin/import": "Bring your site", "/infrastructure/admin/ai": "AI accuracy",
 };
 
-const WRITE_TOOLS = new Set(["update_storefront_design", "set_hero_photo", "update_listing", "add_section", "update_section", "remove_section", "move_section", "set_layout", "create_page", "set_page_layout", "delete_page", "edit_captured_page", "style_captured_site"]);
+const WRITE_TOOLS = new Set(["update_storefront_design", "style_storefront", "set_hero_photo", "update_listing", "add_section", "update_section", "remove_section", "move_section", "set_layout", "create_page", "set_page_layout", "delete_page", "edit_captured_page", "style_captured_site"]);
 
 // Friendly labels for the "what VYA did" chips.
 const ACTION_LABELS: Record<string, string> = {
  update_storefront_design: "Updated design", set_hero_photo: "Set hero photo", update_listing: "Updated listing",
  add_section: "Added section", update_section: "Edited section", remove_section: "Removed section", move_section: "Moved section",
  set_layout: "Rebuilt page", create_page: "Created page", set_page_layout: "Updated page", delete_page: "Deleted page",
- edit_captured_page: "Edited copy", style_captured_site: "Applied styling", remember_fact: "Remembered", forget_fact: "Forgot",
+ edit_captured_page: "Edited copy", style_captured_site: "Applied styling", style_storefront: "Applied custom CSS", remember_fact: "Remembered", forget_fact: "Forgot",
 };
 
 const SUGGESTIONS = ["Build my whole storefront for me", "Make my storefront more elegant", "Add a sale announcement bar", "Write a description for my Chanel bag"];
@@ -45,7 +45,7 @@ function ActionChips({ actions }: { actions?: Action[] }) {
  );
 }
 
-export default function Sidekick() {
+export default function Sidekick({ docked = false }: { docked?: boolean }) {
  const pathname = usePathname();
  const [open, setOpen] = useState(false);
  const [suppressed, setSuppressed] = useState(false); // hide launcher when the home full-page chat is open
@@ -112,7 +112,7 @@ export default function Sidekick() {
  return (
  <>
  {/* Launcher */}
- {!open && !suppressed && (
+ {!docked && !open && !suppressed && (
  <button onClick={() => setOpen(true)} className="group fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#5D0F17] py-2.5 pl-2.5 pr-4 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12]">
  <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/10">
  <Sparkles size={15} />
@@ -123,8 +123,8 @@ export default function Sidekick() {
  )}
 
  {/* Panel */}
- {open && (
- <div className="fixed bottom-5 right-5 z-50 flex h-[600px] max-h-[82vh] w-[400px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-[#FBF9F5] shadow-[0_28px_80px_-24px_rgba(0,0,0,0.5)]">
+ {(open || docked) && (
+ <div className={docked ? "flex h-full w-full flex-col overflow-hidden bg-[#FBF9F5]" : "fixed bottom-5 right-5 z-50 flex h-[600px] max-h-[82vh] w-[400px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-[#FBF9F5] shadow-[0_28px_80px_-24px_rgba(0,0,0,0.5)]"}>
  {/* Header */}
  <div className="flex items-center justify-between border-b border-black/[0.06] bg-gradient-to-br from-[#5D0F17] to-[#3a0a0f] px-4 py-3 text-[#FFFDF8]">
  <div className="flex items-center gap-2.5">
@@ -139,7 +139,7 @@ export default function Sidekick() {
  </div>
  <div className="flex items-center gap-0.5">
  <button onClick={newChat} title="New chat" aria-label="New chat" className="rounded-md p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white"><SquarePen size={15} /></button>
- <button onClick={() => setOpen(false)} aria-label="Close" className="rounded-md p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white"><X size={16} /></button>
+ {!docked && <button onClick={() => setOpen(false)} aria-label="Close" className="rounded-md p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white"><X size={16} /></button>}
  </div>
  </div>
 

@@ -1,6 +1,7 @@
 import { estimatePrice, getMarketReferenceFast, computePriceFlag, type PriceEstimate, type PriceFlag } from "./price-engine";
 import { getMinMarkupBps } from "./store-pricing-db";
-import { getStorePriceMultiplier, getVisualVyaComps } from "./intake-memory-db";
+import { getStorePricingSignal, getVisualVyaComps } from "./intake-memory-db";
+import { getStoreBrief, briefPricingTarget } from "./store-brief-db";
 import { fetchResaleTrend, type Comp } from "./comps";
 import { identifyRunway, isIntakeConfigured } from "./ai-intake";
 import { getPieceRunway, savePieceRunway } from "./comp-cache-db";
@@ -11,6 +12,27 @@ import { gate } from "./concurrency";
 // slot the price/flag/runway in a moment later (this module), instead of blocking on everything.
 
 const AI_GATE = () => gate("intake-ai", Number(process.env.INTAKE_AI_CONCURRENCY) || 3);
+
+/**
+ * The multiplier to apply to market value for THIS store's suggested price. Blends
+ * what we've LEARNED from their behavior (getStorePricingSignal) with what the owner
+ * TOLD us in their brief (briefPricingTarget): the owner's stance just NUDGES the
+ * learned number by default (weight ~0.3), but the more hands-on they price — high
+ * conviction, i.e. they "keep changing the price a lot" — the more their stated intent
+ * leads (up to ~0.85). With no learned signal yet, the owner's stance drives outright.
+ */
+async function resolveStoreMultiplier(slug: string): Promise<{ mult: number; note: string }> {
+ const [signal, brief] = await Promise.all([
+ getStorePricingSignal(slug).catch(() => ({ inferredMult: 1, hasSignal: false, conviction: 0 })),
+ getStoreBrief(slug).catch(() => null),
+ ]);
+ const clamp = (m: number) => Math.min(2.5, Math.max(0.6, m));
+ const ownerTarget = briefPricingTarget(brief);
+ if (ownerTarget == null) return { mult: signal.inferredMult, note: "for this store's pricing" };
+ if (!signal.hasSignal) return { mult: clamp(ownerTarget), note: "per your pricing stance" };
+ const w = Math.min(0.85, Math.max(0.3, 0.3 + 0.55 * signal.conviction));
+ return { mult: clamp(signal.inferredMult * (1 - w) + ownerTarget * w), note: "for this store's pricing" };
+}
 
 export function titleHasBrand(title: string, brand: string): boolean {
  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -89,12 +111,12 @@ export async function computeListingPricing(opts: {
  })).catch(() => null);
  if (estimate && trend?.trending) estimate.rationale += ` · 🔥 ${brandVal} trending (${trend.note})`;
  if (estimate && estimate.marketCents) {
- const mult = await getStorePriceMultiplier(opts.slug).catch(() => 1);
+ const { mult, note } = await resolveStoreMultiplier(opts.slug).catch(() => ({ mult: 1, note: "" }));
  if (mult !== 1) {
  const adjusted = Math.round(estimate.marketCents * mult);
  estimate.suggestedCents = Math.max(adjusted, estimate.floorCents ?? 0);
  const pct = Math.round((mult - 1) * 100);
- estimate.rationale += ` · ${pct >= 0 ? "+" : ""}${pct}% for this store's pricing`;
+ estimate.rationale += ` · ${pct >= 0 ? "+" : ""}${pct}% ${note}`;
  }
  }
  } else {

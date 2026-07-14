@@ -5,6 +5,7 @@ import { draftListing, isIntakeConfigured, PROMPT_VERSION } from "@/app/lib/ai-i
 import { titleHasBrand, computeListingPricing } from "@/app/lib/intake-pricing";
 import { ghostMannequinFromUrl, isPhotoroomConfigured } from "@/app/lib/photoroom";
 import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
+import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
 import { getIntakeHints, getVisualHints } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
 import { reverseImageMatches, matchesToComps, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
@@ -78,8 +79,16 @@ export async function POST(request: NextRequest) {
  const draftOnly = body?.draftOnly === true; // phase 1: return the drafted fields fast, price/runway come from /pricing
  const needReverse = isCompsConfigured() && (needDraft || needPrice); // Lens → brand ID, runway/era, comps
 
- // Only learn the store voice when we're actually writing copy.
+ // Only learn the store voice when we're actually writing copy. Fold in the owner's
+ // brief (what they explicitly told us) as authoritative directives on top of the
+ // voice we learned from their listings — what they SAY overrides what we inferred.
  const voice = needDraft ? ((await getVoice(slug).catch(() => null)) ?? (await buildStoreVoice(slug).catch(() => null))) : null;
+ const directives = needDraft ? briefVoiceDirectives(await getStoreBrief(slug).catch(() => null)) : "";
+ const combinedGuide = directives
+ ? `The store owner's explicit instructions — follow these exactly, they override everything else: ${directives}`
+  + (voice?.guide ? `\n\nHow they tend to write (learned from their listings): ${voice.guide}` : "")
+ : (voice?.guide || "");
+ const voiceArg = (combinedGuide || voice?.examples?.length) ? { guide: combinedGuide, examples: voice?.examples ?? [] } : undefined;
 
  // Embedding (memory) + correction hints + reverse-image — each only when relevant.
  const [embedding, brandHints, matches] = await Promise.all([
@@ -101,7 +110,7 @@ export async function POST(request: NextRequest) {
 
  const [draftRes, ghostPng] = await Promise.allSettled([
  needDraft
- ? AI_GATE().run(() => draftListing(imageUrls, voice ? { guide: voice.guide, examples: voice.examples } : undefined, hints, known))
+ ? AI_GATE().run(() => draftListing(imageUrls, voiceArg, hints, known))
  : Promise.resolve(null),
  isPhotoroomConfigured() ? ghostMannequinFromUrl(mainUrl) : Promise.resolve(null),
  ]);

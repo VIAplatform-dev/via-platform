@@ -133,6 +133,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  // hero/sections/grid — the seller (or VYA) composes the page from blocks. A
  // pageSlug renders one of the store's extra pages; otherwise the home page.
  const homeBlocks = sanitizeBlocks(theme.blocks ?? []);
+ const shopIntro = isShop ? sanitizeBlocks(theme.shopBlocks ?? []) : [];
  const extraPages = sanitizePages(theme.extraPages ?? []);
  const activePage = pageSlug ? extraPages.find((p) => p.slug === pageSlug) : null;
  const blocks = pageSlug ? activePage?.blocks ?? [] : homeBlocks;
@@ -184,6 +185,8 @@ export default async function StorefrontView({ settings, view = "home", preview 
  return (
  <main style={rootStyle} className="min-h-screen">
  {fontsHref && <link rel="stylesheet" href={fontsHref} />}
+ {/* Store's own custom CSS — layered over the theme (targets .vya-* classes). Trusted: only the owner/AI set it. */}
+ {theme.customCss && <style dangerouslySetInnerHTML={{ __html: theme.customCss }} />}
 
  {/* Announcement bar */}
  {header.announcement && (
@@ -332,6 +335,11 @@ export default async function StorefrontView({ settings, view = "home", preview 
  );
  })}
  </>
+ )}
+
+ {/* Editable Shop intro — content the store adds above its catalogue. */}
+ {shopIntro.length > 0 && (
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} />
  )}
 
  {showGrid && !hasBlocks && (

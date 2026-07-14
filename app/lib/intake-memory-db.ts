@@ -289,13 +289,23 @@ export async function embedPendingSoldItems(limit = 60): Promise<{ embedded: num
  return { embedded, remaining: left[0]?.n ?? 0 };
 }
 
+export type StorePricingSignal = {
+ inferredMult: number; // how they price vs market (1 = at market, 1.15 = +15%)
+ hasSignal: boolean;   // false = no history/catalog to learn from yet
+ conviction: number;   // 0..1 — how consistently they price OFF the market read (≈ how
+                       //        much they price hands-on / "keep changing the price a lot")
+};
+
+const clampMult = (m: number) => Math.min(2.5, Math.max(0.6, m));
+
 /**
- * How this store prices relative to market comps — the median of (final price ÷
- * comp market value) across past listings. >1 means they price ABOVE market
- * (premium positioning), <1 below. Defaults to 1 until there's enough history,
- * and is clamped so a few outliers can't blow up suggestions.
+ * How this store prices relative to market comps, whether we actually have signal,
+ * and how "convicted" their pricing is. Native-intake (final price ÷ comp value) is
+ * the most direct read and carries conviction from how far off market they routinely
+ * land; the synced-catalog fallback is structural, so it informs the level but not
+ * conviction. Defaults to (1, no signal, 0) until there's enough to learn from.
  */
-export async function getStorePriceMultiplier(storeSlug: string): Promise<number> {
+export async function getStorePricingSignal(storeSlug: string): Promise<StorePricingSignal> {
  await ensureItemsTable();
  // 1) Native-intake signal (most direct): the seller's final price vs the comp market value we
  //    computed at intake. Only exists for stores that use Add-a-listing.
@@ -309,11 +319,13 @@ export async function getStorePriceMultiplier(storeSlug: string): Promise<number
  if (ratios.length >= 3) {
  const mid = Math.floor(ratios.length / 2);
  const median = ratios.length % 2 ? ratios[mid] : (ratios[mid - 1] + ratios[mid]) / 2;
- return Math.min(2.5, Math.max(0.6, median));
+ // "constantly changing the price a lot" ≈ they routinely set prices well off the market read.
+ const offMarket = ratios.filter((r) => Math.abs(r - 1) > 0.15).length / ratios.length;
+ return { inferredMult: clampMult(median), hasSignal: true, conviction: Math.min(1, offMarket * 1.15) };
  }
  // 2) SYNCED-catalog fallback (every store): how the store's OWN prices compare to the marketplace
  //    median for the SAME category — controlled for category mix. >1 = this store prices above market
- //    (e.g. 1.15 ≈ +15%), <1 = below. This is how we learn a synced store's pricing pattern.
+ //    (e.g. 1.15 ≈ +15%), <1 = below. Structural pattern, so no per-item conviction.
  const syn = (await db()`
   WITH cat_market AS (
    SELECT product_type c, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) med
@@ -329,7 +341,16 @@ export async function getStorePriceMultiplier(storeSlug: string): Promise<number
  `.catch(() => [])) as { ratio: number | null; cats: number }[];
  const r = syn[0];
  if (r && r.cats >= 2 && r.ratio != null && Number.isFinite(Number(r.ratio)) && Number(r.ratio) > 0) {
- return Math.min(2.5, Math.max(0.6, Number(r.ratio)));
+ return { inferredMult: clampMult(Number(r.ratio)), hasSignal: true, conviction: 0 };
  }
- return 1; // not enough signal yet — trust the comps as-is
+ return { inferredMult: 1, hasSignal: false, conviction: 0 };
+}
+
+/**
+ * How this store prices relative to market comps (the multiplier alone). >1 = above
+ * market, <1 = below. Defaults to 1 until there's enough history. Thin wrapper over
+ * getStorePricingSignal for callers that only need the number.
+ */
+export async function getStorePriceMultiplier(storeSlug: string): Promise<number> {
+ return (await getStorePricingSignal(storeSlug)).inferredMult;
 }

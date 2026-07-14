@@ -39,17 +39,17 @@ function blockBody(b: Block, ctx: Ctx) {
  <div className="relative w-full overflow-hidden" style={{ minHeight: "84vh" }}>
  <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
  <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.1) 45%, rgba(0,0,0,0.6) 100%)" }} />
- <div className="relative z-10 flex min-h-[84vh] flex-col items-center justify-end px-6 pb-24 pt-36 text-center text-white">
- <h2 className="max-w-3xl text-5xl leading-[1.04] sm:text-7xl" style={{ fontFamily: head }}>{p.heading}</h2>
- {p.subtext && <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-[15px]">{p.subtext}</p>}
- {p.cta && <a href={shopHref} className="mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black">{p.cta}</a>}
+ <div className="vya-hero-inner relative z-10 flex min-h-[84vh] flex-col items-center justify-end px-6 pb-24 pt-36 text-center text-white">
+ <h2 className="vya-heading max-w-3xl text-5xl leading-[1.04] sm:text-7xl" style={{ fontFamily: head }}>{p.heading}</h2>
+ {p.subtext && <p className="vya-sub mt-5 max-w-xl text-sm leading-relaxed text-white/85 sm:text-[15px]">{p.subtext}</p>}
+ {p.cta && <a href={shopHref} className="vya-cta mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black">{p.cta}</a>}
  </div>
  </div>
  ) : (
- <div className="px-6 py-32 text-center">
- <h2 className="mx-auto max-w-3xl text-5xl leading-[1.05] sm:text-6xl" style={{ fontFamily: head }}>{p.heading}</h2>
- {p.subtext && <p className="mt-5 mx-auto max-w-xl text-sm leading-relaxed opacity-65 sm:text-[15px]">{p.subtext}</p>}
- {p.cta && <a href={shopHref} className="mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }}>{p.cta}</a>}
+ <div className="vya-hero-inner px-6 py-32 text-center">
+ <h2 className="vya-heading mx-auto max-w-3xl text-5xl leading-[1.05] sm:text-6xl" style={{ fontFamily: head }}>{p.heading}</h2>
+ {p.subtext && <p className="vya-sub mt-5 mx-auto max-w-xl text-sm leading-relaxed opacity-65 sm:text-[15px]">{p.subtext}</p>}
+ {p.cta && <a href={shopHref} className="vya-cta mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }}>{p.cta}</a>}
  </div>
  );
 
@@ -60,7 +60,7 @@ function blockBody(b: Block, ctx: Ctx) {
  {p.heading && (
  <div className="mb-12 text-center">
  <span className="mb-3 block text-[10px] uppercase tracking-[0.3em] opacity-40">The Edit</span>
- <h2 className="text-3xl sm:text-[2.6rem] leading-tight" style={{ fontFamily: head }}>{p.heading}</h2>
+ <h2 className="vya-heading text-3xl sm:text-[2.6rem] leading-tight" style={{ fontFamily: head }}>{p.heading}</h2>
  </div>
  )}
  {shown.length ? (
@@ -85,15 +85,15 @@ function blockBody(b: Block, ctx: Ctx) {
  case "text":
  return (
  <section className="mx-auto max-w-2xl px-6 py-20 sm:py-24 text-center">
- {p.heading && <h2 className="mb-5 text-3xl sm:text-4xl leading-tight" style={{ fontFamily: head }}>{p.heading}</h2>}
- {p.body && <p className="text-sm leading-[1.9] opacity-75 sm:text-[15px] whitespace-pre-wrap">{p.body}</p>}
+ {p.heading && <h2 className="vya-heading mb-5 text-3xl sm:text-4xl leading-tight" style={{ fontFamily: head }}>{p.heading}</h2>}
+ {p.body && <p className="vya-body text-sm leading-[1.9] opacity-75 sm:text-[15px] whitespace-pre-wrap">{p.body}</p>}
  </section>
  );
 
  case "image":
  return p.image ? (
  <figure className="w-full">
- <img src={p.image} alt={p.caption || ""} className="w-full object-cover" style={{ maxHeight: "70vh" }} />
+ <img src={p.image} alt={p.caption || ""} className="vya-img w-full object-cover" style={{ maxHeight: "70vh" }} />
  {p.caption && <figcaption className="px-6 py-3 text-center text-xs opacity-60">{p.caption}</figcaption>}
  </figure>
  ) : null;
@@ -132,8 +132,8 @@ function blockBody(b: Block, ctx: Ctx) {
  case "newsletter":
  return (
  <section className="px-6 py-20 sm:py-24 text-center" style={{ borderTop: `1px solid ${fg}1a` }}>
- <h2 className="text-3xl sm:text-4xl leading-tight" style={{ fontFamily: head }}>{p.heading || "Join the list"}</h2>
- {p.subtext && <p className="mt-3 mx-auto max-w-md text-sm opacity-65">{p.subtext}</p>}
+ <h2 className="vya-heading text-3xl sm:text-4xl leading-tight" style={{ fontFamily: head }}>{p.heading || "Join the list"}</h2>
+ {p.subtext && <p className="vya-sub mt-3 mx-auto max-w-md text-sm opacity-65">{p.subtext}</p>}
  <div className="mt-7"><NewsletterForm accent={colors.accent} /></div>
  </section>
  );
@@ -149,12 +149,17 @@ export default function Blocks({
  fonts,
  products,
  shopHref = "#",
+ onSelect,
+ selectedId,
 }: {
  blocks: Block[];
  colors: Colors;
  fonts: { heading?: string; body?: string };
  products: BlockProduct[];
  shopHref?: string;
+ // Editor-only: click a section in the preview to select/edit it.
+ onSelect?: (id: string) => void;
+ selectedId?: string | null;
 }) {
  const head = ff(fonts.heading);
  const body = ff(fonts.body);
@@ -163,8 +168,20 @@ export default function Blocks({
  {blocks.map((b) => {
  const { background, fg } = bgFor(b.style?.bg, colors);
  const inner = blockBody(b, { colors, head, body, products, shopHref, fg });
+ const editable = typeof onSelect === "function";
+ // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
+ // and element: e.g. `.vya-hero .vya-heading { ... }` or `.vya-b-<id> { ... }`.
+ const secClass = `vya-sec vya-${b.type} vya-b-${b.id}`;
  return (
- <div key={b.id} style={background ? { background, color: fg } : undefined}>
+ <div
+ key={b.id}
+ onClick={editable ? (e) => { e.preventDefault(); e.stopPropagation(); onSelect!(b.id); } : undefined}
+ className={editable ? `${secClass} group/sec relative cursor-pointer transition-shadow ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : secClass}
+ style={background ? { background, color: fg } : undefined}
+ >
+ {editable && (
+ <span className={`pointer-events-none absolute left-2 top-2 z-20 rounded bg-[#5D0F17] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white transition-opacity ${selectedId === b.id ? "opacity-100" : "opacity-0 group-hover/sec:opacity-100"}`}>{b.type.replace(/[-_]/g, " ")}</span>
+ )}
  {inner}
  </div>
  );

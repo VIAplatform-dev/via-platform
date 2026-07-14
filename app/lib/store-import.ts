@@ -23,8 +23,10 @@ export type ImportedProduct = {
 export type StorefrontTheme = {
  fonts?: { heading?: string; body?: string };
  colors?: { bg?: string; text?: string; accent?: string };
+ customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
  blocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
+ shopBlocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
  extraPages?: { slug: string; title: string; blocks: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
  logo?: string | null;
  // cloned design (from site-clone): the original's name, nav, hero, and pages.
