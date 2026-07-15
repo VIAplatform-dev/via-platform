@@ -2,14 +2,15 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from "react";
-import { Check, Copy, ChevronDown } from "lucide-react";
+import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark } from "lucide-react";
 import { Card, CardHeader, PageHeader, Button, Input, EmptyState } from "@/app/store/ui";
 
 type Platform = { key: string; name: string; hasApi: boolean };
 type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { configured: boolean; connected: boolean; user: string | null };
 type Etsy = { configured: boolean; connected: boolean; shop: string | null };
-type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string> };
+type PlatformStats = { likes: number; offers: number; views: number; watchers: number };
+type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 type Content = { title: string; body: string; tags: string[]; price: string };
 
 const money = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
@@ -82,6 +83,19 @@ export default function CrossListingPage() {
  }
 
  const connected = platforms.filter((p) => acct(p.key) || (p.key === "ebay" && ebay?.connected) || (p.key === "etsy" && etsy?.connected));
+
+ // Engagement roll-up helpers: a human name per channel + a per-platform breakdown for the tooltip.
+ const nameFor = (k: string) => (k === "vya" ? "VYA" : platforms.find((p) => p.key === k)?.name || k);
+ const statTip = (bp?: Record<string, PlatformStats>) => {
+ if (!bp) return "";
+ return Object.entries(bp)
+ .map(([k, s]) => {
+ const parts = [s.likes ? `${s.likes} liked` : "", s.offers ? `${s.offers} offer${s.offers === 1 ? "" : "s"}` : "", s.views ? `${s.views} views` : "", s.watchers ? `${s.watchers} watching` : ""].filter(Boolean);
+ return parts.length ? `${nameFor(k)}: ${parts.join(", ")}` : "";
+ })
+ .filter(Boolean)
+ .join("\n");
+ };
 
  return (
  <div className="mx-auto max-w-3xl px-6 py-8">
@@ -176,7 +190,17 @@ export default function CrossListingPage() {
  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-stone-100">{it.image && <img src={it.image} alt="" className="h-full w-full object-cover" />}</div>
  <div className="min-w-0 flex-1">
  <p className="truncate text-[13px] font-medium text-stone-800">{it.title}</p>
- <p className="text-[12px] text-stone-400">{money(it.priceCents)}</p>
+ <div className="flex items-center gap-2.5 text-[12px] text-stone-400">
+ <span>{money(it.priceCents)}</span>
+ {it.stats && (it.stats.totals.likes + it.stats.totals.offers + it.stats.totals.views + it.stats.totals.watchers) > 0 && (
+ <span className="flex items-center gap-2.5" title={statTip(it.stats.byPlatform)}>
+ {it.stats.totals.likes > 0 && <span className="inline-flex items-center gap-1 text-stone-500"><Heart size={11} className="text-rose-400" fill="currentColor" />{it.stats.totals.likes}</span>}
+ {it.stats.totals.offers > 0 && <span className="inline-flex items-center gap-1 font-medium text-[#5D0F17]"><Tag size={11} />{it.stats.totals.offers}</span>}
+ {it.stats.totals.views > 0 && <span className="inline-flex items-center gap-1 text-stone-500"><Eye size={11} />{it.stats.totals.views}</span>}
+ {it.stats.totals.watchers > 0 && <span className="inline-flex items-center gap-1 text-stone-500"><Bookmark size={11} />{it.stats.totals.watchers}</span>}
+ </span>
+ )}
+ </div>
  </div>
  <div className="hidden flex-wrap justify-end gap-1 sm:flex">
  {connected.map((p) => {

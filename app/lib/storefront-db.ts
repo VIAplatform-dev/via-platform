@@ -1,5 +1,34 @@
 import { neon } from "@neondatabase/serverless";
 import type { StorefrontTheme } from "./store-import";
+import { sanitizeStorefrontHtml } from "./sanitize-storefront-html";
+
+type ThemeBlock = { id: string; type: string; props: Record<string, string>; style?: { bg?: string } };
+const cap = (s: string | undefined, n: number) => String(s ?? "").slice(0, n);
+// Custom sections are the "build anything" escape hatch, in two flavours, both handled at this one
+// write chokepoint (covers the editor, the design API, and the AI):
+//  • inline  — static markup rendered into the page. XSS-sensitive, so scrub to the safe allowlist.
+//  • sandbox — full HTML+CSS+JS rendered inside an isolated sandboxed iframe (SandboxEmbed). It
+//    can't touch the store, so the JS is kept as-is; we only bound its size.
+function scrubBlocks(blocks?: ThemeBlock[]): ThemeBlock[] | undefined {
+ if (!Array.isArray(blocks)) return blocks;
+ return blocks.map((b) => {
+ if (b?.type !== "custom") return b;
+ const sandbox = b.props?.mode === "sandbox" || !!(b.props?.js && b.props.js.trim());
+ if (sandbox) {
+ return { ...b, props: { ...b.props, mode: "sandbox", html: cap(b.props?.html, 40000), css: cap(b.props?.css, 40000), js: cap(b.props?.js, 40000) } };
+ }
+ return { ...b, props: { ...b.props, html: sanitizeStorefrontHtml(b.props?.html) } };
+ });
+}
+function scrubThemeHtml(theme: StorefrontTheme | null): StorefrontTheme | null {
+ if (!theme) return theme;
+ return {
+ ...theme,
+ blocks: scrubBlocks(theme.blocks),
+ shopBlocks: scrubBlocks(theme.shopBlocks),
+ extraPages: theme.extraPages?.map((p) => ({ ...p, blocks: scrubBlocks(p.blocks) || [] })),
+ };
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Hosted storefronts (Slice 1). One row per store keyed on store_slug (the
@@ -75,8 +104,9 @@ function rowToSettings(r: any): StorefrontSettings {
 /** Save the extracted design theme (fonts/colors/logo) for a store. */
 export async function setStorefrontTheme(storeSlug: string, theme: StorefrontTheme | null): Promise<void> {
  await ensureTable();
+ const clean = scrubThemeHtml(theme);
  const sql = neon(getDatabaseUrl());
- await sql`UPDATE storefront_settings SET theme = ${theme ? JSON.stringify(theme) : null}::jsonb, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
+ await sql`UPDATE storefront_settings SET theme = ${clean ? JSON.stringify(clean) : null}::jsonb, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
 }
 
 /** Public lookup for the storefront page — only enabled rows resolve. */

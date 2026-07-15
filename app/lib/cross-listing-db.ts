@@ -72,6 +72,16 @@ async function ensureTables() {
   UNIQUE (store_slug, item_id, platform)
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_cross_listings_item ON cross_listings (item_id)`;
+ // Engagement per (item, platform): likes/offers/views/watchers, fed by the extension (no-API
+ // channels), the eBay/Etsy APIs, and VYA-native events — the single source the dashboard rolls up.
+ await sql`CREATE TABLE IF NOT EXISTS cross_listing_stats (
+  id SERIAL PRIMARY KEY, store_slug TEXT NOT NULL, item_id TEXT NOT NULL, platform TEXT NOT NULL,
+  likes INTEGER NOT NULL DEFAULT 0, offers INTEGER NOT NULL DEFAULT 0,
+  views INTEGER NOT NULL DEFAULT 0, watchers INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (store_slug, item_id, platform)
+ )`;
+ await sql`CREATE INDEX IF NOT EXISTS idx_cross_listing_stats_store ON cross_listing_stats (store_slug)`;
  ensured = true;
 }
 
@@ -164,12 +174,47 @@ export async function getCrossListingsForItem(storeSlug: string, itemId: string)
  return rows.map((r) => ({ itemId: r.item_id, platform: r.platform, status: r.status, externalUrl: r.external_url ?? null }));
 }
 
+/** All of a store's live cross-listings on one platform (for the per-platform stat pulls). */
+export async function getCrossListingsByPlatform(storeSlug: string, platform: string): Promise<CrossListing[]> {
+ await ensureTables();
+ const rows = (await db()`SELECT item_id, platform, status, external_url FROM cross_listings WHERE store_slug = ${storeSlug} AND platform = ${platform} AND status IN ('listed', 'pending')`.catch(() => [])) as any[];
+ return rows.map((r) => ({ itemId: r.item_id, platform: r.platform, status: r.status, externalUrl: r.external_url ?? null }));
+}
+
 export async function markCrossListing(storeSlug: string, itemId: string, platform: string, status: string, externalUrl?: string | null): Promise<void> {
  await ensureTables();
  await db()`
   INSERT INTO cross_listings (store_slug, item_id, platform, status, external_url, updated_at)
   VALUES (${storeSlug}, ${itemId}, ${platform}, ${status}, ${externalUrl ?? null}, now())
   ON CONFLICT (store_slug, item_id, platform) DO UPDATE SET status = EXCLUDED.status, external_url = COALESCE(EXCLUDED.external_url, cross_listings.external_url), updated_at = now()
+ `.catch(() => {});
+}
+
+// ── engagement stats (likes / offers / views / watchers) per item × platform ──
+export type PlatformStats = { likes: number; offers: number; views: number; watchers: number };
+export type StatsInput = { likes?: number; offers?: number; views?: number; watchers?: number };
+const ZERO_STATS = (): PlatformStats => ({ likes: 0, offers: 0, views: 0, watchers: 0 });
+
+/**
+ * Record engagement for one item on one platform. Only the provided fields are written; omitted
+ * fields keep their prior value (so a channel that only knows likes doesn't zero out views). Called
+ * by the extension report endpoint (no-API channels) and the API/cron pulls (eBay/Etsy).
+ */
+export async function upsertCrossListingStats(storeSlug: string, itemId: string, platform: string, stats: StatsInput): Promise<void> {
+ if (platform !== "vya" && !platformByKey(platform)) return;
+ await ensureTables();
+ const clean = (n: number | undefined): number | null => (n == null || !Number.isFinite(Number(n)) ? null : Math.max(0, Math.min(10_000_000, Math.round(Number(n)))));
+ const likes = clean(stats.likes), offers = clean(stats.offers), views = clean(stats.views), watchers = clean(stats.watchers);
+ if (likes == null && offers == null && views == null && watchers == null) return;
+ await db()`
+  INSERT INTO cross_listing_stats (store_slug, item_id, platform, likes, offers, views, watchers, updated_at)
+  VALUES (${storeSlug}, ${itemId}, ${platform}, ${likes ?? 0}, ${offers ?? 0}, ${views ?? 0}, ${watchers ?? 0}, now())
+  ON CONFLICT (store_slug, item_id, platform) DO UPDATE SET
+   likes = COALESCE(${likes}, cross_listing_stats.likes),
+   offers = COALESCE(${offers}, cross_listing_stats.offers),
+   views = COALESCE(${views}, cross_listing_stats.views),
+   watchers = COALESCE(${watchers}, cross_listing_stats.watchers),
+   updated_at = now()
  `.catch(() => {});
 }
 
@@ -203,12 +248,14 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
  return toPull;
 }
 
-export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string> };
+export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 
-/** Every active/pending item with its per-platform cross-listing status, for the tab. */
+/** Every active/pending item with its per-platform cross-listing status + engagement, for the tab. */
 export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> {
  await ensureTables();
- const rows = (await db()`
+ const sql = db();
+ const [rows, statRows, vyaOffers] = await Promise.all([
+ sql`
   SELECT i.id::text AS item_id, i.title, i.price_cents, i.images, i.status,
    COALESCE(json_object_agg(c.platform, c.status) FILTER (WHERE c.platform IS NOT NULL), '{}') AS listings
   FROM items i JOIN sellers s ON s.id = i.seller_id
@@ -216,10 +263,31 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
   WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved')
   GROUP BY i.id, i.title, i.price_cents, i.images, i.status
   ORDER BY i.created_at DESC LIMIT 200
- `.catch(() => [])) as any[];
- return rows.map((r) => ({
+ `.catch(() => []),
+ sql`SELECT item_id, platform, likes, offers, views, watchers FROM cross_listing_stats WHERE store_slug = ${storeSlug}`.catch(() => []),
+ // VYA-native pending offers per item (reliably keyed by item_id) → folded in as the 'vya' channel.
+ sql`SELECT item_id, COUNT(*)::int AS offers FROM storefront_offers WHERE store_slug = ${storeSlug} AND status = 'pending' AND item_id IS NOT NULL GROUP BY item_id`.catch(() => []),
+ ]) as [any[], any[], any[]];
+
+ // Index stats by item → platform.
+ const byItem = new Map<string, Record<string, PlatformStats>>();
+ const put = (itemId: string, platform: string, s: StatsInput) => {
+ const m = byItem.get(itemId) ?? {};
+ const cur = m[platform] ?? ZERO_STATS();
+ m[platform] = { likes: s.likes ?? cur.likes, offers: s.offers ?? cur.offers, views: s.views ?? cur.views, watchers: s.watchers ?? cur.watchers };
+ byItem.set(itemId, m);
+ };
+ for (const r of statRows) put(String(r.item_id), String(r.platform), { likes: Number(r.likes) || 0, offers: Number(r.offers) || 0, views: Number(r.views) || 0, watchers: Number(r.watchers) || 0 });
+ for (const r of vyaOffers) put(String(r.item_id), "vya", { offers: Number(r.offers) || 0 });
+
+ return rows.map((r) => {
+ const byPlatform = byItem.get(String(r.item_id)) ?? {};
+ const totals = Object.values(byPlatform).reduce<PlatformStats>((t, s) => ({ likes: t.likes + s.likes, offers: t.offers + s.offers, views: t.views + s.views, watchers: t.watchers + s.watchers }), ZERO_STATS());
+ return {
  itemId: r.item_id, title: String(r.title || "Item"), priceCents: Number(r.price_cents || 0),
  image: Array.isArray(r.images) ? (r.images[0] ?? null) : null, status: String(r.status),
  listings: (r.listings && typeof r.listings === "object") ? r.listings : {},
- }));
+ stats: { totals, byPlatform },
+ };
+ });
 }

@@ -1,4 +1,4 @@
-import { sendStoreCampaign, sendStoreNewArrivals } from "./email";
+import { sendStoreCampaign, sendStoreNewArrivals, getStoreEmailBrand } from "./email";
 import { resolveStoreSender } from "./email-settings-db";
 import { getCustomAutomationsForTrigger, isAutomationEnabled } from "./automations-db";
 import { listCustomerProfiles } from "./store-customers-db";
@@ -30,10 +30,11 @@ export async function fireAutomationTrigger(
  if (!autos.length) return 0;
  const { fromName, fromAddress, replyTo, website } = await resolveStoreSender(storeSlug);
  if (!replyTo) return 0;
+ const brand = await getStoreEmailBrand(storeSlug).catch(() => undefined);
  const v = { name: recipient.name || "there", ...vars };
  let sent = 0;
  for (const a of autos) {
- const r = await sendStoreCampaign({ storeName: fromName, storeEmail: replyTo, fromAddress, subject: fill(a.subject, v), body: fill(a.body, v), link: website, recipients: [recipient.email] }).catch(() => null);
+ const r = await sendStoreCampaign({ storeName: fromName, storeEmail: replyTo, fromAddress, subject: fill(a.subject, v), body: fill(a.body, v), link: website, recipients: [recipient.email], brand }).catch(() => null);
  if (r) sent += r.sent;
  }
  return sent;
@@ -90,9 +91,10 @@ export async function sendAbandonedCartEmail(cart: AbandonedCart): Promise<boole
  if (!cart.email.includes("@")) return false;
  const { fromName, fromAddress, replyTo } = await resolveStoreSender(cart.storeSlug);
  if (!replyTo) return false;
+ const brand = await getStoreEmailBrand(cart.storeSlug).catch(() => undefined);
  const piece = cart.itemTitle || "your piece";
  const subject = `Still thinking about ${piece}?`;
  const body = `Hi ${cart.name || "there"},\n\nYou were checking out ${piece} — and since it's one-of-one, once it's gone, it's gone. Come finish up whenever you're ready:`;
- const r = await sendStoreCampaign({ storeName: fromName, storeEmail: replyTo, fromAddress, subject, body, link: `${CHECKOUT_BASE}/checkout?item=${cart.itemId}`, recipients: [cart.email] }).catch(() => null);
+ const r = await sendStoreCampaign({ storeName: fromName, storeEmail: replyTo, fromAddress, subject, body, link: `${CHECKOUT_BASE}/checkout?item=${cart.itemId}`, recipients: [cart.email], brand }).catch(() => null);
  return !!r && r.sent > 0;
 }

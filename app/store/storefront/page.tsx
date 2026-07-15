@@ -4,8 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import Blocks from "@/app/s/Blocks";
 import Sidekick from "../Sidekick";
 import { useStoreBase } from "../nav-base";
-import { RotateCw, Globe, ChevronDown, Home as HomeIcon, Copy, Check, ExternalLink, SlidersHorizontal, GripVertical, ChevronUp, X as XIcon, Plus } from "lucide-react";
-import { makeBlock, pageSlugify, type Block, type BlockDef, type BlockType, type StorePage } from "@/app/lib/storefront-blocks";
+import { RotateCw, Globe, ChevronDown, Home as HomeIcon, Copy, Check, ExternalLink, SlidersHorizontal, GripVertical, ChevronUp, X as XIcon, Plus, Monitor, Tablet, Smartphone, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { makeBlock, pageSlugify, type Block, type BlockDef, type BlockType, type BlockStyle, type BlockScale, type StorePage } from "@/app/lib/storefront-blocks";
 import { parseDesign, buildDesignCss, HEADING_FONTS, BODY_FONTS, type DesignSettings } from "@/app/lib/captured-design";
 
 type Template = { id: string; name: string; description: string; colors: { bg: string; text: string; accent: string }; fonts: { heading: string; body: string }; heroStyle: string };
@@ -56,6 +56,11 @@ export default function StorefrontEditor() {
  const [shopBlocks, setShopBlocks] = useState<Block[]>([]); // editable intro content above the Shop grid
  const [blockTypes, setBlockTypes] = useState<BlockDef[]>([]);
  const [dragIdx, setDragIdx] = useState<number | null>(null);
+ const [canvasOver, setCanvasOver] = useState<number | null>(null); // canvas drag: which section shows the drop line
+ const canvasRef = useRef<HTMLDivElement>(null); // the live preview, for the text-selection toolbar
+ const [fmtBar, setFmtBar] = useState<{ top: number; left: number } | null>(null);
+ const [device, setDevice] = useState<"desktop" | "tablet" | "phone">("desktop"); // Framer-style responsive preview
+ const deviceW = device === "phone" ? "24rem" : device === "tablet" ? "40rem" : "100%";
 
  // Details
  const [handle, setHandle] = useState("");
@@ -241,12 +246,57 @@ export default function StorefrontEditor() {
  else setExtraPages((ps) => ps.map((p) => (p.slug === activeSlug ? { ...p, blocks: fn(p.blocks) } : p)));
  setSaved(false);
  }
+ // Canva-style: text typed directly on the canvas syncs back to the block's prop on blur.
+ function editField(id: string, key: string, value: string) {
+ updateCur((bs) => bs.map((b) => (b.id === id ? { ...b, props: { ...(b.props || {}), [key]: value } } : b)));
+ }
  function addBlock(type: BlockType) { updateCur((bs) => [...bs, makeBlock(type)]); }
  function removeBlock(id: string) { updateCur((bs) => bs.filter((b) => b.id !== id)); }
  function moveBlock(i: number, dir: -1 | 1) { updateCur((bs) => { const to = i + dir; if (to < 0 || to >= bs.length) return bs; const next = [...bs]; [next[i], next[to]] = [next[to], next[i]]; return next; }); }
  function setBlockProp(id: string, key: string, val: string) { updateCur((bs) => bs.map((b) => (b.id === id ? { ...b, props: { ...b.props, [key]: val } } : b))); }
- function setBlockBg(id: string, bg: string) { updateCur((bs) => bs.map((b) => (b.id === id ? { ...b, style: bg ? { bg } : undefined } : b))); }
+ // Merge one visual override into a section's style; empty/undefined values clear that key.
+ function patchBlockStyle(id: string, patch: Partial<BlockStyle>) {
+ updateCur((bs) => bs.map((b) => {
+ if (b.id !== id) return b;
+ const merged: BlockStyle = { ...(b.style || {}), ...patch };
+ (Object.keys(merged) as (keyof BlockStyle)[]).forEach((k) => { if (!merged[k]) delete merged[k]; });
+ return { ...b, style: Object.keys(merged).length ? merged : undefined };
+ }));
+ }
+ function setBlockBg(id: string, bg: string) { patchBlockStyle(id, { bg: bg || undefined }); }
  function reorderTo(to: number) { if (dragIdx === null || dragIdx === to) { setDragIdx(null); return; } const from = dragIdx; updateCur((bs) => { const next = [...bs]; const [m] = next.splice(from, 1); next.splice(to, 0, m); return next; }); setDragIdx(null); }
+ // Drag a section by its grip on the canvas → reorder, with a drop line (shared drag state with the panel).
+ const canvasReorder = {
+ dragIndex: dragIdx,
+ overIndex: canvasOver,
+ onStart: (i: number) => setDragIdx(i),
+ onOver: (i: number) => setCanvasOver((c) => (c === i ? c : i)),
+ onEnd: () => { setDragIdx(null); setCanvasOver(null); },
+ onDrop: (i: number) => { reorderTo(i); setCanvasOver(null); },
+ };
+
+ // Floating format toolbar: when the owner selects text inside an editable element on the canvas,
+ // pop a small bar (bold / italic / underline / colour) above the selection — Canva-style.
+ useEffect(() => {
+ const onSel = () => {
+ const s = window.getSelection();
+ if (!s || s.isCollapsed || s.rangeCount === 0) { setFmtBar(null); return; }
+ let node: Node | null = s.getRangeAt(0).commonAncestorContainer;
+ if (node.nodeType === Node.TEXT_NODE) node = node.parentElement;
+ const host = node as HTMLElement | null;
+ if (!host || !canvasRef.current?.contains(host) || !host.closest('[contenteditable="true"]')) { setFmtBar(null); return; }
+ const r = s.getRangeAt(0).getBoundingClientRect();
+ if (r.width === 0 && r.height === 0) { setFmtBar(null); return; }
+ setFmtBar({ top: r.top, left: r.left + r.width / 2 });
+ };
+ document.addEventListener("selectionchange", onSel);
+ return () => document.removeEventListener("selectionchange", onSel);
+ }, []);
+ function fmtCmd(cmd: string, val?: string) {
+ if (cmd === "foreColor") document.execCommand("styleWithCSS", false, "true");
+ document.execCommand(cmd, false, val);
+ if (cmd === "foreColor") document.execCommand("styleWithCSS", false, "false");
+ }
 
  function addPage() {
  const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
@@ -337,8 +387,16 @@ export default function StorefrontEditor() {
  setAssets((a) => a.filter((x) => x.url !== url));
  await fetch(`/api/store/assets?url=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
  }
- // Place a photo as the hero and persist it immediately (drag-drop or click).
+ // Place a photo as the hero and persist immediately. If the home page has a hero SECTION, set its
+ // image (the modern block model); otherwise fall back to the legacy storefront hero image.
  async function setHero(url: string) {
+ const heroBlock = blocks.find((b) => b.type === "hero");
+ if (heroBlock) {
+ const next = blocks.map((b) => (b.id === heroBlock.id ? { ...b, props: { ...b.props, image: url } } : b));
+ setBlocks(next); setSaved(false);
+ await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks: next, shopBlocks, extraPages }) }).catch(() => {});
+ return;
+ }
  setHeroImage(url);
  await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled, tagline, accentColor: colors.accent, heroImage: url, about }) }).catch(() => {});
  }
@@ -512,6 +570,28 @@ export default function StorefrontEditor() {
  return (
  <div className="fixed inset-0 z-[60] flex flex-col bg-[#f4f4f5] text-stone-900">
  <HideGlobalChat />
+ {/* Floating format toolbar — appears over a text selection on the canvas (Canva-style). */}
+ {fmtBar && (
+ <div
+ style={{ position: "fixed", top: Math.max(8, fmtBar.top - 46), left: fmtBar.left, transform: "translateX(-50%)", zIndex: 90 }}
+ className="flex items-center gap-0.5 rounded-lg border border-stone-200 bg-white px-1 py-1 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.35)]"
+ onMouseDown={(e) => e.preventDefault()}
+ >
+ {[
+ { key: "bold", label: "B", cls: "font-bold", run: () => fmtCmd("bold") },
+ { key: "italic", label: "I", cls: "italic", run: () => fmtCmd("italic") },
+ { key: "underline", label: "U", cls: "underline", run: () => fmtCmd("underline") },
+ ].map((t) => (
+ <button key={t.key} type="button" title={t.key} onClick={t.run} className={`grid h-7 w-7 place-items-center rounded-md text-[13px] text-stone-600 transition hover:bg-stone-100 ${t.cls}`}>{t.label}</button>
+ ))}
+ <span className="mx-0.5 h-5 w-px bg-stone-200" />
+ {[colors.accent, "#1a1a1a", "#8a7d6b", "#b4453f", "#2f5d50"].map((c) => (
+ <button key={c} type="button" title="Text colour" onClick={() => fmtCmd("foreColor", c)} className="h-5 w-5 rounded-full border border-black/10 transition hover:scale-110" style={{ background: c }} />
+ ))}
+ <span className="mx-0.5 h-5 w-px bg-stone-200" />
+ <button type="button" title="Clear formatting" onClick={() => fmtCmd("removeFormat")} className="grid h-7 w-7 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100"><XIcon size={13} /></button>
+ </div>
+ )}
  {/* Top bar */}
  <header className="flex items-center justify-between gap-3 border-b border-stone-200/80 bg-white px-3 py-2">
  <div className="flex min-w-0 items-center gap-2">
@@ -545,10 +625,10 @@ export default function StorefrontEditor() {
 
  {/* Build with VYA — only when the store has no sections yet (else they edit by hand / ask VYA in chat) */}
  {blocks.length === 0 && (
- <div className="mb-6 border border-stone-300 bg-stone-50 p-4">
+ <div className="mb-6 rounded-xl border border-stone-300 bg-stone-50 p-4">
  <p className="text-[15px] font-semibold mb-1">Start in one click</p>
  <p className="text-xs text-stone-500 mb-3">Let VYA design a full storefront — homepage, About, FAQ &amp; shipping pages — from your products and brand. You can edit everything after.</p>
- <button onClick={generateStorefront} disabled={genBusy} className="w-full bg-[#5D0F17] text-white px-5 py-3 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{genBusy ? "VYA is designing your store…" : "Build my storefront with VYA ✨"}</button>
+ <button onClick={generateStorefront} disabled={genBusy} className="w-full rounded-lg bg-[#5D0F17] text-white px-5 py-3 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{genBusy ? "VYA is designing your store…" : "Build my storefront with VYA ✨"}</button>
  {genBusy && <p className="mt-2 text-[11px] text-stone-400">Designing your homepage + pages — about 10–20 seconds.</p>}
  {genErr && <p className="mt-2 text-xs text-red-700">{genErr}</p>}
  </div>
@@ -567,7 +647,7 @@ export default function StorefrontEditor() {
  <p className={label}>Template</p>
  <div className="grid grid-cols-2 gap-2.5 mb-7">
  {templates.map((t) => (
- <button key={t.id} onClick={() => applyTemplate(t)} className={`text-left border overflow-hidden transition ${template === t.id ? "border-[#5D0F17] ring-1 ring-[#5D0F17]" : "border-stone-200 hover:border-[#5D0F17]/40"}`}>
+ <button key={t.id} onClick={() => applyTemplate(t)} className={`text-left rounded-xl border overflow-hidden transition ${template === t.id ? "border-[#5D0F17] ring-1 ring-[#5D0F17]" : "border-stone-200 hover:border-[#5D0F17]/40"}`}>
  <div className="h-16 flex items-center justify-center" style={{ background: t.colors.bg }}>
  <span className="text-base" style={{ color: t.colors.text, fontFamily: ff(t.fonts.heading) }}>{t.name}</span>
  </div>
@@ -580,7 +660,9 @@ export default function StorefrontEditor() {
  <div className="space-y-2 mb-7">
  {([["bg", "Background"], ["text", "Text"], ["accent", "Accent"]] as const).map(([k, lbl]) => (
  <div key={k} className="flex items-center gap-3">
- <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(colors[k]) ? colors[k] : "#000000"} onChange={(e) => { setColors((c) => ({ ...c, [k]: e.target.value })); setSaved(false); }} className="h-9 w-11 cursor-pointer border border-stone-200 bg-white p-0.5 shrink-0" />
+ <label className="relative h-9 w-11 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-stone-200" style={{ background: /^#[0-9a-fA-F]{6}$/.test(colors[k]) ? colors[k] : "#fff" }}>
+ <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(colors[k]) ? colors[k] : "#000000"} onChange={(e) => { setColors((c) => ({ ...c, [k]: e.target.value })); setSaved(false); }} className="absolute inset-0 cursor-pointer opacity-0" />
+ </label>
  <input value={colors[k]} onChange={(e) => { setColors((c) => ({ ...c, [k]: e.target.value })); setSaved(false); }} className={`${input} w-24 font-mono text-xs`} />
  <span className="text-sm text-stone-500">{lbl}</span>
  </div>
@@ -592,15 +674,20 @@ export default function StorefrontEditor() {
  {([["heading", "Headings"], ["body", "Body"]] as const).map(([k, lbl]) => (
  <div key={k}>
  <label className="block text-xs text-stone-500 mb-1">{lbl}</label>
- <select value={fonts[k]} onChange={(e) => { setFonts((f) => ({ ...f, [k]: e.target.value })); setSaved(false); }} className={input} style={{ fontFamily: ff(fonts[k]) }}>
+ <div className="relative">
+ <select value={fonts[k]} onChange={(e) => { setFonts((f) => ({ ...f, [k]: e.target.value })); setSaved(false); }} className={`${input} appearance-none pr-8`} style={{ fontFamily: ff(fonts[k]) }}>
  {(k === "heading" ? headingFonts : bodyFonts).map((f) => <option key={f} value={f} style={{ fontFamily: ff(f) }}>{f}</option>)}
  </select>
+ <ChevronDown size={14} strokeWidth={2} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+ </div>
+ {/* live preview of the chosen face */}
+ <p className="mt-2 truncate rounded-lg bg-stone-50 px-3 py-2 text-stone-700" style={{ fontFamily: ff(fonts[k]), fontSize: k === "heading" ? "20px" : "14px" }}>{k === "heading" ? storeName : "Curated vintage, one-of-one — shop the edit."}</p>
  </div>
  ))}
  </div>
 
  <div className="flex items-center gap-4">
- <button onClick={saveDesign} disabled={busy} className="bg-[#5D0F17] text-white px-6 py-3 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{busy ? "Saving…" : "Save design"}</button>
+ <button onClick={saveDesign} disabled={busy} className="rounded-lg bg-[#5D0F17] text-white px-6 py-3 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{busy ? "Saving…" : "Save design"}</button>
  {saved && <span className="text-xs text-green-700">Saved ✓</span>}
  {err && <span className="text-xs text-red-700">{err}</span>}
  </div>
@@ -611,7 +698,7 @@ export default function StorefrontEditor() {
  <p className="-mt-2 mb-2 text-xs text-stone-400">Advanced — layered over your theme site-wide. Target the storefront classes: <code className="rounded bg-stone-100 px-1">.vya-hero</code>, <code className="rounded bg-stone-100 px-1">.vya-heading</code>, <code className="rounded bg-stone-100 px-1">.vya-cta</code>, <code className="rounded bg-stone-100 px-1">.vya-featured</code>… Or just tell VYA what you want and it writes this for you.</p>
  <textarea value={customCss} onChange={(e) => { setCustomCss(e.target.value); setCssSaved(false); }} spellCheck={false} placeholder=".vya-hero .vya-hero-inner { align-items: flex-start; text-align: left; }" className={`${input} min-h-[140px] resize-y font-mono text-[12px] leading-relaxed`} />
  <div className="mt-3 flex items-center gap-3">
- <button onClick={async () => { setCssBusy(true); setCssSaved(false); const r = await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customCss }) }).catch(() => null); setCssBusy(false); if (r && r.ok) setCssSaved(true); }} disabled={cssBusy} className="bg-[#5D0F17] text-white px-5 py-2.5 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{cssBusy ? "Applying…" : "Apply CSS"}</button>
+ <button onClick={async () => { setCssBusy(true); setCssSaved(false); const r = await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customCss }) }).catch(() => null); setCssBusy(false); if (r && r.ok) setCssSaved(true); }} disabled={cssBusy} className="rounded-lg bg-[#5D0F17] text-white px-5 py-2.5 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{cssBusy ? "Applying…" : "Apply CSS"}</button>
  {cssSaved && <span className="text-xs text-green-700">Applied ✓ — live on your site</span>}
  </div>
  </div>
@@ -637,6 +724,10 @@ export default function StorefrontEditor() {
  {curBlocks.map((b, i) => {
  const def = blockTypes.find((d) => d.type === b.type);
  const curBg = b.style?.bg || "";
+ const st = b.style || {};
+ const hasHeading = ["hero", "featured", "text", "newsletter"].includes(b.type);
+ const textish = ["announcement", "hero", "featured", "text", "newsletter"].includes(b.type);
+ const canBg = b.type !== "announcement" && b.type !== "hero";
  return (
  <div key={b.id} id={`ed-${b.id}`} onDragOver={(e) => { if (dragIdx !== null) e.preventDefault(); }} onDrop={() => reorderTo(i)} className={`overflow-hidden rounded-xl border bg-white transition ${dragIdx === i ? "border-[#5D0F17] opacity-50" : selBlock === b.id ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/15" : "border-stone-200"}`}>
  <div draggable onDragStart={() => setDragIdx(i)} onDragEnd={() => setDragIdx(null)} className="flex cursor-grab items-center justify-between border-b border-stone-100 bg-stone-50/70 px-3 py-2 active:cursor-grabbing">
@@ -658,14 +749,70 @@ export default function StorefrontEditor() {
  )}
  </div>
  ))}
- {b.type !== "announcement" && b.type !== "hero" && (
+ {(canBg || textish || hasHeading) && (
+ <div className="mt-1 space-y-3 rounded-lg bg-stone-50/70 p-2.5">
+ <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Design</p>
+
+ {canBg && (
  <div>
  <label className="mb-1 block text-[11px] text-stone-500">Background</label>
  <div className="flex items-center gap-1.5">
  {([["", "Default"], ["accent", "Accent"], ["dark", "Dark"]] as const).map(([val, lbl]) => (
- <button key={lbl} onClick={() => setBlockBg(b.id, val)} className={`border px-2.5 py-1 text-[11px] ${curBg === val || (val === "" && !curBg) ? "border-[#5D0F17] text-[#5D0F17]" : "border-stone-200 text-stone-400"}`}>{lbl}</button>
+ <button key={lbl} onClick={() => setBlockBg(b.id, val)} className={`rounded-md border px-2.5 py-1 text-[11px] transition ${curBg === val || (val === "" && !curBg) ? "border-[#5D0F17] bg-white text-[#5D0F17]" : "border-stone-200 text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
  ))}
- <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(curBg) ? curBg : "#000000"} onChange={(e) => setBlockBg(b.id, e.target.value)} className="h-7 w-9 cursor-pointer border border-stone-200 bg-white p-0.5" title="Custom background color" />
+ <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-md border border-stone-200" title="Custom colour" style={{ background: /^#[0-9a-fA-F]{6}$/.test(curBg) ? curBg : "#ffffff" }}>
+ <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(curBg) ? curBg : "#000000"} onChange={(e) => setBlockBg(b.id, e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
+ {!/^#[0-9a-fA-F]{6}$/.test(curBg) && <Plus size={13} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-stone-400" />}
+ </label>
+ </div>
+ </div>
+ )}
+
+ {textish && (
+ <div>
+ <label className="mb-1 block text-[11px] text-stone-500">Text colour</label>
+ <div className="flex flex-wrap items-center gap-1.5">
+ <button onClick={() => patchBlockStyle(b.id, { textColor: undefined })} className={`rounded-md border px-2.5 py-1 text-[11px] transition ${!st.textColor ? "border-[#5D0F17] bg-white text-[#5D0F17]" : "border-stone-200 text-stone-400 hover:text-stone-600"}`}>Default</button>
+ {[colors.text, colors.accent, "#ffffff", "#111111", "#8a7d6b"].map((c) => (
+ <button key={c} onClick={() => patchBlockStyle(b.id, { textColor: c })} title="Text colour" className={`h-6 w-6 rounded-full border transition hover:scale-110 ${st.textColor?.toLowerCase() === c.toLowerCase() ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10"}`} style={{ background: c }} />
+ ))}
+ <label className="relative h-6 w-6 cursor-pointer overflow-hidden rounded-full border border-stone-200" title="Custom colour" style={{ background: st.textColor && ![colors.text, colors.accent, "#ffffff", "#111111", "#8a7d6b"].map((x) => x.toLowerCase()).includes(st.textColor.toLowerCase()) ? st.textColor : "#fff" }}>
+ <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(st.textColor || "") ? st.textColor : "#111111"} onChange={(e) => patchBlockStyle(b.id, { textColor: e.target.value })} className="absolute inset-0 cursor-pointer opacity-0" />
+ <Plus size={12} className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-stone-400" />
+ </label>
+ </div>
+ </div>
+ )}
+
+ {textish && (
+ <div>
+ <label className="mb-1 block text-[11px] text-stone-500">Alignment</label>
+ <div className="flex items-center gap-1">
+ {([["left", AlignLeft], ["center", AlignCenter], ["right", AlignRight]] as const).map(([val, Icon]) => (
+ <button key={val} onClick={() => patchBlockStyle(b.id, { align: st.align === val ? undefined : val })} title={val} className={`grid h-7 flex-1 place-items-center rounded-md border transition ${st.align === val ? "border-[#5D0F17] bg-white text-[#5D0F17]" : "border-stone-200 text-stone-400 hover:text-stone-600"}`}><Icon size={14} /></button>
+ ))}
+ </div>
+ </div>
+ )}
+
+ {hasHeading && (
+ <div>
+ <label className="mb-1 block text-[11px] text-stone-500">Heading size</label>
+ <div className="flex items-center gap-1">
+ {([["sm", "S"], ["md", "M"], ["lg", "L"], ["xl", "XL"]] as const).map(([val, lbl]) => (
+ <button key={val} onClick={() => patchBlockStyle(b.id, { headingSize: st.headingSize === val ? undefined : val })} className={`h-7 flex-1 rounded-md border text-[11px] font-medium transition ${st.headingSize === val ? "border-[#5D0F17] bg-white text-[#5D0F17]" : "border-stone-200 text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
+ ))}
+ </div>
+ </div>
+ )}
+
+ <div>
+ <label className="mb-1 block text-[11px] text-stone-500">Spacing</label>
+ <div className="flex items-center gap-1">
+ {([["", "Default"], ["md", "Cozy"], ["lg", "Roomy"], ["xl", "Airy"]] as const).map(([val, lbl]) => (
+ <button key={lbl} onClick={() => patchBlockStyle(b.id, { space: (val || undefined) as BlockScale | undefined })} className={`h-7 flex-1 rounded-md border text-[11px] transition ${(st.space || "") === val ? "border-[#5D0F17] bg-white text-[#5D0F17]" : "border-stone-200 text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
+ ))}
+ </div>
  </div>
  </div>
  )}
@@ -702,11 +849,11 @@ export default function StorefrontEditor() {
  {/* ── Photos tab ── */}
  {tab === "assets" && (
  <div>
- <p className="text-xs text-stone-500 mb-4">Upload photos for your storefront — hero banners, lookbook shots, anything. Then drag one onto the hero in the preview, or hit “Set as hero.”</p>
+ <p className="text-xs text-stone-500 mb-4">Your photo library — hero banners, lookbook shots, anything. Hover any photo to set it as your hero. To use one in a section, upload here and paste its link, or just ask VYA.</p>
  <label
  onDragOver={(e) => { e.preventDefault(); }}
  onDrop={(e) => { e.preventDefault(); if (e.dataTransfer.files?.length) uploadAssets(e.dataTransfer.files); }}
- className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-stone-300 bg-white py-8 text-center cursor-pointer hover:border-[#5D0F17]/40 transition mb-5"
+ className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-stone-300 bg-white py-8 text-center cursor-pointer hover:border-[#5D0F17]/40 transition mb-5"
  >
  <span className="text-sm text-stone-600">{assetBusy ? "Uploading…" : "Drop photos here or click to upload"}</span>
  <span className="text-[11px] text-stone-400">JPG / PNG, up to 15MB each</span>
@@ -714,15 +861,15 @@ export default function StorefrontEditor() {
  </label>
  {assets.length ? (
  <>
- <p className="text-[11px] text-stone-400 mb-2">Drag a photo onto the hero in the preview →</p>
+ <p className="text-[11px] text-stone-400 mb-2">{assets.length} photo{assets.length === 1 ? "" : "s"} · hover for options</p>
  <div className="grid grid-cols-3 gap-2">
  {assets.map((a) => (
- <div key={a.url} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.url); e.dataTransfer.effectAllowed = "copy"; }} className="group relative aspect-square overflow-hidden border border-stone-200 cursor-grab active:cursor-grabbing">
+ <div key={a.url} draggable onDragStart={(e) => { e.dataTransfer.setData("text/plain", a.url); e.dataTransfer.effectAllowed = "copy"; }} className="group relative aspect-square overflow-hidden rounded-lg border border-stone-200 cursor-grab active:cursor-grabbing">
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={a.url} alt="" className="h-full w-full object-cover pointer-events-none" />
  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition flex flex-col justify-between p-1.5" style={{ background: "rgba(0,0,0,0.35)" }}>
- <button onClick={() => deleteAsset(a.url)} className="self-end h-5 w-5 rounded-full bg-white/90 text-[#5D0F17] text-xs leading-none">×</button>
- <button onClick={() => setHero(a.url)} className="bg-white/90 text-[#5D0F17] py-1 text-[10px] uppercase tracking-[0.12em]">Set as hero</button>
+ <button onClick={() => deleteAsset(a.url)} title="Delete photo" className="self-end grid h-5 w-5 place-items-center rounded-full bg-white/90 text-[#5D0F17] text-xs leading-none">×</button>
+ <button onClick={() => setHero(a.url)} className="rounded-md bg-white/90 text-[#5D0F17] py-1 text-[10px] font-medium uppercase tracking-[0.12em] hover:bg-white">Set as hero</button>
  </div>
  </div>
  ))}
@@ -749,15 +896,16 @@ export default function StorefrontEditor() {
  <input className={input} value={tagline} onChange={(e) => { setTagline(e.target.value); setSaved(false); }} placeholder="Curated vintage, one-of-one." maxLength={120} />
  </div>
  <div className="mb-5">
- <label className={label}>Hero image URL <span className="text-stone-300">(optional)</span></label>
+ <label className={label}>Fallback hero image <span className="text-stone-300">(optional)</span></label>
  <input className={input} value={heroImage} onChange={(e) => { setHeroImage(e.target.value); setSaved(false); }} placeholder="https://…/banner.jpg" />
+ <p className="mt-1.5 text-[11px] text-stone-400">Shown only if your homepage has no hero section. Most stores set the hero from the Photos tab or a hero section instead.</p>
  </div>
  <div className="mb-7">
  <label className={label}>About <span className="text-stone-300">(optional)</span></label>
  <textarea className={`${input} min-h-[90px] resize-y`} value={about} onChange={(e) => { setAbout(e.target.value); setSaved(false); }} placeholder="A line or two about your store." maxLength={1000} />
  </div>
  <div className="flex items-center gap-4">
- <button onClick={saveDetails} disabled={busy} className="bg-[#5D0F17] text-white px-6 py-3 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{busy ? "Saving…" : "Save details"}</button>
+ <button onClick={saveDetails} disabled={busy} className="rounded-lg bg-[#5D0F17] text-white px-6 py-3 text-[13px] font-medium hover:bg-[#5D0F17]/85 transition disabled:opacity-50">{busy ? "Saving…" : "Save details"}</button>
  {saved && <span className="text-xs text-green-700">Saved ✓</span>}
  {err && <span className="text-xs text-red-700">{err}</span>}
  </div>
@@ -858,8 +1006,8 @@ export default function StorefrontEditor() {
  {/* ───── Live preview ───── */}
  <div className="order-2 flex-1 overflow-y-auto bg-[#f4f4f5] p-5 lg:p-8">
  <div className="mx-auto max-w-3xl">
- {/* Browser chrome toolbar */}
- <div className="flex items-center gap-2 rounded-t-xl border border-b-0 border-stone-200 bg-white px-3 py-2">
+ {/* Browser chrome / control bar */}
+ <div className="mb-3 flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
  <span className="hidden gap-1.5 pr-1 md:flex"><i className="h-3 w-3 rounded-full bg-stone-200" /><i className="h-3 w-3 rounded-full bg-stone-200" /><i className="h-3 w-3 rounded-full bg-stone-200" /></span>
  <button onClick={() => setPreviewKey((k) => k + 1)} title="Reload preview" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"><RotateCw size={14} strokeWidth={2} /></button>
  <div className="relative shrink-0">
@@ -877,11 +1025,18 @@ export default function StorefrontEditor() {
  <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${enabled ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>{enabled ? "Live" : "Draft"}</span>
  <button onClick={() => { navigator.clipboard?.writeText(`https://${liveUrl(activeSlug !== "home" ? `/${activeSlug}` : "")}`).catch(() => {}); setCopiedUrl(true); setTimeout(() => setCopiedUrl(false), 1200); }} title="Copy link" className="shrink-0 text-stone-400 transition hover:text-stone-600">{copiedUrl ? <Check size={13} strokeWidth={2.5} className="text-emerald-500" /> : <Copy size={13} strokeWidth={2} />}</button>
  </div>
+ {/* Responsive device preview — see the store at desktop, tablet, and phone widths. */}
+ <div className="hidden shrink-0 items-center gap-0.5 rounded-lg border border-stone-200 bg-stone-50 p-0.5 sm:flex">
+ {([["desktop", Monitor], ["tablet", Tablet], ["phone", Smartphone]] as const).map(([d, Icon]) => (
+ <button key={d} onClick={() => setDevice(d)} title={d[0].toUpperCase() + d.slice(1)} className={`grid h-6 w-7 place-items-center rounded-md transition ${device === d ? "bg-white text-[#5D0F17] shadow-sm" : "text-stone-400 hover:text-stone-600"}`}><Icon size={13} strokeWidth={2} /></button>
+ ))}
+ </div>
  {handle && <a href={`/s/${handle}${activeSlug !== "home" ? `/${activeSlug}` : ""}?preview=1`} target="_blank" rel="noopener noreferrer" title="Open in new tab" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"><ExternalLink size={14} strokeWidth={2} /></a>}
  </div>
 
- {/* the storefront, live */}
- <div className="overflow-hidden rounded-b-xl border border-stone-200 shadow-[0_18px_50px_-24px_rgba(0,0,0,0.35)]" style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
+ {/* the storefront, live — resizes like a device on the stage */}
+ <div className="mx-auto w-full" style={{ maxWidth: deviceW, transition: "max-width .4s cubic-bezier(.4,0,.2,1)" }}>
+ <div ref={canvasRef} className="@container overflow-hidden rounded-xl border border-stone-200 shadow-[0_18px_50px_-24px_rgba(0,0,0,0.35)]" style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
  {/* Store's custom CSS (AI- or hand-written), so the preview matches the live site. */}
  {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
  {/* header */}
@@ -896,7 +1051,7 @@ export default function StorefrontEditor() {
 
  {activeSlug === "shop" ? (
  <>
- {shopBlocks.length > 0 && <Blocks blocks={shopBlocks} colors={colors} fonts={fonts} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={selectBlock} selectedId={selBlock} />}
+ {shopBlocks.length > 0 && <Blocks blocks={shopBlocks} colors={colors} fonts={fonts} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={selectBlock} selectedId={selBlock} edit onEditField={editField} reorder={canvasReorder} />}
  {/* the product grid (auto — your live catalogue) */}
  <div className="mx-auto max-w-6xl px-6 py-16">
  <div className="mb-8 text-center">
@@ -904,7 +1059,7 @@ export default function StorefrontEditor() {
  <h2 className="text-3xl" style={{ fontFamily: ff(fonts.heading) }}>Shop</h2>
  </div>
  {products.length > 0 ? (
- <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 lg:grid-cols-4">
+ <div className="grid grid-cols-2 gap-x-6 gap-y-10 @lg:grid-cols-3 @2xl:grid-cols-4">
  {products.slice(0, 8).map((p, i) => (
  <div key={i}>
  {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -920,7 +1075,7 @@ export default function StorefrontEditor() {
  </div>
  </>
  ) : curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={selectBlock} selectedId={selBlock} />
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={selectBlock} selectedId={selBlock} edit onEditField={editField} reorder={canvasReorder} />
  ) : (<>
  {/* hero — drop a photo from the library here to set it */}
  <div className="relative" onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; if (!dragHero) setDragHero(true); }} onDragLeave={() => setDragHero(false)} onDrop={(e) => { e.preventDefault(); setDragHero(false); const url = e.dataTransfer.getData("text/plain"); if (url) setHero(url); }}>
@@ -951,7 +1106,7 @@ export default function StorefrontEditor() {
  <div className="px-8 py-9">
  <p className="text-center text-lg mb-6" style={{ fontFamily: ff(fonts.heading) }}>The Edit</p>
  {gridProducts.length ? (
- <div className="grid grid-cols-3 gap-x-4 gap-y-7">
+ <div className="grid grid-cols-2 gap-x-4 gap-y-7 @lg:grid-cols-3">
  {gridProducts.map((p, i) => (
  <div key={i}>
  {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -962,7 +1117,7 @@ export default function StorefrontEditor() {
  ))}
  </div>
  ) : (
- <div className="grid grid-cols-3 gap-4">
+ <div className="grid grid-cols-2 gap-4 @lg:grid-cols-3">
  {[0, 1, 2].map((i) => <div key={i}><div className="aspect-[3/4]" style={{ background: `${colors.text}10` }} /><p className="mt-2 text-[11px]" style={{ opacity: 0.7 }}>Vintage piece</p><p className="text-[11px]" style={{ color: colors.accent }}>$120</p></div>)}
  </div>
  )}
@@ -971,6 +1126,7 @@ export default function StorefrontEditor() {
 
  {/* footer */}
  <div className="px-8 py-6 text-center text-[10px] uppercase tracking-[0.18em]" style={{ borderTop: `1px solid ${colors.text}14`, opacity: 0.5 }}>{storeName} · Powered by VYA</div>
+ </div>
  </div>
  </div>
  </div>

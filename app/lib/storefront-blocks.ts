@@ -3,8 +3,17 @@
 // small, curated set of section types (simpler than Shopify's nested tree), each with
 // a flat props bag so VYA can build them conversationally.
 
-export type BlockType = "announcement" | "hero" | "featured" | "text" | "image" | "gallery" | "video" | "newsletter";
-export type BlockStyle = { bg?: string }; // bg: "accent" | "dark" | a #hex (default = theme background)
+export type BlockType = "announcement" | "hero" | "featured" | "text" | "image" | "gallery" | "video" | "newsletter" | "custom";
+// Per-section visual overrides set from the Design panel (all optional; unset = theme default).
+export type BlockScale = "sm" | "md" | "lg" | "xl";
+export type BlockAlign = "left" | "center" | "right";
+export type BlockStyle = {
+ bg?: string; // "accent" | "dark" | a #hex (default = theme background)
+ textColor?: string; // #hex — overrides the section's text colour
+ align?: BlockAlign; // text alignment
+ headingSize?: BlockScale; // heading scale
+ space?: BlockScale; // extra vertical breathing room around the section
+};
 export type Block = { id: string; type: BlockType; props: Record<string, string>; style?: BlockStyle };
 
 export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" };
@@ -19,6 +28,10 @@ export const BLOCK_TYPES: BlockDef[] = [
  { type: "gallery", label: "Gallery", description: "A row of photos from your library.", fields: [{ key: "images", label: "Image URLs (one per line)", kind: "textarea" }], defaults: { images: "" } },
  { type: "video", label: "Video", description: "Embed a video — paste a YouTube, Vimeo, or .mp4 link.", fields: [{ key: "url", label: "Video URL (YouTube, Vimeo, or .mp4)", kind: "text" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { url: "", caption: "" } },
  { type: "newsletter", label: "Newsletter signup", description: "Collect emails from your visitors.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }], defaults: { heading: "Join the list", subtext: "First access to new arrivals." } },
+ // Escape hatch: any custom component VYA (or a hands-on seller) builds from HTML — accordions,
+ // tabs, comparison tables, timelines… Paired with custom CSS this can express anything the fixed
+ // section types can't. The HTML is sanitized to a safe allowlist on save (see sanitize-storefront-html).
+ { type: "custom", label: "Custom section", description: "Anything else — accordions, tabs, tables, or fully interactive widgets. Ask VYA to build it, or write your own HTML/CSS/JS. Add JS and it runs safely in an isolated sandbox.", fields: [{ key: "html", label: "HTML", kind: "textarea" }, { key: "css", label: "CSS (optional)", kind: "textarea" }, { key: "js", label: "JavaScript (optional — runs sandboxed)", kind: "textarea" }], defaults: { html: "" } },
 ];
 
 export const BLOCK_TYPE_IDS = BLOCK_TYPES.map((b) => b.type);
@@ -76,9 +89,17 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (!b || !blockDef(b.type)) continue;
  const props: Record<string, string> = {};
  for (const [k, v] of Object.entries(b.props || {})) props[k] = String(v ?? "");
- const bg = String(b.style?.bg ?? "");
- const style: BlockStyle | undefined = bg === "accent" || bg === "dark" || /^#[0-9a-fA-F]{6}$/.test(bg) ? { bg } : undefined;
- out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, props, ...(style ? { style } : {}) });
+ const s = (b.style || {}) as BlockStyle;
+ const bg = String(s.bg ?? "");
+ const scale = (v: unknown): BlockScale | undefined => (v === "sm" || v === "md" || v === "lg" || v === "xl" ? v : undefined);
+ const style: BlockStyle = {};
+ if (bg === "accent" || bg === "dark" || /^#[0-9a-fA-F]{6}$/.test(bg)) style.bg = bg;
+ if (/^#[0-9a-fA-F]{6}$/.test(String(s.textColor ?? ""))) style.textColor = s.textColor;
+ if (s.align === "left" || s.align === "center" || s.align === "right") style.align = s.align;
+ if (scale(s.headingSize)) style.headingSize = s.headingSize;
+ if (scale(s.space)) style.space = s.space;
+ const hasStyle = Object.keys(style).length > 0;
+ out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, props, ...(hasStyle ? { style } : {}) });
  }
  return out;
 }

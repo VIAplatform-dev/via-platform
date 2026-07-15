@@ -19,12 +19,12 @@ const PAGE_LABEL: Record<string, string> = {
  "/infrastructure/admin/connect": "Connect", "/infrastructure/admin/import": "Bring your site", "/infrastructure/admin/ai": "AI accuracy",
 };
 
-const WRITE_TOOLS = new Set(["update_storefront_design", "style_storefront", "set_hero_photo", "update_listing", "add_section", "update_section", "remove_section", "move_section", "set_layout", "create_page", "set_page_layout", "delete_page", "edit_captured_page", "style_captured_site"]);
+const WRITE_TOOLS = new Set(["update_storefront_design", "style_storefront", "add_html_section", "set_hero_photo", "update_listing", "add_section", "update_section", "remove_section", "move_section", "set_layout", "create_page", "set_page_layout", "delete_page", "edit_captured_page", "style_captured_site"]);
 
 // Friendly labels for the "what VYA did" chips.
 const ACTION_LABELS: Record<string, string> = {
  update_storefront_design: "Updated design", set_hero_photo: "Set hero photo", update_listing: "Updated listing",
- add_section: "Added section", update_section: "Edited section", remove_section: "Removed section", move_section: "Moved section",
+ add_section: "Added section", add_html_section: "Built custom section", update_section: "Edited section", remove_section: "Removed section", move_section: "Moved section",
  set_layout: "Rebuilt page", create_page: "Created page", set_page_layout: "Updated page", delete_page: "Deleted page",
  edit_captured_page: "Edited copy", style_captured_site: "Applied styling", style_storefront: "Applied custom CSS", remember_fact: "Remembered", forget_fact: "Forgot",
 };

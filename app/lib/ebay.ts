@@ -99,6 +99,40 @@ export async function getRecentEbaySoldSkus(storeSlug: string, sinceISO: string)
  return out;
 }
 
+// Per-listing item-page views from the Sell Analytics traffic report, keyed by eBay listing id.
+// Views are the one engagement metric the modern OAuth Sell API exposes cleanly; watch counts and
+// incoming Best Offers live only on the legacy Trading API, so they're not pulled here (yet).
+// Returns {} on any error — this is a best-effort background enrichment.
+export async function getEbayListingViews(storeSlug: string, listingIds: string[]): Promise<Record<string, number>> {
+ const ids = Array.from(new Set(listingIds.filter(Boolean)));
+ if (!ids.length) return {};
+ const token = await accessToken(storeSlug);
+ if (!token) return {};
+
+ // Report window: the trailing 30 days ending yesterday (the report lags ~a day).
+ const day = 24 * 3600 * 1000;
+ const end = new Date(Date.now() - day);
+ const start = new Date(end.getTime() - 30 * day);
+ const ymd = (d: Date) => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`;
+ const dateRange = `[${ymd(start)}..${ymd(end)}]`;
+
+ const out: Record<string, number> = {};
+ // getTrafficReport caps listing_ids per call; batch to stay well under the limit.
+ for (let i = 0; i < ids.length; i += 200) {
+ const batch = ids.slice(i, i + 200);
+ const filter = `marketplace_ids:{${MARKETPLACE}},date_range:${dateRange},listing_ids:{${batch.join("|")}}`;
+ const qs = `dimension=LISTING&metric=LISTING_VIEWS_TOTAL&filter=${encodeURIComponent(filter)}`;
+ const r = await ebayFetch(token, `/sell/analytics/v1/traffic_report?${qs}`);
+ if (!r.ok || !Array.isArray(r.json?.records)) continue;
+ for (const rec of r.json.records) {
+ const listingId = String(rec?.dimensionValues?.[0]?.value ?? "");
+ const views = Number(rec?.metricValues?.[0]?.value ?? 0);
+ if (listingId && Number.isFinite(views)) out[listingId] = Math.max(0, Math.round(views));
+ }
+ }
+ return out;
+}
+
 async function ebayFetch(token: string, path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; json: any }> {
  const res = await fetch(`${API}${path}`, {
  ...init,

@@ -48,8 +48,8 @@ const TOOLS = [
  { name: "write_description", description: "Write a polished, SEO-friendly description for a vintage item. Returns text only — does not save it.", input_schema: { type: "object", properties: { title: { type: "string" }, details: { type: "string" } }, required: ["title"] } },
  { name: "update_listing", description: "Update a listing's title, price (in USD), and/or description, by id. Confirm first.", input_schema: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, priceUsd: { type: "number" }, description: { type: "string" } }, required: ["id"] } },
  { name: "list_sections", description: "List the home page's sections in order (id, type, props). The storefront home page is built from these stackable sections.", input_schema: { type: "object", properties: {} } },
- { name: "add_section", description: "Add a section to the home page. type is one of: announcement (props: text), hero (props: heading, subtext, cta, image), featured (props: heading — a grid of the store's products), text (props: heading, body), image (props: image, caption), gallery (props: images — newline-separated URLs), video (props: url — a YouTube, Vimeo, or .mp4 link; optional caption), newsletter (props: heading, subtext). Optionally set style.bg to 'accent', 'dark', or a #hex to give the section a colored background. position is the 0-based index to insert at (defaults to the end). Confirm first.", input_schema: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, position: { type: "number" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } },
- { name: "update_section", description: "Update a section by id — merge new props and/or set style.bg ('accent', 'dark', or a #hex, or empty to reset to default). Confirm first.", input_schema: { type: "object", properties: { id: { type: "string" }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["id"] } },
+ { name: "add_section", description: "Add a section to the home page. type is one of: announcement (props: text), hero (props: heading, subtext, cta, image), featured (props: heading — a grid of the store's products), text (props: heading, body), image (props: image, caption), gallery (props: images — newline-separated URLs), video (props: url — a YouTube, Vimeo, or .mp4 link; optional caption), newsletter (props: heading, subtext). Optionally set style.bg to 'accent', 'dark', or a #hex to give the section a colored background. position is the 0-based index to insert at (defaults to the end). style is optional visual overrides: bg ('accent'/'dark'/#hex), textColor (#hex), align ('left'/'center'/'right'), headingSize ('sm'/'md'/'lg'/'xl'), space ('sm'/'md'/'lg'/'xl'). Confirm first.", input_schema: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, position: { type: "number" }, style: { type: "object", properties: { bg: { type: "string" }, textColor: { type: "string" }, align: { type: "string", enum: ["left", "center", "right"] }, headingSize: { type: "string", enum: ["sm", "md", "lg", "xl"] }, space: { type: "string", enum: ["sm", "md", "lg", "xl"] } } } }, required: ["type"] } },
+ { name: "update_section", description: "Update a section by id — merge new props and/or visual style. style fields (all optional, all merge): bg ('accent', 'dark', a #hex, or empty to reset), textColor (#hex), align ('left'/'center'/'right'), headingSize ('sm'/'md'/'lg'/'xl'), space (extra breathing room: 'sm'/'md'/'lg'/'xl'). Use these for requests like 'make the heading bigger', 'left-align this', 'more space around it', 'white text'. To revise a custom (HTML) section, pass props.html with the full new markup. Confirm first.", input_schema: { type: "object", properties: { id: { type: "string" }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" }, textColor: { type: "string" }, align: { type: "string", enum: ["left", "center", "right"] }, headingSize: { type: "string", enum: ["sm", "md", "lg", "xl"] }, space: { type: "string", enum: ["sm", "md", "lg", "xl"] } } } }, required: ["id"] } },
  { name: "remove_section", description: "Remove a section by id. Confirm first.", input_schema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
  { name: "move_section", description: "Move a section up or down by id. Confirm first.", input_schema: { type: "object", properties: { id: { type: "string" }, direction: { type: "string", enum: ["up", "down"] } }, required: ["id", "direction"] } },
  { name: "list_pages", description: "List the storefront's pages — the home page plus any extra pages (About, FAQ, etc.) with slug, title, and section count.", input_schema: { type: "object", properties: {} } },
@@ -59,7 +59,8 @@ const TOOLS = [
  { name: "list_captured_pages", description: "List the pages of the seller's CAPTURED site (their real existing site, hosted on VYA) by path. Only relevant if they brought their own site over rather than building from sections.", input_schema: { type: "object", properties: {} } },
  { name: "edit_captured_page", description: "Edit copy on one page of the captured site: replace every occurrence of `find` with `replace` in that page's HTML (path from list_captured_pages). Use for wording changes, fixing a typo, updating a banner/announcement. `find` must be exact visible text. Confirm first.", input_schema: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"] } },
  { name: "style_captured_site", description: "Apply site-wide custom CSS to the captured site — injected over the original styles on every page, for color/font/spacing/button tweaks. Pass the full CSS to set (replaces any previous custom CSS); pass empty css to clear. Confirm first.", input_schema: { type: "object", properties: { css: { type: "string" } }, required: ["css"] } },
- { name: "set_layout", description: "Replace the ENTIRE home page with a full set of sections at once — use this to build or rebuild a whole storefront in one go. Provide blocks as an ordered array of { type, props, style? }. Types + props: announcement {text}; hero {heading, subtext, cta, image}; featured {heading}; text {heading, body}; image {image, caption}; gallery {images: newline-separated URLs}; video {url: a YouTube/Vimeo/.mp4 link, caption}; newsletter {heading, subtext}. Optionally give a section style.bg ('accent', 'dark', or a #hex) for contrast — e.g. a dark about section. Write real, tailored copy for this seller — don't leave placeholders. Confirm before calling.", input_schema: { type: "object", properties: { blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["blocks"] } },
+ { name: "set_layout", description: "Replace the ENTIRE home page with a full set of sections at once — use this to build or rebuild a whole storefront in one go. Provide blocks as an ordered array of { type, props, style? }. Types + props: announcement {text}; hero {heading, subtext, cta, image}; featured {heading}; text {heading, body}; image {image, caption}; gallery {images: newline-separated URLs}; video {url: a YouTube/Vimeo/.mp4 link, caption}; newsletter {heading, subtext}; custom {html: raw HTML for anything the other types can't express}. Optionally give a section style.bg ('accent', 'dark', or a #hex) for contrast — e.g. a dark about section. Write real, tailored copy for this seller — don't leave placeholders. Confirm before calling.", input_schema: { type: "object", properties: { blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["blocks"] } },
+ { name: "add_html_section", description: "Build ANY section the fixed types can't express — this is how you say YES to literally any component request instead of declining. Two modes:\n• STATIC (html only, optionally css): rendered inline in the page, indexable, inherits the store's styles. Best for accordions/FAQ (native <details><summary>), tabs, comparison/size tables, pricing grids, timelines, testimonials, bespoke layouts. Inline html is limited to safe markup (no scripts/iframes/forms).\n• INTERACTIVE (also pass js): the html+css+js run together inside a secure SANDBOXED iframe, fully isolated from the store (the code can't read cookies, the DOM, or any customer data). Use this for anything dynamic that CSS can't do: countdown timers, size/price calculators, quizzes, product filters, canvas/JS animations, live previews, mortgage-style widgets — anything. You can load libraries and use fetch inside it. The store's colors/fonts are exposed as CSS vars (--bg, --text, --accent, --heading, --body).\nWrite complete, real code (no placeholders); give elements class names so you can also style them with style_storefront (static mode) — for interactive mode put styling in the css field. page: 'home' (default), 'shop' (intro above the product grid), or an extra page's slug. position: 0-based insert index (default end). Confirm first.", input_schema: { type: "object", properties: { html: { type: "string" }, css: { type: "string" }, js: { type: "string" }, page: { type: "string" }, position: { type: "number" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["html"] } },
  { name: "remember_fact", description: "Save a durable fact about this seller or store to long-term memory — a preference, brand-voice note, a decision, a recurring detail — anything worth recalling in future conversations (e.g. 'Prefers minimal, editorial storefronts', 'Brand voice is playful and irreverent', 'Ships only within the US', 'Focuses on 90s designer denim'). Do this whenever the seller tells you something about themselves or their store that should persist. One clear, self-contained fact per call. No need to confirm — just remember and mention it briefly.", input_schema: { type: "object", properties: { fact: { type: "string" } }, required: ["fact"] } },
  { name: "forget_fact", description: "Remove saved memories matching a phrase (case-insensitive substring). Use when the seller says something changed or asks you to forget it.", input_schema: { type: "object", properties: { match: { type: "string" } }, required: ["match"] } },
  { name: "list_memory", description: "List everything currently in long-term memory for this store.", input_schema: { type: "object", properties: {} } },
@@ -161,7 +162,8 @@ async function runTool(slug: string, name: string, input: any): Promise<any> {
  const b = blocks.find((x) => x.id === input.id);
  if (!b) return { error: "No section with that id." };
  if (input.props && typeof input.props === "object") b.props = { ...b.props, ...input.props };
- if (input.style && typeof input.style === "object") b.style = input.style.bg ? { bg: String(input.style.bg) } : undefined;
+ // Merge visual overrides (bg, textColor, align, headingSize, space); sanitizeBlocks validates them.
+ if (input.style && typeof input.style === "object") b.style = { ...b.style, ...input.style };
  theme.blocks = sanitizeBlocks(blocks);
  await setStorefrontTheme(slug, theme);
  return { ok: true, section: b };
@@ -193,6 +195,38 @@ async function runTool(slug: string, name: string, input: any): Promise<any> {
  theme.blocks = sanitizeBlocks(incoming);
  await setStorefrontTheme(slug, theme);
  return { ok: true, count: theme.blocks.length, order: theme.blocks.map((b) => b.type) };
+ }
+ case "add_html_section": {
+ const html = String(input.html ?? "").trim();
+ const js = String(input.js ?? "").trim();
+ const css = String(input.css ?? "").trim();
+ if (!html && !js) return { error: "Provide the HTML for the section." };
+ const theme = await loadTheme(slug);
+ // Any JS ⇒ interactive/sandboxed; otherwise a static inline section.
+ const props: Record<string, string> = js ? { html, css, js, mode: "sandbox" } : { html, ...(css ? { css } : {}) };
+ const block = makeBlock("custom", props);
+ if (input.style && typeof input.style === "object") block.style = input.style;
+ // Target a page: 'home' (default), 'shop' (intro above the grid), or an extra page's slug.
+ const page = String(input.page ?? "home");
+ const insertInto = (arr: typeof theme.blocks) => {
+ const list = sanitizeBlocks(arr ?? []);
+ const pos = Number.isInteger(input.position) ? Math.max(0, Math.min(list.length, Number(input.position))) : list.length;
+ list.splice(pos, 0, block);
+ return sanitizeBlocks(list);
+ };
+ if (page === "shop") {
+ theme.shopBlocks = insertInto(theme.shopBlocks);
+ } else if (page === "home") {
+ theme.blocks = insertInto(theme.blocks);
+ } else {
+ const pages = sanitizePages(theme.extraPages ?? []);
+ const pg = pages.find((p) => p.slug === page);
+ if (!pg) return { error: "No page with that slug. Use 'home', 'shop', or an existing extra page's slug (see list_pages)." };
+ pg.blocks = insertInto(pg.blocks);
+ theme.extraPages = pages;
+ }
+ await setStorefrontTheme(slug, theme);
+ return { ok: true, added: { id: block.id, page, mode: js ? "sandbox" : "static" }, note: js ? "Interactive section added — it runs sandboxed and is isolated from the store." : "Static section added — style it further with style_storefront if needed." };
  }
  case "list_pages": {
  const sf = await getStorefrontBySlug(slug);
@@ -268,11 +302,16 @@ When a seller asks you to build or change part of their page, prefer the section
 
 For any OPEN-ENDED design or layout request that the section fields don't cover — repositioning an element, alignment, spacing, sizing, custom colors, borders, hover effects, "move the heading to the bottom left", "make the buttons rounded", "add more space above the products", etc. — use style_storefront to write real CSS targeting the .vya-* classes. Never say you "can't" make a design change: if it's expressible in CSS, do it with style_storefront. It replaces the whole custom-CSS block, so when adding to existing styling, read the current CSS with get_storefront first and include it. Confirm the change in one line before applying.
 
+When a seller asks for a COMPONENT that isn't one of the built-in section types, do NOT tell them it isn't supported — build it with add_html_section. There is no design or component you have to refuse; assume you can build whatever they describe and do it.
+- For STATIC components — an accordion/FAQ (native <details><summary>), tabs, a comparison or size table, a pricing grid, a timeline, testimonials, bespoke layouts — pass just html (and give elements class names), then style them with style_storefront so they match the store.
+- For INTERACTIVE / DYNAMIC things CSS alone can't do — a countdown timer, a size or price calculator, a quiz, a product filter, a canvas or JS animation, a live preview, any real widget — pass js (plus html and css) to add_html_section. That code runs inside a secure sandboxed iframe, fully isolated from the store, so it's always safe to build. Write complete, working code and use the store's colors via the --bg/--text/--accent/--heading/--body CSS variables.
+Never answer a "can you build X" with "that's not a supported section." If it can be built with HTML, CSS, or JavaScript, you can build it — so say yes and build it.
+
 When a seller asks you to build or redesign their WHOLE storefront ("build me a storefront", "design my homepage", "make me a store for X"), do it in one move: first call update_storefront_design to set a fitting template/colors/fonts, then call set_layout with a complete page — usually a hero, a featured-products grid, a short about/text section, and a newsletter. Write real, specific copy in their voice (use their store name and what they sell); never leave placeholder text. Briefly preview the plan and confirm before applying.
 
 Rules:
 - For READ actions (get_storefront, list_photos, list_inventory, write_description, list_sections) just do it, no need to ask.
-- For any CHANGE (update_storefront_design, style_storefront, set_hero_photo, update_listing, add_section, update_section, remove_section, move_section) first state in one short line exactly what you'll change, and ask the seller to confirm. Only call the write tool AFTER they confirm in their next message.
+- For any CHANGE (update_storefront_design, style_storefront, add_html_section, set_hero_photo, update_listing, add_section, update_section, remove_section, move_section) first state in one short line exactly what you'll change, and ask the seller to confirm. Only call the write tool AFTER they confirm in their next message.
 - Be concise and friendly — prefer doing over explaining. After a change, confirm what changed in one line.
 - You only ever take ACTIONS on THIS seller's own store. For an action you genuinely can't perform yet (e.g. orders, shipping, payouts), say it's on the way — but still answer the underlying question if you can.`;
 

@@ -436,28 +436,67 @@ function escapeHtml(s: string): string {
  * can't send "from" a gmail/unverified domain without it being spam-filtered).
  * Links are UTM-tagged so the campaign shows up in the store's audience insights.
  */
+// A store's email brand — pulled from its storefront design so campaigns match the store automatically.
+export type EmailBrand = { accent: string; text: string; bg: string; headingFont?: string; bodyFont?: string; logo?: string | null };
+const DEFAULT_BRAND: EmailBrand = { accent: "#5D0F17", text: "#1c1917", bg: "#ffffff" };
+
+const EMAIL_SERIF = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Cormorant", "Newsreader", "Instrument Serif", "Fraunces", "EB Garamond", "Lora", "DM Serif Display", "Libre Baskerville", "Prata", "Spectral"]);
+function fontStack(name: string | undefined, kind: "heading" | "body"): string {
+ const sans = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+ const serif = "Georgia, 'Times New Roman', serif";
+ if (!name) return kind === "heading" ? serif : sans;
+ return `'${name}', ${EMAIL_SERIF.has(name) ? serif : sans}`;
+}
+// Readable text over the accent (buttons): near-black on light accents, white on dark.
+function readableOn(hex: string): string {
+ const h = (hex || "").replace("#", "");
+ if (h.length !== 6) return "#ffffff";
+ const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+ return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#1c1917" : "#ffffff";
+}
+function fontsHref(brand: EmailBrand): string {
+ const fams = [brand.headingFont, brand.bodyFont].filter((f): f is string => !!f).map((f) => `family=${f.replace(/ /g, "+")}:wght@400;500;600;700`);
+ return fams.length ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${fams.join("&")}&display=swap" />` : "";
+}
+
+/** A store's email brand (accent, text, bg, fonts, logo), pulled from its storefront design. */
+export async function getStoreEmailBrand(slug: string): Promise<EmailBrand> {
+ const { getStorefrontBySlug } = await import("./storefront-db");
+ const sf = await getStorefrontBySlug(slug).catch(() => null);
+ const t = sf?.theme;
+ return {
+ accent: t?.colors?.accent || sf?.accentColor || "#5D0F17",
+ text: t?.colors?.text || "#1c1917",
+ bg: t?.colors?.bg || "#ffffff",
+ headingFont: t?.fonts?.heading || undefined,
+ bodyFont: t?.fonts?.body || undefined,
+ logo: t?.logo || null,
+ };
+}
+
 // Lightweight, email-safe formatting for store-written emails (campaigns + automations). Stores
 // write with a familiar shorthand — # / ## headings, **bold**, *italic*, [links](url), - bullets,
 // ![images](url), --- dividers — and it renders to inline-styled HTML that survives email clients.
-export function renderEmailBody(raw: string): string {
+export function renderEmailBody(raw: string, brand: EmailBrand = DEFAULT_BRAND): string {
+ const headStack = fontStack(brand.headingFont, "heading");
  const cleanUrl = (u: string) => (/^(https?:|mailto:)/i.test(u.trim()) ? u.trim() : "#");
  const inline = (s: string) =>
  escapeHtml(s)
  .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_m, alt, url) => `<img src="${cleanUrl(url)}" alt="${alt}" style="max-width:100%;border-radius:6px;margin:10px 0;display:block;" />`)
- .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, t, url) => `<a href="${cleanUrl(url)}" style="color:#5D0F17;text-decoration:underline;">${t}</a>`)
+ .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, t, url) => `<a href="${cleanUrl(url)}" style="color:${brand.accent};text-decoration:underline;">${t}</a>`)
  .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
  .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
  const lines = raw.replace(/\r\n/g, "\n").split("\n");
  const out: string[] = [];
  let para: string[] = [];
  let list: string[] = [];
- const flushPara = () => { if (para.length) { out.push(`<p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#292524;">${para.join("<br/>")}</p>`); para = []; } };
- const flushList = () => { if (list.length) { out.push(`<ul style="margin:0 0 16px;padding-left:20px;font-size:15px;line-height:1.7;color:#292524;">${list.map((li) => `<li style="margin:0 0 6px;">${li}</li>`).join("")}</ul>`); list = []; } };
+ const flushPara = () => { if (para.length) { out.push(`<p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:${brand.text};">${para.join("<br/>")}</p>`); para = []; } };
+ const flushList = () => { if (list.length) { out.push(`<ul style="margin:0 0 16px;padding-left:20px;font-size:15px;line-height:1.7;color:${brand.text};">${list.map((li) => `<li style="margin:0 0 6px;">${li}</li>`).join("")}</ul>`); list = []; } };
  for (const line of lines) {
  const t = line.trim();
  if (!t) { flushPara(); flushList(); continue; }
- if (/^##\s+/.test(t)) { flushPara(); flushList(); out.push(`<h2 style="margin:18px 0 10px;font-size:17px;font-weight:600;color:#1c1917;">${inline(t.replace(/^##\s+/, ""))}</h2>`); continue; }
- if (/^#\s+/.test(t)) { flushPara(); flushList(); out.push(`<h1 style="margin:18px 0 12px;font-size:21px;font-weight:600;letter-spacing:-0.01em;color:#1c1917;">${inline(t.replace(/^#\s+/, ""))}</h1>`); continue; }
+ if (/^##\s+/.test(t)) { flushPara(); flushList(); out.push(`<h2 style="margin:22px 0 10px;font-family:${headStack};font-size:19px;font-weight:600;letter-spacing:-0.01em;color:${brand.text};">${inline(t.replace(/^##\s+/, ""))}</h2>`); continue; }
+ if (/^#\s+/.test(t)) { flushPara(); flushList(); out.push(`<h1 style="margin:20px 0 12px;font-family:${headStack};font-size:24px;font-weight:700;letter-spacing:-0.015em;color:${brand.text};">${inline(t.replace(/^#\s+/, ""))}</h1>`); continue; }
  if (/^(---|\*\*\*)$/.test(t)) { flushPara(); flushList(); out.push(`<hr style="border:none;border-top:1px solid #eee;margin:22px 0;" />`); continue; }
  if (/^[-*]\s+/.test(t)) { flushPara(); list.push(inline(t.replace(/^[-*]\s+/, ""))); continue; }
  para.push(inline(t));
@@ -468,15 +507,28 @@ export function renderEmailBody(raw: string): string {
 
 // The full campaign/automation email — the shared renderer behind both what's sent and the
 // in-browser preview, so what a store sees is exactly what lands in the inbox.
-export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string }): string {
+export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string; brand?: EmailBrand }): string {
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
+ const b = opts.brand || DEFAULT_BRAND;
  const cta = opts.link ? withUtm(opts.link, "campaign") : null;
- const content = renderEmailBody(opts.body);
- return `<!doctype html><html><body style="margin:0;background:#f6f5f2;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1c1917;">
- <div style="max-width:560px;margin:0 auto;background:#ffffff;">
- <div style="padding:28px 32px 6px;"><h1 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-0.01em;">${escapeHtml(cleanName)}</h1></div>
- <div style="padding:10px 32px 24px;">${content}${cta ? `<p style="margin:24px 0 0;"><a href="${cta}" style="display:inline-block;background:#1c1917;color:#ffffff;text-decoration:none;padding:12px 26px;border-radius:6px;font-size:14px;">Shop now</a></p>` : ""}</div>
- <div style="padding:16px 32px 30px;border-top:1px solid #eeeeee;font-size:12px;color:#a8a29e;">You're receiving this because you shopped with ${escapeHtml(cleanName)}. Reply to this email to reach us.</div>
+ const content = renderEmailBody(opts.body, b);
+ const bodyStack = fontStack(b.bodyFont, "body");
+ const headStack = fontStack(b.headingFont, "heading");
+ const btnText = readableOn(b.accent);
+ const surface = b.bg || "#ffffff";
+ const header = b.logo
+ ? `<img src="${b.logo}" alt="${escapeHtml(cleanName)}" style="max-height:44px;width:auto;display:inline-block;" />`
+ : `<div style="font-family:${headStack};font-size:27px;font-weight:700;letter-spacing:-0.015em;color:${b.text};">${escapeHtml(cleanName)}</div>`;
+ return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />${fontsHref(b)}</head>
+ <body style="margin:0;padding:0;background:#f1efeb;font-family:${bodyStack};color:${b.text};-webkit-font-smoothing:antialiased;">
+ <div style="padding:30px 14px 40px;">
+ <div style="max-width:600px;margin:0 auto;background:${surface};border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -8px rgba(0,0,0,0.12);">
+ <div style="height:5px;background:${b.accent};"></div>
+ <div style="padding:36px 44px 14px;text-align:center;">${header}</div>
+ <div style="padding:12px 44px 34px;">${content}${cta ? `<div style="text-align:center;margin:32px 0 8px;"><a href="${cta}" style="display:inline-block;background:${b.accent};color:${btnText};text-decoration:none;padding:15px 38px;border-radius:9px;font-size:14px;font-weight:600;letter-spacing:0.02em;">Shop now</a></div>` : ""}</div>
+ <div style="padding:22px 44px 34px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;line-height:1.6;color:#a29b93;text-align:center;">You're receiving this because you shopped with ${escapeHtml(cleanName)}.<br />Reply to this email to reach us.</div>
+ </div>
+ <div style="max-width:600px;margin:16px auto 0;text-align:center;font-size:11px;letter-spacing:0.04em;color:#c2bdb6;">Powered by VYA</div>
  </div></body></html>`;
 }
 
@@ -488,12 +540,13 @@ export async function sendStoreCampaign(opts: {
  body: string;
  link?: string;
  recipients: string[];
+ brand?: EmailBrand;
 }): Promise<{ sent: number; failed: number }> {
  const resend = getResend();
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
  const sender = (opts.fromAddress && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(opts.fromAddress)) ? opts.fromAddress : "campaigns@vyaplatform.com";
  const from = `${cleanName} <${sender}>`;
- const html = campaignEmailHtml({ storeName: cleanName, body: opts.body, link: opts.link });
+ const html = campaignEmailHtml({ storeName: cleanName, body: opts.body, link: opts.link, brand: opts.brand });
 
  let sent = 0, failed = 0;
  for (let i = 0; i < opts.recipients.length; i += 100) {
