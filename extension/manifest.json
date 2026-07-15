@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "VYA Cross-Lister",
+  "version": "0.3.0",
+  "description": "Cross-list your VYA inventory to Depop & Poshmark from your own browser session, and sync your likes back to VYA — no marketplace API, no re-typing.",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://vyaplatform.com/*",
+    "https://www.depop.com/*",
+    "https://depop.com/*",
+    "https://poshmark.com/*",
+    "https://www.poshmark.com/*"
+  ],
+  "background": { "service_worker": "src/background.js", "type": "module" },
+  "action": { "default_popup": "src/popup.html", "default_title": "VYA Cross-Lister" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.depop.com/*", "https://depop.com/*"],
+      "js": ["src/content/depop.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://poshmark.com/*", "https://www.poshmark.com/*"],
+      "js": ["src/content/poshmark.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

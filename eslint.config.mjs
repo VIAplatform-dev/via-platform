@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Browser extension (Chrome MV3, its own `chrome.*` runtime) — not part of the Next app.
+    "extension/**",
   ]),
 ]);
 
