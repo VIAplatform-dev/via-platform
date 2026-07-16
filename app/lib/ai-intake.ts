@@ -24,7 +24,9 @@ export type ListingDraft = {
  material: DraftField;
  condition: DraftField;
  category: string | null;
+ searchQuery: string | null; // tightest brand+model+era phrase to find THIS piece's comps
  careTag: string | null; // verbatim care/composition label text, if legible
+ tag: { brandText: string | null; rn: string | null; madeIn: string | null; styleCode: string | null } | null; // OCR of the brand/RN label — transcribed, not inferred
  runway: string | null; // runway collection/season if identifiable, e.g. "Blumarine F/W 2002"
  priceHint: number | null; // suggested USD price
  parcel: { weightOz: number; lengthIn: number; widthIn: number; heightIn: number }; // estimated shipping parcel
@@ -39,10 +41,10 @@ export function needsReview(field: DraftField): boolean {
 
 // Bump when the intake prompts/logic change materially — stamped on every training
 // example so we never blend guesses from different "brain eras" when training.
-export const PROMPT_VERSION = "2026-07-01";
+export const PROMPT_VERSION = "2026-07-16";
 
 const SYSTEM =
- "You are a vintage & secondhand fashion expert drafting a resale listing from product photos. Identify the piece precisely and read any visible care/composition tag for fabric content. You also write the SEO-optimized description and benchmark price the way the best resale sellers do — drawing on how comparable pieces are titled, described, and sold on Grailed, eBay (sold listings), Vestiaire Collective, and Depop. Authentication, era, and material are high-stakes — only give high confidence when the visual evidence is genuinely clear; otherwise lower the confidence or return null. Never invent facts (measurements, flaws, provenance) you can't see. RUNWAY PROVENANCE: when a recognizable designer piece clearly matches a documented runway collection, COMMIT to the specific season/year (these are well-documented — e.g. the brown ruched Tom Ford for Gucci pieces are S/S 2004; Cavalli poppy-print gowns are S/S 2003) and weave that provenance in. Do NOT hedge to era-level (e.g. just 'Tom Ford era') or leave it blank out of over-caution when you clearly recognize the collection — if the description names a designer/era/collection, the runway field MUST name the exact season+year. Only avoid a runway for a generic piece not tied to a specific documented show; never fabricate one for a no-name piece.\n\nCRITICAL — BRANDING: Do NOT name a specific brand or designer from silhouette, fabric, color, or overall 'vibe' alone. A designer-LOOKING dress is not evidence of any particular house. Assign a brand ONLY when there is (a) a visible label/logo/hardware/monogram in the photo, (b) reverse-image-search matches provided to you that point to it, or (c) an unmistakable, documented archival design. Absent that, return brand = null with low confidence — an honest 'unbranded' beats a confident wrong label. Never default to a 'house style' guess (e.g. assuming every slinky Y2K piece is one particular Italian house).";
+ "You are a vintage & secondhand fashion expert drafting a resale listing from product photos. Identify the piece precisely and read any visible care/composition tag for fabric content. You also write the SEO-optimized description and benchmark price the way the best resale sellers do — drawing on how comparable pieces are titled, described, and sold on Grailed, eBay (sold listings), Vestiaire Collective, and Depop. Authentication, era, and material are high-stakes — only give high confidence when the visual evidence is genuinely clear; otherwise lower the confidence or return null. Never invent facts (measurements, flaws, provenance) you can't see. RUNWAY PROVENANCE: when a recognizable designer piece clearly matches a documented runway collection, COMMIT to the specific season/year (these are well-documented — e.g. the brown ruched Tom Ford for Gucci pieces are S/S 2004; Cavalli poppy-print gowns are S/S 2003) and weave that provenance in. Do NOT hedge to era-level (e.g. just 'Tom Ford era') or leave it blank out of over-caution when you clearly recognize the collection — if the description names a designer/era/collection, the runway field MUST name the exact season+year. Only avoid a runway for a generic piece not tied to a specific documented show; never fabricate one for a no-name piece.\n\nCRITICAL — BRANDING: Do NOT name a specific brand or designer from silhouette, fabric, color, or overall 'vibe' alone. A designer-LOOKING dress is not evidence of any particular house. Assign a brand ONLY when there is (a) a visible label/logo/hardware/monogram in the photo, (b) reverse-image-search matches provided to you that point to it, or (c) an unmistakable, documented archival design. Absent that, return brand = null with low confidence — an honest 'unbranded' beats a confident wrong label. Never default to a 'house style' guess (e.g. assuming every slinky Y2K piece is one particular Italian house).\n\nPINPOINT THE PIECE: you are usually GIVEN the brand — use it, and go past 'a Prada bag' to the SPECIFIC model / line / collection and era (e.g. 'Prada Re-Nylon shoulder bag', 'the Cavalli S/S 2003 poppy-print gown', 'Levi's 501 big E'). Pricing accuracy depends on comps for the EXACT piece, not the brand in general — so put that specificity into both the title AND the searchQuery.";
 
 const INSTRUCTION = `Return ONLY a JSON object (no prose, no markdown) with exactly this shape:
 {
@@ -53,7 +55,9 @@ const INSTRUCTION = `Return ONLY a JSON object (no prose, no markdown) with exac
  "material": {"value": string|null, "confidence": number}, // prefer the care tag if legible
  "condition": {"value": string|null, "confidence": number},
  "category": string|null,                          // e.g. "bags","dresses","shoes","tops"
+ "searchQuery": string|null,                       // The TIGHTEST phrase to find THIS EXACT piece's resale comps: the KNOWN brand + the specific model/line/collection + one key attribute (material or silhouette) + era ONLY if it narrows it. No adjectives, no condition, no fluff. e.g. "Prada Re-Nylon shoulder bag", "Levi's 501 big E", "Cavalli S/S 2003 poppy print gown", "Coach Willis crossbody". Getting to the SPECIFIC model — not just the brand — is what makes the price accurate. null only if you genuinely can't get more specific than the brand.
  "careTag": string|null,                           // verbatim text legible on the care/composition label, else null
+ "tag": {"brandText": string|null, "rn": string|null, "madeIn": string|null, "styleCode": string|null}, // READ THE LABEL — transcribe EXACTLY as printed, never inferred: the brand/maker name on the brand label; the RN number (US "RN 12345" → digits only); "Made in ___"; any style/article/model number printed. null anything not clearly legible. The printed brand name and RN are the STRONGEST brand evidence there is — much stronger than silhouette or vibe.
  "runway": string|null,                            // The specific runway collection, formatted "Brand S/S YYYY" or "Brand F/W YYYY" (e.g. "Tom Ford for Gucci S/S 2004", "Blumarine F/W 2002"). NAME IT whenever the designer + distinctive design match a documented, recognizable collection — do not hedge to era-level or blank it out of over-caution. If your description references a designer/era/collection, this field MUST carry the exact season+year. null ONLY for generic pieces not tied to a specific show.
  "priceHint": number|null,                         // suggested resale price in USD (integer), benchmarked to how comparable pieces sell on Grailed / eBay sold / Vestiaire / Depop given brand, era, rarity, and condition
  "parcel": {"weightOz": int, "lengthIn": int, "widthIn": int, "heightIn": int}   // estimated SHIPPING parcel (packed, incl. packaging). Judge weight from the ACTUAL item shown — its size, material, and heft — NOT a blanket category default. A strappy sandal weighs a fraction of a boot. Guide ranges (oz): strappy sandals / kitten heels / thin flats ≈ 12-18; pumps / heels / loafers / ballet flats ≈ 16-26; sneakers ≈ 28-40; ankle boots ≈ 36-52; tall/heavy boots ≈ 52-72; tee / thin top ≈ 6-10; blouse / light dress ≈ 10-18; knit sweater ≈ 16-28; jeans ≈ 20-28; coat ≈ 40-64; handbag ≈ 16-40 (small clutch ≈ 12). Box dims (in): sandals/heels/accessories ≈ 12x8x4; sneakers ≈ 13x8x5; boots/coats ≈ 16x12x6; folded garments ≈ 12x10x2. Do NOT over-weight lightweight items.
@@ -90,11 +94,25 @@ function parseDraft(text: string): ListingDraft {
  material: toField(raw.material),
  condition: toField(raw.condition),
  category: typeof raw.category === "string" ? raw.category.trim() : null,
+ searchQuery: typeof raw.searchQuery === "string" && raw.searchQuery.trim() ? raw.searchQuery.trim().slice(0, 160) : null,
  careTag: typeof raw.careTag === "string" && raw.careTag.trim() ? raw.careTag.trim() : null,
+ tag: parseTag(raw.tag),
  runway: typeof raw.runway === "string" && raw.runway.trim() ? raw.runway.trim().slice(0, 120) : null,
  priceHint: typeof raw.priceHint === "number" && raw.priceHint > 0 ? Math.round(raw.priceHint) : null,
  parcel: parseParcel(raw.parcel),
  };
+}
+
+// Structured OCR of the garment's brand/RN label. Kept verbatim (the model is told to transcribe,
+// not infer). null when nothing on the label was legible. RN is normalized to digits (US RN numbers
+// are 5-6 digits; keep up to 8 to be safe).
+function parseTag(t: any): ListingDraft["tag"] {
+ const s = (v: any) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 120) : null);
+ const rnRaw = t?.rn != null ? String(t.rn).replace(/[^0-9]/g, "") : "";
+ const rn = rnRaw.length >= 4 && rnRaw.length <= 8 ? rnRaw : null;
+ const brandText = s(t?.brandText), madeIn = s(t?.madeIn), styleCode = s(t?.styleCode);
+ if (!brandText && !rn && !madeIn && !styleCode) return null;
+ return { brandText, rn, madeIn, styleCode };
 }
 
 // Estimated shipping parcel with safe defaults (a medium poly mailer) when the

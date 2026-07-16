@@ -88,3 +88,62 @@ export async function getIntakeAccuracy(days = 30): Promise<IntakeAccuracy> {
 
  return { periodDays: days, totalPublishes, totalCorrections, fields, topBrandMisses, price };
 }
+
+// ── where it fails vs works: price calibration broken out BY CATEGORY ──────────
+// The aggregate median hides that (say) handbags price well while no-name tees are 60% off.
+// Uses the published items' AI-market-value vs the seller's final price, grouped by category.
+export type SegmentStat = {
+ category: string;
+ publishes: number;
+ priced: number; // items with both an AI value and a final price (gradeable)
+ medianRatio: number | null; // median(final ÷ AI); 1.0 = on the money
+ offPct: number | null; // % of priced items the AI was >20% off on
+ avgErrorPct: number | null; // mean |ratio − 1|, as a %
+};
+const medianOf = (a: number[]): number | null => {
+ if (!a.length) return null;
+ const s = [...a].sort((x, y) => x - y);
+ return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+};
+export async function getSegmentCalibration(days = 30): Promise<SegmentStat[]> {
+ const sql = db();
+ const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+ const rows = (await sql`
+  SELECT COALESCE(NULLIF(lower(trim(category)), ''), 'uncategorized') AS cat,
+   COUNT(*)::int AS publishes,
+   COALESCE(array_agg((price_cents::float / market_cents)) FILTER (WHERE market_cents > 0 AND price_cents > 0), '{}') AS ratios
+  FROM intake_memory_items WHERE created_at >= ${cutoff}
+  GROUP BY cat ORDER BY publishes DESC LIMIT 24
+ `.catch(() => [])) as any[];
+ return rows.map((r) => {
+ const ratios = (Array.isArray(r.ratios) ? r.ratios : []).map(Number).filter((n: number) => Number.isFinite(n) && n > 0);
+ const m = medianOf(ratios);
+ return {
+ category: String(r.cat),
+ publishes: Number(r.publishes || 0),
+ priced: ratios.length,
+ medianRatio: m != null ? Math.round(m * 100) / 100 : null,
+ offPct: ratios.length ? Math.round((ratios.filter((x: number) => Math.abs(x - 1) > 0.2).length / ratios.length) * 100) : null,
+ avgErrorPct: ratios.length ? Math.round((ratios.reduce((s: number, x: number) => s + Math.abs(x - 1), 0) / ratios.length) * 100) : null,
+ };
+ });
+}
+
+// ── what sellers are actually putting in: the live correction feed ────────────
+// Every field a seller changed from the AI's draft, newest first — AI guess → their value,
+// with the photo. This is the raw "where the model is wrong" stream.
+export type CorrectionRow = { field: string; aiValue: string | null; finalValue: string | null; imageUrl: string | null; store: string; at: string };
+export async function getRecentCorrections(limit = 50): Promise<CorrectionRow[]> {
+ const sql = db();
+ const rows = (await sql`
+  SELECT field, ai_value, final_value, image_url, store_slug, created_at
+  FROM intake_predictions
+  WHERE NOT accepted AND (ai_value IS NOT NULL OR final_value IS NOT NULL)
+  ORDER BY created_at DESC LIMIT ${Math.min(100, Math.max(1, limit))}
+ `.catch(() => [])) as any[];
+ return rows.map((r) => ({
+ field: String(r.field), aiValue: r.ai_value ?? null, finalValue: r.final_value ?? null,
+ imageUrl: r.image_url ?? null, store: String(r.store_slug || ""),
+ at: r.created_at ? new Date(r.created_at).toISOString() : "",
+ }));
+}

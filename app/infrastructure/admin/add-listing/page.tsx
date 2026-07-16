@@ -13,6 +13,7 @@ type Draft = {
  material: Field;
  condition: Field;
  category: string | null;
+ searchQuery: string | null;
  careTag: string | null;
  runway: string | null;
  priceHint: number | null;
@@ -213,6 +214,9 @@ export default function IntakePage() {
  // runs now (cheaply, off our own data), so a typed price still gets an over/under-market flag.
  async function fillWithAI() {
  if (!photos.length) { setErr("Add at least one photo first."); return; }
+ // Brand-first: the seller knows the brand better than a photo does, and it anchors the comps,
+ // price, and description. Require it before the AI fills the rest (most sellers type it anyway).
+ if (!form.brand.trim()) { setErr("Add the brand first — it anchors the price and description. (Type “Unbranded” if it has no label.)"); return; }
  setBusy(true);
  setBusyMsg("Filling the blanks…");
  setErr(null);
@@ -278,13 +282,14 @@ export default function IntakePage() {
  era: filled.era || dr?.era?.value || "",
  material: filled.material || dr?.material?.value || "",
  category: filled.category || dr?.category || "",
+ condition: filled.condition || dr?.condition?.value || "",
  price: filled.price || "",
  runway: (d.runway ?? dr?.runway) || "",
  };
  const r2 = await fetch("/api/store/intake/pricing", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ imageUrls: photos, fields: resolved, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
+ body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
  });
  const d2 = await r2.json().catch(() => null);
  if (r2.ok && d2) {
@@ -466,10 +471,10 @@ export default function IntakePage() {
  {runway && <p className="mt-3 text-[12px] text-stone-600">🎬 Runway match: <a href={runwayShowUrl(runway)} target="_blank" rel="noopener noreferrer" className="font-medium underline decoration-stone-300 underline-offset-2 hover:decoration-stone-600">{runway}</a> <span className="text-stone-400">↗ view show</span></p>}
  {careTag && <p className="mt-3 text-[12px] text-stone-500">Read from care tag: <span className="italic">{careTag}</span></p>}
 
- <Button className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length}>
+ <Button className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length || !form.brand.trim()}>
  <Sparkles size={14} className="mr-1.5 inline" />{busy ? busyMsg : "Fill the rest with AI"}
  </Button>
- <p className="mt-1.5 text-[11px] text-stone-400">Only fills blanks. Your price is always checked against live market comps.</p>
+ <p className="mt-1.5 text-[11px] text-stone-400">{!form.brand.trim() ? "Enter the brand first — it anchors the price & description. (“Unbranded” is fine.)" : "Only fills blanks. Your price is always checked against live market comps."}</p>
 
  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
  </div>

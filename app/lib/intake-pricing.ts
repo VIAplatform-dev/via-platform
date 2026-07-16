@@ -74,6 +74,8 @@ export async function computeListingPricing(opts: {
  era: string;
  material: string;
  category: string;
+ condition?: string; // seller/AI condition — swings resale price, so it's fed to the valuation
+ searchQuery?: string | null; // AI's tight "brand + specific model + era" comp phrase
  price: string | null; // seller's typed price in dollars; null/"" → suggest one
  imageUrls: string[];
  mainUrl: string;
@@ -86,7 +88,11 @@ export async function computeListingPricing(opts: {
 }): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; runway: string | null }> {
  const brandVal = opts.brand.trim();
  const baseTitle = opts.title || [opts.era, opts.material, opts.category].filter(Boolean).join(" ");
- const query = brandVal && !baseTitle.toLowerCase().includes(brandVal.toLowerCase()) ? `${brandVal} ${baseTitle}` : baseTitle;
+ const brandTitle = brandVal && !baseTitle.toLowerCase().includes(brandVal.toLowerCase()) ? `${brandVal} ${baseTitle}` : baseTitle;
+ // A tight AI search phrase (brand + specific model + era) finds SAME-PIECE comps far better than
+ // the SEO title — prefer it, but only when it actually carries the (authoritative) brand.
+ const sq = (opts.searchQuery || "").trim();
+ const query = sq && (!brandVal || sq.toLowerCase().includes(brandVal.toLowerCase())) ? sq : brandTitle;
  const needPrice = !opts.price || !opts.price.trim();
 
  // VYA pieces that LOOK like this one → strong comps, even when the brand is unknown/wrong.
@@ -107,7 +113,7 @@ export async function computeListingPricing(opts: {
  minMarkupBps,
  knowledgeHintCents: opts.knowledgeHintCents,
  extraComps: comps,
- context: { brand: brandVal || null, era: opts.era || null, runway: opts.runwaySoFar, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
+ context: { brand: brandVal || null, era: opts.era || null, condition: opts.condition || null, runway: opts.runwaySoFar, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
  })).catch(() => null);
  if (estimate && trend?.trending) estimate.rationale += ` · 🔥 ${brandVal} trending (${trend.note})`;
  if (estimate && estimate.marketCents) {

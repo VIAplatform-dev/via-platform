@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 type FieldAccuracy = { field: string; accepted: number; corrected: number; accuracyPct: number };
 type BrandMiss = { from: string; to: string; n: number };
 type PriceCalibration = { samples: number; medianRatio: number; overpricedPct: number; underpricedPct: number; avgAbsErrorPct: number };
+type SegmentStat = { category: string; publishes: number; priced: number; medianRatio: number | null; offPct: number | null; avgErrorPct: number | null };
+type CorrectionRow = { field: string; aiValue: string | null; finalValue: string | null; imageUrl: string | null; store: string; at: string };
 type Data = {
  periodDays: number;
  totalPublishes: number;
@@ -13,6 +15,8 @@ type Data = {
  fields: FieldAccuracy[];
  topBrandMisses: BrandMiss[];
  price: PriceCalibration;
+ segments: SegmentStat[];
+ corrections: CorrectionRow[];
 };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -276,6 +280,60 @@ export default function IntakeAccuracyPage() {
  <span className="text-stone-400">→</span>
  <span className="font-medium text-emerald-700">{m.to}</span>
  {m.n > 1 && <span className="ml-1 rounded-full bg-stone-100 px-2 text-[11px] text-stone-500">×{m.n}</span>}
+ </div>
+ ))}
+ </div>
+ </div>
+ )}
+
+ {/* Where pricing lands — by category (where it fails vs works) */}
+ {data.segments && data.segments.length > 0 && (
+ <div className="rounded-xl border border-stone-200 bg-white p-5">
+ <p className="mb-1 text-[13px] font-medium text-stone-700">Where pricing lands — by category</p>
+ <p className="mb-3 text-[11px] text-stone-400">Median of (seller’s final price ÷ AI’s market value) per category. 1.00× = on the money; far from it = the model is off there. This is where to aim next.</p>
+ <div className="overflow-x-auto">
+ <table className="w-full text-[12px]">
+ <thead className="text-left text-[11px] uppercase tracking-wide text-stone-400">
+ <tr><th className="py-1.5 pr-4 font-medium">Category</th><th className="py-1.5 pr-4 font-medium">Listings</th><th className="py-1.5 pr-4 font-medium">Priced</th><th className="py-1.5 pr-4 font-medium">Median</th><th className="py-1.5 pr-4 font-medium">Off &gt;20%</th><th className="py-1.5 font-medium">Avg err</th></tr>
+ </thead>
+ <tbody>
+ {data.segments.map((s) => {
+ const r = s.medianRatio;
+ const c = r == null ? "text-stone-400" : r >= 0.9 && r <= 1.1 ? "text-emerald-600" : (r < 0.75 || r > 1.3) ? "text-red-600" : "text-amber-600";
+ return (
+ <tr key={s.category} className="border-t border-stone-100">
+ <td className="py-1.5 pr-4 capitalize text-stone-700">{s.category}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.publishes}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.priced}</td>
+ <td className={`py-1.5 pr-4 font-semibold tabular-nums ${c}`}>{r != null ? `${r.toFixed(2)}×` : "—"}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.offPct != null ? `${s.offPct}%` : "—"}</td>
+ <td className="py-1.5 tabular-nums text-stone-500">{s.avgErrorPct != null ? `±${s.avgErrorPct}%` : "—"}</td>
+ </tr>
+ );
+ })}
+ </tbody>
+ </table>
+ </div>
+ </div>
+ )}
+
+ {/* What sellers are changing — the live correction feed (what people are putting in) */}
+ {data.corrections && data.corrections.length > 0 && (
+ <div className="rounded-xl border border-stone-200 bg-white p-5">
+ <p className="mb-1 text-[13px] font-medium text-stone-700">What sellers are changing</p>
+ <p className="mb-3 text-[11px] text-stone-400">Every field a seller corrected from the AI’s draft, newest first — the raw stream of where the model is wrong, with the photo.</p>
+ <div className="max-h-[28rem] space-y-1.5 overflow-y-auto pr-1">
+ {data.corrections.map((c, i) => (
+ <div key={i} className="flex items-center gap-2.5 rounded-lg border border-stone-100 px-2 py-1.5">
+ {/* eslint-disable-next-line @next/next/no-img-element */}
+ {c.imageUrl ? <img src={c.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-md bg-stone-100 object-cover" /> : <div className="h-9 w-9 shrink-0 rounded-md bg-stone-100" />}
+ <span className="w-16 shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-wide text-stone-500">{c.field}</span>
+ <span className="min-w-0 flex-1 truncate">
+ <span className="text-red-600 line-through decoration-red-300">{c.aiValue || "—"}</span>
+ <span className="mx-1.5 text-stone-400">→</span>
+ <span className="font-medium text-emerald-700">{c.finalValue || "—"}</span>
+ </span>
+ <span className="shrink-0 text-[10px] text-stone-400">{c.store}</span>
  </div>
  ))}
  </div>

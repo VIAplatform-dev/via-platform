@@ -134,7 +134,7 @@
     },
     {
       "path": "/api/cron/snapshot-market-trends",
-      "schedule": "0 7 * * *"
+      "schedule": "0 7 * * 1"
     },
     {
       "path": "/api/cron/embed-sold-items",

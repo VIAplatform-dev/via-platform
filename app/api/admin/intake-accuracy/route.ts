@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/app/lib/storeAuth";
-import { getIntakeAccuracy } from "@/app/lib/intake-accuracy-db";
+import { getIntakeAccuracy, getSegmentCalibration, getRecentCorrections } from "@/app/lib/intake-accuracy-db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +11,12 @@ export async function GET(request: NextRequest) {
  const raw = new URL(request.url).searchParams.get("days");
  const days = Math.max(1, Math.min(3650, Number(raw) || 30));
  try {
- const data = await getIntakeAccuracy(days);
- return NextResponse.json({ ok: true, ...data });
+ const [data, segments, corrections] = await Promise.all([
+ getIntakeAccuracy(days),
+ getSegmentCalibration(days),
+ getRecentCorrections(60),
+ ]);
+ return NextResponse.json({ ok: true, ...data, segments, corrections });
  } catch (e) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
  }

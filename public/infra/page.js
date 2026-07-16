@@ -110,3 +110,27 @@
   var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); } });},{threshold:0.4,rootMargin:'0px 0px -12% 0px'});
   items.forEach(function(i){ io.observe(i); });
 })();
+
+// Soft scroll — ease the native scroll toward a wheel-driven target so pages glide instead of
+// snapping. Real window.scrollTo keeps scroll events firing, so reveal animations still work.
+// Off for touch + reduced-motion.
+(function(){
+  var mm=window.matchMedia;
+  if(mm && (mm('(prefers-reduced-motion: reduce)').matches || mm('(pointer: coarse)').matches)) return;
+  var target=window.scrollY, current=target, active=false;
+  function maxY(){ return document.documentElement.scrollHeight - window.innerHeight; }
+  function loop(){
+    current += (target-current)*0.11;
+    if(Math.abs(target-current)<0.4){ current=target; window.scrollTo({top:current,behavior:'instant'}); active=false; return; }
+    window.scrollTo({top:current,behavior:'instant'});
+    requestAnimationFrame(loop);
+  }
+  window.addEventListener('wheel',function(e){
+    if(e.ctrlKey || !e.deltaY) return;
+    e.preventDefault();
+    var dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?window.innerHeight:1);
+    target=Math.max(0,Math.min(target+dy,maxY()));
+    if(!active){ active=true; current=window.scrollY; requestAnimationFrame(loop); }
+  },{passive:false});
+  window.addEventListener('scroll',function(){ if(!active){ target=current=window.scrollY; } },{passive:true});
+})();

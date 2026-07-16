@@ -29,6 +29,8 @@ export async function POST(request: NextRequest) {
  era: str("era"),
  material: str("material"),
  category: str("category"),
+ condition: str("condition"),
+ searchQuery: typeof body?.searchQuery === "string" ? body.searchQuery : null,
  price: str("price") || null,
  imageUrls,
  mainUrl: imageUrls[0],

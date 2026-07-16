@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { draftListing, isIntakeConfigured, PROMPT_VERSION } from "@/app/lib/ai-intake";
+import { rnToBrand, learnRnBrand } from "@/app/lib/rn-lookup";
 import { titleHasBrand, computeListingPricing } from "@/app/lib/intake-pricing";
 import { ghostMannequinFromUrl, isPhotoroomConfigured } from "@/app/lib/photoroom";
 import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
@@ -130,15 +131,29 @@ export async function POST(request: NextRequest) {
  }
  }
 
- // Reverse-image consensus brand wins over the model's uncertainty — but only when the
- // seller didn't supply a brand themselves (their input is authoritative).
+ // Brand resolution priority (seller's input is always authoritative and untouched):
+ //   1. the LABEL — a brand name transcribed off the tag, or an RN that resolves to a maker.
+ //      A printed identity beats any visual guess, so it wins over Lens/vision.
+ //   2. reverse-image (Lens) consensus — overrides the model's uncertainty.
+ //   3. the model's own visual inference (already in draft.brand).
  const idBrand = brandFromMatches(matches);
- if (draft && idBrand.brand && !has("brand")) {
+ let labelBrand: string | null = null;
+ if (draft && !has("brand")) {
+ const tagBrand = draft.tag?.brandText?.trim() || null;
+ const rnBrand = !tagBrand && draft.tag?.rn ? await rnToBrand(draft.tag.rn).catch(() => null) : null;
+ labelBrand = tagBrand || rnBrand;
+ if (labelBrand) draft.brand = { value: labelBrand, confidence: 0.92 }; // printed label = high confidence
+ }
+ // Lens consensus only when the label didn't already pin the brand.
+ if (draft && idBrand.brand && !has("brand") && !labelBrand) {
  const cur = draft.brand?.value || "";
  const disagrees = !cur || draft.brand.confidence < 0.7 || !cur.toLowerCase().includes(idBrand.brand.toLowerCase());
  if (disagrees) draft.brand = { value: idBrand.brand, confidence: idBrand.hits >= 2 ? 0.85 : 0.6 };
  }
- console.log(`[intake ${slug}] needDraft=${needDraft} needPrice=${needPrice} lens=${matches.length} brand=${idBrand.brand ?? "—"}`);
+ // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label —
+ // learn it so a later faded-name/legible-RN tag can still resolve. (Not circular: two OCR'd facts.)
+ if (draft?.tag?.rn && draft.tag?.brandText) learnRnBrand(draft.tag.rn, draft.tag.brandText, "label").catch(() => {});
+ console.log(`[intake ${slug}] needDraft=${needDraft} needPrice=${needPrice} lens=${matches.length} label=${labelBrand ?? "—"} brand=${draft?.brand?.value ?? idBrand.brand ?? "—"}`);
 
  // Price + over/under-market flag + runway. In draftOnly mode (phase 1) we SKIP this so the
  // form can render the drafted FIELDS immediately; the client then calls
@@ -147,8 +162,15 @@ export async function POST(request: NextRequest) {
  let estimate = null;
  let priceFlag = null;
  let runway: string | null = has("runway") ? val("runway") : (draft?.runway ?? null);
- const reverseComps = matchesToComps(relevantMatches);
- const reverseTitles = relevantMatches.map((m) => m.title);
+ // Price comps must be SAME-BRAND or they poison the valuation. Filter the reverse-image matches to
+ // the resolved brand — the seller's if they typed one, else the Lens-consensus / drafted brand
+ // (the common AI-intake case, where without this the raw look-alike matches flowed in unfiltered).
+ // Fall back to the seller-brand-filtered set only if brand-filtering leaves nothing to price from.
+ const resolvedBrand = (has("brand") ? val("brand") : (draft?.brand?.value || idBrand.brand)) || "";
+ const brandFiltered = resolvedBrand ? matches.filter((m) => titleHasBrand(m.title, resolvedBrand)) : [];
+ const pricingMatches = brandFiltered.length ? brandFiltered : relevantMatches;
+ const reverseComps = matchesToComps(pricingMatches);
+ const reverseTitles = pricingMatches.map((m) => m.title);
  if (!draftOnly) {
  const pr = await computeListingPricing({
  slug,
@@ -157,6 +179,8 @@ export async function POST(request: NextRequest) {
  era: has("era") ? val("era") : (draft?.era?.value || ""),
  material: has("material") ? val("material") : (draft?.material?.value || ""),
  category: has("category") ? val("category") : (draft?.category || ""),
+ condition: has("condition") ? val("condition") : (draft?.condition?.value || ""),
+ searchQuery: draft?.searchQuery || null,
  price: has("price") ? val("price") : null,
  imageUrls,
  mainUrl,
