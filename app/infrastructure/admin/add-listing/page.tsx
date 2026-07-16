@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Sparkles } from "lucide-react";
+import { Camera, Sparkles, Tag } from "lucide-react";
 import { Card, Button, cn } from "@/app/store/ui";
 
 type Field = { value: string | null; confidence: number };
@@ -12,6 +12,8 @@ type Draft = {
  era: Field;
  material: Field;
  condition: Field;
+ conditionGrade: string | null;
+ flaws: string[];
  category: string | null;
  searchQuery: string | null;
  careTag: string | null;
@@ -109,6 +111,8 @@ export default function IntakePage() {
  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
  const [careTag, setCareTag] = useState<string | null>(null);
  const [reverseImage, setReverseImage] = useState<{ matches: number; brand: string | null; hits: number; sampleTitles: string[] } | null>(null);
+ const [specificPiece, setSpecificPiece] = useState<{ model: string; similarity: number; era: string | null; source: string; refPriceCents: number | null } | null>(null);
+ const [flaws, setFlaws] = useState<string[]>([]);
  const [promptVersion, setPromptVersion] = useState<string | null>(null);
  const [cols, setCols] = useState<Collection[]>([]);
  const [selectedCols, setSelectedCols] = useState<string[]>([]);
@@ -236,6 +240,8 @@ export default function IntakePage() {
  if (d.ghostUrl) setGhost(d.ghostUrl);
  if (Array.isArray(d.embedding)) setEmbedding(d.embedding);
  setReverseImage(d.reverseImage || null);
+ setSpecificPiece(d.specificPiece || null);
+ if (dr && Array.isArray(dr.flaws)) setFlaws(dr.flaws);
  setPromptVersion(d.promptVersion || null);
  if (dr?.careTag) setCareTag(dr.careTag);
  if (d.runway || dr?.runway) setRunway(d.runway ?? dr?.runway);
@@ -283,13 +289,14 @@ export default function IntakePage() {
  material: filled.material || dr?.material?.value || "",
  category: filled.category || dr?.category || "",
  condition: filled.condition || dr?.condition?.value || "",
+ conditionGrade: filled.condition || dr?.conditionGrade || dr?.condition?.value || "",
  price: filled.price || "",
  runway: (d.runway ?? dr?.runway) || "",
  };
  const r2 = await fetch("/api/store/intake/pricing", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
+ body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: d.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
  });
  const d2 = await r2.json().catch(() => null);
  if (r2.ok && d2) {
@@ -367,7 +374,7 @@ export default function IntakePage() {
  function reset() {
  setPhase("form"); setPhotos([]); setRunway(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null);
+ setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null);
  }
 
  // ── Done ──
@@ -464,12 +471,22 @@ export default function IntakePage() {
  >
  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#5D0F17]/[0.07] text-[#5D0F17]"><Camera size={20} /></span>
  <p className="text-[13px] font-medium text-stone-700">{busy ? busyMsg : "Add photos"}</p>
- <p className="mt-1 text-[11px] text-stone-400">or drag here · up to 8</p>
+ <p className="mt-1 text-[11px] text-stone-400">or drag here · up to 8 · include the tag</p>
  </div>
  )}
 
  {runway && <p className="mt-3 text-[12px] text-stone-600">🎬 Runway match: <a href={runwayShowUrl(runway)} target="_blank" rel="noopener noreferrer" className="font-medium underline decoration-stone-300 underline-offset-2 hover:decoration-stone-600">{runway}</a> <span className="text-stone-400">↗ view show</span></p>}
  {careTag && <p className="mt-3 text-[12px] text-stone-500">Read from care tag: <span className="italic">{careTag}</span></p>}
+ {/* Nudge for a tag shot — a legible brand/care label is the single strongest signal for
+   getting the brand + era right, and the reverse-image search now scans every frame. */}
+ {!reverseImage?.brand && (
+ <p className="mt-3 flex items-start gap-1.5 text-[11px] text-stone-400"><Tag size={12} className="mt-px shrink-0 text-stone-400" />Add a clear shot of the brand/care tag — it’s the surest way for AI to nail the brand &amp; era.</p>
+ )}
+ {/* Specific-piece match (Phase 2): the exact model we recognized from the reference index,
+   used to sharpen the title/era and tighten the price comps. Only shown when confident. */}
+ {specificPiece && (
+ <p className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-[11px] text-stone-600">🎯 Looks like <span className="font-medium text-stone-800">{specificPiece.model}</span> <span className="text-stone-400">· {Math.round(specificPiece.similarity * 100)}% match{specificPiece.refPriceCents ? ` · refs ~$${Math.round(specificPiece.refPriceCents / 100)}` : ""}</span></p>
+ )}
 
  <Button className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length || !form.brand.trim()}>
  <Sparkles size={14} className="mr-1.5 inline" />{busy ? busyMsg : "Fill the rest with AI"}
@@ -490,6 +507,9 @@ export default function IntakePage() {
  <div>
  <label className={label}>Condition</label>
  <input className={input} value={form.condition} onChange={(e) => set("condition", e.target.value)} />
+ {flaws.length > 0 && (
+ <p className="mt-1 text-[10.5px] text-amber-700/90">AI noted: {flaws.join(" · ")} <span className="text-stone-400">— factored into the price</span></p>
+ )}
  </div>
  </div>
  <div className="grid grid-cols-2 gap-3">

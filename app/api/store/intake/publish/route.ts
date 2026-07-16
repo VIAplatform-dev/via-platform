@@ -99,11 +99,13 @@ export async function POST(request: NextRequest) {
  // to the photo, so the next intake learns from it (feeds back in as hints).
  const ai = (body.aiDraft && typeof body.aiDraft === "object" ? body.aiDraft : {}) as Record<string, unknown>;
  const photoUrl = typeof body.photo === "string" && body.photo ? body.photo : (images[images.length - 1] ?? null);
+ const itemCategory = str(body.category, 60);
  const fieldRows = (["brand", "era", "material", "condition", "category"] as const).map((f) => ({
  field: f,
  aiValue: typeof ai[f] === "string" ? (ai[f] as string) : null,
  finalValue: String((body as Record<string, unknown>)[f] ?? "").trim(),
  imageUrl: photoUrl,
+ category: itemCategory,
  }));
  // logCorrections → the hint loop (brand fixes). logPredictions → the acceptance
  // flow: every AI-predicted field + whether the seller kept it, for true accuracy.
@@ -117,6 +119,7 @@ export async function POST(request: NextRequest) {
  await rememberItem(slug, {
  imageUrl: photoUrl,
  embedding,
+ title,
  brand: str(body.brand, 80),
  era: str(body.era, 40),
  material: str(body.material, 120),

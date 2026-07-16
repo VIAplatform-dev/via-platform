@@ -92,6 +92,33 @@ export const CONDITIONS = [
 ] as const;
 export type Condition = (typeof CONDITIONS)[number];
 
+// ── Condition → price adjustment (Phase 4) ──
+// Resale comps are typically listed at "very good", so that's the baseline (1.0). The valuation
+// prices the piece at this standard condition; then we scale EXPLICITLY to the item's real grade,
+// so wear/newness moves the price transparently instead of the model self-discounting invisibly.
+// Tunable here — never hardcode a condition discount in the pricing logic.
+export const CONDITION_REFERENCE: Condition = "Very Good";
+export const CONDITION_MULTIPLIERS: Record<Condition, number> = {
+ "Deadstock/NWT": 1.1,
+ "Excellent": 1.05,
+ "Very Good": 1.0,
+ "Good": 0.95,
+ "Fair": 0.9,
+};
+
+// Map a freeform condition string (seller-typed or AI) to a canonical grade — else null (no guess).
+// "very good" is checked before "good" so it wins; nothing recognizable → null (no adjustment).
+export function normalizeConditionGrade(text: string | null | undefined): Condition | null {
+ const s = (text || "").toLowerCase().trim();
+ if (!s) return null;
+ if (/\b(nwt|bnwt|nib|new with tags|dead ?stock|unworn|never worn)\b/.test(s)) return "Deadstock/NWT";
+ if (/\b(excellent|pristine|like ?new|mint|flawless)\b/.test(s)) return "Excellent";
+ if (/\bvery good\b/.test(s)) return "Very Good";
+ if (/\b(good|gently worn|minor wear)\b/.test(s)) return "Good";
+ if (/\b(fair|poor|worn|distressed|as[- ]is|heavily used|damaged)\b/.test(s)) return "Fair";
+ return null;
+}
+
 // ── Event-quality filters (events ETL) ──
 // Junk traffic inflates the Demand Index. The events ETL drops it BEFORE building
 // the unified log (the legacy capture tables are never touched). Every threshold

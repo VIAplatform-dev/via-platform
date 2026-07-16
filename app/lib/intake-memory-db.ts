@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { cosine, embedImage, isEmbeddingConfigured } from "./embeddings";
+import { brandMatch } from "./brand-match";
 import type { Comp } from "./comps";
 
 // The intake "correction memory" — v1 of the learning loop.
@@ -75,10 +76,11 @@ async function ensurePredictionsTable() {
   )
  `;
  await db()`CREATE INDEX IF NOT EXISTS idx_intake_pred_field ON intake_predictions (field, created_at DESC)`;
+ await db()`ALTER TABLE intake_predictions ADD COLUMN IF NOT EXISTS category TEXT`; // to slice accuracy by segment
  predEnsured = true;
 }
 
-export type PredictionInput = { field: string; aiValue: string | null; finalValue: string; imageUrl?: string | null };
+export type PredictionInput = { field: string; aiValue: string | null; finalValue: string; imageUrl?: string | null; category?: string | null };
 
 /**
  * Log every field the AI actually PREDICTED (non-empty guess), with whether the
@@ -92,10 +94,13 @@ export async function logPredictions(storeSlug: string, preds: PredictionInput[]
  await ensurePredictionsTable();
  const sql = db();
  for (const p of real) {
-  const accepted = !!p.finalValue.trim() && norm(p.aiValue) === norm(p.finalValue);
+  // Brand is graded house-level (Dior ≡ Christian Dior); other fields exact after normalize.
+  const accepted = p.field === "brand"
+   ? brandMatch(p.aiValue, p.finalValue)
+   : (!!p.finalValue.trim() && norm(p.aiValue) === norm(p.finalValue));
   await sql`
-   INSERT INTO intake_predictions (store_slug, field, ai_value, final_value, accepted, image_url)
-   VALUES (${storeSlug}, ${p.field}, ${p.aiValue}, ${p.finalValue.trim().slice(0, 200)}, ${accepted}, ${p.imageUrl ?? null})
+   INSERT INTO intake_predictions (store_slug, field, ai_value, final_value, accepted, image_url, category)
+   VALUES (${storeSlug}, ${p.field}, ${p.aiValue}, ${p.finalValue.trim().slice(0, 200)}, ${accepted}, ${p.imageUrl ?? null}, ${p.category ?? null})
   `.catch(() => {});
  }
 }
@@ -160,6 +165,7 @@ async function ensureItemsTable() {
  `;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS market_cents INTEGER`;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS price_cents INTEGER`;
+ await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS title TEXT`; // the confirmed descriptor — carries the specific model, so retrieval can teach it
  await db()`CREATE INDEX IF NOT EXISTS idx_intake_mem_store ON intake_memory_items (store_slug, created_at DESC)`;
  itemsEnsured = true;
 }
@@ -167,6 +173,7 @@ async function ensureItemsTable() {
 export type MemoryItem = {
  imageUrl: string | null;
  embedding: number[];
+ title?: string | null; // the seller's confirmed title — the specific-piece descriptor
  brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; category?: string | null;
  marketCents?: number | null; // comp market value at intake (raw, before store adjustment)
  priceCents?: number | null;  // the seller's final list price
@@ -180,10 +187,10 @@ export type MemoryItem = {
 export async function rememberItem(storeSlug: string, item: MemoryItem): Promise<void> {
  await ensureItemsTable();
  await db()`
-  INSERT INTO intake_memory_items (store_slug, image_url, embedding, brand, era, material, condition, category, market_cents, price_cents)
+  INSERT INTO intake_memory_items (store_slug, image_url, embedding, brand, era, material, condition, category, market_cents, price_cents, title)
   VALUES (${storeSlug}, ${item.imageUrl ?? null}, ${JSON.stringify(item.embedding ?? [])},
    ${item.brand ?? null}, ${item.era ?? null}, ${item.material ?? null}, ${item.condition ?? null}, ${item.category ?? null},
-   ${item.marketCents ?? null}, ${item.priceCents ?? null})
+   ${item.marketCents ?? null}, ${item.priceCents ?? null}, ${item.title ?? null})
  `.catch(() => {});
 }
 
@@ -196,10 +203,10 @@ export async function getVisualHints(storeSlug: string, embedding: number[]): Pr
  if (!embedding || embedding.length === 0) return "";
  await ensureItemsTable();
  const rows = (await db()`
-  SELECT image_url, embedding, brand, era, material, category
+  SELECT image_url, embedding, brand, era, material, category, title
   FROM intake_memory_items WHERE store_slug = ${storeSlug}
   ORDER BY created_at DESC LIMIT 400
- `.catch(() => [])) as { embedding: string; brand: string | null; era: string | null; material: string | null; category: string | null }[];
+ `.catch(() => [])) as { embedding: string; brand: string | null; era: string | null; material: string | null; category: string | null; title: string | null }[];
 
  const scored = rows
   .map((r) => {
@@ -213,10 +220,72 @@ export async function getVisualHints(storeSlug: string, embedding: number[]): Pr
 
  if (scored.length === 0) return "";
  const lines = scored.map((s) => {
-  const bits = [s.r.brand && `brand: ${s.r.brand}`, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ");
+  const bits = s.r.title || [s.r.brand && `brand: ${s.r.brand}`, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ");
   return `• a visually similar piece this seller listed → ${bits || "(no labels)"}`;
  });
  return `\n\nVISUALLY SIMILAR PAST LISTINGS (this seller's own catalog — strong signal; weight heavily for brand/era/material):\n${lines.join("\n")}`;
+}
+
+/**
+ * Cross-store visual retrieval — the most visually-similar SELLER-CONFIRMED pieces across the WHOLE
+ * platform (every store's published items), preferring the same brand when one is known. This is the
+ * compounding loop: every seller's confirmed listing becomes a reference example for everyone —
+ * including a brand-new store's very first upload, which the per-store getVisualHints can't help.
+ * Labels only (era/model/category/material), NEVER another store's prices (that stays aggregated in
+ * the pricing engine) — so it's privacy-safe and used only to sharpen identification.
+ */
+export async function getCrossStoreSimilar(embedding: number[], brand?: string | null, limit = 4, opts?: { excludeNearIdentical?: boolean }): Promise<string> {
+ if (!embedding || embedding.length === 0) return "";
+ await ensureItemsTable();
+ const b = (brand || "").trim();
+ const rows = (await (b
+ ? db()`SELECT embedding, brand, era, material, category, title FROM intake_memory_items WHERE brand ILIKE ${b} AND embedding <> '[]' ORDER BY created_at DESC LIMIT 500`
+ : db()`SELECT embedding, brand, era, material, category, title FROM intake_memory_items WHERE embedding <> '[]' ORDER BY created_at DESC LIMIT 500`
+ ).catch(() => [])) as { embedding: string; brand: string | null; era: string | null; material: string | null; category: string | null; title: string | null }[];
+
+ const hi = opts?.excludeNearIdentical ? 0.995 : 1.01; // drop a self/identical match in the eval
+ const scored = rows
+ .map((r) => { let v: number[] = []; try { v = JSON.parse(r.embedding); } catch { /* skip malformed */ } return { r, score: v.length ? cosine(embedding, v) : 0 }; })
+ .filter((s) => s.score >= 0.62 && s.score < hi)
+ .sort((a, b2) => b2.score - a.score)
+ .slice(0, limit);
+ if (scored.length === 0) return "";
+ // Prefer the confirmed TITLE — it carries the specific model/line, which is what sharpens ID.
+ const lines = scored.map((s) => `• ${s.r.title || ([s.r.brand, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ") || "(no labels)")}`);
+ return `\n\nSIMILAR PIECES CONFIRMED ACROSS VYA (sellers verified these labels — reference for era/model/category/material; do NOT invent a brand from them):\n${lines.join("\n")}`;
+}
+
+/**
+ * Cross-store brand prior — what a KNOWN brand's pieces TEND to be and sell for across the whole
+ * platform (aggregated over every store's confirmed listings). A soft calibration for era/category
+ * and a price anchor when the exact piece isn't visually matched. Aggregated + N-gated, so it's
+ * privacy-safe (no single store's numbers) and only appears once a brand has enough real history.
+ */
+export async function getBrandPrior(brand: string | null | undefined): Promise<string> {
+ const b = (brand || "").trim();
+ if (!b) return "";
+ await ensureItemsTable();
+ const rows = (await db()`
+  SELECT era, category, material, price_cents
+  FROM intake_memory_items
+  WHERE brand ILIKE ${b} AND created_at >= now() - interval '540 days'
+ `.catch(() => [])) as { era: string | null; category: string | null; material: string | null; price_cents: number | null }[];
+ if (rows.length < 8) return ""; // need a real aggregate before we lean on it
+ const top = (key: "era" | "category" | "material"): string[] => {
+ const m = new Map<string, number>();
+ for (const r of rows) { const v = (r[key] || "").toLowerCase().trim(); if (v) m.set(v, (m.get(v) || 0) + 1); }
+ return [...m.entries()].sort((a, c) => c[1] - a[1]).slice(0, 3).map((e) => e[0]);
+ };
+ const prices = rows.map((r) => Number(r.price_cents)).filter((n) => n > 0).sort((a, c) => a - c);
+ const med = prices.length ? prices[Math.floor(prices.length / 2)] : null;
+ const cats = top("category"), eras = top("era"), mats = top("material");
+ const parts: string[] = [];
+ if (cats.length) parts.push(`usually ${cats.join(", ")}`);
+ if (eras.length) parts.push(`typically ${eras.join(", ")}`);
+ if (mats.length) parts.push(`often ${mats.join(", ")}`);
+ if (!parts.length && !med) return "";
+ const priceStr = med ? `; they resell around $${Math.round(med / 100)} on VYA` : "";
+ return `\n\nVYA MEMORY for ${b}: ${parts.join(", ")}${priceStr} (across ${rows.length} listings). Use as a soft prior — calibrate era/category to it, but the actual photo always wins.`;
 }
 
 /**
@@ -259,6 +328,75 @@ export async function getVisualVyaComps(embedding: number[], limit = 8): Promise
  }
 
  return scored.filter((s) => s.comp.priceCents > 0).sort((a, b) => b.score - a.score).slice(0, limit).map((s) => s.comp);
+}
+
+// ── Specific-piece resolution (Phase 2): identify the exact model, not just the brand ──
+// "Prada" is trivial (typed); "Prada Re-Nylon ~2019" is what makes the PRICE right. This matches the
+// upload's embedding against the reference index — the labeled catalog (training_examples) + confirmed
+// VYA listings, all carrying a TITLE (the model/line) — same-brand preferred. Returns a discrete
+// resolution only when the best match clears a HIGH similarity bar (so it means "the same piece", not
+// "looks similar"); otherwise null → the pipeline degrades gracefully to brand-only. The returned
+// query drives tighter comps, and the reference price is a sanity prior.
+export type SpecificPiece = {
+ model: string;          // the matched title — carries the specific line/model
+ query: string;          // tight comp query built from it (brand-guaranteed)
+ similarity: number;     // best cosine, 0..1
+ agree: number;          // how many references cleared the bar (confidence)
+ brand: string | null; era: string | null; category: string | null;
+ priceCents: number | null; // median reference price of the close matches (a prior)
+ source: string;         // 'catalog' | 'vya-listing'
+};
+
+const SPECIFIC_MIN = 0.82; // asserts "the SAME specific piece" — deliberately high; below this, brand-only
+
+export async function resolveSpecificPiece(embedding: number[], brand?: string | null, opts?: { excludeNearIdentical?: boolean }): Promise<SpecificPiece | null> {
+ if (!embedding || embedding.length === 0) return null;
+ await ensureItemsTable();
+ const b = (brand || "").trim();
+ const [catalog, listed] = await Promise.all([
+ (b
+  ? db()`SELECT title, brand, era, category, price_cents, embedding FROM training_examples WHERE brand ILIKE ${b} AND embedding IS NOT NULL AND embedding <> '[]' AND title IS NOT NULL ORDER BY created_at DESC LIMIT 800`
+  : db()`SELECT title, brand, era, category, price_cents, embedding FROM training_examples WHERE embedding IS NOT NULL AND embedding <> '[]' AND title IS NOT NULL ORDER BY created_at DESC LIMIT 800`
+ ).catch(() => []),
+ (b
+  ? db()`SELECT title, brand, era, category, price_cents, market_cents, embedding FROM intake_memory_items WHERE brand ILIKE ${b} AND embedding <> '[]' AND title IS NOT NULL ORDER BY created_at DESC LIMIT 500`
+  : db()`SELECT title, brand, era, category, price_cents, market_cents, embedding FROM intake_memory_items WHERE embedding <> '[]' AND title IS NOT NULL ORDER BY created_at DESC LIMIT 500`
+ ).catch(() => []),
+ ]) as [{ title: string | null; brand: string | null; era: string | null; category: string | null; price_cents: number | null; embedding: string }[],
+        { title: string | null; brand: string | null; era: string | null; category: string | null; price_cents: number | null; market_cents: number | null; embedding: string }[]];
+
+ type Scored = { score: number; title: string | null; brand: string | null; era: string | null; category: string | null; priceCents: number | null; source: string };
+ const refs: Scored[] = [];
+ for (const r of catalog) {
+ const v = parseVec(r.embedding); if (!v.length) continue;
+ refs.push({ score: cosine(embedding, v), title: r.title, brand: r.brand, era: r.era, category: r.category, priceCents: r.price_cents != null ? Number(r.price_cents) : null, source: "catalog" });
+ }
+ for (const r of listed) {
+ const v = parseVec(r.embedding); if (!v.length) continue;
+ const p = r.price_cents ?? r.market_cents;
+ refs.push({ score: cosine(embedding, v), title: r.title, brand: r.brand, era: r.era, category: r.category, priceCents: p != null ? Number(p) : null, source: "vya-listing" });
+ }
+ if (!refs.length) return null;
+ refs.sort((a, c) => c.score - a.score);
+ // Drop a near-identical self-match — the SAME photo scoring ~1.0. In production this de-dups an
+ // item re-processed against its own stored embedding; in the eval it's the leak guard that keeps
+ // "does memory help?" honest (an item can't match against a copy of itself).
+ const pool = opts?.excludeNearIdentical ? refs.filter((x) => x.score < 0.995) : refs;
+ if (!pool.length) return null;
+ const best = pool[0];
+ if (best.score < SPECIFIC_MIN) return null;
+ const model = (best.title || "").trim();
+ if (!model) return null;
+
+ const close = pool.filter((x) => x.score >= SPECIFIC_MIN);
+ const prices = close.map((x) => x.priceCents).filter((n): n is number => !!n && n > 0).sort((a, c) => a - c);
+ const medPrice = prices.length ? prices[Math.floor(prices.length / 2)] : null;
+ // Tight comp query: the matched title, brand guaranteed present so comps stay same-label.
+ const query = b && !model.toLowerCase().includes(b.toLowerCase()) ? `${b} ${model}` : model;
+ return {
+ model, query, similarity: Math.round(best.score * 1000) / 1000, agree: close.length,
+ brand: best.brand, era: best.era, category: best.category, priceCents: medPrice, source: best.source,
+ };
 }
 
 // ── Embed-on-sale: build the visual comp corpus from REAL sales ──

@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { brandMatch } from "./brand-match";
 
 // Intake accuracy = the AI-listing feedback loop, measured. Turns the corrections we
 // already log (intake_corrections = only the fields a seller CHANGED from the AI's
@@ -132,6 +133,32 @@ export async function getSegmentCalibration(days = 30): Promise<SegmentStat[]> {
 // ── what sellers are actually putting in: the live correction feed ────────────
 // Every field a seller changed from the AI's draft, newest first — AI guess → their value,
 // with the photo. This is the raw "where the model is wrong" stream.
+// ── brand accuracy BY CATEGORY: where does the model get the brand right vs wrong? ──────────────
+// Only listings where the AI actually predicted the brand (the seller didn't type it) are scored —
+// that's the model doing the identifying. Graded house-level (Dior ≡ Christian Dior) at read time,
+// so all history counts and the number isn't a false low.
+export type BrandSegmentStat = { category: string; graded: number; correct: number; pct: number };
+export async function getBrandAccuracyBySegment(days = 30): Promise<BrandSegmentStat[]> {
+ const sql = db();
+ const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+ const rows = (await sql`
+  SELECT COALESCE(NULLIF(lower(trim(category)), ''), 'uncategorized') AS cat, ai_value, final_value
+  FROM intake_predictions
+  WHERE field = 'brand' AND ai_value IS NOT NULL AND ai_value <> '' AND final_value IS NOT NULL AND final_value <> ''
+   AND created_at >= ${cutoff}
+ `.catch(() => [])) as { cat: string; ai_value: string; final_value: string }[];
+ const byCat = new Map<string, { graded: number; correct: number }>();
+ for (const r of rows) {
+ const c = byCat.get(r.cat) ?? { graded: 0, correct: 0 };
+ c.graded++;
+ if (brandMatch(r.ai_value, r.final_value)) c.correct++;
+ byCat.set(r.cat, c);
+ }
+ return [...byCat.entries()]
+ .map(([category, s]) => ({ category, graded: s.graded, correct: s.correct, pct: s.graded ? Math.round((s.correct / s.graded) * 100) : 0 }))
+ .sort((a, b) => b.graded - a.graded);
+}
+
 export type CorrectionRow = { field: string; aiValue: string | null; finalValue: string | null; imageUrl: string | null; store: string; at: string };
 export async function getRecentCorrections(limit = 50): Promise<CorrectionRow[]> {
  const sql = db();

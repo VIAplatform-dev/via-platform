@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
  material: str("material"),
  category: str("category"),
  condition: str("condition"),
+ conditionGrade: str("conditionGrade") || undefined,
  searchQuery: typeof body?.searchQuery === "string" ? body.searchQuery : null,
  price: str("price") || null,
  imageUrls,

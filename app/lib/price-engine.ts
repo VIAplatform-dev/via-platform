@@ -2,6 +2,7 @@ import { fetchComps, rankComps, isCompsConfigured, type Comp } from "./comps";
 import { getCachedComps, saveComps, getVyaComps } from "./comp-cache-db";
 import { inferCategoryFromTitle } from "./loadStoreProducts";
 import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db";
+import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config";
 import { AI_MODELS } from "./ai-models";
 
 // The price engine: turn real comps into one defensible number.
@@ -38,7 +39,7 @@ export async function valueFromComps(
  query: string,
  photoUrl: string | undefined,
  comps: Comp[],
- ctx?: { brand?: string | null; era?: string | null; condition?: string | null; runway?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null },
+ ctx?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null },
 ) {
  const fallback = () => {
  const sold = comps.filter((c) => c.sold).map((c) => c.priceCents);
@@ -69,8 +70,14 @@ export async function valueFromComps(
  const idLine = ctx && (ctx.brand || ctx.era || ctx.runway)
  ? `\n\nThis piece has been identified as: ${[ctx.brand, ctx.era].filter(Boolean).join(", ")}${ctx.runway ? ` — from the ${ctx.runway} runway collection (archival/collectible)` : ""}.`
  : "";
+ // Condition handling. When we have a canonical GRADE, an explicit multiplier is applied downstream —
+ // so tell the model to value at STANDARD resale condition and NOT self-discount (avoids double-
+ // counting). When there's no gradable condition, fall back to the soft, model-judged adjustment.
+ const gradeKnown = !!normalizeConditionGrade(ctx?.conditionGrade ?? ctx?.condition ?? null);
  const condLine = ctx?.condition
- ? `\n\nCONDITION of THIS piece: ${ctx.condition}. Online comps are usually listed as "very good / excellent", so adjust to the real condition: flaws/visible wear ("good"/"fair") price toward the LOW end of the sold cluster or below; pristine / new-with-tags price toward the HIGH end. Do not price a worn piece at the pristine-comp median.`
+ ? (gradeKnown
+  ? `\n\nValue this piece at STANDARD resale condition (very good) — i.e. its market value in normal resale shape, the way the comps are listed. Do NOT discount for this specific item's individual flaws or wear; that condition adjustment is applied separately and explicitly. (Its stated condition "${ctx.condition}" is context only.)`
+  : `\n\nCONDITION of THIS piece: ${ctx.condition}. Online comps are usually listed as "very good / excellent", so adjust to the real condition: flaws/visible wear ("good"/"fair") price toward the LOW end of the sold cluster or below; pristine / new-with-tags price toward the HIGH end. Do not price a worn piece at the pristine-comp median.`)
  : "";
  const b = ctx?.internalBenchmark;
  const benchLine = b
@@ -164,7 +171,7 @@ export async function estimatePrice(opts: {
  minMarkupBps: number;
  knowledgeHintCents?: number | null;
  extraComps?: Comp[]; // reverse-image (visually-identical) matches — the strongest comps
- context?: { brand?: string | null; era?: string | null; condition?: string | null; runway?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
+ context?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
 }): Promise<PriceEstimate> {
  // Fetch external comps and THIS platform's own realized-price benchmark together. The
  // internal benchmark (privacy-gated, from the nightly market_metrics) is the strongest
@@ -207,6 +214,21 @@ export async function estimatePrice(opts: {
  marketCents = opts.knowledgeHintCents;
  confidence = 0.3;
  rationale = "Estimated from model knowledge (live comps not enabled).";
+ }
+
+ // Explicit condition adjustment (Phase 4): comps were valued at standard resale condition, so
+ // scale the whole band to THIS piece's grade — a transparent, tunable move (config), not the
+ // model quietly self-discounting. Skipped when the condition isn't gradable (multiplier stays 1).
+ const grade = normalizeConditionGrade(opts.context?.conditionGrade ?? opts.context?.condition ?? null);
+ if (grade && marketCents != null) {
+ const mult = CONDITION_MULTIPLIERS[grade];
+ if (mult !== 1) {
+ marketCents = Math.round(marketCents * mult);
+ if (low != null) low = Math.round(low * mult);
+ if (high != null) high = Math.round(high * mult);
+ const pct = Math.round((mult - 1) * 100);
+ rationale += ` · ${pct >= 0 ? "+" : ""}${pct}% (${grade} condition)`;
+ }
  }
 
  const floorCents = opts.costCents && opts.costCents > 0 ? Math.round(opts.costCents * (1 + opts.minMarkupBps / 10000)) : null;

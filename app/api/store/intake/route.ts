@@ -7,9 +7,9 @@ import { titleHasBrand, computeListingPricing } from "@/app/lib/intake-pricing";
 import { ghostMannequinFromUrl, isPhotoroomConfigured } from "@/app/lib/photoroom";
 import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
 import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
-import { getIntakeHints, getVisualHints } from "@/app/lib/intake-memory-db";
+import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
-import { reverseImageMatches, matchesToComps, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { reverseImageBestOf, matchesToComps, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
 
@@ -91,17 +91,51 @@ export async function POST(request: NextRequest) {
  : (voice?.guide || "");
  const voiceArg = (combinedGuide || voice?.examples?.length) ? { guide: combinedGuide, examples: voice?.examples ?? [] } : undefined;
 
- // Embedding (memory) + correction hints + reverse-image — each only when relevant.
- const [embedding, brandHints, matches] = await Promise.all([
+ // "Enough evidence — stop searching frames" gate for the multi-frame reverse image. Brand
+ // typed → we only need enough SAME-BRAND priced comps to value the specific piece; brand
+ // unknown → we need a confident brand CONSENSUS plus something to price against.
+ const brandTyped = has("brand") ? val("brand") : null;
+ const reverseFrames = Math.max(1, Math.min(6, Number(process.env.INTAKE_REVERSE_FRAMES) || 3));
+ const strongReverse = (ms: VisualMatch[]) => {
+ const priced = ms.filter((m) => m.priceCents && m.priceCents > 0);
+ if (brandTyped) return priced.filter((m) => titleHasBrand(m.title, brandTyped)).length >= 3;
+ const { hits } = brandFromMatches(ms);
+ return hits >= 2 && priced.length >= 2;
+ };
+
+ // Embedding (memory) + correction hints + reverse-image — each only when relevant. Reverse
+ // image now scans multiple frames adaptively: a clean primary photo costs one Lens call; a
+ // weak one escalates to later frames (the tag shot, a front-flat) to rescue the ID.
+ const [embedding, brandHints, reverse] = await Promise.all([
  isEmbeddingConfigured() ? embedImage(mainUrl).catch(() => null) : Promise.resolve(null),
  needDraft ? getIntakeHints(slug).catch(() => "") : Promise.resolve(""),
- needReverse ? reverseImageMatches(mainUrl).catch(() => [] as VisualMatch[]) : Promise.resolve([] as VisualMatch[]),
+ needReverse ? reverseImageBestOf(imageUrls, { maxFrames: reverseFrames, strong: strongReverse }) : Promise.resolve({ matches: [] as VisualMatch[], framesUsed: 0 }),
  ]);
- const visualHints = needDraft && embedding ? await getVisualHints(slug, embedding).catch(() => "") : "";
+ const matches = reverse.matches;
+ // Per-store visual memory + CROSS-STORE confirmed pieces (the compounding loop: every seller's
+ // verified listings sharpen everyone's — incl. a brand-new store's first upload). Brand-scoped
+ // when the seller typed one, so the references are same-brand and directly instructive.
+ const [visualHints, crossHints] = needDraft && embedding
+ ? await Promise.all([
+ getVisualHints(slug, embedding).catch(() => ""),
+ getCrossStoreSimilar(embedding, has("brand") ? val("brand") : null).catch(() => ""),
+ ])
+ : ["", ""];
+ // Cross-store brand prior — what this (known) brand's pieces tend to be + resell for on VYA.
+ const brandPrior = needDraft && has("brand") ? await getBrandPrior(val("brand")).catch(() => "") : "";
+ // Specific-piece resolution (Phase 2): match the photo to the exact known model/line in the
+ // reference index. When confident, it names the piece (sharpens title/era) AND gives a tight
+ // comp query (sharpens price). Null when no close match → graceful fall back to brand-only.
+ const specific = embedding && (needReverse || needPrice)
+ ? await resolveSpecificPiece(embedding, has("brand") ? val("brand") : null).catch(() => null)
+ : null;
+ const specificHint = specific
+ ? `\n\nLIKELY THE SAME PIECE — a confirmed VYA/catalog reference matches this photo very closely (${Math.round(specific.similarity * 100)}% visual match): "${specific.model}"${specific.era ? ` (${specific.era})` : ""}. Treat this as a strong identification of the specific model/line — reflect that specificity in the title and era unless the photo clearly contradicts it. Never mention this reference or the match in the copy.`
+ : "";
  // If the seller typed the brand, keep only same-brand matches (a look-alike in a
  // different label must not sway the copy) — but still use them to find the runway/era.
  const relevantMatches = has("brand") ? matches.filter((m) => titleHasBrand(m.title, val("brand"))) : matches;
- const hints = reverseImageHint(relevantMatches, has("brand")) + brandHints + visualHints;
+ const hints = reverseImageHint(relevantMatches, has("brand")) + brandHints + visualHints + crossHints + brandPrior + specificHint;
 
  // Vision draft (gated) + ghost cover, in parallel. Skip the draft if nothing's blank.
  // Pass the seller's typed fields so the copy honors them (e.g. won't write
@@ -153,7 +187,7 @@ export async function POST(request: NextRequest) {
  // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label —
  // learn it so a later faded-name/legible-RN tag can still resolve. (Not circular: two OCR'd facts.)
  if (draft?.tag?.rn && draft.tag?.brandText) learnRnBrand(draft.tag.rn, draft.tag.brandText, "label").catch(() => {});
- console.log(`[intake ${slug}] needDraft=${needDraft} needPrice=${needPrice} lens=${matches.length} label=${labelBrand ?? "—"} brand=${draft?.brand?.value ?? idBrand.brand ?? "—"}`);
+ console.log(`[intake ${slug}] needDraft=${needDraft} needPrice=${needPrice} lens=${matches.length}/${reverse.framesUsed}f label=${labelBrand ?? "—"} brand=${draft?.brand?.value ?? idBrand.brand ?? "—"} specific=${specific ? `${specific.model.slice(0, 40)}@${specific.similarity}` : "—"}`);
 
  // Price + over/under-market flag + runway. In draftOnly mode (phase 1) we SKIP this so the
  // form can render the drafted FIELDS immediately; the client then calls
@@ -180,7 +214,8 @@ export async function POST(request: NextRequest) {
  material: has("material") ? val("material") : (draft?.material?.value || ""),
  category: has("category") ? val("category") : (draft?.category || ""),
  condition: has("condition") ? val("condition") : (draft?.condition?.value || ""),
- searchQuery: draft?.searchQuery || null,
+ conditionGrade: has("condition") ? val("condition") : (draft?.conditionGrade || draft?.condition?.value || ""),
+ searchQuery: specific?.query || draft?.searchQuery || null,
  price: has("price") ? val("price") : null,
  imageUrls,
  mainUrl,
@@ -200,7 +235,11 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({
  ok: true, draft, ghostUrl, photoroom: isPhotoroomConfigured(), estimate, priceFlag, runway, embedding, promptVersion: PROMPT_VERSION,
  // For phase 2 (/api/store/intake/pricing): the reverse-image comps/titles + whether the draft ran.
- needDraft, reverseComps, reverseTitles,
+ // searchQuery is the EFFECTIVE comp query (the specific-piece query when we resolved one) — the
+ // client threads it to /pricing so phase-2 comps are as tight as phase-1's.
+ needDraft, reverseComps, reverseTitles, searchQuery: specific?.query || draft?.searchQuery || null,
+ // Specific-piece resolution (Phase 2): the exact model we matched, for the "Looks like…" cue.
+ specificPiece: specific ? { model: specific.model, similarity: specific.similarity, era: specific.era, source: specific.source, refPriceCents: specific.priceCents } : null,
  // Only surface the reverse-image brand banner when WE identified the brand — never
  // when the seller supplied it (their brand stands, and Lens can find a look-alike).
  reverseImage: needReverse && !has("brand") ? { matches: matches.length, brand: idBrand.brand, hits: idBrand.hits, sampleTitles: matches.slice(0, 6).map((m) => m.title) } : null,

@@ -7,7 +7,12 @@ type FieldAccuracy = { field: string; accepted: number; corrected: number; accur
 type BrandMiss = { from: string; to: string; n: number };
 type PriceCalibration = { samples: number; medianRatio: number; overpricedPct: number; underpricedPct: number; avgAbsErrorPct: number };
 type SegmentStat = { category: string; publishes: number; priced: number; medianRatio: number | null; offPct: number | null; avgErrorPct: number | null };
+type BrandSegmentStat = { category: string; graded: number; correct: number; pct: number };
 type CorrectionRow = { field: string; aiValue: string | null; finalValue: string | null; imageUrl: string | null; store: string; at: string };
+type Verdict = "pass" | "close" | "fail" | "insufficient";
+type DimVerdict = { dimension: string; label: string; n: number; correct: number; pct: number | null; ci95: [number, number] | null; verdict: Verdict; note: string };
+type PriceScore = { segment: string; n: number; within10: number; within20: number; within10Pct: number | null; within20Pct: number | null; ci95: [number, number] | null; medianErrorPct: number | null; verdict: Verdict };
+type BetaReadiness = { gate: number; ready: boolean; blockers: string[]; brand: DimVerdict; specific: DimVerdict; price: { overall: PriceScore; byCategory: PriceScore[]; byTier: PriceScore[]; totalGraded: number }; goldenRanAt: string | null };
 type Data = {
  periodDays: number;
  totalPublishes: number;
@@ -16,7 +21,9 @@ type Data = {
  topBrandMisses: BrandMiss[];
  price: PriceCalibration;
  segments: SegmentStat[];
+ brandSegments: BrandSegmentStat[];
  corrections: CorrectionRow[];
+ betaReadiness: BetaReadiness | null;
 };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -31,9 +38,86 @@ function Stat({ label, value, hint }: { label: string; value: React.ReactNode; h
  );
 }
 
+const VERDICT_STYLE: Record<Verdict, { t: string; chip: string; ring: string }> = {
+ pass: { t: "PASS", chip: "bg-emerald-100 text-emerald-800", ring: "ring-emerald-200" },
+ close: { t: "SO CLOSE", chip: "bg-amber-100 text-amber-800", ring: "ring-amber-200" },
+ fail: { t: "BELOW 95%", chip: "bg-red-100 text-red-700", ring: "ring-red-200" },
+ insufficient: { t: "NEED DATA", chip: "bg-stone-100 text-stone-500", ring: "ring-stone-200" },
+};
+const ciStr = (ci: [number, number] | null) => (ci ? `${Math.round(ci[0] * 100)}–${Math.round(ci[1] * 100)}%` : null);
+
+// One gated dimension (brand / price / specific): the number, its 95% CI, and the pass/fail verdict.
+function MetricCard({ label, pct, n, ci, verdict, sub }: { label: string; pct: number | null; n: number; ci: [number, number] | null; verdict: Verdict; sub?: string }) {
+ const v = VERDICT_STYLE[verdict];
+ return (
+ <div className={`rounded-xl border border-stone-200 bg-white p-4 ring-1 ${v.ring}`}>
+ <div className="flex items-center justify-between gap-2">
+ <p className="text-[12px] font-medium text-stone-700">{label}</p>
+ <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide ${v.chip}`}>{v.t}</span>
+ </div>
+ <p className="mt-1 text-[26px] font-semibold leading-none tabular-nums text-stone-900">{pct == null ? "—" : `${pct}%`}</p>
+ <p className="mt-1.5 text-[10.5px] text-stone-400">{n ? `n=${n}${ci ? ` · 95% CI ${ciStr(ci)}` : ""}` : "no data yet"}{sub ? ` · ${sub}` : ""}</p>
+ </div>
+ );
+}
+
+function Readiness({ b }: { b: BetaReadiness }) {
+ const p = b.price.overall;
+ const segs = [...b.price.byTier, ...b.price.byCategory].filter((s) => s.n > 0);
+ return (
+ <section className="rounded-2xl border border-stone-200 bg-gradient-to-b from-white to-stone-50/70 p-5">
+ <div className="flex items-start justify-between gap-4">
+ <div>
+ <h2 className="text-[15px] font-semibold text-stone-900">Beta readiness</h2>
+ <p className="mt-0.5 text-[11px] text-stone-500">Brand, price, and specific-piece must each clear <b>95%</b> — judged on the <i>lower</i> end of the confidence interval, so a lucky small sample can’t call it. Price is graded against what items actually sold for.</p>
+ </div>
+ <span className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ${b.ready ? "bg-emerald-600 text-white" : "bg-stone-800 text-white"}`}>{b.ready ? "READY ✓" : "NOT READY"}</span>
+ </div>
+ <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+ <MetricCard label="Brand ID" pct={b.brand.pct} n={b.brand.n} ci={b.brand.ci95} verdict={b.brand.verdict} sub="golden exam" />
+ <MetricCard label="Price" pct={p.within10Pct} n={p.n} ci={p.ci95} verdict={p.verdict} sub="within ±10% of sold" />
+ <MetricCard label="Specific piece" pct={b.specific.pct} n={b.specific.n} ci={b.specific.ci95} verdict={b.specific.verdict} sub="golden exam" />
+ </div>
+ {b.blockers.length > 0 && (
+ <div className="mt-3 rounded-lg border border-stone-200 bg-white px-3 py-2">
+ <p className="text-[11px] font-medium text-stone-600">What’s standing between here and beta:</p>
+ <ul className="mt-1 space-y-0.5">
+ {b.blockers.map((x, i) => <li key={i} className="text-[11.5px] text-stone-500">• {x}</li>)}
+ </ul>
+ </div>
+ )}
+ {!b.goldenRanAt && (
+ <p className="mt-2 text-[11px] text-amber-700">Brand &amp; specific are blank until you curate the golden set and run the golden exam (<code>POST /api/admin/eval {"{"}goldenOnly:true{"}"}</code>). Price grades on its own from real sales (<code>POST /api/admin/price-eval</code>).</p>
+ )}
+ {segs.length > 0 && (
+ <div className="mt-3 overflow-x-auto">
+ <p className="mb-1.5 text-[11px] font-medium text-stone-500">Price accuracy by segment <span className="font-normal text-stone-400">— where it’s solid vs weak</span></p>
+ <table className="w-full text-[12px]">
+ <thead className="text-left text-[10px] uppercase tracking-wide text-stone-400"><tr><th className="py-1 pr-4 font-medium">Segment</th><th className="py-1 pr-4 font-medium">Graded</th><th className="py-1 pr-4 font-medium">±10%</th><th className="py-1 pr-4 font-medium">±20%</th><th className="py-1 pr-4 font-medium">Median err</th><th className="py-1 font-medium">Verdict</th></tr></thead>
+ <tbody>
+ {segs.map((s) => (
+ <tr key={s.segment} className="border-t border-stone-100">
+ <td className="py-1.5 pr-4 capitalize text-stone-700">{s.segment}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.n}</td>
+ <td className="py-1.5 pr-4 tabular-nums font-semibold text-stone-800">{s.within10Pct == null ? "—" : `${s.within10Pct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.within20Pct == null ? "—" : `${s.within20Pct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.medianErrorPct == null ? "—" : `±${s.medianErrorPct}%`}</td>
+ <td className="py-1.5"><span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold ${VERDICT_STYLE[s.verdict].chip}`}>{VERDICT_STYLE[s.verdict].t}</span></td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ )}
+ </section>
+ );
+}
+
 type TrainingStats = { total: number; bySource: { source: string; count: number; withBrand: number; withPrice: number; withImage: number }[] };
 type EvalResult = { sample: number; withReverseImage: boolean; fields: { field: string; correct: number; total: number; pct: number }[]; price?: { within20: number; total: number; pct: number }; misses: { field: string; image: string; guessed: string | null; truth: string }[] };
 type EvalRun = { ranAt: string; sample: number; brandPct: number | null; eraPct: number | null; categoryPct: number | null; pricePct: number | null };
+type ArmScore = { brand: { pct: number | null; correct: number; total: number }; specific: { pct: number | null; correct: number; total: number }; era: { pct: number | null; correct: number; total: number } };
+type AblationRun = { sample: number; goldenOnly: boolean; memoryHitRate: number; base: ArmScore; withMemory: ArmScore; delta: { brandPct: number | null; specificPct: number | null; eraPct: number | null }; note: string };
 const pctStr = (n: number | null) => (n == null ? "—" : `${n}%`);
 const SOURCE_LABEL: Record<string, string> = { intake: "AI listings", items: "VYA inventory", marketplace: "Marketplace" };
 
@@ -49,6 +133,8 @@ export default function IntakeAccuracyPage() {
  const [evalSample, setEvalSample] = useState(15);
  const [evalPrice, setEvalPrice] = useState(false);
  const [evalRuns, setEvalRuns] = useState<EvalRun[]>([]);
+ const [ablation, setAblation] = useState<AblationRun | null>(null);
+ const [ablationRunning, setAblationRunning] = useState(false);
 
  useEffect(() => {
  fetch(`/api/admin/intake-accuracy?days=${days}`)
@@ -84,10 +170,21 @@ export default function IntakeAccuracyPage() {
  setEvalRunning(false);
  }
 
+ async function runAblationNow() {
+ setAblationRunning(true);
+ try {
+ const r = await fetch("/api/admin/ablation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sample: 15 }) });
+ if (r.ok) setAblation(await r.json());
+ } catch { /* ignore */ }
+ setAblationRunning(false);
+ }
+
  const price = data?.price;
- // Calibration verdict from the median final ÷ market ratio.
+ // Calibration verdict — honest about sample size + spread, not just the median.
  const cal = !price || price.samples < 3 ? null
- : price.medianRatio >= 0.9 && price.medianRatio <= 1.1 ? { t: "Well calibrated", c: "text-emerald-600" }
+ : price.samples < 10 ? { t: `Too little data · ${price.samples} listings`, c: "text-stone-400" }
+ : price.medianRatio >= 0.9 && price.medianRatio <= 1.1
+ ? (price.avgAbsErrorPct > 30 ? { t: `Centered, but noisy (±${price.avgAbsErrorPct}% per item)`, c: "text-amber-600" } : { t: "Well calibrated", c: "text-emerald-600" })
  : price.medianRatio < 0.9 ? { t: `Runs ~${Math.round((1 - price.medianRatio) * 100)}% HIGH`, c: "text-red-600" }
  : { t: `Runs ~${Math.round((price.medianRatio - 1) * 100)}% LOW`, c: "text-amber-600" };
 
@@ -184,11 +281,44 @@ export default function IntakeAccuracyPage() {
  )}
  </div>
 
- {/* Nightly exam history — auto-runs ~1 AM ET; watch the trend climb. */}
+ {/* Ablation — does the learning loop actually add accuracy? Memory OFF vs ON, same items. */}
+ <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5">
+ <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+ <div>
+ <p className="text-[13px] font-medium text-stone-700">Does memory actually help? <span className="font-normal text-stone-400">— the honest test</span></p>
+ <p className="text-[11px] text-stone-400">Runs the same photos with the learning loop OFF vs ON. A positive delta = memory is really adding accuracy; ~0 = it isn’t (usually because the corpus is still empty). Reverse-image is held out so the delta is memory alone.</p>
+ </div>
+ <button onClick={runAblationNow} disabled={ablationRunning} className="shrink-0 rounded-lg bg-stone-900 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">{ablationRunning ? "Running…" : "Run A/B"}</button>
+ </div>
+ {ablationRunning && <p className="text-[12px] text-stone-400">Drafting each photo twice (off vs on) — this takes a minute…</p>}
+ {ablation && !ablationRunning && (
+ <div>
+ <div className="overflow-x-auto">
+ <table className="w-full text-[12px]">
+ <thead className="text-left text-[11px] uppercase tracking-wide text-stone-400"><tr><th className="py-1 pr-4 font-medium">Dimension</th><th className="py-1 pr-4 font-medium">Memory off</th><th className="py-1 pr-4 font-medium">Memory on</th><th className="py-1 font-medium">Lift</th></tr></thead>
+ <tbody>
+ {([["Brand", ablation.base.brand, ablation.withMemory.brand, ablation.delta.brandPct], ["Specific", ablation.base.specific, ablation.withMemory.specific, ablation.delta.specificPct], ["Era", ablation.base.era, ablation.withMemory.era, ablation.delta.eraPct]] as [string, ArmScore["brand"], ArmScore["brand"], number | null][]).map(([label, off, on, delta]) => (
+ <tr key={label} className="border-t border-stone-100">
+ <td className="py-1.5 pr-4 text-stone-700">{label}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{off.pct == null ? "—" : `${off.pct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-800">{on.pct == null ? "—" : `${on.pct}%`}</td>
+ <td className={`py-1.5 tabular-nums font-semibold ${delta == null ? "text-stone-400" : delta > 0 ? "text-emerald-600" : delta < 0 ? "text-red-600" : "text-stone-400"}`}>{delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta} pts`}</td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ <p className="mt-2 text-[11px] text-stone-400">Graded {ablation.sample} photos{ablation.goldenOnly ? " · golden set" : ""} · memory produced a hint on {ablation.memoryHitRate}% of them.</p>
+ <p className={`mt-1 text-[11.5px] ${ablation.memoryHitRate === 0 ? "text-amber-700" : "text-stone-500"}`}>{ablation.note}</p>
+ </div>
+ )}
+ </div>
+
+ {/* Weekly exam history — auto-runs Mondays; watch the trend climb. */}
  {evalRuns.length > 0 && (
  <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5">
- <p className="mb-1 text-[13px] font-medium text-stone-700">Nightly exams</p>
- <p className="mb-3 text-[11px] text-stone-400">Runs automatically around 1 AM ET. Compare mornings to see prompt changes move the numbers.</p>
+ <p className="mb-1 text-[13px] font-medium text-stone-700">Weekly exams</p>
+ <p className="mb-3 text-[11px] text-stone-400">Runs automatically on Mondays. Run the exam on-demand (above) right after a change to see it move.</p>
  <div className="overflow-x-auto">
  <table className="w-full text-[12px]">
  <thead>
@@ -226,6 +356,12 @@ export default function IntakeAccuracyPage() {
  </div>
  ) : (
  <div className="space-y-6">
+ {data.betaReadiness && <Readiness b={data.betaReadiness} />}
+ {data.totalPublishes < 25 && (
+ <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[12px] text-amber-800">
+ <b>Still early — {data.totalPublishes} AI-drafted listing{data.totalPublishes === 1 ? "" : "s"} so far.</b> These numbers are <b>directional, not reliable yet</b> — a single item can swing a whole category. They get trustworthy as sellers publish (aim for a few dozen per category). Rows below with too few listings are marked as such.
+ </div>
+ )}
  <div className="grid grid-cols-3 gap-3">
  <Stat label="Listings" value={data.totalPublishes.toLocaleString()} hint="AI-drafted, published" />
  <Stat label="Corrections" value={data.totalCorrections.toLocaleString()} hint="fields sellers changed" />
@@ -286,28 +422,64 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
+ {/* Brand accuracy by category — where the model IDs the brand right vs wrong */}
+ {data.brandSegments && data.brandSegments.length > 0 && (
+ <div className="rounded-xl border border-stone-200 bg-white p-5">
+ <p className="mb-1 text-[13px] font-medium text-stone-700">Brand accuracy — by category</p>
+ <p className="mb-3 text-[11px] text-stone-400">How often the AI gets the brand right when the seller didn’t type it (graded house-level — Dior = Christian Dior). Only cases where the model actually did the identifying.</p>
+ <div className="overflow-x-auto">
+ <table className="w-full text-[12px]">
+ <thead className="text-left text-[11px] uppercase tracking-wide text-stone-400">
+ <tr><th className="py-1.5 pr-4 font-medium">Category</th><th className="py-1.5 pr-4 font-medium">Graded</th><th className="py-1.5 font-medium">Brand correct</th></tr>
+ </thead>
+ <tbody>
+ {data.brandSegments.map((s) => {
+ const thin = s.graded < 3;
+ const c = thin ? "text-stone-400" : s.pct >= 85 ? "text-emerald-600" : s.pct >= 65 ? "text-amber-600" : "text-red-600";
+ return (
+ <tr key={s.category} className="border-t border-stone-100">
+ <td className="py-1.5 pr-4 capitalize text-stone-700">{s.category}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.graded}</td>
+ <td className={`py-1.5 font-semibold tabular-nums ${c}`}>{thin ? `too few to judge (${s.graded})` : <>{s.pct}% <span className="font-normal text-stone-400">({s.correct}/{s.graded} right)</span></>}</td>
+ </tr>
+ );
+ })}
+ </tbody>
+ </table>
+ </div>
+ </div>
+ )}
+
  {/* Where pricing lands — by category (where it fails vs works) */}
  {data.segments && data.segments.length > 0 && (
  <div className="rounded-xl border border-stone-200 bg-white p-5">
  <p className="mb-1 text-[13px] font-medium text-stone-700">Where pricing lands — by category</p>
- <p className="mb-3 text-[11px] text-stone-400">Median of (seller’s final price ÷ AI’s market value) per category. 1.00× = on the money; far from it = the model is off there. This is where to aim next.</p>
+ <p className="mb-3 text-[11px] text-stone-400">Is the AI’s price landing near where sellers actually list? <b>1.00× = spot on;</b> above 1 means the AI priced too <b>low</b>, below 1 too <b>high</b>. Categories under 3 priced listings are too thin to judge — they’ll firm up as you list.</p>
  <div className="overflow-x-auto">
  <table className="w-full text-[12px]">
  <thead className="text-left text-[11px] uppercase tracking-wide text-stone-400">
- <tr><th className="py-1.5 pr-4 font-medium">Category</th><th className="py-1.5 pr-4 font-medium">Listings</th><th className="py-1.5 pr-4 font-medium">Priced</th><th className="py-1.5 pr-4 font-medium">Median</th><th className="py-1.5 pr-4 font-medium">Off &gt;20%</th><th className="py-1.5 font-medium">Avg err</th></tr>
+ <tr><th className="py-1.5 pr-4 font-medium">Category</th><th className="py-1.5 pr-4 font-medium">Priced</th><th className="py-1.5 pr-4 font-medium">Median</th><th className="py-1.5 font-medium">Reading</th></tr>
  </thead>
  <tbody>
  {data.segments.map((s) => {
  const r = s.medianRatio;
- const c = r == null ? "text-stone-400" : r >= 0.9 && r <= 1.1 ? "text-emerald-600" : (r < 0.75 || r > 1.3) ? "text-red-600" : "text-amber-600";
+ const thin = s.priced < 3;
+ const show = !thin && r != null;
+ const reading = s.priced === 0 ? "No priced listings yet"
+ : thin ? `Too thin to judge — only ${s.priced}`
+ : r == null ? "—"
+ : r >= 0.9 && r <= 1.1 ? "On the money"
+ : r > 1.3 ? `AI priced way too LOW (sellers listed ~${Math.round((r - 1) * 100)}% higher)`
+ : r > 1.1 ? "AI runs a bit low"
+ : r < 0.75 ? `AI priced way too HIGH (sellers cut ~${Math.round((1 - r) * 100)}%)`
+ : "AI runs a bit high";
+ const c = !show ? "text-stone-400" : r >= 0.9 && r <= 1.1 ? "text-emerald-600" : (r < 0.75 || r > 1.3) ? "text-red-600" : "text-amber-600";
  return (
  <tr key={s.category} className="border-t border-stone-100">
  <td className="py-1.5 pr-4 capitalize text-stone-700">{s.category}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.publishes}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.priced}</td>
- <td className={`py-1.5 pr-4 font-semibold tabular-nums ${c}`}>{r != null ? `${r.toFixed(2)}×` : "—"}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.offPct != null ? `${s.offPct}%` : "—"}</td>
- <td className="py-1.5 tabular-nums text-stone-500">{s.avgErrorPct != null ? `±${s.avgErrorPct}%` : "—"}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.priced}<span className="text-stone-300"> / {s.publishes}</span></td>
+ <td className={`py-1.5 pr-4 font-semibold tabular-nums ${c}`}>{show ? `${r.toFixed(2)}×` : "—"}</td>
+ <td className={`py-1.5 ${c}`}>{reading}</td>
  </tr>
  );
  })}

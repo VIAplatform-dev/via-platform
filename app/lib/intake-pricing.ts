@@ -74,7 +74,8 @@ export async function computeListingPricing(opts: {
  era: string;
  material: string;
  category: string;
- condition?: string; // seller/AI condition — swings resale price, so it's fed to the valuation
+ condition?: string; // seller/AI condition note — swings resale price, so it's fed to the valuation
+ conditionGrade?: string; // canonical grade (Phase 4) → explicit price-band multiplier
  searchQuery?: string | null; // AI's tight "brand + specific model + era" comp phrase
  price: string | null; // seller's typed price in dollars; null/"" → suggest one
  imageUrls: string[];
@@ -113,7 +114,7 @@ export async function computeListingPricing(opts: {
  minMarkupBps,
  knowledgeHintCents: opts.knowledgeHintCents,
  extraComps: comps,
- context: { brand: brandVal || null, era: opts.era || null, condition: opts.condition || null, runway: opts.runwaySoFar, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
+ context: { brand: brandVal || null, era: opts.era || null, condition: opts.condition || null, conditionGrade: opts.conditionGrade || opts.condition || null, runway: opts.runwaySoFar, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
  })).catch(() => null);
  if (estimate && trend?.trending) estimate.rationale += ` · 🔥 ${brandVal} trending (${trend.note})`;
  if (estimate && estimate.marketCents) {

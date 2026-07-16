@@ -57,6 +57,39 @@ export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch
  .filter((m) => m.title);
 }
 
+/** Adaptive multi-frame reverse image. Sellers upload several photos but only the first
+ *  ever gets searched — a bad primary frame (folded, back, a detail shot) finds nothing
+ *  even when a later frame would nail the exact piece. This tries the primary first and
+ *  only escalates to the next frames when the evidence so far is WEAK, merging + deduping
+ *  matches across the frames it actually ran. Quota-aware: a clean product shot still
+ *  costs exactly one Lens call; extra calls are spent only on the hard cases that need them.
+ *  `strong(matchesSoFar)` decides "we have enough, stop" — the caller supplies it because
+ *  what counts as enough (brand consensus vs. priced comps) depends on the intake context. */
+export async function reverseImageBestOf(
+ imageUrls: string[],
+ opts?: { maxFrames?: number; strong?: (matches: VisualMatch[]) => boolean },
+): Promise<{ matches: VisualMatch[]; framesUsed: number }> {
+ const urls = (imageUrls || []).filter((u) => typeof u === "string" && u);
+ if (!isCompsConfigured() || !urls.length) return { matches: [], framesUsed: 0 };
+ const maxFrames = Math.max(1, Math.min(urls.length, opts?.maxFrames ?? 3));
+ const strong = opts?.strong ?? ((ms: VisualMatch[]) => ms.filter((m) => m.priceCents && m.priceCents > 0).length >= 3);
+ const merged: VisualMatch[] = [];
+ const seen = new Set<string>();
+ let framesUsed = 0;
+ for (let i = 0; i < maxFrames; i++) {
+ const found = await reverseImageMatches(urls[i]).catch(() => [] as VisualMatch[]);
+ framesUsed++;
+ for (const m of found) {
+ const k = m.link || `${m.title}|${m.priceCents}`;
+ if (seen.has(k)) continue;
+ seen.add(k);
+ merged.push(m);
+ }
+ if (strong(merged)) break; // enough evidence — don't spend more quota on this listing
+ }
+ return { matches: merged, framesUsed };
+}
+
 /** Reverse-image matches that carry a price → resale comps. Visually-identical items
  *  are the truest comps there are, so these anchor the valuation. */
 export function matchesToComps(matches: VisualMatch[]): Comp[] {

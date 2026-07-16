@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { embedImage, isEmbeddingConfigured } from "./embeddings";
 
 // The VYA training dataset — one clean, append-only "golden record" per example, so
 // that when we're ready to train our own model it starts from pristine data, not a
@@ -41,6 +42,15 @@ async function ensureTable() {
   )
  `;
  await sql`CREATE INDEX IF NOT EXISTS idx_training_source ON training_examples (source, created_at DESC)`;
+ // Golden set: a small, hand-verified subset that IS the benchmark — the real exam, so
+ // accuracy isn't measured against noisy auto-labels. Self-healing add for existing tables.
+ await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS golden BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
+ await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS golden_at TIMESTAMPTZ`.catch(() => {});
+ await sql`CREATE INDEX IF NOT EXISTS idx_training_golden ON training_examples (golden) WHERE golden`.catch(() => {});
+ // Reference index: a photo embedding per labeled example, so a new upload can be matched to the
+ // SPECIFIC known piece (title carries the model/line) and priced off it — not just brand-guessed.
+ // Populated in batches by embedPendingTrainingExamples (Voyage cost, so it's a run-when-ready job).
+ await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS embedding TEXT`.catch(() => {});
  ensured = true;
 }
 
@@ -142,4 +152,114 @@ export async function getTrainingStats(): Promise<TrainingStats> {
  `.catch(() => [])) as { source: string; count: number; with_brand: number; with_price: number; with_image: number }[];
  const bySource = rows.map((r) => ({ source: r.source, count: Number(r.count), withBrand: Number(r.with_brand), withPrice: Number(r.with_price), withImage: Number(r.with_image) }));
  return { total: bySource.reduce((s, r) => s + r.count, 0), bySource };
+}
+
+// ── Golden set: the hand-verified benchmark ───────────────────────────────────
+// "Golden" means a human confirmed the brand + sold price are correct — so it's the
+// answer key we actually trust. The exam runs against these instead of noisy auto-labels.
+
+export type GoldenExample = {
+ id: number; source: string; itemRef: string; imageUrl: string | null;
+ brand: string | null; era: string | null; category: string | null;
+ priceCents: number | null; title: string | null; trust: string | null;
+};
+
+/** Promote/demote examples to the golden set by id. Idempotent; returns the new golden count. */
+export async function markGolden(ids: number[], on = true): Promise<number> {
+ await ensureTable();
+ const clean = ids.map((n) => Math.round(Number(n))).filter((n) => Number.isFinite(n) && n > 0);
+ if (clean.length) {
+ await db()`UPDATE training_examples SET golden = ${on}, golden_at = ${on ? new Date().toISOString() : null} WHERE id = ANY(${clean})`.catch(() => {});
+ }
+ const rows = (await db()`SELECT COUNT(*)::int AS n FROM training_examples WHERE golden`.catch(() => [{ n: 0 }])) as { n: number }[];
+ return rows[0]?.n ?? 0;
+}
+
+export type GoldenStats = { total: number; byCategory: { category: string; n: number }[]; withPrice: number; tiers: { trust: string; n: number }[] };
+export async function getGoldenStats(): Promise<GoldenStats> {
+ await ensureTable();
+ const [tot, cats, tiers] = await Promise.all([
+ db()`SELECT COUNT(*)::int AS n, COUNT(*) FILTER (WHERE price_cents > 0)::int AS priced FROM training_examples WHERE golden`.catch(() => [{ n: 0, priced: 0 }]),
+ db()`SELECT COALESCE(NULLIF(lower(trim(category)), ''), 'uncategorized') AS c, COUNT(*)::int AS n FROM training_examples WHERE golden GROUP BY c ORDER BY n DESC`.catch(() => []),
+ db()`SELECT COALESCE(trust, 'unknown') AS t, COUNT(*)::int AS n FROM training_examples WHERE golden GROUP BY t ORDER BY n DESC`.catch(() => []),
+ ]) as [{ n: number; priced: number }[], { c: string; n: number }[], { t: string; n: number }[]];
+ return {
+ total: Number(tot[0]?.n || 0),
+ withPrice: Number(tot[0]?.priced || 0),
+ byCategory: cats.map((r) => ({ category: String(r.c), n: Number(r.n) })),
+ tiers: tiers.map((r) => ({ trust: String(r.t), n: Number(r.n) })),
+ };
+}
+
+/** Best auto-labeled rows to REVIEW for promotion — the trustworthiest candidates first:
+ *  high-trust, a usable photo, a brand + a real price, and (for intake rows) the seller KEPT
+ *  the AI's brand. A human still confirms before these become golden. */
+export async function getGoldenCandidates(limit = 60, category?: string): Promise<GoldenExample[]> {
+ await ensureTable();
+ const lim = Math.max(1, Math.min(200, Math.round(limit)));
+ const cat = (category ?? "").trim().toLowerCase();
+ const rows = (await db()`
+  SELECT id, source, item_ref, image_urls, brand, era, category, price_cents, title, trust
+  FROM training_examples
+  WHERE NOT golden
+   AND brand IS NOT NULL AND brand <> ''
+   AND price_cents > 0
+   AND jsonb_array_length(image_urls) > 0
+   AND (${cat} = '' OR lower(trim(category)) = ${cat})
+   AND (source <> 'intake' OR accepted IS NULL OR (accepted->>'brand') = 'true')
+  ORDER BY (CASE WHEN trust = 'high' THEN 0 WHEN trust = 'medium' THEN 1 ELSE 2 END), created_at DESC
+  LIMIT ${lim}
+ `.catch(() => [])) as Record<string, unknown>[];
+ const s = (v: unknown) => (v == null || v === "" ? null : String(v));
+ return rows.map((r) => ({
+ id: Number(r.id), source: String(r.source), itemRef: String(r.item_ref),
+ imageUrl: Array.isArray(r.image_urls) && r.image_urls[0] ? String(r.image_urls[0]) : null,
+ brand: s(r.brand), era: s(r.era), category: s(r.category),
+ priceCents: r.price_cents != null ? Number(r.price_cents) : null, title: s(r.title), trust: s(r.trust),
+ }));
+}
+
+// ── Reference index: embed the labeled catalog so uploads match a SPECIFIC piece ──
+// Turns training_examples (brand + title + era + price for thousands of pieces) into a visual
+// reference by adding a photo embedding to each. Batched + idempotent — one Voyage call per
+// unembedded row, newest first, prioritizing rows with a brand + title (the useful references).
+
+export type ReferenceIndexStats = { embedded: number; embeddable: number; remaining: number; withBrandTitle: number };
+
+/** Embed a batch of un-embedded training examples. Gated on Voyage; safe to re-run (only fills gaps). */
+export async function embedPendingTrainingExamples(limit = 100): Promise<ReferenceIndexStats> {
+ await ensureTable();
+ if (!isEmbeddingConfigured()) return { embedded: 0, embeddable: 0, remaining: 0, withBrandTitle: 0 };
+ const lim = Math.max(1, Math.min(300, Math.round(limit)));
+ const rows = (await db()`
+  SELECT id, image_urls FROM training_examples
+  WHERE embedding IS NULL AND jsonb_array_length(image_urls) > 0
+   AND brand IS NOT NULL AND brand <> '' AND title IS NOT NULL AND title <> ''
+  ORDER BY (CASE WHEN trust = 'high' THEN 0 WHEN trust = 'medium' THEN 1 ELSE 2 END), created_at DESC
+  LIMIT ${lim}
+ `.catch(() => [])) as { id: number; image_urls: unknown }[];
+ let embedded = 0;
+ for (const r of rows) {
+ const url = Array.isArray(r.image_urls) && r.image_urls[0] ? String(r.image_urls[0]) : null;
+ if (!url) { await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); continue; }
+ const v = await embedImage(url).catch(() => null);
+ // Store '[]' for a failed/unusable image so the batch cursor advances and we don't retry it forever.
+ await db()`UPDATE training_examples SET embedding = ${JSON.stringify(v && v.length ? v : [])} WHERE id = ${r.id}`.catch(() => {});
+ if (v && v.length) embedded++;
+ }
+ return getReferenceIndexStats().then((st) => ({ ...st, embedded }));
+}
+
+export async function getReferenceIndexStats(): Promise<ReferenceIndexStats> {
+ await ensureTable();
+ const rows = (await db()`
+  SELECT
+   COUNT(*) FILTER (WHERE embedding IS NOT NULL AND embedding <> '[]')::int AS embedded,
+   COUNT(*) FILTER (WHERE jsonb_array_length(image_urls) > 0 AND brand IS NOT NULL AND brand <> '' AND title IS NOT NULL AND title <> '')::int AS embeddable,
+   COUNT(*) FILTER (WHERE embedding IS NULL AND jsonb_array_length(image_urls) > 0 AND brand IS NOT NULL AND brand <> '' AND title IS NOT NULL AND title <> '')::int AS remaining,
+   COUNT(*) FILTER (WHERE brand IS NOT NULL AND brand <> '' AND title IS NOT NULL AND title <> '')::int AS with_bt
+  FROM training_examples
+ `.catch(() => [{ embedded: 0, embeddable: 0, remaining: 0, with_bt: 0 }])) as { embedded: number; embeddable: number; remaining: number; with_bt: number }[];
+ const r = rows[0] || { embedded: 0, embeddable: 0, remaining: 0, with_bt: 0 };
+ return { embedded: Number(r.embedded), embeddable: Number(r.embeddable), remaining: Number(r.remaining), withBrandTitle: Number(r.with_bt) };
 }

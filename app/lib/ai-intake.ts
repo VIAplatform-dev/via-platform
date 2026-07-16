@@ -23,6 +23,8 @@ export type ListingDraft = {
  era: DraftField;
  material: DraftField;
  condition: DraftField;
+ conditionGrade: string | null; // canonical resale grade (Deadstock/NWT…Fair) from VISIBLE wear
+ flaws: string[]; // specific visible flaws (pilling, scuffs, tarnish…) — [] if none seen
  category: string | null;
  searchQuery: string | null; // tightest brand+model+era phrase to find THIS piece's comps
  careTag: string | null; // verbatim care/composition label text, if legible
@@ -53,7 +55,9 @@ const INSTRUCTION = `Return ONLY a JSON object (no prose, no markdown) with exac
  "brand": {"value": string|null, "confidence": number},
  "era": {"value": string|null, "confidence": number},      // e.g. "1990s","Y2K","2000s"
  "material": {"value": string|null, "confidence": number}, // prefer the care tag if legible
- "condition": {"value": string|null, "confidence": number},
+ "condition": {"value": string|null, "confidence": number},   // a short, honest customer-facing condition note (e.g. "Excellent — light wear to the sole")
+ "conditionGrade": string|null,                    // EXACTLY one of: "Deadstock/NWT","Excellent","Very Good","Good","Fair". Grade STRICTLY from VISIBLE wear only. Inspect closely for: pilling, stains, fading, sole/heel wear, scuffs, tarnished or missing hardware, holes, loose threads, pulls, stretched/misshapen areas, yellowing. A clean piece with NO visible flaws is "Excellent" (or "Deadstock/NWT" only if tags/deadstock are visible) — do NOT default to "Good". Only grade down for wear you can actually see.
+ "flaws": string[],                                // the specific visible flaws behind the grade, e.g. ["light pilling at cuffs","scuffed toe","tarnished zipper pull"]. [] if none are visible. NEVER invent a flaw you cannot clearly see in the photos.
  "category": string|null,                          // e.g. "bags","dresses","shoes","tops"
  "searchQuery": string|null,                       // The TIGHTEST phrase to find THIS EXACT piece's resale comps: the KNOWN brand + the specific model/line/collection + one key attribute (material or silhouette) + era ONLY if it narrows it. No adjectives, no condition, no fluff. e.g. "Prada Re-Nylon shoulder bag", "Levi's 501 big E", "Cavalli S/S 2003 poppy print gown", "Coach Willis crossbody". Getting to the SPECIFIC model — not just the brand — is what makes the price accurate. null only if you genuinely can't get more specific than the brand.
  "careTag": string|null,                           // verbatim text legible on the care/composition label, else null
@@ -93,6 +97,8 @@ function parseDraft(text: string): ListingDraft {
  era: toField(raw.era),
  material: toField(raw.material),
  condition: toField(raw.condition),
+ conditionGrade: typeof raw.conditionGrade === "string" && raw.conditionGrade.trim() ? raw.conditionGrade.trim().slice(0, 40) : null,
+ flaws: Array.isArray(raw.flaws) ? raw.flaws.filter((f: any) => typeof f === "string" && f.trim()).map((f: string) => f.trim().slice(0, 120)).slice(0, 8) : [],
  category: typeof raw.category === "string" ? raw.category.trim() : null,
  searchQuery: typeof raw.searchQuery === "string" && raw.searchQuery.trim() ? raw.searchQuery.trim().slice(0, 160) : null,
  careTag: typeof raw.careTag === "string" && raw.careTag.trim() ? raw.careTag.trim() : null,
