@@ -12,31 +12,49 @@ export function isEmbeddingConfigured(): boolean {
  return Boolean(process.env.VOYAGE_API_KEY);
 }
 
-/** Embed a single image by URL. Returns the vector, or null on any failure. */
-export async function embedImage(imageUrl: string): Promise<number[] | null> {
+export type EmbedStatus = "ok" | "rate_limited" | "bad_image" | "error";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Embed a single image by URL, reporting WHY it failed so batch jobs can react correctly:
+ *  • rate_limited (429 / 5xx, after retries) → transient; do NOT mark the row permanently failed.
+ *  • bad_image (4xx / empty result) → the URL is genuinely unfetchable/unusable; safe to skip.
+ * Retries a couple times with backoff on throttling, so one rate-limit blip doesn't lose an image.
+ */
+export async function embedImageResult(imageUrl: string): Promise<{ embedding: number[] | null; status: EmbedStatus }> {
  const key = process.env.VOYAGE_API_KEY;
- if (!key || !imageUrl) return null;
+ if (!key || !imageUrl) return { embedding: null, status: "bad_image" };
+ for (let attempt = 0; attempt < 3; attempt++) {
  try {
  const res = await fetch(VOYAGE_URL, {
   method: "POST",
   headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
-  body: JSON.stringify({
-  model: MODEL,
-  inputs: [{ content: [{ type: "image_url", image_url: imageUrl }] }],
-  }),
+  body: JSON.stringify({ model: MODEL, inputs: [{ content: [{ type: "image_url", image_url: imageUrl }] }] }),
   signal: AbortSignal.timeout(15000),
  });
+ if (res.status === 429 || res.status >= 500) {
+  if (attempt < 2) { await sleep(800 * (attempt + 1)); continue; } // back off and retry
+  return { embedding: null, status: "rate_limited" };
+ }
  if (!res.ok) {
   console.error(`[embeddings] Voyage ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-  return null;
+  return { embedding: null, status: "bad_image" }; // 4xx = the image URL itself is the problem
  }
  const data = (await res.json()) as { data?: Array<{ embedding?: number[] }> };
  const emb = data?.data?.[0]?.embedding;
- return Array.isArray(emb) && emb.length > 0 ? emb : null;
+ return Array.isArray(emb) && emb.length > 0 ? { embedding: emb, status: "ok" } : { embedding: null, status: "bad_image" };
  } catch (err) {
- console.error("[embeddings] failed:", err);
- return null;
+  if (attempt < 2) { await sleep(800 * (attempt + 1)); continue; }
+  console.error("[embeddings] failed:", err);
+  return { embedding: null, status: "error" };
  }
+ }
+ return { embedding: null, status: "error" };
+}
+
+/** Embed a single image by URL. Returns the vector, or null on any failure. */
+export async function embedImage(imageUrl: string): Promise<number[] | null> {
+ return (await embedImageResult(imageUrl)).embedding;
 }
 
 /** Cosine similarity between two equal-length vectors (0..1 for normalized inputs). */

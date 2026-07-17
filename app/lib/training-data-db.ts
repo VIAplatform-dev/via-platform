@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { embedImage, isEmbeddingConfigured } from "./embeddings";
+import { embedImageResult, isEmbeddingConfigured } from "./embeddings";
 
 // The VYA training dataset — one clean, append-only "golden record" per example, so
 // that when we're ready to train our own model it starts from pristine data, not a
@@ -224,10 +224,15 @@ export async function getGoldenCandidates(limit = 60, category?: string): Promis
 // reference by adding a photo embedding to each. Batched + idempotent — one Voyage call per
 // unembedded row, newest first, prioritizing rows with a brand + title (the useful references).
 
-export type ReferenceIndexStats = { embedded: number; embeddable: number; remaining: number; withBrandTitle: number };
+export type ReferenceIndexStats = { embedded: number; embeddable: number; remaining: number; withBrandTitle: number; badImage?: number; rateLimited?: number };
 
-/** Embed a batch of un-embedded training examples. Gated on Voyage; safe to re-run (only fills gaps). */
-export async function embedPendingTrainingExamples(limit = 100): Promise<ReferenceIndexStats> {
+/**
+ * Embed a batch of un-embedded training examples. Gated on Voyage; safe to re-run (only fills gaps).
+ * Rate-limit-aware: a throttled image is LEFT unembedded (retried next run), only a genuinely bad
+ * URL is marked '[]' (permanently skipped) — so throttling can't poison the index. Runs sequentially
+ * so it self-paces against Voyage's rate limit; keep the batch modest (default 60, like the sold cron).
+ */
+export async function embedPendingTrainingExamples(limit = 60): Promise<ReferenceIndexStats> {
  await ensureTable();
  if (!isEmbeddingConfigured()) return { embedded: 0, embeddable: 0, remaining: 0, withBrandTitle: 0 };
  const lim = Math.max(1, Math.min(300, Math.round(limit)));
@@ -238,16 +243,32 @@ export async function embedPendingTrainingExamples(limit = 100): Promise<Referen
   ORDER BY (CASE WHEN trust = 'high' THEN 0 WHEN trust = 'medium' THEN 1 ELSE 2 END), created_at DESC
   LIMIT ${lim}
  `.catch(() => [])) as { id: number; image_urls: unknown }[];
- let embedded = 0;
+ let embedded = 0, badImage = 0, rateLimited = 0;
  for (const r of rows) {
  const url = Array.isArray(r.image_urls) && r.image_urls[0] ? String(r.image_urls[0]) : null;
- if (!url) { await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); continue; }
- const v = await embedImage(url).catch(() => null);
- // Store '[]' for a failed/unusable image so the batch cursor advances and we don't retry it forever.
- await db()`UPDATE training_examples SET embedding = ${JSON.stringify(v && v.length ? v : [])} WHERE id = ${r.id}`.catch(() => {});
- if (v && v.length) embedded++;
+ if (!url) { await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); badImage++; continue; }
+ const { embedding, status } = await embedImageResult(url);
+ if (status === "ok" && embedding && embedding.length) {
+ await db()`UPDATE training_examples SET embedding = ${JSON.stringify(embedding)} WHERE id = ${r.id}`.catch(() => {});
+ embedded++;
+ } else if (status === "bad_image") {
+ await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); // permanent skip — the URL is unusable
+ badImage++;
+ } else {
+ rateLimited++; // throttled/transient — LEAVE it null so the next run retries it
  }
- return getReferenceIndexStats().then((st) => ({ ...st, embedded }));
+ }
+ return getReferenceIndexStats().then((st) => ({ ...st, embedded, badImage, rateLimited }));
+}
+
+/** Un-poison rows a prior (buggy) run marked '[]' under throttling, so they get re-attempted. */
+export async function resetFailedEmbeddings(): Promise<number> {
+ await ensureTable();
+ const rows = (await db()`
+  WITH u AS (UPDATE training_examples SET embedding = NULL WHERE embedding = '[]' RETURNING 1)
+  SELECT count(*)::int AS n FROM u
+ `.catch(() => [{ n: 0 }])) as { n: number }[];
+ return rows[0]?.n ?? 0;
 }
 
 export async function getReferenceIndexStats(): Promise<ReferenceIndexStats> {

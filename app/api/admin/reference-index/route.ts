@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/app/lib/storeAuth";
-import { embedPendingTrainingExamples, getReferenceIndexStats } from "@/app/lib/training-data-db";
+import { embedPendingTrainingExamples, getReferenceIndexStats, resetFailedEmbeddings } from "@/app/lib/training-data-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // embedding a batch of catalog photos (one Voyage call each)
@@ -22,8 +22,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => ({}));
- const limit = Math.max(1, Math.min(300, Number(body?.limit) || 100));
  try {
+ // { reset: true } → un-poison rows a prior throttled run wrongly marked as failed, then re-stat.
+ if (body?.reset === true) {
+ const reset = await resetFailedEmbeddings();
+ return NextResponse.json({ ok: true, reset, stats: await getReferenceIndexStats() });
+ }
+ const limit = Math.max(1, Math.min(300, Number(body?.limit) || 60));
  const stats = await embedPendingTrainingExamples(limit);
  return NextResponse.json({ ok: true, ...stats });
  } catch (e) {
