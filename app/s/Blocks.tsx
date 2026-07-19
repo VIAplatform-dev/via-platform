@@ -197,6 +197,58 @@ function blockBody(b: Block, ctx: Ctx) {
  ) : null;
  }
 
+ case "split": {
+ const right = (p.imageSide || "").toLowerCase().startsWith("r");
+ return (
+ <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
+ {p.image
+ ? <img src={p.image} alt="" className={`vya-img aspect-[4/5] w-full object-cover ${right ? "@lg:order-2" : ""}`} />
+ : <div className={`aspect-[4/5] w-full ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }} />}
+ <div>
+ {p.heading && <h2 {...txt(p.heading, "heading")} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
+ {p.body && <p {...txtPlain(p.body, "body")} className="vya-body mt-4 whitespace-pre-wrap text-sm leading-[1.9] opacity-75 @xl:text-[15px]" />}
+ {p.cta && <a href={shopHref} {...txt(p.cta, "cta")} className="vya-cta mt-7 inline-block px-8 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+ </div>
+ </section>
+ );
+ }
+
+ case "marquee": {
+ const items = (p.items || "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+ if (!items.length) return ctx.edit ? <div className="px-6 py-6 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Marquee — add the names you carry</div> : null;
+ const rowd = [...items, ...items];
+ return (
+ <div className="vya-marquee overflow-hidden whitespace-nowrap py-5" style={{ borderTop: `1px solid ${fg}1a`, borderBottom: `1px solid ${fg}1a` }}>
+ <div className="vya-marquee-track inline-flex gap-12">
+ {rowd.map((it, i) => <span key={i} className="text-lg uppercase tracking-wide opacity-55">{it}<span style={{ marginLeft: "3rem", color: colors.accent }}>✦</span></span>)}
+ </div>
+ </div>
+ );
+ }
+
+ case "statement":
+ return (
+ <section className="mx-auto max-w-4xl px-6 py-20 @xl:py-28">
+ {p.quote && <p {...txtPlain(p.quote, "quote")} className="vya-heading whitespace-pre-wrap text-3xl leading-[1.1] tracking-tight @xl:text-5xl" style={{ fontFamily: head }} />}
+ {p.attribution && <p {...txt(p.attribution, "attribution")} className="vya-sub mt-6 text-[11px] uppercase tracking-[0.22em] opacity-60" />}
+ </section>
+ );
+
+ case "spotlight":
+ return (
+ <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
+ {p.image
+ ? <img src={p.image} alt="" className="vya-img aspect-square w-full object-cover" />
+ : <div className="aspect-square w-full" style={{ background: `${fg}0d` }} />}
+ <div>
+ {p.heading && <h2 {...txt(p.heading, "heading")} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
+ {p.price && <p {...txt(p.price, "price")} className="mt-2 text-xl" style={{ color: colors.accent }} />}
+ {p.subtext && <p {...txtPlain(p.subtext, "subtext")} className="vya-body mt-4 whitespace-pre-wrap text-sm leading-[1.8] opacity-75 @xl:text-[15px]" />}
+ {p.cta && <a href={shopHref} {...txt(p.cta, "cta")} className="vya-cta mt-7 inline-block px-8 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+ </div>
+ </section>
+ );
+
  case "video": {
  const url = (p.url || "").trim();
  if (!url) return null;
@@ -287,6 +339,7 @@ export default function Blocks({
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
  <div className="@container" style={{ fontFamily: body, color: colors.text }}>
+ <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}" }} />
  {blocks.map((b, i) => {
  const { background, fg } = bgFor(b.style?.bg, colors);
  const inner = blockBody(b, { colors, head, body, products, shopHref, fg, edit, onEditField });

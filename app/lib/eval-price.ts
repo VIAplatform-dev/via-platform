@@ -1,6 +1,8 @@
 import { neon } from "@neondatabase/serverless";
 import { estimatePrice } from "./price-engine";
 import { reverseImageBestOf, matchesToComps, isCompsConfigured } from "./comps";
+import { resolveSpecificPiece } from "./intake-memory-db";
+import { embedImage, isEmbeddingConfigured } from "./embeddings";
 import { normalizeCategory } from "./market-data-db";
 import { gate } from "./concurrency";
 
@@ -46,8 +48,14 @@ async function ensureTable() {
   )
  `.catch(() => {});
  await db()`CREATE INDEX IF NOT EXISTS idx_price_eval_ran ON price_eval_items (ran_at DESC)`.catch(() => {});
- // One graded reading per sold item — re-running refreshes it rather than double-counting.
- await db()`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_eval_sold ON price_eval_items (sold_id)`.catch(() => {});
+ // Grading MODE: 'title' = the pricer is fed the item's real human title (easy mode); 'photo' = the
+ // query is derived from the photo alone via the reference index (resolveSpecificPiece), mirroring a
+ // real seller upload. specific_resolved records whether the reference index matched a piece at all.
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'title'`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS specific_resolved BOOLEAN`.catch(() => {});
+ // A sold item can be graded once PER MODE (title + photo coexist). Replace the old sold-only index.
+ await db()`DROP INDEX IF EXISTS uq_price_eval_sold`.catch(() => {});
+ await db()`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_eval_sold_mode ON price_eval_items (sold_id, mode)`.catch(() => {});
  ensured = true;
 }
 
@@ -59,24 +67,27 @@ export type PriceEvalItem = {
  within10: boolean | null; within20: boolean | null;
 };
 
-export type PriceEvalRun = { requested: number; graded: number; skipped: number; within10Pct: number | null; medianErrorPct: number | null };
+export type PriceEvalRun = { requested: number; graded: number; skipped: number; within10Pct: number | null; medianErrorPct: number | null; mode: string; specificResolvedPct: number | null };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Grade a fresh sample of real sales. Blind: the pricer gets the photo + brand and must predict the
- * market value; we compare to the real sold price. Costs SerpApi (reverse-image + comps) per item,
- * so keep the sample small and run periodically — every run adds to the persisted, accumulating set.
+ * Grade a fresh sample of real sales against the real sold price. Two modes:
+ *  • default (title) — the pricer is handed the item's real title (easy mode: identification is free).
+ *  • photoOnly — the query is derived from the PHOTO alone via the reference index, no human title;
+ *    this mirrors a real seller upload and is the honest test of "can VYA price from a photo?".
+ * Costs SerpApi (reverse-image + comps) per item; keep the sample small. Accumulates per (sale, mode).
  */
-export async function runPriceEval(opts: { sample: number }): Promise<PriceEvalRun> {
+export async function runPriceEval(opts: { sample: number; photoOnly?: boolean }): Promise<PriceEvalRun> {
  await ensureTable();
  const sample = Math.max(1, Math.min(40, Math.round(opts.sample) || 12));
+ const mode = opts.photoOnly ? "photo" : "title";
  const sql = db();
 
- // Prefer sales we haven't graded yet (grow coverage), newest first; fall back to random re-grades.
+ // Prefer sales not yet graded IN THIS MODE (grow coverage), newest first.
  const rows = (await sql`
-  SELECT s.id, s.title, s.designer, s.final_price, s.image
+  SELECT s.id, s.title, s.designer, s.final_price, s.image, s.embedding
   FROM sold_items s
-  LEFT JOIN price_eval_items p ON p.sold_id = s.id
+  LEFT JOIN price_eval_items p ON p.sold_id = s.id AND p.mode = ${mode}
   WHERE s.image IS NOT NULL AND s.image <> '' AND s.final_price > 0 AND p.id IS NULL
   ORDER BY s.sold_at DESC
   LIMIT ${sample}
@@ -92,13 +103,22 @@ export async function runPriceEval(opts: { sample: number }): Promise<PriceEvalR
  try {
  // Reverse-image the sold photo → the same-piece comps production would use. One Lens call.
  const matches = isCompsConfigured() ? (await reverseImageBestOf([image], { maxFrames: 1 })).matches : [];
- const query = title || [brand, "vintage"].filter(Boolean).join(" ");
+ let query: string;
+ let specificResolved: boolean | null = null;
+ if (mode === "photo") {
+ // Photo-only: identify the piece from the photo via the reference index — NO human title.
+ // excludeNearIdentical stops the item matching a copy of itself in the index (cheating).
+ let emb: number[] = [];
+ try { emb = Array.isArray(r.embedding) ? r.embedding : JSON.parse(r.embedding || "[]"); } catch { emb = []; }
+ if ((!emb || !emb.length) && isEmbeddingConfigured()) emb = (await embedImage(image).catch(() => null)) || [];
+ const specific = emb && emb.length ? await resolveSpecificPiece(emb, brand, { excludeNearIdentical: true }).catch(() => null) : null;
+ specificResolved = !!specific;
+ query = specific?.query || brand || title; // fall back to brand (then title) when nothing matches
+ } else {
+ query = title || [brand, "vintage"].filter(Boolean).join(" ");
+ }
  // No condition passed → no condition multiplier skews the read (we don't know the sold item's grade).
- const est = await estimatePrice({
- query, photoUrl: image, minMarkupBps: 3000,
- extraComps: matchesToComps(matches),
- context: { brand },
- }).catch(() => null);
+ const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context: { brand } }).catch(() => null);
  const predCents = est?.marketCents && est.marketCents > 0 ? est.marketCents : null;
  const errorPct = predCents != null ? Math.round((Math.abs(predCents - soldCents) / soldCents) * 100) : null;
  const within10 = errorPct != null ? errorPct <= 10 : null;
@@ -106,25 +126,28 @@ export async function runPriceEval(opts: { sample: number }): Promise<PriceEvalR
  const category = normalizeCategory(title) || "uncategorized";
  const tier = tierOf(soldCents);
  await sql`
-  INSERT INTO price_eval_items (sold_id, brand, category, tier, sold_cents, pred_cents, error_pct, within10, within20, ran_at)
-  VALUES (${r.id}, ${brand}, ${category}, ${tier}, ${soldCents}, ${predCents}, ${errorPct}, ${within10}, ${within20}, now())
-  ON CONFLICT (sold_id) DO UPDATE SET
+  INSERT INTO price_eval_items (sold_id, mode, brand, category, tier, sold_cents, pred_cents, error_pct, within10, within20, specific_resolved, ran_at)
+  VALUES (${r.id}, ${mode}, ${brand}, ${category}, ${tier}, ${soldCents}, ${predCents}, ${errorPct}, ${within10}, ${within20}, ${specificResolved}, now())
+  ON CONFLICT (sold_id, mode) DO UPDATE SET
    pred_cents = EXCLUDED.pred_cents, error_pct = EXCLUDED.error_pct, within10 = EXCLUDED.within10,
-   within20 = EXCLUDED.within20, brand = EXCLUDED.brand, category = EXCLUDED.category, tier = EXCLUDED.tier, ran_at = now()
+   within20 = EXCLUDED.within20, brand = EXCLUDED.brand, category = EXCLUDED.category, tier = EXCLUDED.tier, specific_resolved = EXCLUDED.specific_resolved, ran_at = now()
  `.catch(() => {});
- return { predCents, errorPct };
+ return { predCents, errorPct, specificResolved };
  } catch { return null; }
  })));
 
- const ok = graded.filter((x): x is { predCents: number | null; errorPct: number | null } => !!x && x.errorPct != null);
+ const ok = graded.filter((x): x is { predCents: number | null; errorPct: number | null; specificResolved: boolean | null } => !!x && x.errorPct != null);
  const errs = ok.map((x) => x.errorPct as number).sort((a, b) => a - b);
  const within10 = ok.filter((x) => (x.errorPct as number) <= 10).length;
+ const resolved = ok.filter((x) => x.specificResolved).length;
  return {
  requested: rows.length,
  graded: ok.length,
  skipped: rows.length - ok.length,
  within10Pct: ok.length ? Math.round((within10 / ok.length) * 100) : null,
  medianErrorPct: errs.length ? errs[Math.floor(errs.length / 2)] : null,
+ mode,
+ specificResolvedPct: mode === "photo" && ok.length ? Math.round((resolved / ok.length) * 100) : null,
  };
 }
 
@@ -175,16 +198,41 @@ function scoreOf(segment: string, items: { within10: boolean | null; within20: b
  };
 }
 
+// The individual worst misses — joined back to the sold item so you can SEE the piece, what it
+// really sold for, and what the AI predicted. This is where you diagnose WHY it's off (a category,
+// a price tier, a kind of piece the comps don't cover).
+export type PriceMiss = {
+ soldId: number; brand: string | null; title: string | null; category: string; tier: string;
+ soldUsd: number; predUsd: number | null; errorPct: number | null; image: string | null;
+};
+export async function getPriceMisses(limit = 20, windowDays = 120, mode = "title"): Promise<PriceMiss[]> {
+ await ensureTable();
+ const lim = Math.max(1, Math.min(100, Math.round(limit)));
+ const cutoff = new Date(Date.now() - windowDays * 86400000).toISOString();
+ const rows = (await db()`
+  SELECT p.sold_id, p.brand, p.category, p.tier, p.sold_cents, p.pred_cents, p.error_pct, s.title, s.image
+  FROM price_eval_items p LEFT JOIN sold_items s ON s.id = p.sold_id
+  WHERE p.ran_at >= ${cutoff} AND p.error_pct IS NOT NULL AND p.within10 = false AND p.mode = ${mode}
+  ORDER BY p.error_pct DESC LIMIT ${lim}
+ `.catch(() => [])) as { sold_id: number; brand: string | null; category: string | null; tier: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null; title: string | null; image: string | null }[];
+ return rows.map((r) => ({
+ soldId: Number(r.sold_id), brand: r.brand ?? null, title: r.title ?? null,
+ category: r.category || "uncategorized", tier: r.tier || "—",
+ soldUsd: Math.round(Number(r.sold_cents) / 100), predUsd: r.pred_cents != null ? Math.round(Number(r.pred_cents) / 100) : null,
+ errorPct: r.error_pct != null ? Number(r.error_pct) : null, image: r.image ?? null,
+ }));
+}
+
 export type PriceAccuracy = { overall: PriceScore; byCategory: PriceScore[]; byTier: PriceScore[]; totalGraded: number; windowDays: number };
 
 /** The accumulated price-accuracy picture across ALL graded sales in the window — overall + by
  *  category + by price tier, each with a 95% CI and a pass/fail verdict vs the ±10% beta bar. */
-export async function getPriceAccuracy(windowDays = 120): Promise<PriceAccuracy> {
+export async function getPriceAccuracy(windowDays = 120, mode = "title"): Promise<PriceAccuracy> {
  await ensureTable();
  const cutoff = new Date(Date.now() - windowDays * 86400000).toISOString();
  const rows = (await db()`
   SELECT category, tier, within10, within20, error_pct
-  FROM price_eval_items WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL
+  FROM price_eval_items WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode = ${mode}
  `.catch(() => [])) as { category: string | null; tier: string | null; within10: boolean | null; within20: boolean | null; error_pct: number | null }[];
  const items = rows.map((r) => ({ category: r.category || "uncategorized", tier: r.tier || "—", within10: r.within10, within20: r.within20, errorPct: r.error_pct }));
 
