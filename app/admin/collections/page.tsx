@@ -252,14 +252,10 @@ export default function CollectionsAdminPage() {
  </span>
  </div>
 
- {/* Collection tabs — only show collections with items, plus the last one (newest) */}
+ {/* Collection tabs — show EVERY collection so empty ones can be curated. A dot marks the
+   ones that already have items (from activeSlugs). */}
  <div style={{ display: "flex", gap: 0, borderTop: "1px solid #e4e4e7", overflowX: "auto" }}>
- {[EMAIL_PICKS_COLLECTION, ...COLLECTIONS].filter((col) =>
- col.slug === EMAIL_PICKS_COLLECTION.slug || // always show the email tab
- activeSlugs === null || // still loading — show all
- activeSlugs.has(col.slug) ||
- col.slug === COLLECTIONS[COLLECTIONS.length - 1].slug // always show newest collection
- ).map((col) => (
+ {[EMAIL_PICKS_COLLECTION, ...COLLECTIONS].map((col) => (
  <button
  key={col.slug}
  onClick={() => setActiveCollection(col)}
@@ -278,6 +274,7 @@ export default function CollectionsAdminPage() {
  }}
  >
  {col.name}
+ {activeSlugs?.has(col.slug) && <span style={{ marginLeft: 5, color: "#16a34a" }} title="Has items">•</span>}
  {col.curatedBy && (
  <span style={{ fontSize: 9, marginLeft: 6, color: "#a1a1aa", textTransform: "none", letterSpacing: 0 }}>
  by {col.curatedBy}
