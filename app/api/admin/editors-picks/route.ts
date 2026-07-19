@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
+import { createHash } from "crypto";
 import {
  getAllEditorsPicks,
  addEditorsPick,
@@ -6,9 +8,19 @@ import {
  getActiveCollectionSlugs,
 } from "@/app/lib/editors-picks-db";
 
+// Curating a collection changes what the marketplace shows — but the homepage is ISR-cached
+// (revalidate = 1800). Refresh the affected pages NOW so a newly-populated collection appears
+// immediately in the nav / homepage / collection page instead of up to 30 minutes later.
+function revalidateMarketplace(slug: string) {
+ try {
+ revalidatePath("/");
+ revalidatePath("/collections");
+ revalidatePath(`/collections/${slug}`);
+ } catch { /* best-effort */ }
+}
+
 function hashPassword(password: string): string {
- const crypto = require("crypto");
- return crypto.createHash("sha256").update(password).digest("hex");
+ return createHash("sha256").update(password).digest("hex");
 }
 function isAuthorized(request: NextRequest): boolean {
  const adminPassword = process.env.ADMIN_PASSWORD;
@@ -57,6 +69,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "productId required" }, { status: 400 });
  }
  await addEditorsPick(productId, collectionSlug);
+ revalidateMarketplace(collectionSlug);
  return NextResponse.json({ ok: true });
  } catch (error) {
  const msg = error instanceof Error ? error.message : "Failed to add pick";
@@ -75,6 +88,7 @@ export async function DELETE(request: NextRequest) {
  return NextResponse.json({ error: "productId required" }, { status: 400 });
  }
  await removeEditorsPick(productId, collectionSlug);
+ revalidateMarketplace(collectionSlug);
  return NextResponse.json({ ok: true });
  } catch (error) {
  console.error("Failed to remove pick:", error);
