@@ -212,7 +212,7 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  if (!(have[1].json?.returnPolicies?.length > 0)) {
  await create(`/sell/account/v1/return_policy`, "return", {
  name: "VYA Default Returns", marketplaceId: MARKETPLACE, categoryTypes: CAT_TYPES,
- returnsAccepted: true, returnPeriod: { value: 30, unit: "DAY" }, returnShippingCostPayer: "BUYER",
+ returnsAccepted: false,
  });
  }
  if (!(have[2].json?.fulfillmentPolicies?.length > 0)) {
@@ -221,7 +221,7 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  handlingTime: { value: 3, unit: "DAY" },
  shippingOptions: [{
  optionType: "DOMESTIC", costType: "FLAT_RATE",
- shippingServices: [{ sortOrder: 1, shippingServiceCode: "USPSGroundAdvantage", shippingCost: { value: "0.00", currency: "USD" }, freeShipping: true }],
+ shippingServices: [{ sortOrder: 1, shippingCarrierCode: "USPS", shippingServiceCode: "USPSGroundAdvantage", shippingCost: { value: "9.95", currency: "USD" }, freeShipping: false }],
  }],
  });
  }
@@ -230,7 +230,9 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  const pol = await policyIds(token);
  const policies = { fulfillment: !!pol.fulfillment, payment: !!pol.payment, return: !!pol.return };
  const ok = policies.fulfillment && policies.payment && policies.return;
- return { ok, optedIn, created, policies, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete — some business policies are still missing.") };
+ // If any policy exists, the account is provably opted in (creating one requires it) — reflect that.
+ const opted = optedIn || policies.payment || policies.return || policies.fulfillment;
+ return { ok, optedIn: opted, created, policies, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete — some business policies are still missing.") };
 }
 
 // Suggest a leaf category from the title (eBay requires a categoryId to publish).
@@ -403,5 +405,10 @@ export async function endOnEbay(storeSlug: string, itemId: string): Promise<bool
 
 function ebayErr(j: any): string | null {
  const e = j?.errors?.[0];
- return e ? `eBay: ${e.message || e.longMessage || "error"}` : null;
+ if (!e) return null;
+ // eBay's `message` is often a template like "Invalid ." with the field left blank — the actual
+ // offending field is in `parameters`. Surface longMessage + the parameters so errors are usable.
+ const params = Array.isArray(e.parameters) ? e.parameters.map((p: any) => `${p.name}=${p.value}`).filter(Boolean).join(", ") : "";
+ const msg = e.longMessage || e.message || "error";
+ return `eBay: ${msg}${params ? ` [${params}]` : ""}`;
 }
