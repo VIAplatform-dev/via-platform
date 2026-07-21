@@ -207,6 +207,27 @@ export type EbayItem = { itemId: string; title: string; description?: string | n
 export type EbayResult = { ok: boolean; listingUrl?: string; error?: string };
 
 // Create/replace inventory item → create offer → publish. Returns the live listing URL.
+// Pre-flight: is this store's eBay account actually ready to list? Confirms the token refreshes and
+// the API responds (policyIds is an authenticated read), and that the required business policies
+// exist — the #1 silent blocker of a real publish. Creates NOTHING on eBay; safe to run anytime.
+export async function testEbayConnection(storeSlug: string): Promise<{
+ ok: boolean; configured: boolean; tokenValid: boolean;
+ policies: { fulfillment: boolean; payment: boolean; return: boolean };
+ readyToList: boolean; error?: string;
+}> {
+ const base = { ok: false, configured: ebayConfigured(), tokenValid: false, policies: { fulfillment: false, payment: false, return: false }, readyToList: false };
+ if (!ebayConfigured()) return { ...base, error: "eBay app keys aren’t set on the server." };
+ const token = await accessToken(storeSlug);
+ if (!token) return { ...base, error: "No valid eBay token — the account isn’t connected, or the refresh token failed. Reconnect it." };
+ const pol = await policyIds(token); // authenticated read → proves the token works AND surfaces policies
+ const policies = { fulfillment: !!pol.fulfillment, payment: !!pol.payment, return: !!pol.return };
+ const readyToList = policies.fulfillment && policies.payment && policies.return;
+ return {
+ ok: true, configured: true, tokenValid: true, policies, readyToList,
+ error: readyToList ? undefined : "Token works and the API responds, but eBay business policies (payment / shipping / returns) aren’t all set up on the account — a real publish will fail until they are.",
+ };
+}
+
 export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<EbayResult> {
  if (!ebayConfigured()) return { ok: false, error: "eBay isn’t configured on the server." };
  const token = await accessToken(storeSlug);

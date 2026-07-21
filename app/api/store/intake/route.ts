@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
  ? await resolveSpecificPiece(embedding, has("brand") ? val("brand") : null).catch(() => null)
  : null;
  const specificHint = specific
- ? `\n\nLIKELY THE SAME PIECE — a confirmed VYA/catalog reference matches this photo very closely (${Math.round(specific.similarity * 100)}% visual match): "${specific.model}"${specific.era ? ` (${specific.era})` : ""}. Treat this as a strong identification of the specific model/line — reflect that specificity in the title and era unless the photo clearly contradicts it. Never mention this reference or the match in the copy.`
+ ? `\n\nSIMILAR REFERENCE — a past VYA/catalog piece looks visually similar to this photo (${Math.round(specific.similarity * 100)}% visual match): "${specific.model}"${specific.era ? ` (${specific.era})` : ""}. Use it ONLY as a hint for the likely model/line/silhouette and era — it is a LOOK-ALIKE, not confirmed to be the same piece. Do NOT copy its MATERIAL, condition, or exact variant from it: look-alike pieces — especially bags with the same logo — routinely differ in fabric and trim, so those must come from what you can actually SEE or the care tag, never from this reference. If the photo clearly differs from it, ignore it entirely. Never mention this reference in the copy.`
  : "";
  // If the seller typed the brand, keep only same-brand matches (a look-alike in a
  // different label must not sway the copy) — but still use them to find the runway/era.
