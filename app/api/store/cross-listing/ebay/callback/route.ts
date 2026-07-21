@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ebayExchangeCode, ebaySignState } from "@/app/lib/ebay";
+import { ebayExchangeCode, ebaySignState, ensureEbayReady } from "@/app/lib/ebay";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
  return NextResponse.redirect(back);
  }
  const ok = await ebayExchangeCode(slug, code).catch(() => false);
+ // On a fresh connect, auto-opt into Business Policies + create default payment/shipping/return
+ // policies so the seller can list immediately (best-effort — never fail the connect over it).
+ if (ok) await ensureEbayReady(slug).catch(() => null);
  back.searchParams.set("ebay", ok ? "connected" : "error");
  return NextResponse.redirect(back);
 }

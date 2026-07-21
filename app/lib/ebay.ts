@@ -12,10 +12,12 @@ const AUTHORIZE_BASE = "https://auth.ebay.com/oauth2/authorize";
 const API = "https://api.ebay.com";
 const MARKETPLACE = "EBAY_US";
 
-// Scopes needed to read the seller's business policies and create/publish listings.
+// Scopes needed to create/publish listings AND manage the seller's business policies —
+// `sell.account` (write, not .readonly) lets us opt the account into Business Policies and
+// create default payment/shipping/return policies for them, so onboarding needs zero eBay setup.
 const SCOPES = [
  "https://api.ebay.com/oauth/api_scope/sell.inventory",
- "https://api.ebay.com/oauth/api_scope/sell.account.readonly",
+ "https://api.ebay.com/oauth/api_scope/sell.account",
 ];
 
 export function ebayConfigured(): boolean {
@@ -164,6 +166,73 @@ async function policyIds(token: string): Promise<{ fulfillment?: string; payment
  };
 }
 
+const CAT_TYPES = [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }];
+
+// Make a freshly-connected account able to list WITHOUT the seller ever touching eBay's settings:
+// (1) opt into the Business Policies program — the fix for eBay's "User is not eligible for Business
+// Policy" error, which otherwise blocks every API publish; (2) create sane default payment / return /
+// shipping policies for any that are missing. Idempotent + best-effort: existing policies are left
+// alone, an already-opted account is fine, and a step eBay rejects is reported (not thrown). Requires
+// the `sell.account` write scope — so it only works after the seller reconnects under the new scope.
+export type EbaySetup = {
+ ok: boolean; optedIn: boolean; created: string[];
+ policies: { fulfillment: boolean; payment: boolean; return: boolean }; error?: string;
+};
+export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
+ const empty = { ok: false, optedIn: false, created: [] as string[], policies: { fulfillment: false, payment: false, return: false } };
+ const token = await accessToken(storeSlug);
+ if (!token) return { ...empty, error: "eBay isn’t connected — reconnect the account." };
+ const problems: string[] = [];
+
+ // 1) Opt into Business Policies (idempotent — an account that's already opted in returns an error we ignore).
+ const opt = await ebayFetch(token, `/sell/account/v1/program/opt_in`, { method: "POST", body: JSON.stringify({ programType: "SELLING_POLICY_MANAGEMENT" }) });
+ const alreadyOpted = /already|opted[- ]?in/i.test(JSON.stringify(opt.json || ""));
+ const optedIn = opt.ok || alreadyOpted;
+ if (!optedIn) { const e = ebayErr(opt.json); if (e) problems.push(`opt-in ${e}`); }
+
+ // 2) Create defaults for any missing policy (skip ones the seller already has).
+ const q = `?marketplace_id=${MARKETPLACE}`;
+ const have = await Promise.all([
+ ebayFetch(token, `/sell/account/v1/payment_policy${q}`),
+ ebayFetch(token, `/sell/account/v1/return_policy${q}`),
+ ebayFetch(token, `/sell/account/v1/fulfillment_policy${q}`),
+ ]);
+ const created: string[] = [];
+ const create = async (path: string, label: string, body: Record<string, unknown>) => {
+ const res = await ebayFetch(token, path, { method: "POST", body: JSON.stringify(body) });
+ if (res.ok) created.push(label);
+ else { const e = ebayErr(res.json); if (e) problems.push(`${label} ${e}`); }
+ };
+
+ if (!(have[0].json?.paymentPolicies?.length > 0)) {
+ await create(`/sell/account/v1/payment_policy`, "payment", {
+ name: "VYA Default Payment", marketplaceId: MARKETPLACE, categoryTypes: CAT_TYPES, immediatePay: true,
+ });
+ }
+ if (!(have[1].json?.returnPolicies?.length > 0)) {
+ await create(`/sell/account/v1/return_policy`, "return", {
+ name: "VYA Default Returns", marketplaceId: MARKETPLACE, categoryTypes: CAT_TYPES,
+ returnsAccepted: true, returnPeriod: { value: 30, unit: "DAY" }, returnShippingCostPayer: "BUYER",
+ });
+ }
+ if (!(have[2].json?.fulfillmentPolicies?.length > 0)) {
+ await create(`/sell/account/v1/fulfillment_policy`, "fulfillment", {
+ name: "VYA Default Shipping", marketplaceId: MARKETPLACE, categoryTypes: CAT_TYPES,
+ handlingTime: { value: 3, unit: "DAY" },
+ shippingOptions: [{
+ optionType: "DOMESTIC", costType: "FLAT_RATE",
+ shippingServices: [{ sortOrder: 1, shippingServiceCode: "USPSGroundAdvantage", shippingCost: { value: "0.00", currency: "USD" }, freeShipping: true }],
+ }],
+ });
+ }
+
+ // 3) Re-read to confirm the account can now list.
+ const pol = await policyIds(token);
+ const policies = { fulfillment: !!pol.fulfillment, payment: !!pol.payment, return: !!pol.return };
+ const ok = policies.fulfillment && policies.payment && policies.return;
+ return { ok, optedIn, created, policies, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete — some business policies are still missing.") };
+}
+
 // Suggest a leaf category from the title (eBay requires a categoryId to publish).
 async function suggestCategory(token: string, title: string): Promise<string | null> {
  const r = await ebayFetch(token, `/commerce/taxonomy/v1/category_tree/0/get_category_suggestions?q=${encodeURIComponent(title.slice(0, 60))}`);
@@ -253,9 +322,16 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  // 1) category + policies + the category's STANDARD aspects, up front. eBay's 2026
  // fashion update blocks free-text sizes on Apparel/Footwear — so we pull the leaf
  // category's allowed Size values from the Taxonomy API and map the piece's size to one.
- const [pol, categoryId] = await Promise.all([policyIds(token), suggestCategory(token, `${item.brand || ""} ${item.title}`)]);
+ const [pol0, categoryId] = await Promise.all([policyIds(token), suggestCategory(token, `${item.brand || ""} ${item.title}`)]);
+ let pol = pol0;
  if (!pol.fulfillment || !pol.payment || !pol.return) {
- return { ok: false, error: "Set up eBay business policies (payment, shipping, returns) first — they’re required to list." };
+ // Self-heal: opt in + create default policies, then re-read. Fixes accounts connected before
+ // auto-setup existed, or where a policy was deleted — no manual eBay setup required.
+ const setup = await ensureEbayReady(storeSlug);
+ pol = await policyIds(token);
+ if (!pol.fulfillment || !pol.payment || !pol.return) {
+ return { ok: false, error: setup.error || "Couldn’t set up eBay business policies (payment, shipping, returns) automatically — reconnect eBay and try again." };
+ }
  }
  let sizeAspect: string | null = null;
  if (categoryId) {
