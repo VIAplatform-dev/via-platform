@@ -210,21 +210,35 @@ export type EbayResult = { ok: boolean; listingUrl?: string; error?: string };
 // Pre-flight: is this store's eBay account actually ready to list? Confirms the token refreshes and
 // the API responds (policyIds is an authenticated read), and that the required business policies
 // exist — the #1 silent blocker of a real publish. Creates NOTHING on eBay; safe to run anytime.
+type PolicyProbe = { status: number; count: number; error: string | null };
 export async function testEbayConnection(storeSlug: string): Promise<{
- ok: boolean; configured: boolean; tokenValid: boolean;
+ ok: boolean; configured: boolean; tokenValid: boolean; marketplace: string;
  policies: { fulfillment: boolean; payment: boolean; return: boolean };
- readyToList: boolean; error?: string;
+ readyToList: boolean; debug?: { fulfillment: PolicyProbe; payment: PolicyProbe; return: PolicyProbe }; error?: string;
 }> {
- const base = { ok: false, configured: ebayConfigured(), tokenValid: false, policies: { fulfillment: false, payment: false, return: false }, readyToList: false };
+ const base = { ok: false, configured: ebayConfigured(), tokenValid: false, marketplace: MARKETPLACE, policies: { fulfillment: false, payment: false, return: false }, readyToList: false };
  if (!ebayConfigured()) return { ...base, error: "eBay app keys aren’t set on the server." };
  const token = await accessToken(storeSlug);
  if (!token) return { ...base, error: "No valid eBay token — the account isn’t connected, or the refresh token failed. Reconnect it." };
- const pol = await policyIds(token); // authenticated read → proves the token works AND surfaces policies
- const policies = { fulfillment: !!pol.fulfillment, payment: !!pol.payment, return: !!pol.return };
+ // Hit the three policy endpoints directly so we can surface eBay's ACTUAL response (status + any
+ // error message), not just "empty" — that tells us opt-in vs wrong-marketplace vs a real error.
+ const q = `?marketplace_id=${MARKETPLACE}`;
+ const [f, p, r] = await Promise.all([
+ ebayFetch(token, `/sell/account/v1/fulfillment_policy${q}`),
+ ebayFetch(token, `/sell/account/v1/payment_policy${q}`),
+ ebayFetch(token, `/sell/account/v1/return_policy${q}`),
+ ]);
+ const probe = (x: { status: number; json: any }, key: string): PolicyProbe => ({
+ status: x.status,
+ count: Array.isArray(x.json?.[key]) ? x.json[key].length : 0,
+ error: x.json?.errors?.[0]?.longMessage || x.json?.errors?.[0]?.message || null,
+ });
+ const debug = { fulfillment: probe(f, "fulfillmentPolicies"), payment: probe(p, "paymentPolicies"), return: probe(r, "returnPolicies") };
+ const policies = { fulfillment: debug.fulfillment.count > 0, payment: debug.payment.count > 0, return: debug.return.count > 0 };
  const readyToList = policies.fulfillment && policies.payment && policies.return;
  return {
- ok: true, configured: true, tokenValid: true, policies, readyToList,
- error: readyToList ? undefined : "Token works and the API responds, but eBay business policies (payment / shipping / returns) aren’t all set up on the account — a real publish will fail until they are.",
+ ok: true, configured: true, tokenValid: true, marketplace: MARKETPLACE, policies, readyToList, debug,
+ error: readyToList ? undefined : "No EBAY_US business policies found — see `debug` for eBay’s exact response per policy (opt-in required, wrong marketplace/country, or a specific error).",
  };
 }
 
