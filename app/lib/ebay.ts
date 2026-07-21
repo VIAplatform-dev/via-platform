@@ -221,7 +221,10 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  handlingTime: { value: 3, unit: "DAY" },
  shippingOptions: [{
  optionType: "DOMESTIC", costType: "FLAT_RATE",
- shippingServices: [{ sortOrder: 1, shippingCarrierCode: "USPS", shippingServiceCode: "USPSGroundAdvantage", shippingCost: { value: "9.95", currency: "USD" }, freeShipping: false }],
+ // "Other" = a generic economy flat-rate service. Carrier-specific codes (e.g. USPSGroundAdvantage)
+ // route through eBay's label system and require the account to be shipping-label eligible, which
+ // triggers LOGISTICS_INFO_IS_MISSING when it isn't. A generic service skips that eligibility check.
+ shippingServices: [{ sortOrder: 1, shippingServiceCode: "Other", shippingCost: { value: "9.95", currency: "USD" }, freeShipping: false }],
  }],
  });
  }
