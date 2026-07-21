@@ -61,7 +61,9 @@ export default function CrossListingPage() {
  }
  async function disconnect(k: string) {
  const r = await fetch(`/api/store/cross-listing?platform=${k}`, { method: "DELETE" });
- const d = await r.json(); if (r.ok) setAccounts(d.accounts);
+ // Refresh EVERYTHING (not just accounts) — eBay/Etsy connected state lives in ebay/etsy, so
+ // updating only accounts would leave an OAuth platform still showing "Connected" after disconnect.
+ if (r.ok) await load();
  }
  async function toggleAuto(a: Account) {
  const r = await fetch("/api/store/cross-listing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ platform: a.platform, handle: a.handle, autoList: !a.autoList }) });
