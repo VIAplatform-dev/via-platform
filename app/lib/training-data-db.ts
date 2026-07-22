@@ -51,6 +51,8 @@ async function ensureTable() {
  // SPECIFIC known piece (title carries the model/line) and priced off it — not just brand-guessed.
  // Populated in batches by embedPendingTrainingExamples (Voyage cost, so it's a run-when-ready job).
  await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS embedding TEXT`.catch(() => {});
+ // Celebrity provenance ("worn by") captured at intake — a resale-value + identification signal.
+ await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS ai_celebrity TEXT`.catch(() => {});
  ensured = true;
 }
 
@@ -64,7 +66,7 @@ export type IntakeExample = {
  final: Partial<Record<"brand" | "era" | "material" | "condition" | "category" | "size" | "title" | "description", string | null>>;
  priceCents: number | null;
  marketCents: number | null;
- ai: Partial<Record<"brand" | "era" | "material" | "condition" | "category" | "title" | "description" | "runway", string | null>>;
+ ai: Partial<Record<"brand" | "era" | "material" | "condition" | "category" | "title" | "description" | "runway" | "celebrity", string | null>>;
  reverseImage?: unknown;
  promptVersion?: string | null;
  trust: string;
@@ -85,14 +87,14 @@ export async function recordIntakeExample(x: IntakeExample): Promise<void> {
  await db()`
   INSERT INTO training_examples
    (source, store_slug, item_ref, image_urls, brand, era, material, condition, category, size, title, description,
-    price_cents, market_cents, ai_brand, ai_era, ai_material, ai_condition, ai_category, ai_title, ai_description, ai_runway,
+    price_cents, market_cents, ai_brand, ai_era, ai_material, ai_condition, ai_category, ai_title, ai_description, ai_runway, ai_celebrity,
     accepted, reverse_image, prompt_version, trust)
   VALUES ('intake', ${x.storeSlug}, ${x.itemId}, ${JSON.stringify(x.imageUrls ?? [])},
    ${clean(f.brand, 80)}, ${clean(f.era, 40)}, ${clean(f.material, 120)}, ${clean(f.condition, 80)}, ${clean(f.category, 60)}, ${clean(f.size, 40)},
    ${clean(f.title, 200)}, ${clean(f.description, 2000)},
    ${x.priceCents ?? null}, ${x.marketCents ?? null},
    ${clean(ai.brand, 80)}, ${clean(ai.era, 40)}, ${clean(ai.material, 120)}, ${clean(ai.condition, 80)}, ${clean(ai.category, 60)},
-   ${clean(ai.title, 200)}, ${clean(ai.description, 2000)}, ${clean(ai.runway, 120)},
+   ${clean(ai.title, 200)}, ${clean(ai.description, 2000)}, ${clean(ai.runway, 120)}, ${clean(ai.celebrity, 120)},
    ${JSON.stringify(accepted)}, ${x.reverseImage ? JSON.stringify(x.reverseImage) : null}, ${x.promptVersion ?? null}, ${x.trust})
   ON CONFLICT (source, item_ref) DO UPDATE SET
    image_urls = EXCLUDED.image_urls, brand = EXCLUDED.brand, era = EXCLUDED.era, material = EXCLUDED.material,
@@ -129,6 +131,27 @@ export async function backfillFromProducts(): Promise<number> {
     CASE WHEN p.price IS NOT NULL THEN round(p.price * 100)::int ELSE NULL END, 'medium'
    FROM products p
    WHERE p.image IS NOT NULL AND p.image <> '' AND p.title IS NOT NULL
+   ON CONFLICT (source, item_ref) DO NOTHING
+   RETURNING 1
+  ) SELECT count(*)::int AS n FROM ins
+ `.catch(() => [{ n: 0 }])) as { n: number }[];
+ return rows[0]?.n ?? 0;
+}
+
+/** Backfill SOLD/removed pieces into the dataset. A sold item is a real photo of something that
+ *  actually moved at a real price — the best kind of comp — but it's deleted from the live catalog
+ *  when it sells, so the item/product backfills can't see it. This keeps every sold piece in the
+ *  identification library (and its price in the answer key). Idempotent; keyed by the sold row id. */
+export async function backfillFromSold(): Promise<number> {
+ await ensureTable();
+ const rows = (await db()`
+  WITH ins AS (
+   INSERT INTO training_examples (source, store_slug, item_ref, image_urls, brand, title, size, price_cents, trust)
+   SELECT 'sold', s.store_slug, 'sold-' || s.id::text,
+    jsonb_build_array(s.image), s.designer, s.title, s.size,
+    CASE WHEN s.final_price IS NOT NULL THEN round(s.final_price * 100)::int ELSE NULL END, 'high'
+   FROM sold_items s
+   WHERE s.image IS NOT NULL AND s.image <> '' AND s.title IS NOT NULL AND s.final_price > 0
    ON CONFLICT (source, item_ref) DO NOTHING
    RETURNING 1
   ) SELECT count(*)::int AS n FROM ins
@@ -245,18 +268,24 @@ export async function embedPendingTrainingExamples(limit = 60): Promise<Referenc
  `.catch(() => [])) as { id: number; image_urls: unknown }[];
  let embedded = 0, badImage = 0, rateLimited = 0;
  for (const r of rows) {
- const url = Array.isArray(r.image_urls) && r.image_urls[0] ? String(r.image_urls[0]) : null;
- if (!url) { await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); badImage++; continue; }
+ const urls = Array.isArray(r.image_urls) ? r.image_urls.filter((u): u is string => typeof u === "string" && !!u) : [];
+ if (!urls.length) { await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); badImage++; continue; }
+ // Try each photo in turn: a dead PRIMARY link shouldn't skip a piece whose 2nd/3rd frame is fine
+ // (the single biggest cause of the un-embedded gap). Only give up when EVERY frame is unusable.
+ let saved = false, throttled = false;
+ for (const url of urls.slice(0, 4)) {
  const { embedding, status } = await embedImageResult(url);
  if (status === "ok" && embedding && embedding.length) {
  await db()`UPDATE training_examples SET embedding = ${JSON.stringify(embedding)} WHERE id = ${r.id}`.catch(() => {});
- embedded++;
- } else if (status === "bad_image") {
- await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); // permanent skip — the URL is unusable
- badImage++;
- } else {
- rateLimited++; // throttled/transient — LEAVE it null so the next run retries it
+ embedded++; saved = true; break;
  }
+ if (status !== "bad_image") { throttled = true; break; } // rate-limited/transient — retry the whole row next run
+ // bad_image → fall through and try the next frame
+ }
+ if (saved) continue;
+ if (throttled) { rateLimited++; continue; } // LEAVE it null so the next run retries it
+ await db()`UPDATE training_examples SET embedding = '[]' WHERE id = ${r.id}`.catch(() => {}); // every frame unusable
+ badImage++;
  }
  return getReferenceIndexStats().then((st) => ({ ...st, embedded, badImage, rateLimited }));
 }

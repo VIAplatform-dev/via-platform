@@ -90,6 +90,18 @@ export async function reverseImageBestOf(
  return { matches: merged, framesUsed };
 }
 
+// Editorial / archival photo sources — Getty & the fashion press. Their captions are the richest
+// PROVENANCE signal (who wore it, which show/season) and frequently DON'T name the brand, so they'd
+// be dropped by the brand filter that guards pricing. We mine them separately for runway + celebrity.
+const EDITORIAL_SOURCE = /getty|gettyimages|wireimage|imaxtree|shutterstock|vogue|wwd\.com|\bwwd\b|gorunway|firstview|nowfashion|launchmetrics|harper|harpersbazaar|elle\.com|hola|popsugar|whowhatwear|redcarpet/i;
+
+/** Titles/captions of reverse-image matches that come from editorial/Getty sources — the raw
+ *  evidence for "documented on the runway" and "as seen on <celebrity>". Kept UN-brand-filtered
+ *  on purpose: a red-carpet caption naming the wearer rarely repeats the brand. [] if none. */
+export function editorialCaptions(matches: VisualMatch[]): string[] {
+ return matches.filter((m) => m.title && EDITORIAL_SOURCE.test(m.source || "")).map((m) => m.title).slice(0, 20);
+}
+
 /** Reverse-image matches that carry a price → resale comps. Visually-identical items
  *  are the truest comps there are, so these anchor the valuation. */
 export function matchesToComps(matches: VisualMatch[]): Comp[] {

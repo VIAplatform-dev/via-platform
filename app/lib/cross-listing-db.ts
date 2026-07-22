@@ -181,6 +181,22 @@ export async function getCrossListingsByPlatform(storeSlug: string, platform: st
  return rows.map((r) => ({ itemId: r.item_id, platform: r.platform, status: r.status, externalUrl: r.external_url ?? null }));
 }
 
+// Recent failed cross-listings with the stored reason (on error, external_url holds the message).
+// The board only shows a per-platform status, so this is how you see WHY something failed.
+export async function getCrossListingErrors(storeSlug: string, platform?: string): Promise<{ itemId: string; title: string; platform: string; status: string; error: string | null; updatedAt: string }[]> {
+ await ensureTables();
+ const rows = (await db()`
+  SELECT c.item_id, c.platform, c.status, c.external_url, c.updated_at, i.title
+  FROM cross_listings c LEFT JOIN items i ON i.id::text = c.item_id
+  WHERE c.store_slug = ${storeSlug} AND c.status = 'error'
+  ORDER BY c.updated_at DESC LIMIT 50
+ `.catch(() => [])) as any[];
+ return rows
+  .filter((r) => !platform || r.platform === platform)
+  .slice(0, 25)
+  .map((r) => ({ itemId: r.item_id, title: r.title ?? "(unknown item)", platform: r.platform, status: r.status, error: r.external_url ?? null, updatedAt: r.updated_at }));
+}
+
 export async function markCrossListing(storeSlug: string, itemId: string, platform: string, status: string, externalUrl?: string | null): Promise<void> {
  await ensureTables();
  await db()`
@@ -248,7 +264,7 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
  return toPull;
 }
 
-export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 
 /** Every active/pending item with its per-platform cross-listing status + engagement, for the tab. */
 export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> {
@@ -257,7 +273,8 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  const [rows, statRows, vyaOffers] = await Promise.all([
  sql`
   SELECT i.id::text AS item_id, i.title, i.price_cents, i.images, i.status,
-   COALESCE(json_object_agg(c.platform, c.status) FILTER (WHERE c.platform IS NOT NULL), '{}') AS listings
+   COALESCE(json_object_agg(c.platform, c.status) FILTER (WHERE c.platform IS NOT NULL), '{}') AS listings,
+   COALESCE(json_object_agg(c.platform, c.external_url) FILTER (WHERE c.status = 'error' AND c.external_url IS NOT NULL), '{}') AS errors
   FROM items i JOIN sellers s ON s.id = i.seller_id
   LEFT JOIN cross_listings c ON c.item_id = i.id::text AND c.store_slug = ${storeSlug}
   WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved')
@@ -287,6 +304,7 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  itemId: r.item_id, title: String(r.title || "Item"), priceCents: Number(r.price_cents || 0),
  image: Array.isArray(r.images) ? (r.images[0] ?? null) : null, status: String(r.status),
  listings: (r.listings && typeof r.listings === "object") ? r.listings : {},
+ errors: (r.errors && typeof r.errors === "object") ? r.errors : {},
  stats: { totals, byPlatform },
  };
  });

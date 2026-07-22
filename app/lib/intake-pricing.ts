@@ -3,7 +3,7 @@ import { getMinMarkupBps } from "./store-pricing-db";
 import { getStorePricingSignal, getVisualVyaComps } from "./intake-memory-db";
 import { getStoreBrief, briefPricingTarget } from "./store-brief-db";
 import { fetchResaleTrend, type Comp } from "./comps";
-import { identifyRunway, isIntakeConfigured } from "./ai-intake";
+import { identifyRunway, identifyCelebrity, isIntakeConfigured } from "./ai-intake";
 import { getPieceRunway, savePieceRunway } from "./comp-cache-db";
 import { gate } from "./concurrency";
 
@@ -82,11 +82,13 @@ export async function computeListingPricing(opts: {
  mainUrl: string;
  extraComps: Comp[]; // reverse-image comps for the valuation
  reverseTitles: string[]; // reverse-image match titles, for runway mining
+ editorialTitles?: string[]; // editorial/Getty captions (un-brand-filtered) — provenance evidence
  embedding?: number[]; // the intake photo embedding — for VYA visual price comps (already computed, no extra cost)
  knowledgeHintCents: number | null;
  runwaySoFar: string | null; // runway the seller/draft already provided
+ celebritySoFar?: string | null; // celebrity provenance the seller/draft already provided
  draftRanFull: boolean; // did the full vision draft run? gates the proactive runway pass
-}): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; runway: string | null }> {
+}): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; runway: string | null; celebrity: string | null }> {
  const brandVal = opts.brand.trim();
  const baseTitle = opts.title || [opts.era, opts.material, opts.category].filter(Boolean).join(" ");
  const brandTitle = brandVal && !baseTitle.toLowerCase().includes(brandVal.toLowerCase()) ? `${brandVal} ${baseTitle}` : baseTitle;
@@ -101,6 +103,16 @@ export async function computeListingPricing(opts: {
  const visualComps = opts.embedding?.length ? await getVisualVyaComps(opts.embedding).catch(() => []) : [];
  const comps = [...opts.extraComps, ...visualComps];
 
+ // Celebrity provenance — resolved BEFORE pricing so a verified "worn by" can lift the estimate.
+ // Only runs when reverse-image surfaced editorial/Getty captions (the evidence), so the common
+ // case costs nothing. Seller/draft value wins; otherwise confirm the exact piece against the photo.
+ let celebrity: string | null = (opts.celebritySoFar || "").trim() || null;
+ const editorialTitles = opts.editorialTitles || [];
+ if (!celebrity && editorialTitles.length && isIntakeConfigured()) {
+ const c = await AI_GATE().run(() => identifyCelebrity(opts.imageUrls, brandVal, opts.title, editorialTitles)).catch(() => null);
+ if (c) celebrity = c.context ? `${c.name} (${c.context})` : c.name;
+ }
+
  let estimate: PriceEstimate | null = null;
  let priceFlag: PriceFlag | null = null;
  if (needPrice) {
@@ -114,7 +126,7 @@ export async function computeListingPricing(opts: {
  minMarkupBps,
  knowledgeHintCents: opts.knowledgeHintCents,
  extraComps: comps,
- context: { brand: brandVal || null, era: opts.era || null, condition: opts.condition || null, conditionGrade: opts.conditionGrade || opts.condition || null, runway: opts.runwaySoFar, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
+ context: { brand: brandVal || null, era: opts.era || null, condition: opts.condition || null, conditionGrade: opts.conditionGrade || opts.condition || null, runway: opts.runwaySoFar, celebrity, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
  })).catch(() => null);
  if (estimate && trend?.trending) estimate.rationale += ` · 🔥 ${brandVal} trending (${trend.note})`;
  if (estimate && estimate.marketCents) {
@@ -139,7 +151,9 @@ export async function computeListingPricing(opts: {
  let runway: string | null = opts.runwaySoFar;
  if (!runway && brandVal) {
  runway = await getPieceRunway(brandVal, opts.title).catch(() => null); // seen this exact piece before?
- const titles = [...opts.reverseTitles, ...(estimate?.comps || []).map((c) => c.title)];
+ // Editorial/Getty captions (e.g. "…walks the runway at the Prada F/W 2004 show") are prime
+ // season evidence and are included here even though they skip the brand filter used for pricing.
+ const titles = [...opts.reverseTitles, ...editorialTitles, ...(estimate?.comps || []).map((c) => c.title)];
  if (!runway) runway = extractRunway(brandVal, titles); // resellers often cite the season in comps
  if (!runway && !opts.draftRanFull && isIntakeConfigured()) {
  // Proactive: recognize the piece from the photo + comps even when nobody labeled it a runway.
@@ -149,5 +163,5 @@ export async function computeListingPricing(opts: {
  }
  if (runway && brandVal && opts.title) await savePieceRunway(brandVal, opts.title, runway).catch(() => {});
 
- return { estimate, priceFlag, runway };
+ return { estimate, priceFlag, runway, celebrity };
 }

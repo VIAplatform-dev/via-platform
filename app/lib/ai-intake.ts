@@ -217,3 +217,48 @@ export async function identifyRunway(
  return null;
  }
 }
+
+// Is this EXACT piece documented on a named public figure? Reverse-image search often surfaces
+// Getty / red-carpet photos of the same garment; those captions (passed in) name the wearer + event.
+// This confirms it against the actual photo so we only assert a same-garment match — a "worn by"
+// claim lifts price and is shown to buyers, so the bar is HIGH: it must be the same piece, not a
+// look-alike or merely the same brand, and we NEVER fabricate a name. Returns null for anything less.
+export async function identifyCelebrity(
+ imageUrls: string[],
+ brand: string,
+ item: string,
+ editorialCaptions: string[],
+): Promise<{ name: string; context: string | null } | null> {
+ const apiKey = process.env.ANTHROPIC_API_KEY;
+ if (!apiKey) return null;
+ const images = imageUrls.filter(Boolean).slice(0, 2).map((url) => ({ type: "image", source: { type: "url", url } }));
+ if (!images.length) return null;
+ const caps = editorialCaptions.filter(Boolean).slice(0, 20).map((t) => `- ${t}`).join("\n");
+ // Without editorial captions there's no documented-wear evidence to confirm against — don't guess.
+ if (!caps) return null;
+ const prompt = `You are a fashion archivist verifying celebrity provenance for a resale listing. The pictured piece is${brand ? ` ${brand}` : ""}${item ? ` — ${item}` : ""}.\n\nReverse-image search returned these editorial/Getty photo captions of visually-matching images (evidence — they often name who is wearing the piece and the event):\n${caps}\n\nWas THIS EXACT piece (the same garment/accessory in the photo — same design, not merely the same brand or a similar style) worn by a specific, named public figure in these documented photos? Only answer with a name if the captions clearly attribute this same piece to a real named person AND the photographed garment genuinely matches. Give the person's real full name and, briefly, the occasion if stated (e.g. "at the 2003 Met Gala"). Return null for an unnamed model, a generic runway/stock caption, a different garment, or any uncertainty. NEVER invent or guess a name.\nReturn ONLY JSON: {"name": string|null, "context": string|null, "confidence": 0..1}.`;
+ try {
+ const res = await fetch(ANTHROPIC_URL, {
+ method: "POST",
+ headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+ body: JSON.stringify({
+ model: INTAKE_MODEL,
+ max_tokens: 200,
+ messages: [{ role: "user", content: [...images, { type: "text", text: prompt }] }],
+ }),
+ });
+ if (!res.ok) return null;
+ const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+ const text = data.content?.find((c) => c.type === "text")?.text ?? "";
+ const m = text.match(/\{[\s\S]*\}/);
+ if (!m) return null;
+ const parsed = JSON.parse(m[0]) as { name?: unknown; context?: unknown; confidence?: unknown };
+ const name = typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim().slice(0, 80) : null;
+ const context = typeof parsed.context === "string" && parsed.context.trim() ? parsed.context.trim().slice(0, 120) : null;
+ const conf = typeof parsed.confidence === "number" ? parsed.confidence : 0;
+ // Higher bar than runway: naming a person is a stronger, more falsifiable public claim.
+ return name && conf >= 0.6 ? { name, context } : null;
+ } catch {
+ return null;
+ }
+}

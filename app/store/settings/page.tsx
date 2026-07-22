@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardHeader, PageHeader, Button, Input, Field, cn } from "../ui";
+import { SHIPPING_TIERS } from "@/app/lib/shipping-tiers";
 
 type ShipFrom = { name?: string; street1?: string; street2?: string; city?: string; state?: string; zip?: string; country?: string; phone?: string };
 type ShipMode = "buyer_pays" | "store_pays" | "free_over";
@@ -219,8 +220,24 @@ export default function SettingsPage() {
   {/* Shipping */}
   {tab === "shipping" && (
   <Card>
-  <CardHeader title="Shipping" />
+  <CardHeader title="Shipping" subtitle="Buyers pay one clean flat rate by size — VYA buys the real carrier label and handles the rest." />
   <div className="space-y-5 px-5 py-4">
+   <div>
+   <p className="mb-1 text-[13px] font-medium text-stone-700">Flat rates</p>
+   <p className="mb-3 text-xs text-stone-500">Each piece is auto-sized from its weight and dimensions — the buyer just sees one price. No live-rate math, no odd numbers.</p>
+   <div className="grid grid-cols-3 gap-2">
+    {SHIPPING_TIERS.map((t) => (
+    <div key={t.id} className="rounded-lg border border-stone-200 bg-stone-50/60 p-3">
+     <div className="flex items-baseline justify-between gap-1">
+     <span className="text-[13px] font-semibold text-stone-900">{t.label}</span>
+     <span className="text-[15px] font-semibold text-[#5D0F17]">${(t.priceCents / 100).toFixed(0)}</span>
+     </div>
+     <p className="mt-1 text-[11px] leading-snug text-stone-500">{t.examples}</p>
+    </div>
+    ))}
+   </div>
+   </div>
+
    <Field label="Ship-from address">
    <div className="grid grid-cols-2 gap-2">
     <Input className="col-span-2" value={from.name || ""} onChange={(e) => setF("name", e.target.value)} placeholder="Name / store" />
@@ -238,9 +255,9 @@ export default function SettingsPage() {
    <p className="mb-2 text-[13px] font-medium text-stone-700">Who pays for shipping</p>
    <div className="space-y-2">
     {([
-    ["buyer_pays", "Buyer pays", "Live rate shown at checkout, added to the buyer’s total."],
-    ["store_pays", "Free shipping (you absorb it)", "No shipping at checkout; you cover the label cost."],
-    ["free_over", "Free over a threshold", "Buyer pays below the amount, free at/above it."],
+    ["buyer_pays", "Buyer pays", "The flat rate is added to the buyer’s total at checkout."],
+    ["store_pays", "Free shipping (you absorb it)", "No shipping charged; you cover the label at fulfillment."],
+    ["free_over", "Free over a threshold", "Buyer pays the flat rate below the amount, free at/above it."],
     ] as const).map(([m, title, desc]) => (
     <label key={m} className={cn("flex cursor-pointer gap-3 rounded-lg border p-3 transition", mode === m ? "border-[#5D0F17] bg-[#5D0F17]/[0.03]" : "border-stone-200 hover:border-stone-300")}>
      <input type="radio" name="shipmode" checked={mode === m} onChange={() => { setMode(m); setSSaved(false); }} className="mt-0.5 accent-[#5D0F17]" style={{ accentColor: ACCENT }} />

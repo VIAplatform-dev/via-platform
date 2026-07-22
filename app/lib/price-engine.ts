@@ -39,7 +39,7 @@ export async function valueFromComps(
  query: string,
  photoUrl: string | undefined,
  comps: Comp[],
- ctx?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null },
+ ctx?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null },
 ) {
  const fallback = () => {
  const sold = comps.filter((c) => c.sold).map((c) => c.priceCents);
@@ -67,8 +67,8 @@ export async function valueFromComps(
  const apiKey = process.env.ANTHROPIC_API_KEY;
  if (!apiKey || !comps.length) return fallback();
 
- const idLine = ctx && (ctx.brand || ctx.era || ctx.runway)
- ? `\n\nThis piece has been identified as: ${[ctx.brand, ctx.era].filter(Boolean).join(", ")}${ctx.runway ? ` — from the ${ctx.runway} runway collection (archival/collectible)` : ""}.`
+ const idLine = ctx && (ctx.brand || ctx.era || ctx.runway || ctx.celebrity)
+ ? `\n\nThis piece has been identified as: ${[ctx.brand, ctx.era].filter(Boolean).join(", ")}${ctx.runway ? ` — from the ${ctx.runway} runway collection (archival/collectible)` : ""}${ctx.celebrity ? ` — documented worn by ${ctx.celebrity}; verified celebrity provenance earns a MODEST premium (at most ~10-15%) over comps, never a multiple` : ""}.`
  : "";
  // Condition handling. When we have a canonical GRADE, an explicit multiplier is applied downstream —
  // so tell the model to value at STANDARD resale condition and NOT self-discount (avoids double-
@@ -171,7 +171,7 @@ export async function estimatePrice(opts: {
  minMarkupBps: number;
  knowledgeHintCents?: number | null;
  extraComps?: Comp[]; // reverse-image (visually-identical) matches — the strongest comps
- context?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
+ context?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
 }): Promise<PriceEstimate> {
  // Fetch external comps and THIS platform's own realized-price benchmark together. The
  // internal benchmark (privacy-gated, from the nightly market_metrics) is the strongest

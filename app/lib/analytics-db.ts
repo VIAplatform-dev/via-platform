@@ -288,7 +288,53 @@ export async function saveConversion(conversion: ConversionRecord): Promise<{ du
  )
  `;
 
+ await recordConfirmedSales({ storeSlug, storeName: conversion.storeName, orderId: conversion.orderId, currency: origCurrency, soldAt: conversion.timestamp, items: conversion.items }).catch(() => {});
  return { duplicate: false };
+}
+
+let confirmedColEnsured = false;
+
+/**
+ * A confirmed order is the truest price label there is: what a piece ACTUALLY sold for. The matching
+ * sold_items row (captured when the piece dropped off the store feed) already carries the LISTED
+ * price PLUS the photo + embedding the price eval needs — so we upgrade THAT row in place to the real
+ * sold price and flag it `confirmed`. That turns the price answer-key from a guess into a receipt.
+ *
+ * Deliberately UPDATE-only (never an INSERT): the rows worth correcting are the ones with photos, and
+ * they already exist. It's fully isolated — its own try/catch per line, it only ever touches an
+ * unconfirmed row it matches by store + title, writes columns known to exist, and never blocks the
+ * order/conversion flow. A sale of something never in our feed simply counts as `unmatched`.
+ */
+export async function recordConfirmedSales(o: {
+ storeSlug: string; storeName: string; orderId: string; currency: string; soldAt: string; items: ConversionItem[];
+}): Promise<{ upgraded: number; unmatched: number }> {
+ const sql = neon(getDatabaseUrl());
+ if (!confirmedColEnsured) {
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
+ confirmedColEnsured = true;
+ }
+ const cur = (o.currency || "USD").toUpperCase();
+ let upgraded = 0, unmatched = 0;
+ for (const it of o.items || []) {
+ const title = (it.productName || "").trim();
+ const priceUsd = cur === "USD" ? it.price : convertCurrencyToUSD(it.price, cur);
+ if (!title || !(priceUsd > 0)) continue;
+ try {
+ // Upgrade the most-recent matching inferred row to the REAL sold price (keeps its photo+embedding).
+ // original_price is left alone — it's the listed price; final_price now holds what it truly sold for.
+ const up = await sql`
+  UPDATE sold_items SET final_price = ${priceUsd}, confirmed = true, sold_at = ${o.soldAt}
+  WHERE id = (
+   SELECT id FROM sold_items
+   WHERE store_slug = ${o.storeSlug} AND lower(title) = lower(${title}) AND confirmed = false
+   ORDER BY sold_at DESC LIMIT 1
+  )
+  RETURNING id
+ `;
+ if (up.length) upgraded++; else unmatched++;
+ } catch { /* isolated — one bad line never breaks the order flow */ }
+ }
+ return { upgraded, unmatched };
 }
 
 // Resolve an email to a VYA account id (for per-recipient email-link attribution).

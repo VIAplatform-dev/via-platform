@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
  if (!imageUrls.length) return NextResponse.json({ error: "imageUrls required" }, { status: 400 });
  const reverseComps: Comp[] = Array.isArray(body?.reverseComps) ? body.reverseComps : [];
  const reverseTitles: string[] = Array.isArray(body?.reverseTitles) ? body.reverseTitles.filter((t: unknown): t is string => typeof t === "string") : [];
+ const editorialTitles: string[] = Array.isArray(body?.editorialTitles) ? body.editorialTitles.filter((t: unknown): t is string => typeof t === "string") : [];
 
  const pr = await computeListingPricing({
  slug,
@@ -37,10 +38,12 @@ export async function POST(request: NextRequest) {
  mainUrl: imageUrls[0],
  extraComps: reverseComps,
  reverseTitles,
+ editorialTitles,
  knowledgeHintCents: typeof body?.knowledgeHintCents === "number" ? body.knowledgeHintCents : null,
  runwaySoFar: str("runway") || null,
+ celebritySoFar: str("celebrity") || null,
  draftRanFull: body?.draftRanFull === true,
  });
 
- return NextResponse.json({ ok: true, estimate: pr.estimate, priceFlag: pr.priceFlag, runway: pr.runway });
+ return NextResponse.json({ ok: true, estimate: pr.estimate, priceFlag: pr.priceFlag, runway: pr.runway, celebrity: pr.celebrity });
 }

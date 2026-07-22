@@ -194,6 +194,9 @@ export async function initDatabase() {
  await sql`CREATE INDEX IF NOT EXISTS idx_sold_items_sold_at ON sold_items(sold_at DESC)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_sold_items_designer ON sold_items(designer, sold_at DESC)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_sold_items_store ON sold_items(store_slug, sold_at DESC)`;
+ // Confirmed = final_price is the REAL amount from a matched order (a receipt), not the listed price
+ // inferred at feed-drop. Populated by recordConfirmedSales; lets the price eval grade against truth.
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
 
  // Preserve the identity of products removed from the catalog (sold out / renamed) so the
  // events ETL can still resolve their views — otherwise that history orphans and demand for

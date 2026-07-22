@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/app/lib/storeAuth";
-import { getTrainingStats, backfillFromItems, backfillFromProducts } from "@/app/lib/training-data-db";
+import { getTrainingStats, backfillFromItems, backfillFromProducts, backfillFromSold } from "@/app/lib/training-data-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {
- const [items, products] = await Promise.all([backfillFromItems(), backfillFromProducts()]);
- return NextResponse.json({ ok: true, added: { items, products }, ...(await getTrainingStats()) });
+ const [items, products, sold] = await Promise.all([backfillFromItems(), backfillFromProducts(), backfillFromSold()]);
+ return NextResponse.json({ ok: true, added: { items, products, sold }, ...(await getTrainingStats()) });
  } catch (e) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
  }

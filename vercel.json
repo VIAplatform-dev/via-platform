@@ -141,6 +141,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/backfill-training",
+      "schedule": "0 11 * * *"
+    },
+    {
       "path": "/api/cron/embed-reference-index",
       "schedule": "*/15 * * * *"
     }

@@ -7,6 +7,7 @@ import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
 import { getRates, buyLabel, isShippoConfigured } from "@/app/lib/shippo";
+import { shippingMarginCents } from "@/app/lib/shipping-tiers";
 import { sendBuyerTrackingEmail } from "@/app/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -103,7 +104,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const sellerPays = !(order.shippingPaidCents && order.shippingPaidCents > 0);
 
  if (body?.action === "label_quote") {
- return NextResponse.json({ rate: { provider: cheapest.provider, service: cheapest.service, costCents: cheapest.amountCents, estDays: cheapest.estDays, rateId: cheapest.rateId }, sellerPays });
+ // The buyer paid a flat tier at checkout; the real label costs less — the difference is VYA's margin.
+ const buyerPaidCents = order.shippingPaidCents || 0;
+ const marginCents = buyerPaidCents > 0 ? shippingMarginCents(buyerPaidCents, cheapest.amountCents) : 0;
+ return NextResponse.json({ rate: { provider: cheapest.provider, service: cheapest.service, costCents: cheapest.amountCents, estDays: cheapest.estDays, rateId: cheapest.rateId }, sellerPays, buyerPaidCents, marginCents });
  }
 
  if (body?.action === "buy_label") {

@@ -53,6 +53,8 @@ async function ensureTable() {
  // real seller upload. specific_resolved records whether the reference index matched a piece at all.
  await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'title'`.catch(() => {});
  await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS specific_resolved BOOLEAN`.catch(() => {});
+ // Confirmed-sale flag lives on sold_items — ensure it exists so a `confirmedOnly` eval can filter on it.
+ await db()`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
  // A sold item can be graded once PER MODE (title + photo coexist). Replace the old sold-only index.
  await db()`DROP INDEX IF EXISTS uq_price_eval_sold`.catch(() => {});
  await db()`CREATE UNIQUE INDEX IF NOT EXISTS uq_price_eval_sold_mode ON price_eval_items (sold_id, mode)`.catch(() => {});
@@ -77,21 +79,31 @@ export type PriceEvalRun = { requested: number; graded: number; skipped: number;
  *    this mirrors a real seller upload and is the honest test of "can VYA price from a photo?".
  * Costs SerpApi (reverse-image + comps) per item; keep the sample small. Accumulates per (sale, mode).
  */
-export async function runPriceEval(opts: { sample: number; photoOnly?: boolean }): Promise<PriceEvalRun> {
+export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; confirmedOnly?: boolean }): Promise<PriceEvalRun> {
  await ensureTable();
  const sample = Math.max(1, Math.min(40, Math.round(opts.sample) || 12));
  const mode = opts.photoOnly ? "photo" : "title";
  const sql = db();
 
- // Prefer sales not yet graded IN THIS MODE (grow coverage), newest first.
- const rows = (await sql`
+ // Prefer sales not yet graded IN THIS MODE (grow coverage), newest first. `confirmedOnly` grades
+ // against ONLY real confirmed order prices (the receipts) — the truest answer key, once we have them.
+ const rows = (await (opts.confirmedOnly
+ ? sql`
+  SELECT s.id, s.title, s.designer, s.final_price, s.image, s.embedding
+  FROM sold_items s
+  LEFT JOIN price_eval_items p ON p.sold_id = s.id AND p.mode = ${mode}
+  WHERE s.image IS NOT NULL AND s.image <> '' AND s.final_price > 0 AND s.confirmed = true AND p.id IS NULL
+  ORDER BY s.sold_at DESC
+  LIMIT ${sample}
+ `
+ : sql`
   SELECT s.id, s.title, s.designer, s.final_price, s.image, s.embedding
   FROM sold_items s
   LEFT JOIN price_eval_items p ON p.sold_id = s.id AND p.mode = ${mode}
   WHERE s.image IS NOT NULL AND s.image <> '' AND s.final_price > 0 AND p.id IS NULL
   ORDER BY s.sold_at DESC
   LIMIT ${sample}
- `.catch(() => [])) as any[];
+ `).catch(() => [])) as any[];
 
  const g = gate("price-eval", 3);
  const graded = await Promise.all(rows.map((r) => g.run(async () => {

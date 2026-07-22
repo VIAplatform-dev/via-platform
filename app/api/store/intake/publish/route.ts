@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
  title: typeof ai.title === "string" ? ai.title : null,
  description: typeof ai.description === "string" ? ai.description : null,
  runway: typeof body.runway === "string" ? body.runway : null,
+ celebrity: typeof body.celebrity === "string" ? body.celebrity : null,
  },
  reverseImage: body.reverseImage ?? null,
  promptVersion: typeof body.promptVersion === "string" ? body.promptVersion : null,

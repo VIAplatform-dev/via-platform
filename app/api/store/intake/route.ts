@@ -9,7 +9,7 @@ import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
 import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
 import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
-import { reverseImageBestOf, matchesToComps, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { reverseImageBestOf, matchesToComps, editorialCaptions, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
 
@@ -196,6 +196,7 @@ export async function POST(request: NextRequest) {
  let estimate = null;
  let priceFlag = null;
  let runway: string | null = has("runway") ? val("runway") : (draft?.runway ?? null);
+ let celebrity: string | null = has("celebrity") ? val("celebrity") : null;
  // Price comps must be SAME-BRAND or they poison the valuation. Filter the reverse-image matches to
  // the resolved brand — the seller's if they typed one, else the Lens-consensus / drafted brand
  // (the common AI-intake case, where without this the raw look-alike matches flowed in unfiltered).
@@ -205,6 +206,9 @@ export async function POST(request: NextRequest) {
  const pricingMatches = brandFiltered.length ? brandFiltered : relevantMatches;
  const reverseComps = matchesToComps(pricingMatches);
  const reverseTitles = pricingMatches.map((m) => m.title);
+ // Editorial/Getty captions from the FULL match set (not brand-filtered) — provenance evidence
+ // for runway season + celebrity "worn by", which rarely repeat the brand in the caption.
+ const editorialTitles = editorialCaptions(matches);
  if (!draftOnly) {
  const pr = await computeListingPricing({
  slug,
@@ -221,23 +225,26 @@ export async function POST(request: NextRequest) {
  mainUrl,
  extraComps: reverseComps,
  reverseTitles,
+ editorialTitles,
  embedding: embedding ?? undefined,
  knowledgeHintCents: draft?.priceHint ? draft.priceHint * 100 : null,
  runwaySoFar: runway,
+ celebritySoFar: celebrity,
  draftRanFull: needDraft,
  });
  estimate = pr.estimate;
  priceFlag = pr.priceFlag;
  if (pr.runway) runway = pr.runway;
  if (draft && runway) draft.runway = runway;
+ if (pr.celebrity) celebrity = pr.celebrity;
  }
 
  return NextResponse.json({
- ok: true, draft, ghostUrl, photoroom: isPhotoroomConfigured(), estimate, priceFlag, runway, embedding, promptVersion: PROMPT_VERSION,
+ ok: true, draft, ghostUrl, photoroom: isPhotoroomConfigured(), estimate, priceFlag, runway, celebrity, embedding, promptVersion: PROMPT_VERSION,
  // For phase 2 (/api/store/intake/pricing): the reverse-image comps/titles + whether the draft ran.
  // searchQuery is the EFFECTIVE comp query (the specific-piece query when we resolved one) — the
  // client threads it to /pricing so phase-2 comps are as tight as phase-1's.
- needDraft, reverseComps, reverseTitles, searchQuery: specific?.query || draft?.searchQuery || null,
+ needDraft, reverseComps, reverseTitles, editorialTitles, searchQuery: specific?.query || draft?.searchQuery || null,
  // Specific-piece resolution (Phase 2): the exact model we matched, for the "Looks like…" cue.
  specificPiece: specific ? { model: specific.model, similarity: specific.similarity, era: specific.era, source: specific.source, refPriceCents: specific.priceCents } : null,
  // Only surface the reverse-image brand banner when WE identified the brand — never

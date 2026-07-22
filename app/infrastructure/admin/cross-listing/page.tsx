@@ -10,7 +10,8 @@ type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { configured: boolean; connected: boolean; user: string | null };
 type Etsy = { configured: boolean; connected: boolean; shop: string | null };
 type PlatformStats = { likes: number; offers: number; views: number; watchers: number };
-type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; errors?: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+type EbayReady = { readyToList: boolean; tokenValid: boolean; policies: { fulfillment: boolean; payment: boolean; return: boolean } };
 type Content = { title: string; body: string; tags: string[]; price: string };
 
 const money = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
@@ -35,6 +36,9 @@ export default function CrossListingPage() {
  const [content, setContent] = useState<Record<string, Content> | null>(null);
  const [copied, setCopied] = useState<string | null>(null);
  const [soldMenu, setSoldMenu] = useState<string | null>(null);
+ const [ebayReady, setEbayReady] = useState<EbayReady | null>(null);
+ const [ebaySetupBusy, setEbaySetupBusy] = useState(false);
+ const [retrying, setRetrying] = useState<string | null>(null);
 
  async function load() {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
@@ -84,6 +88,27 @@ export default function CrossListingPage() {
  try { await navigator.clipboard.writeText(v); setCopied(key); setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500); } catch { /* ignore */ }
  }
 
+ // Once eBay is connected, check whether it's actually ready to list (opted in + all 3 policies).
+ useEffect(() => {
+ if (!ebay?.connected) return;
+ let active = true;
+ fetch("/api/store/cross-listing/ebay/status").then((x) => (x.ok ? x.json() : null)).then((r) => { if (active && r?.ok) setEbayReady(r); }).catch(() => {});
+ return () => { active = false; };
+ }, [ebay?.connected]);
+
+ async function runEbaySetup() {
+ setEbaySetupBusy(true);
+ const r = await fetch("/api/store/cross-listing/ebay/setup", { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ if (r) setEbayReady({ readyToList: !!r.ok, tokenValid: true, policies: r.policies });
+ setEbaySetupBusy(false);
+ }
+ async function retry(itemId: string) {
+ setRetrying(itemId);
+ const r = await fetch("/api/store/cross-listing/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ if (r?.ok && r.board) setBoard(r.board);
+ setRetrying(null);
+ }
+
  const connected = platforms.filter((p) => acct(p.key) || (p.key === "ebay" && ebay?.connected) || (p.key === "etsy" && etsy?.connected));
 
  // Engagement roll-up helpers: a human name per channel + a per-platform breakdown for the tooltip.
@@ -118,8 +143,18 @@ export default function CrossListingPage() {
  <span className="flex-1 text-[12px] text-stone-400">Not set up on the server yet (needs eBay app keys).</span>
  ) : ebay?.connected ? (
  <>
- <span className="flex-1 truncate text-[13px] text-emerald-700">✓ Connected{ebay.user ? ` · ${ebay.user}` : ""} — auto-posts for real</span>
- <button onClick={() => disconnect("ebay")} className="text-[12px] text-stone-400 hover:text-rose-600">Disconnect</button>
+ <div className="min-w-0 flex-1">
+ <p className="truncate text-[13px] text-emerald-700">✓ Connected{ebay.user ? ` · ${ebay.user}` : ""} — auto-posts for real</p>
+ {ebayReady && (ebayReady.readyToList ? (
+ <p className="text-[11px] text-emerald-600">Ready to list — payment, shipping &amp; returns are set.</p>
+ ) : (
+ <div className="mt-0.5 flex flex-wrap items-center gap-2">
+ <span className="text-[11px] text-amber-600">eBay needs business policies before it can list.</span>
+ <button onClick={runEbaySetup} disabled={ebaySetupBusy} className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50">{ebaySetupBusy ? "Setting up…" : "Set up automatically"}</button>
+ </div>
+ ))}
+ </div>
+ <button onClick={() => disconnect("ebay")} className="self-start text-[12px] text-stone-400 hover:text-rose-600">Disconnect</button>
  </>
  ) : (
  <>
@@ -224,6 +259,15 @@ export default function CrossListingPage() {
  )}
  </div>
  </div>
+
+ {it.errors && Object.keys(it.errors).length > 0 && (
+ <div className="mt-2 rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2">
+ {Object.entries(it.errors).map(([k, msg]) => (
+ <p key={k} className="text-[11px] leading-snug text-rose-700"><span className="font-semibold">{nameFor(k)} couldn’t list:</span> {msg}</p>
+ ))}
+ <button onClick={() => retry(it.itemId)} disabled={retrying === it.itemId} className="mt-1.5 rounded bg-rose-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-rose-700 disabled:opacity-50">{retrying === it.itemId ? "Retrying…" : "Retry"}</button>
+ </div>
+ )}
 
  {open === it.itemId && (
  <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50/60 p-3">

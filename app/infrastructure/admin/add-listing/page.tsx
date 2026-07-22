@@ -100,6 +100,7 @@ export default function IntakePage() {
  const [phase, setPhase] = useState<"form" | "done">("form");
  const [photos, setPhotos] = useState<string[]>([]);
  const [runway, setRunway] = useState<string | null>(null);
+ const [celebrity, setCelebrity] = useState<string | null>(null);
  const [ghost, setGhost] = useState<string | null>(null);
  const [busy, setBusy] = useState(false);
  const [busyMsg, setBusyMsg] = useState("");
@@ -245,6 +246,7 @@ export default function IntakePage() {
  setPromptVersion(d.promptVersion || null);
  if (dr?.careTag) setCareTag(dr.careTag);
  if (d.runway || dr?.runway) setRunway(d.runway ?? dr?.runway);
+ if (d.celebrity) setCelebrity(d.celebrity);
 
  // Flag risky fields the AI filled (were blank) with low confidence — before merge.
  if (dr) {
@@ -292,11 +294,12 @@ export default function IntakePage() {
  conditionGrade: filled.condition || dr?.conditionGrade || dr?.condition?.value || "",
  price: filled.price || "",
  runway: (d.runway ?? dr?.runway) || "",
+ celebrity: d.celebrity || "",
  };
  const r2 = await fetch("/api/store/intake/pricing", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: d.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
+ body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: d.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], editorialTitles: d.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
  });
  const d2 = await r2.json().catch(() => null);
  if (r2.ok && d2) {
@@ -308,6 +311,7 @@ export default function IntakePage() {
  setPriceHigh(typeof est?.highCents === "number" ? Math.round(est.highCents / 100) : null);
  setPriceFlag(d2.priceFlag ?? null);
  if (d2.runway) setRunway(d2.runway);
+ if (d2.celebrity) setCelebrity(d2.celebrity);
  setForm((f) => {
  if (String(f.price).trim()) return f; // seller's own price stands
  if (est?.suggestedCents) return { ...f, price: String(Math.round(est.suggestedCents / 100)) };
@@ -359,7 +363,7 @@ export default function IntakePage() {
  const r = await fetch("/api/store/intake/publish", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ ...form, status, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, runway, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
+ body: JSON.stringify({ ...form, status, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
@@ -372,7 +376,7 @@ export default function IntakePage() {
  }
 
  function reset() {
- setPhase("form"); setPhotos([]); setRunway(null); setGhost(null); setForm(BLANK);
+ setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
  setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null);
  }
@@ -476,6 +480,7 @@ export default function IntakePage() {
  )}
 
  {runway && <p className="mt-3 text-[12px] text-stone-600">🎬 Runway match: <a href={runwayShowUrl(runway)} target="_blank" rel="noopener noreferrer" className="font-medium underline decoration-stone-300 underline-offset-2 hover:decoration-stone-600">{runway}</a> <span className="text-stone-400">↗ view show</span></p>}
+ {celebrity && <p className="mt-1.5 text-[12px] text-stone-600">⭐ As seen on: <span className="font-medium text-stone-800">{celebrity}</span> <span className="text-stone-400">— confirm before publishing</span></p>}
  {careTag && <p className="mt-3 text-[12px] text-stone-500">Read from care tag: <span className="italic">{careTag}</span></p>}
  {/* Nudge for a tag shot — a legible brand/care label is the single strongest signal for
    getting the brand + era right, and the reverse-image search now scans every frame. */}
