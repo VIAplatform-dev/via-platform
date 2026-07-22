@@ -7,6 +7,8 @@ import { getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
+import { getShippingSettings } from "@/app/lib/store-shipping-db";
+import { flatRateCents } from "@/app/lib/shipping-tiers";
 
 export const dynamic = "force-dynamic";
 const COOKIE = "via_cart";
@@ -31,18 +33,21 @@ export async function POST(request: NextRequest) {
  const buyerEmail = typeof buyer.email === "string" ? buyer.email.trim() : "";
  if (!buyerEmail) return NextResponse.json({ error: "Email is required." }, { status: 400 });
  if (!ship.line1 || !ship.city || !ship.state || !ship.zip) return NextResponse.json({ error: "A full shipping address is required." }, { status: 400 });
- const shippingCostCents = Math.max(0, Math.round(Number(body?.shippingCostCents) || 0));
 
  // Reclaim the buyer's own reserved items, then load the still-available bag.
  await sweepExpiredReservations().catch(() => {});
  const avail = [];
+ const sellerIds = new Set<string>();
  let sellerId = "";
  for (const id of ids) {
  let it = await getItem(id);
  if (it && it.status === "reserved") { await releaseReservation(id).catch(() => {}); it = await getItem(id); }
- if (it && it.status === "active") { avail.push(it); sellerId = it.sellerId; }
+ if (it && it.status === "active") { avail.push(it); sellerId = it.sellerId; sellerIds.add(it.sellerId); }
  }
  if (!avail.length) return NextResponse.json({ error: "Your bag items are no longer available." }, { status: 409 });
+ // One PaymentIntent = one seller's connected account. A mixed-store bag would charge everything to
+ // one seller and misattribute the rest — reject it and let the buyer check out per store.
+ if (sellerIds.size > 1) return NextResponse.json({ error: "Your bag has items from more than one store — please check out one store at a time." }, { status: 409 });
  const seller = await getSellerById(sellerId);
  if (!seller) return NextResponse.json({ error: "Seller not found." }, { status: 404 });
  const pay = await getSellerPayments(seller.slug);
@@ -51,6 +56,19 @@ export async function POST(request: NextRequest) {
  const reserved = [];
  for (const it of avail) { const r = await reserveItem(it.id, token); if (r) reserved.push(it); }
  if (!reserved.length) return NextResponse.json({ error: "Your bag items are no longer available." }, { status: 409 });
+
+ // Server-authoritative shipping — NEVER trust a client-supplied amount (a buyer could POST 0 and
+ // dodge the label). Re-derive the flat tier from the bag's combined parcel + the store's mode,
+ // the same way /cart-shipping does, so the charge and the app fee are always correct.
+ const subtotalForShip = reserved.reduce((s, it) => s + it.priceCents, 0);
+ const shipSettings = await getShippingSettings(seller.slug);
+ const shipFree = shipSettings.mode === "store_pays" || (shipSettings.mode === "free_over" && shipSettings.freeThresholdCents != null && subtotalForShip >= shipSettings.freeThresholdCents);
+ const shippingCostCents = shipFree ? 0 : flatRateCents({
+ weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
+ lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),
+ widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
+ heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
+ });
 
  try {
  const subtotal = reserved.reduce((s, it) => s + it.priceCents, 0);

@@ -81,15 +81,18 @@ export async function POST(request: NextRequest) {
  // Charge the seller (VYA's Vercel account funds the actual registration).
  let charge: { id?: string } | null = null;
  try {
- charge = await stripePost("payment_intents", { amount: String(price.priceCents), currency: "usd", customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA domain — ${domain}` }) as { id?: string };
+ // Idempotency key stops a double-click from charging twice for the same domain.
+ charge = await stripePost("payment_intents", { amount: String(price.priceCents), currency: "usd", customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA domain — ${domain}` }, undefined, `domain-${slug}-${domain}`) as { id?: string };
  } catch {
  return NextResponse.json({ error: "Your card couldn’t be charged — check your payment method in Payments." }, { status: 402 });
  }
 
  const bought = await buyDomain(domain, price.priceCents / 100, contact);
  if (!bought.ok) {
- if (charge?.id) await stripePost("refunds", { payment_intent: charge.id }).catch(() => {}); // charged but couldn't register → refund
- return NextResponse.json({ error: `${bought.error || "Couldn’t register the domain."} You were refunded.` }, { status: 502 });
+ // Charged but registration failed → refund, and only SAY "refunded" if the refund actually went through.
+ let refunded = false;
+ if (charge?.id) refunded = await stripePost("refunds", { payment_intent: charge.id }, undefined, `domain-refund-${charge.id}`).then(() => true).catch(() => false);
+ return NextResponse.json({ error: `${bought.error || "Couldn’t register the domain."} ${refunded ? "You were refunded." : "We couldn’t auto-refund — contact support and we’ll refund you right away."}` }, { status: 502 });
  }
 
  await addDomain(domain).catch(() => {});

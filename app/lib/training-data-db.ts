@@ -313,3 +313,51 @@ export async function getReferenceIndexStats(): Promise<ReferenceIndexStats> {
  const r = rows[0] || { embedded: 0, embeddable: 0, remaining: 0, with_bt: 0 };
  return { embedded: Number(r.embedded), embeddable: Number(r.embeddable), remaining: Number(r.remaining), withBrandTitle: Number(r.with_bt) };
 }
+
+export type LibraryHealth = {
+ total: number; embedded: number; deadImage: number; pending: number;
+ growth: { added7d: number; added30d: number; embedded7d: number; embedded30d: number };
+ deadBySource: { source: string; count: number }[];
+ deadByAge: { last30d: number; d30to180: number; over180d: number };
+ deadTopStores: { store: string; count: number }[];
+};
+
+// One read to answer "what are the dead-image rows?" AND "is the library actually growing?".
+// deadImage = rows we tried and could not embed (all photos unreachable, marked '[]'). Growth uses
+// created_at (new labeled examples flowing in) — proof the library keeps compounding on its own.
+export async function getLibraryHealth(): Promise<LibraryHealth> {
+ await ensureTable();
+ type Row = Record<string, string | number | null>;
+ const [main, bySource, byAge, byStore] = (await Promise.all([
+ db()`
+  SELECT
+   COUNT(*)::int AS total,
+   COUNT(*) FILTER (WHERE embedding IS NOT NULL AND embedding <> '[]')::int AS embedded,
+   COUNT(*) FILTER (WHERE embedding = '[]')::int AS dead_image,
+   COUNT(*) FILTER (WHERE embedding IS NULL AND jsonb_array_length(image_urls) > 0 AND brand IS NOT NULL AND brand <> '' AND title IS NOT NULL AND title <> '')::int AS pending,
+   COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS added_7d,
+   COUNT(*) FILTER (WHERE created_at >= now() - interval '30 days')::int AS added_30d,
+   COUNT(*) FILTER (WHERE embedding IS NOT NULL AND embedding <> '[]' AND created_at >= now() - interval '7 days')::int AS emb_7d,
+   COUNT(*) FILTER (WHERE embedding IS NOT NULL AND embedding <> '[]' AND created_at >= now() - interval '30 days')::int AS emb_30d
+  FROM training_examples
+ `.catch(() => []),
+ db()`SELECT source, COUNT(*)::int AS n FROM training_examples WHERE embedding = '[]' GROUP BY source ORDER BY n DESC`.catch(() => []),
+ db()`
+  SELECT
+   COUNT(*) FILTER (WHERE created_at >= now() - interval '30 days')::int AS recent,
+   COUNT(*) FILTER (WHERE created_at < now() - interval '30 days' AND created_at >= now() - interval '180 days')::int AS mid,
+   COUNT(*) FILTER (WHERE created_at < now() - interval '180 days')::int AS old
+  FROM training_examples WHERE embedding = '[]'
+ `.catch(() => []),
+ db()`SELECT store_slug, COUNT(*)::int AS n FROM training_examples WHERE embedding = '[]' GROUP BY store_slug ORDER BY n DESC LIMIT 10`.catch(() => []),
+ ])) as [Row[], Row[], Row[], Row[]];
+ const m: Row = main[0] || {};
+ const g: Row = byAge[0] || {};
+ return {
+ total: Number(m.total || 0), embedded: Number(m.embedded || 0), deadImage: Number(m.dead_image || 0), pending: Number(m.pending || 0),
+ growth: { added7d: Number(m.added_7d || 0), added30d: Number(m.added_30d || 0), embedded7d: Number(m.emb_7d || 0), embedded30d: Number(m.emb_30d || 0) },
+ deadBySource: bySource.map((r) => ({ source: String(r.source || "?"), count: Number(r.n || 0) })),
+ deadByAge: { last30d: Number(g.recent || 0), d30to180: Number(g.mid || 0), over180d: Number(g.old || 0) },
+ deadTopStores: byStore.map((r) => ({ store: String(r.store_slug || "?"), count: Number(r.n || 0) })),
+ };
+}

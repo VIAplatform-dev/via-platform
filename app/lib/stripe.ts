@@ -30,7 +30,7 @@ function flatten(params: Record<string, any>, prefix = ""): [string, string][] {
  return out;
 }
 
-async function request(method: "GET" | "POST" | "DELETE", path: string, params?: Record<string, any>, stripeAccount?: string): Promise<any> {
+async function request(method: "GET" | "POST" | "DELETE", path: string, params?: Record<string, any>, stripeAccount?: string, idempotencyKey?: string): Promise<any> {
  const encoded = params ? new URLSearchParams(flatten(params)).toString() : "";
  const url = method === "GET" && encoded ? `${STRIPE_API}/${path}?${encoded}` : `${STRIPE_API}/${path}`;
  const res = await fetch(url, {
@@ -40,6 +40,9 @@ async function request(method: "GET" | "POST" | "DELETE", path: string, params?:
  "Content-Type": "application/x-www-form-urlencoded",
  // Acting on a connected account = a direct charge on the seller (merchant of record).
  ...(stripeAccount ? { "Stripe-Account": stripeAccount } : {}),
+ // Idempotency-Key makes a POST safe to retry — Stripe returns the SAME result instead of a
+ // second charge/transfer/refund. Pass a STABLE key per logical action on any money-moving call.
+ ...(idempotencyKey && method === "POST" ? { "Idempotency-Key": idempotencyKey } : {}),
  },
  body: method !== "GET" ? encoded : undefined,
  });
@@ -48,7 +51,7 @@ async function request(method: "GET" | "POST" | "DELETE", path: string, params?:
  return json;
 }
 
-export const stripePost = (path: string, params?: Record<string, any>, stripeAccount?: string) => request("POST", path, params, stripeAccount);
+export const stripePost = (path: string, params?: Record<string, any>, stripeAccount?: string, idempotencyKey?: string) => request("POST", path, params, stripeAccount, idempotencyKey);
 export const stripeGet = (path: string, params?: Record<string, any>, stripeAccount?: string) => request("GET", path, params, stripeAccount);
 export const stripeDelete = (path: string) => request("DELETE", path);
 

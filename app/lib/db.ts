@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { unstable_cache } from "next/cache";
 import { HIDDEN_STORE_SLUGS } from "./stores";
 import { SHOPIFY_STORES } from "./storeConfig";
+import { logError } from "./error-log";
 
 // Products from these slugs are hidden site-wide: manually disabled + stores without Collabs ID.
 export const DISABLED_STORE_SLUGS: string[] = ["velvet-archive", ...HIDDEN_STORE_SLUGS];
@@ -197,6 +198,19 @@ export async function initDatabase() {
  // Confirmed = final_price is the REAL amount from a matched order (a receipt), not the listed price
  // inferred at feed-drop. Populated by recordConfirmedSales; lets the price eval grade against truth.
  await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
+ // Reconcile sold_items schema DRIFT: two historical CREATE TABLE definitions disagreed (this one vs
+ // the market-data one), so whichever ran first won and the other's columns were missing — making the
+ // insert below throw silently. Add every column BOTH definitions and the insert paths reference, so
+ // the table converges no matter which shape exists on a given environment.
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS product_id TEXT`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS product_type TEXT`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS source_id TEXT`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS shopify_product_id TEXT`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS collabs_link TEXT`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS click_count INTEGER NOT NULL DEFAULT 0`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS favorite_count INTEGER NOT NULL DEFAULT 0`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS days_listed INTEGER`.catch(() => {});
+ await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS first_seen_at TIMESTAMPTZ`.catch(() => {});
 
  // Preserve the identity of products removed from the catalog (sold out / renamed) so the
  // events ETL can still resolve their views — otherwise that history orphans and demand for
@@ -415,7 +429,7 @@ export async function syncProducts(
   ${(product.brand || product.productType || "").trim() || null}, ${product.price}, ${product.compareAtPrice ?? product.price}, ${product.currency || "USD"},
   ${product.image || (product.images && product.images[0]) || null}, ${product.size || null}, ${product.productType || null}, ${product.shopifyProductId || null}, NOW()
  WHERE NOT EXISTS (SELECT 1 FROM sold_items s WHERE s.store_slug = ${storeSlug} AND lower(s.title) = lower(${product.title}))
- `.catch(() => {});
+ `.catch((e) => logError("sold_items-import-insert", e, { context: { storeSlug, title: product.title } })); // never swallow — this path silently starved the data layer for months
  }
  continue;
  }

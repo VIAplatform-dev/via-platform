@@ -348,6 +348,26 @@ export async function creditConsignedSale(opts: { productId: string; orderId: st
  return { credited: true, consignorId, cutCents };
 }
 
+/**
+ * Refund hook — undo a consigned sale: return the item to 'active' (it's relisted) and DEBIT back the
+ * consignor's credit, so a refunded sale is never paid out. Idempotent: only a 'sold' item matching
+ * this order reverses (the guarded UPDATE means a repeated refund can't double-debit).
+ */
+export async function reverseConsignedSale(opts: { productId: string; orderId: string }): Promise<{ reversed: boolean; consignorId?: number; cutCents?: number }> {
+ await ensureConsignmentTables();
+ const sql = db();
+ const rows = (await sql`SELECT id, store_slug, consignor_id, split_pct, sold_price_cents FROM consignment_items WHERE product_id = ${opts.productId} AND status = 'sold' AND sold_order_id = ${opts.orderId} LIMIT 1`) as Array<Record<string, unknown>>;
+ if (!rows.length) return { reversed: false };
+ const item = rows[0];
+ const itemId = Number(item.id);
+ const consignorId = Number(item.consignor_id);
+ const cutCents = consignorCutCents(Number(item.sold_price_cents), Number(item.split_pct));
+ const updated = (await sql`UPDATE consignment_items SET status = 'active', sold_order_id = NULL, sold_price_cents = NULL, sold_at = NULL WHERE id = ${itemId} AND status = 'sold' AND sold_order_id = ${opts.orderId} RETURNING id`) as unknown[];
+ if (!updated.length) return { reversed: false };
+ await sql`INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, item_id, order_id) VALUES (${item.store_slug as string}, ${consignorId}, 'sale_reversal', ${-Math.abs(cutCents)}, ${itemId}, ${opts.orderId})`;
+ return { reversed: true, consignorId, cutCents };
+}
+
 // ── Ledger / balance / payouts ────────────────────────────────────────────────
 export async function getConsignorBalanceCents(consignorId: number): Promise<number> {
  await ensureConsignmentTables();
@@ -362,7 +382,7 @@ export async function getPayableBalanceCents(consignorId: number, holdDays: numb
  const sql = db();
  const rows = (await sql`
  SELECT COALESCE(SUM(amount_cents), 0) AS bal FROM consignor_ledger
- WHERE consignor_id = ${consignorId} AND (type <> 'sale_credit' OR created_at <= NOW() - (${holdDays} || ' days')::interval)`) as Array<Record<string, unknown>>;
+ WHERE consignor_id = ${consignorId} AND (type NOT IN ('sale_credit', 'sale_reversal') OR created_at <= NOW() - (${holdDays} || ' days')::interval)`) as Array<Record<string, unknown>>;
  return Number(rows[0]?.bal ?? 0);
 }
 

@@ -168,3 +168,10 @@ export async function orderExistsForPaymentIntent(pi: string): Promise<boolean> 
  const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.stripePaymentIntent, pi)).limit(1);
  return rows.length > 0;
 }
+
+/** The order(s) tied to a PaymentIntent — used to unwind a sale on a dispute/chargeback or refund. */
+export async function getOrdersByPaymentIntent(pi: string): Promise<{ id: string; itemId: string; sellerId: string; status: string }[]> {
+ const db = getDb();
+ const rows = await db.select({ id: orders.id, itemId: orders.itemId, sellerId: orders.sellerId, status: orders.status }).from(orders).where(eq(orders.stripePaymentIntent, pi));
+ return rows.map((r) => ({ id: String(r.id), itemId: String(r.itemId), sellerId: String(r.sellerId), status: String(r.status) }));
+}

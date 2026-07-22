@@ -109,6 +109,14 @@ export async function setStorefrontTheme(storeSlug: string, theme: StorefrontThe
  await sql`UPDATE storefront_settings SET theme = ${clean ? JSON.stringify(clean) : null}::jsonb, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
 }
 
+/** Remove a store's storefront entirely — settings, theme, pages, handle, publish state. A clean
+ *  slate: the public handle stops resolving and the editor reopens blank. Idempotent. */
+export async function deleteStorefront(storeSlug: string): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`DELETE FROM storefront_settings WHERE store_slug = ${storeSlug}`;
+}
+
 /** Public lookup for the storefront page — only enabled rows resolve. */
 export async function getStorefrontByHandle(handle: string): Promise<StorefrontSettings | null> {
  await ensureTable();

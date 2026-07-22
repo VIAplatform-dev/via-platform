@@ -65,6 +65,7 @@ export default function StorefrontEditor() {
  // Details
  const [handle, setHandle] = useState("");
  const [enabled, setEnabled] = useState(false);
+ const [delBusy, setDelBusy] = useState(false);
  const [tagline, setTagline] = useState("");
  const [heroImage, setHeroImage] = useState("");
  const [about, setAbout] = useState("");
@@ -95,6 +96,7 @@ export default function StorefrontEditor() {
  // Captured site (a seller who brought their own site over): they edit THAT, not blocks.
  const [captured, setCaptured] = useState<{ count: number; url: string | null; origin: string | null; pages: string[] } | null>(null);
  const [isAdmin, setIsAdmin] = useState(false); // owner-only: the reset/wipe action
+ const [isPlatformAdmin, setIsPlatformAdmin] = useState(false); // platform admin login only: delete storefront
  const [selPath, setSelPath] = useState("/");
  const [syncBusy, setSyncBusy] = useState(false);
  const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -139,6 +141,7 @@ export default function StorefrontEditor() {
  const d = await sfR.json();
  setHandle(d.settings.handle || ""); setEnabled(!!d.settings.enabled);
  setTagline(d.settings.tagline || ""); setHeroImage(d.settings.heroImage || ""); setAbout(d.settings.about || "");
+ setIsPlatformAdmin(!!d.admin);
  }
  if (dsR.ok) {
  const d = await dsR.json();
@@ -333,6 +336,15 @@ export default function StorefrontEditor() {
  const next = !enabled;
  setEnabled(next);
  await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled: next, tagline, accentColor: colors.accent, heroImage, about }) }).catch(() => setEnabled(!next));
+ }
+
+ // Admin-only: wipe this storefront entirely (settings, design, pages, public URL) and reopen blank.
+ async function removeStorefront() {
+ if (!confirm("DELETE STOREFRONT: wipes this store’s storefront — settings, design, pages, and its public URL. This can’t be undone. Continue?")) return;
+ setDelBusy(true);
+ const r = await fetch("/api/store/storefront", { method: "DELETE" }).catch(() => null);
+ if (r && r.ok) { window.location.reload(); return; }
+ setDelBusy(false);
  }
 
  async function saveDetails() {
@@ -552,6 +564,12 @@ export default function StorefrontEditor() {
  <button onClick={reSync} disabled={syncBusy} className="w-full rounded-md border border-stone-300 px-3 py-1.5 text-[11px] font-medium text-stone-600 hover:border-[#5D0F17] disabled:opacity-50">{syncBusy ? "Syncing…" : "Re-sync from live site (admin)"}</button>
  {(syncBusy || syncMsg) && <p className={`text-[11px] ${syncBusy ? "text-stone-400" : syncMsg!.startsWith("✓") ? "text-green-700" : "text-amber-700"}`}>{syncBusy ? "Re-crawling — a minute or two…" : syncMsg}</p>}
  <button onClick={async () => { if (!confirm("OWNER RESET: discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone — continue?")) return; await fetch("/api/store/capture", { method: "DELETE" }).catch(() => {}); setCaptured(null); }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
+ </div>
+ )}
+ {isPlatformAdmin && (
+ <div className="mt-4 space-y-1.5 border-t border-stone-100 pt-3">
+ <button onClick={removeStorefront} disabled={delBusy} className="w-full rounded-md border border-red-200 px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">{delBusy ? "Deleting…" : "Delete storefront"}</button>
+ <p className="text-[10px] leading-tight text-stone-400">Platform admin only — wipes this storefront entirely.</p>
  </div>
  )}
  </div>

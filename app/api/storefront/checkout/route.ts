@@ -7,6 +7,8 @@ import { getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
+import { getShippingSettings } from "@/app/lib/store-shipping-db";
+import { flatRateCents } from "@/app/lib/shipping-tiers";
 import type { Item } from "@/app/lib/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +40,6 @@ export async function POST(request: NextRequest) {
  const buyerEmail = typeof buyer.email === "string" ? buyer.email.trim() : "";
  if (!buyerEmail) return NextResponse.json({ error: "Email is required." }, { status: 400 });
  if (!ship.line1 || !ship.city || !ship.state || !ship.zip) return NextResponse.json({ error: "A full shipping address is required." }, { status: 400 });
- const shippingCostCents = Math.max(0, Math.round(Number(body?.shippingCostCents) || 0));
 
  // Free expired reservations first, then reclaim any items still reserved in THIS
  // buyer's own cart (e.g. a checkout they opened and backed out of) so they aren't
@@ -59,7 +60,6 @@ export async function POST(request: NextRequest) {
  const base = baseUrl(request);
  const sessions: { sellerSlug: string; url: string; itemIds: string[] }[] = [];
  const reservedAll: string[] = [];
- let shippingApplied = false;
 
  try {
  for (const [sellerId, sellerItems] of bySeller) {
@@ -88,10 +88,17 @@ export async function POST(request: NextRequest) {
  };
  });
  const subtotal = reserved.reduce((s, it) => s + it.priceCents, 0);
- // Buyer-paid shipping (quoted live on the VYA checkout page) is charged once, on
- // the first seller's session — single-seller carts are the norm for a captured store.
- const shipHere = shippingApplied ? 0 : shippingCostCents;
- shippingApplied = true;
+ // Server-authoritative shipping, PER SELLER — each store ships its own parcel, so each session
+ // charges that store's own flat tier. Never a client-supplied value, and not "only the first seller"
+ // (which used to leave sellers 2..N charged for a label the buyer never paid for).
+ const shipSettings = await getShippingSettings(seller.slug);
+ const shipFree = shipSettings.mode === "store_pays" || (shipSettings.mode === "free_over" && shipSettings.freeThresholdCents != null && subtotal >= shipSettings.freeThresholdCents);
+ const shipHere = shipFree ? 0 : flatRateCents({
+ weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
+ lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),
+ widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
+ heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
+ });
  const cur = (reserved[0].currency || "usd").toLowerCase();
  if (shipHere > 0) lineItems[reserved.length] = { quantity: 1, price_data: { currency: cur, unit_amount: shipHere, product_data: { name: "Shipping" } } };
  // Consignment (Model A): route each consigned item's consignor cut into VYA's balance, on top

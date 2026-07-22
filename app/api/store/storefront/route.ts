@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
+import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
 import { stores } from "@/app/lib/stores";
 import {
  getStorefrontBySlug,
  isHandleTaken,
  upsertStorefront,
+ deleteStorefront,
  normalizeHandle,
  type StorefrontSettings,
 } from "@/app/lib/storefront-db";
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
  ok: true,
  settings,
  store: { slug, name: store?.name ?? slug, logo: store?.logo ?? null },
+ admin: isAdminRequest(request), // platform admin (your admin login) — gates the Delete action
  });
 }
 
@@ -82,4 +84,15 @@ export async function POST(request: NextRequest) {
  });
 
  return NextResponse.json({ ok: true, settings: saved });
+}
+
+// DELETE ?store=<slug> — completely remove a store's storefront (settings, theme, pages, publish
+// state). The public handle stops resolving and the editor reopens blank; a fresh one can be built
+// from scratch. PLATFORM ADMIN ONLY — not the store owner; only your admin login can do this.
+export async function DELETE(request: NextRequest) {
+ if (!isAdminRequest(request)) return NextResponse.json({ error: "Admin only." }, { status: 401 });
+ const slug = new URL(request.url).searchParams.get("store") || (await resolveStoreSlugAny(request));
+ if (!slug) return NextResponse.json({ error: "store slug required (?store=<slug>)" }, { status: 400 });
+ await deleteStorefront(slug);
+ return NextResponse.json({ ok: true, deleted: slug });
 }

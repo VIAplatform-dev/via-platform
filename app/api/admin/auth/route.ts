@@ -140,8 +140,11 @@ export async function POST(request: Request) {
  Buffer.from(validOtp.padEnd(6, " "))
  );
  if (!isMatch) {
+ // Invalidate the challenge on a wrong guess so the 6-digit code can't be brute-forced —
+ // one guess per issued code. A mistyped code just means requesting a fresh one.
+ cookieStore.delete("via_admin_otp");
  return NextResponse.json(
- { error: "Incorrect code." },
+ { error: "Incorrect code — request a new one." },
  { status: 401 }
  );
  }

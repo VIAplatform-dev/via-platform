@@ -1,5 +1,6 @@
 import { fetchShopifyProductsPublic } from "@/app/lib/shopifyClient";
 import { formatPrice } from "@/app/lib/formatPrice";
+import { safeUrl } from "@/app/lib/safe-url";
 import type { StoreProfile } from "@/app/lib/store-profile";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -63,22 +64,7 @@ export type ImportResult = {
  error?: string;
 };
 
-/** Reject anything that isn't a plain public web domain (basic SSRF guard). */
-function safeUrl(raw: string): URL | null {
- let u: URL;
- try {
- u = new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw);
- } catch {
- return null;
- }
- if (u.protocol !== "https:" && u.protocol !== "http:") return null;
- const h = u.hostname.toLowerCase();
- if (!h.includes(".")) return null;
- if (h === "localhost" || /\.(local|internal|lan|test)$/.test(h)) return null;
- if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return null; // bare IPv4
- if (h.includes(":")) return null; // IPv6 literal
- return u;
-}
+// SSRF guard lives in ./safe-url so the site-capture crawler shares the exact same allow-list.
 
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);

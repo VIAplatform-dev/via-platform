@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listStripeConnectedConsignors, getConsignmentSettings, getPayableBalanceCents, recordPayout } from "@/app/lib/consignment-db";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
+import { logError } from "@/app/lib/error-log";
 
 // Auto-payout: for stores that turned it on, direct-deposit each consignor's balance once their
 // sales clear the store's return window (hold_days) — no clicking. Only touches consignors who
@@ -34,12 +35,19 @@ export async function GET(request: Request) {
  if (payable <= 0) continue;
  try {
  // Platform transfer from VYA's balance (holds the consignor's cut routed from the sale).
- const transfer = await stripePost("transfers", { amount: payable, currency: "usd", destination: c.stripeAccountId });
+ // Idempotency key = consignor + exact payable: if the ledger write below fails, the next run
+ // sees the same payable and re-sends the SAME key, so Stripe returns the existing transfer
+ // (no second payout) and we just re-record it. Prevents the double-pay on a transient failure.
+ const idem = `consignor-payout-${c.id}-${payable}`;
+ const transfer = await stripePost("transfers", { amount: payable, currency: "usd", destination: c.stripeAccountId }, undefined, idem);
  await recordPayout({ storeSlug: c.storeSlug, consignorId: c.id, amountCents: payable, method: "stripe", status: "paid", stripeTransferId: transfer.id as string });
  paid++;
  totalCents += payable;
  } catch (e) {
- console.error(`[consignment-payouts] consignor ${c.id}:`, e);
+ // Critical: a Stripe transfer may have gone out while the ledger write failed — surfaces to ops
+ // so a stuck/undebited payout is caught before the next run (the idempotency key prevents a
+ // double-transfer, but this failure still needs eyes).
+ await logError("consignment-payout", e, { severity: "critical", context: { consignorId: c.id, storeSlug: c.storeSlug, payable } });
  skipped++;
  }
  }

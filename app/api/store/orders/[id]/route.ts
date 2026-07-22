@@ -3,11 +3,13 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getOrderDetail, updateOrderStatus, setOrderShipped, markTrackingEmailSent, type OrderStatus } from "@/app/lib/db/orders";
 import { relistItem } from "@/app/lib/db/inventory";
+import { reverseConsignedSale } from "@/app/lib/consignment-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
 import { getRates, buyLabel, isShippoConfigured } from "@/app/lib/shippo";
 import { shippingMarginCents } from "@/app/lib/shipping-tiers";
+import { logError } from "@/app/lib/error-log";
 import { sendBuyerTrackingEmail } from "@/app/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -67,6 +69,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  }
  }
  await relistItem(r.order.itemId); // default: the one-of-one is available again
+ // If this was a consigned piece, undo the consignor's credit too — otherwise a refunded sale
+ // still gets paid out at the next payout run. Reverts the item to available + debits the ledger.
+ await reverseConsignedSale({ productId: r.order.itemId, orderId: id }).catch(() => {});
  await updateOrderStatus(id, "refunded");
  return NextResponse.json({ ok: true, status: "refunded", relisted: true });
  }
@@ -112,16 +117,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
  if (body?.action === "buy_label") {
  const rateId = String(body?.rateId || cheapest.rateId);
- if (sellerPays) {
- if (!seller.stripeCustomerId) return NextResponse.json({ error: "Add a payment method to cover free-shipping labels first." }, { status: 400 });
- try {
- await stripePost("payment_intents", { amount: String(cheapest.amountCents), currency: (order.currency || "usd").toLowerCase(), customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA shipping label — order ${id}` });
- } catch {
- return NextResponse.json({ error: "Couldn’t charge your card for the label." }, { status: 402 });
- }
- }
+ // Free-shipping labels are billed to the seller — require a card up front.
+ if (sellerPays && !seller.stripeCustomerId) return NextResponse.json({ error: "Add a payment method to cover free-shipping labels first." }, { status: 400 });
+ // Buy the label FIRST: if Shippo fails, the seller is never left charged for a label they didn't get.
  const label = await buyLabel(rateId);
  if (!label) return NextResponse.json({ error: "Label purchase failed — try again." }, { status: 502 });
+ // Then recover the cost from the seller. Idempotency key stops a double-click double-charge; and if
+ // billing fails the order still ships — we don't strand the buyer over a seller-card problem, just log it.
+ if (sellerPays) {
+ await stripePost("payment_intents", { amount: String(label.costCents || cheapest.amountCents), currency: (order.currency || "usd").toLowerCase(), customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA shipping label — order ${id}` }, undefined, `ship-label-${id}`).catch((e) => logError("label-seller-charge", e, { context: { orderId: id, slug, costCents: label.costCents } }));
+ }
  await setOrderShipped(id, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
  if (order.buyerEmail) {
  try {

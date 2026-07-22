@@ -50,7 +50,10 @@ export async function POST(request: NextRequest) {
  try {
  // Platform transfer — VYA pays the consignor from its own balance (which holds the cut routed
  // from the sale). Stripe won't let the store transfer directly to another connected account.
- const transfer = await stripePost("transfers", { amount: amountCents, currency: "usd", destination: consignor.stripeAccountId });
+ // Idempotency key = consignor + exact amount: a double-click / retry returns the SAME transfer
+ // instead of paying twice, and if the ledger write fails we can safely re-send it.
+ const idem = `consignor-payout-${consignorId}-${amountCents}`;
+ const transfer = await stripePost("transfers", { amount: amountCents, currency: "usd", destination: consignor.stripeAccountId }, undefined, idem);
  const payoutId = await recordPayout({ storeSlug: slug, consignorId, amountCents, method, status: "paid", stripeTransferId: transfer.id as string });
  return NextResponse.json({ ok: true, payoutId, amountCents, method, status: "paid" });
  } catch (e) {

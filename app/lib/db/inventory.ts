@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull, lt, ne } from "drizzle-orm";
 import { getDb, items, reservations, orders, payouts } from "./index";
 import type { Item, NewItem, Reservation } from "./index";
 import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-core";
+import { logError } from "@/app/lib/error-log";
 
 // ───────────────────────────────────────────────────────────────────────────
 // One-of-one inventory engine. Every mutation that changes availability is a
@@ -114,11 +115,20 @@ export async function reserveItem(
  .returning({ id: items.id });
  if (!locked) return null; // not available — already reserved or sold
 
+ try {
  const [res] = await db
  .insert(reservations)
  .values({ itemId, buyerRef, expiresAt: reservationExpiry(ttlSeconds) })
  .returning();
  return res ?? null;
+ } catch (e) {
+ // The status flip succeeded but the reservation row didn't — revert so the item isn't stranded
+ // as permanently 'reserved' with no reservation the sweeper can ever expire. Guarded on 'reserved'
+ // so a concurrent sale isn't clobbered.
+ await db.update(items).set({ status: "active", updatedAt: new Date() }).where(and(eq(items.id, itemId), eq(items.status, "reserved"))).catch(() => {});
+ logError("reserve-item-revert", e, { context: { itemId } });
+ return null;
+ }
 }
 
 /** Release any live reservation on an item and return it to active. */

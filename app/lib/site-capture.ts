@@ -5,6 +5,7 @@
 // the VYA-hosted copy — so the whole site can be navigated on VYA, pixel-faithful.
 // (JS is stripped for v1: looks identical; interactivity + cart + AI editing next.)
 import * as cheerio from "cheerio";
+import { safeUrl } from "@/app/lib/safe-url";
 // The DB helpers are imported lazily inside crawlAndStore (the only consumer) so that
 // the pure HTML functions here — applyEdits/prepareEditMode/captureSite — can be used
 // (and unit-tested) without pulling in the database layer.
@@ -31,8 +32,12 @@ export type CaptureOpts = { rewriteLink?: (sameOriginUrl: string) => string | nu
 export type Capture = { html: string; origin: string; sourceUrl: string; bytes: number; inlinedSheets: number; links: string[] };
 
 export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<Capture> {
- const sourceUrl = url.startsWith("http") ? url : `https://${url}`;
- const origin = new URL(sourceUrl).origin;
+ // SSRF guard: this fetches a user-supplied URL server-side, so reject anything that isn't a plain
+ // public web host (localhost, internal TLDs, bare IPs incl. cloud metadata, IPv6) before touching it.
+ const safe = safeUrl(url);
+ if (!safe) throw new Error("That URL isn’t a valid public website.");
+ const sourceUrl = safe.href;
+ const origin = safe.origin;
  const res = await fetch(sourceUrl, { headers: UA, signal: AbortSignal.timeout(20000) });
  if (!res.ok) throw new Error(`Couldn't load ${sourceUrl} (${res.status})`);
  const $ = cheerio.load(await res.text());
@@ -119,8 +124,10 @@ function includePath(p: string): boolean {
 }
 
 export async function crawlAndStore(slug: string, startUrl: string, maxPages = 80): Promise<{ pages: number; paths: string[] }> {
+ const safe = safeUrl(startUrl); // SSRF guard on the crawl entry (same as captureSite)
+ if (!safe) throw new Error("That URL isn’t a valid public website.");
  const { saveCapturePage, deleteCaptures, getSiteCss, setSiteCss } = await import("./site-capture-db");
- const start = startUrl.startsWith("http") ? startUrl : `https://${startUrl}`;
+ const start = safe.href;
  const origin = new URL(start).origin;
  const linkBase = `/site/${slug}`;
  const rewriteLink = (full: string) => {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { markSold, releaseReservation } from "@/app/lib/db/inventory";
-import { creditConsignedSale } from "@/app/lib/consignment-db";
+import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory";
+import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
-import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, getOrdersNeedingConfirmation, markConfirmationSent } from "@/app/lib/db/orders";
+import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, getOrdersNeedingConfirmation, markConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus } from "@/app/lib/db/orders";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { sendBuyerOrderConfirmation, sendSellerSaleNotification } from "@/app/lib/email";
 import { fireAutomationTrigger } from "@/app/lib/automation-engine";
@@ -73,6 +73,23 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  }
  }
 }
+// Unwind a sale when money is clawed back — a LOST dispute/chargeback or an out-of-band Stripe
+// refund. Relists each one-of-one, reverses any consignor credit so a reversed sale is never paid
+// out, and marks the order refunded. Idempotent (an already-refunded order is skipped) — so it's
+// safe even when it double-fires with our own refund button. NOT run on dispute.created (which may
+// still be won); only on a definite loss/refund.
+async function unwindByPaymentIntent(pi: string | null, reason: string) {
+ if (!pi) return;
+ const ords = await getOrdersByPaymentIntent(pi).catch(() => []);
+ for (const o of ords) {
+ if (o.status === "refunded" || o.status === "removed") continue;
+ await relistItem(o.itemId).catch(() => {});
+ await reverseConsignedSale({ productId: o.itemId, orderId: o.id }).catch(() => {});
+ await updateOrderStatus(o.id, "refunded").catch(() => {});
+ console.error(`[connect-webhook] unwound order ${o.id} (item ${o.itemId}) — ${reason}`);
+ }
+}
+
 // Stripe Connect webhook for buyer checkouts. On a confirmed payment we mark each
 // one-of-one item sold, record the order (with buyer + shipping) + the seller's
 // payout, then send confirmation emails to both sides — idempotently.
@@ -140,6 +157,14 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
  const s = event.data.object as Stripe.Checkout.Session;
  const itemIds = (s.metadata?.itemIds || s.metadata?.itemId || "").split(",").map((t) => t.trim()).filter(Boolean);
  for (const itemId of itemIds) await releaseReservation(itemId);
+ } else if (event.type === "charge.refunded") {
+ // Refund issued directly in Stripe (not via our order button) — unwind the sale so records + ledger stay true.
+ const c = event.data.object as Stripe.Charge;
+ await unwindByPaymentIntent(typeof c.payment_intent === "string" ? c.payment_intent : null, "charge.refunded");
+ } else if (event.type === "charge.dispute.closed") {
+ // Chargeback resolved. Only unwind if the seller LOST (funds actually clawed back); a won dispute keeps the sale.
+ const d = event.data.object as Stripe.Dispute;
+ if (d.status === "lost") await unwindByPaymentIntent(typeof d.payment_intent === "string" ? d.payment_intent : null, "dispute lost");
  }
  } catch (e) {
  console.error("stripe-connect webhook handler error:", e);
