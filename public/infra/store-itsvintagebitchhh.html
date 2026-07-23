@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ITSVINTAGEBITCHHH — live on VYA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--f:'Raleway',-apple-system,Arial,sans-serif;--ink:#0a0a0a}
+html{scroll-behavior:smooth}
+body{font-family:var(--f);color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+img{display:block;max-width:100%}
+a{color:inherit}
+.vbar{display:flex;align-items:center;gap:12px;background:#0b0b0c;color:#fff;padding:8px 18px;font-size:12px}
+.vbar .vm{font-weight:800;letter-spacing:.02em}.vbar .dom{color:rgba(255,255,255,.55)}
+.vbar .live{display:inline-flex;align-items:center;gap:6px;color:#42d69d;font-weight:600;font-size:11px}
+.vbar .live::before{content:"";width:6px;height:6px;border-radius:50%;background:#33d18f}
+.vbar .sp{margin-left:auto;display:flex;gap:8px}
+.vbar button{font-family:var(--f);font-size:11.5px;font-weight:600;border:1px solid rgba(255,255,255,.2);background:transparent;color:#fff;border-radius:7px;padding:5px 11px;cursor:pointer}
+.vbar button.p{background:#fff;color:#0a0a0a;border-color:#fff}
+.wm{text-align:center;font-weight:800;letter-spacing:-0.01em;line-height:.9;font-size:clamp(30px,9vw,140px);padding:22px 12px 6px;white-space:nowrap;overflow:hidden;cursor:pointer}
+.snav{display:flex;align-items:center;gap:clamp(14px,2.4vw,28px);justify-content:center;padding:13px 22px;border-top:1px solid #eee;border-bottom:1px solid #111;font-size:clamp(11px,1.05vw,14px);position:relative;flex-wrap:wrap}
+.snav a{font-weight:500;letter-spacing:.01em;cursor:pointer;text-decoration:none;white-space:nowrap}
+.snav a:hover{opacity:.55}.snav a.on{border-bottom:2px solid #111;padding-bottom:2px}
+.snav .cart{position:absolute;right:22px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.snav .cart svg{width:19px;height:19px;stroke:#111;fill:none;stroke-width:1.6}
+.snav .cart .ct{font-size:10.5px;font-weight:700;background:#111;color:#fff;border-radius:50%;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.view{min-height:40vh}
+/* home */
+.hero{position:relative;height:min(66vh,620px);overflow:hidden;background:#e9e7e2}
+.hero img{width:100%;height:100%;object-fit:cover;object-position:center 28%}
+.hbtns{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;padding:0 16px}
+.hbtn{background:#0a0a0a;color:#fff;font-weight:600;font-size:clamp(12px,1.1vw,15px);letter-spacing:.02em;padding:16px clamp(24px,3.5vw,46px);border-radius:40px;border:none;cursor:pointer;font-family:var(--f);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.hbtn:hover{transform:translateY(-2px)}
+.strip{max-width:1400px;margin:0 auto;padding:44px 22px 70px}
+.strip-h{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px}
+.strip-h h2{font-weight:800;font-size:clamp(20px,2.4vw,32px)}
+.strip-h a{font-size:13px;font-weight:600;cursor:pointer;border-bottom:1px solid #111}
+/* shop */
+.shop{max-width:1400px;margin:0 auto;padding:44px 22px 80px}
+.shop-h{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:20px}
+.shop-h h2{font-weight:800;font-size:clamp(22px,2.6vw,38px)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-family:var(--f);font-size:12.5px;font-weight:600;border:1px solid #ddd;background:#fff;color:#333;border-radius:30px;padding:7px 15px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:#111}.chip.on{background:#0a0a0a;color:#fff;border-color:#0a0a0a}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 18px;margin-top:26px}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:720px){.grid{grid-template-columns:repeat(2,1fr)}}
+.pcard{cursor:pointer}
+.pimg{position:relative;aspect-ratio:3/4;overflow:hidden;background:#f0efec}
+.pimg img{width:100%;height:100%;object-fit:cover;transition:opacity .35s,transform .5s}
+.pimg img.b{position:absolute;inset:0;opacity:0}
+.pcard:hover .pimg img.a{opacity:0}.pcard:hover .pimg img.b{opacity:1}.pcard:hover .pimg img{transform:scale(1.03)}
+.sold{position:absolute;top:9px;left:9px;background:#0a0a0a;color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.08em;padding:4px 8px;border-radius:3px;text-transform:uppercase}
+.qv{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(255,255,255,.94);font-weight:600;font-size:12px;text-align:center;padding:10px;border-radius:6px;opacity:0;transform:translateY(8px);transition:.25s}
+.pcard:hover .qv{opacity:1;transform:none}
+.pmeta{padding:11px 2px}.pt{font-size:13px;font-weight:600;line-height:1.25}.pp{font-size:12.5px;color:#555;margin-top:3px}
+/* generic page */
+.page-w{max-width:900px;margin:0 auto;padding:60px 24px 90px}
+.page-w h1{font-weight:800;font-size:clamp(28px,4vw,54px);letter-spacing:-0.02em;margin-bottom:8px}
+.page-w .lead{color:#666;font-size:16px;line-height:1.6;max-width:60ch}
+.page-w p{color:#333;font-size:15px;line-height:1.7;margin-top:16px;max-width:64ch}
+/* blog */
+.posts{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:34px}
+@media(max-width:720px){.posts{grid-template-columns:1fr}}
+.post{cursor:pointer}
+.post .pi{aspect-ratio:4/3;overflow:hidden;background:#f0efec}
+.post .pi img{width:100%;height:100%;object-fit:cover;transition:.5s}.post:hover .pi img{transform:scale(1.04)}
+.post .d{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#999;margin-top:14px;font-weight:600}
+.post h3{font-weight:700;font-size:19px;margin-top:7px;line-height:1.25}
+.post p{color:#666;font-size:13.5px;margin-top:7px;line-height:1.5}
+/* contact / form */
+.cwrap{display:grid;grid-template-columns:1fr 1fr;gap:44px;margin-top:34px}
+@media(max-width:720px){.cwrap{grid-template-columns:1fr}}
+.cinfo a{display:block;font-size:15px;margin-top:10px;color:#111;text-decoration:none;border-bottom:1px solid #ddd;padding-bottom:8px;width:fit-content}
+.form input,.form textarea{width:100%;font-family:var(--f);font-size:14px;border:1px solid #ddd;border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.form textarea{min-height:110px;resize:vertical}
+.form button,.book button{background:#0a0a0a;color:#fff;font-family:var(--f);font-weight:600;font-size:15px;border:none;border-radius:40px;padding:14px 26px;cursor:pointer}
+/* book */
+.book{max-width:520px;margin:0 auto;text-align:center}
+.slots{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:26px 0}
+.slot{border:1px solid #ddd;border-radius:9px;padding:11px 18px;font-size:14px;cursor:pointer;font-weight:500}
+.slot:hover,.slot.on{background:#0a0a0a;color:#fff;border-color:#0a0a0a}
+/* modal / toast */
+.ov{position:fixed;inset:0;background:rgba(10,10,10,.55);z-index:80;display:none;align-items:center;justify-content:center;padding:22px}
+.ov.show{display:flex}
+.modal{background:#fff;border-radius:10px;max-width:860px;width:100%;max-height:88vh;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;box-shadow:0 40px 100px rgba(0,0,0,.4);position:relative}
+@media(max-width:640px){.modal{grid-template-columns:1fr;max-height:92vh;overflow:auto}}
+.m-img{aspect-ratio:3/4;background:#f0efec}.m-img img{width:100%;height:100%;object-fit:cover}
+.m-body{padding:30px 30px 26px;display:flex;flex-direction:column}
+.m-cat{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#999;font-weight:600}
+.m-t{font-weight:800;font-size:22px;letter-spacing:-0.01em;margin-top:9px;line-height:1.12}
+.m-pr{font-size:19px;margin-top:11px;font-weight:600}.m-d{font-size:13.5px;color:#555;line-height:1.5;margin-top:14px}
+.m-size{font-size:13px;color:#333;margin-top:14px}.m-size b{font-weight:700}
+.m-add{margin-top:auto;background:#0a0a0a;color:#fff;font-family:var(--f);font-weight:600;font-size:15px;border:none;border-radius:40px;padding:15px;cursor:pointer}
+.m-add:disabled{background:#ccc;cursor:not-allowed}
+.m-x{position:absolute;top:16px;right:18px;background:#fff;border:none;width:32px;height:32px;border-radius:50%;font-size:19px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.2);z-index:2}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#0a0a0a;color:#fff;padding:12px 20px;border-radius:40px;font-size:13px;font-weight:500;opacity:0;transition:.3s;z-index:90;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.foot{border-top:1px solid #111;padding:36px 22px;text-align:center;font-size:12px;color:#888;letter-spacing:.04em}.foot b{color:#111;font-weight:700}
+</style>
+</head>
+<body>
+<div class="vbar"><span class="vm">VYA</span><span class="dom">itsvintagebitchhh.com</span><span class="live">Live on VYA</span><span class="sp"><button>Edit site</button><button class="p">Publish</button></span></div>
+<header>
+  <div class="wm" onclick="go('home')">ITSVINTAGEBITCHHH</div>
+  <nav class="snav">
+    <a data-v="home" onclick="go('home')">HOME</a>
+    <a data-v="shop" onclick="go('shop')">SHOP BY CATEGORY</a>
+    <a data-v="blog" onclick="go('blog')">THE BLOG</a>
+    <a data-v="about" onclick="go('about')">ABOUT US</a>
+    <a data-v="contact" onclick="go('contact')">CONTACT US</a>
+    <a data-v="book" onclick="go('book')">BOOK AN APPOINTMENT</a>
+    <span class="cart" onclick="openCart()"><svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8zM9 8V6a3 3 0 0 1 6 0v2"/></svg><span class="ct" id="ct">0</span></span>
+  </nav>
+</header>
+<main class="view" id="view"></main>
+<div class="foot">Powered by <b>VYA</b></div>
+
+<div class="ov" id="ov" onclick="if(event.target===this)closeModal()">
+  <div class="modal"><button class="m-x" onclick="closeModal()">×</button>
+    <div class="m-img"><img id="mimg"/></div>
+    <div class="m-body"><div class="m-cat" id="mcat"></div><div class="m-t" id="mt"></div><div class="m-pr" id="mpr"></div><div class="m-d" id="md"></div><div class="m-size" id="msz"></div><button class="m-add" id="madd" onclick="addFromModal()">Add to cart</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var PRODUCTS=[{"t": "Agnes B Skirt", "pr": "175", "ty": "Skirts", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/D982ED13-30F9-48DB-9353-B836912FED6C.jpg?v=1780064543&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/FC228578-AB70-49D7-A99D-FA3C2944A0B4.jpg?v=1780064542&width=800", "size": "US 2", "d": "Agnes B from the 90s, in zebra. Plush texture.", "sold": false}, {"t": "Gazebo Mesh Top", "pr": "150", "ty": "Tops", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/1C9039B8-6EB4-412C-A8FD-3E053BCA3E71.jpg?v=1780064543&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/1301A9A5-701D-47E3-B7A8-87AA36EA77D0.jpg?v=1780064543&width=800", "size": "Small", "d": "Mesh / wool turtleneck in an epic mixing of prints.", "sold": false}, {"t": "Tibi Cocktail Dress", "pr": "120", "ty": "Dresses", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/DE78EC80-46AF-46C3-925B-CFDA8E9BDB55.jpg?v=1779155591&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/69C603DD-2F2C-4ADF-AFAB-5AD16300B6FD.jpg?v=1779155591&width=800", "size": "US 4", "d": "Fabulous Tibi dress, perfect for a summer soir\u00e9e.", "sold": false}, {"t": "Patrizia Pepe Lace Lined Rain Coat", "pr": "125", "ty": "Outerwear", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/BD966E5E-7A86-4358-A8AF-775B4BD75B7B.jpg?v=1778513697&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/3800B205-E4C6-40BF-A687-87BE1A21D2BB.jpg?v=1778513697&width=800", "size": "Small", "d": "Rain coat / windbreaker, can be worn reversible. So cool.", "sold": false}, {"t": "Comme des Gar\u00e7ons Drop Crotch Capris", "pr": "150", "ty": "Pants", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/FE783D84-86B4-4B92-8FFE-4478C90FE9AC.jpg?v=1778513530&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/3E86D0AD-B0E8-4728-BDBE-8576B4790D73.jpg?v=1778513530&width=800", "size": "Small", "d": "CDG black label drop crotch capris.", "sold": false}, {"t": "Fuzzi Mesh Top", "pr": "100", "ty": "Tops", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/6C026C40-9516-4722-87EA-271000196DF1.jpg?v=1778513380&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/5F32E67E-CE7E-4B22-9DDC-E93FFC6D8274.jpg?v=1778513380&width=800", "size": "Small", "d": "Fuzzi mesh, like JPG uses. So cute.", "sold": true}, {"t": "Sergio Rossi Heels", "pr": "150", "ty": "Shoes", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/0795E4D6-3423-4F53-B04C-99D0632AA50E.jpg?v=1778513183&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/2421BF58-236B-4751-BB06-8B3D4FAE233D.jpg?v=1778513183&width=800", "size": "38 (US 8)", "d": "Perfect little heel for summer.", "sold": false}, {"t": "Dries Van Noten Heels", "pr": "500", "ty": "Shoes", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/AA76456C-E9F4-4DBC-B36E-F3E15F895D3C.jpg?v=1778512967&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/70A71B39-19CD-462A-8FD8-EB11CBC4325B.jpg?v=1778512967&width=800", "size": "40 (US 10)", "d": "Iconic. Old Dries, made in Belgium. Excellent condition.", "sold": false}, {"t": "Stella McCartney Draped Dress", "pr": "225", "ty": "Dresses", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/5CCDF154-00D5-4906-83A8-37636F58021D.jpg?v=1778512722&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/62F61724-4DBF-4CB4-BD9F-958772864EA2.jpg?v=1778512722&width=800", "size": "US 4", "d": "Old-school British meets French girl.", "sold": true}, {"t": "Donna Karan 90s Alligator Belt", "pr": "275", "ty": "Accessories", "img": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/6B01D0AF-CB93-4998-83B4-C3ACFA1AA2ED.jpg?v=1778512465&width=800", "img2": "https://cdn.shopify.com/s/files/1/0568/0824/3372/files/D64CF63E-BE38-4F78-831E-CEBB23FF2957.jpg?v=1778512465&width=800", "size": "XS/S", "d": "They quite literally don't make em like this anymore.", "sold": false}],CATS=["All", "Dresses", "Outerwear", "Tops", "Pants", "Skirts", "Accessories", "Shoes"],HERO="https://itsvintagebitchhh.com/cdn/shop/files/ScanNow_Doc_1_3.jpg?width=2200";
+var view="home",cur="All",cart=0,openId=null;
+function money(p){return "$"+p;}
+function card(p,i){return '<div class="pcard" onclick="openProduct('+i+')"><div class="pimg">'+(p.sold?'<span class="sold">Sold</span>':'')+'<img class="a" src="'+p.img+'" loading="lazy"><img class="b" src="'+p.img2+'" loading="lazy"><div class="qv">Quick view</div></div><div class="pmeta"><div class="pt">'+p.t+'</div><div class="pp">'+money(p.pr)+'</div></div></div>';}
+function homeHTML(){
+  var strip=PRODUCTS.slice(0,4).map(function(p){return card(p,PRODUCTS.indexOf(p));}).join('');
+  return '<section class="hero"><img src="'+HERO+'" onerror="this.style.display=\'none\'"><div class="hbtns"><button class="hbtn" onclick="go(\'shop\')">SHOP ALL</button><button class="hbtn" onclick="go(\'book\')">MAKE AN APPOINTMENT</button></div></section>'+
+    '<section class="strip"><div class="strip-h"><h2>Just in</h2><a onclick="go(\'shop\')">Shop all &#8594;</a></div><div class="grid">'+strip+'</div></section>';
+}
+function shopHTML(){
+  var chips=CATS.map(function(c){return '<button class="chip'+(c===cur?' on':'')+'" onclick="setCat(\''+c+'\')">'+c+'</button>';}).join('');
+  var list=PRODUCTS.map(function(p,i){return [p,i];}).filter(function(x){return cur==="All"||x[0].ty===cur;});
+  var g=list.map(function(x){return card(x[0],x[1]);}).join('');
+  return '<section class="shop"><div class="shop-h"><h2>Shop all</h2><div class="chips">'+chips+'</div></div><div class="grid">'+g+'</div></section>';
+}
+function blogHTML(){
+  var posts=[
+    ['06.02.26','How to spot real vintage Comme des Garçons','A quick field guide to labels, seams, and the black-label drop-crotch era.',PRODUCTS[4].img],
+    ['05.24.26','Styling the archive: 90s Agnes B','Zebra, plush textures, and why the 90s still does it best.',PRODUCTS[0].img],
+    ['05.11.26','New drop: the summer soirée edit','Tibi, Stella and the pieces we cannot stop wearing right now.',PRODUCTS[2].img],
+    ['04.30.26','Care notes for lace &amp; mesh','Keeping delicate vintage looking like the day it was made.',PRODUCTS[1].img]
+  ];
+  var cards=posts.map(function(b){return '<div class="post" onclick="toast(\'Post opening soon\')"><div class="pi"><img src="'+b[3]+'"></div><div class="d">'+b[0]+'</div><h3>'+b[1]+'</h3><p>'+b[2]+'</p></div>';}).join('');
+  return '<div class="page-w"><h1>The Blog</h1><p class="lead">Notes from the archive — sourcing stories, styling, and the pieces we are obsessed with.</p><div class="posts">'+cards+'</div></div>';
+}
+function aboutHTML(){
+  return '<div class="page-w"><h1>About us</h1><p class="lead">ITSVINTAGEBITCHHH is a one-of-one vintage archive. Every piece is hand-sourced, one of a kind, and chosen for the women who want to wear something no one else has.</p>'+
+    '<p>What started as a personal obsession with rare designer and 90s pieces turned into a curated shop of true one-offs — Comme des Garçons, Agnes B, Tibi, Dries, and the odd perfect find you did not know you needed.</p>'+
+    '<p>Because everything is a single piece, when it is gone, it is gone. Book an appointment to shop the archive in person, or browse the drop online.</p>'+
+    '<p><b>By appointment &amp; online.</b> New pieces added weekly.</p></div>';
+}
+function contactHTML(){
+  return '<div class="page-w"><h1>Contact us</h1><p class="lead">Questions about a piece, sizing, or a hold? Reach out — we answer everything ourselves.</p><div class="cwrap"><div class="cinfo"><a href="#" onclick="return false">hello@itsvintagebitchhh.com</a><a href="#" onclick="return false">@itsvintagebitchhh on Instagram</a><a onclick="go(\'book\')">Book an appointment &#8594;</a></div><div class="form"><input placeholder="Your name"><input placeholder="Email"><textarea placeholder="Your message"></textarea><button onclick="toast(\'Message sent ✓\')">Send message</button></div></div></div>';
+}
+function bookHTML(){
+  return '<div class="page-w"><div class="book"><h1>Book an appointment</h1><p class="lead" style="margin:0 auto">Come shop the archive in person. Pick a time and VYA will hold it for you.</p><div class="slots"><div class="slot" onclick="pickSlot(this)">Thu 2:00</div><div class="slot" onclick="pickSlot(this)">Fri 11:30</div><div class="slot" onclick="pickSlot(this)">Sat 1:00</div><div class="slot" onclick="pickSlot(this)">Sun 3:30</div></div><button onclick="toast(\'Appointment requested ✓\')">Request appointment</button></div></div>';
+}
+var VIEWS={home:homeHTML,shop:shopHTML,blog:blogHTML,about:aboutHTML,contact:contactHTML,book:bookHTML};
+function go(v){view=v;render();window.scrollTo({top:0,behavior:'smooth'});}
+function render(){
+  document.getElementById('view').innerHTML=VIEWS[view]();
+  [].forEach.call(document.querySelectorAll('.snav a[data-v]'),function(a){a.classList.toggle('on',a.getAttribute('data-v')===view);});
+}
+function setCat(c){cur=c;render();}
+function openProduct(i){var p=PRODUCTS[i];openId=i;document.getElementById('mimg').src=p.img.replace('width=800','width=1400');document.getElementById('mcat').textContent=p.ty;document.getElementById('mt').textContent=p.t;document.getElementById('mpr').textContent=money(p.pr);document.getElementById('md').textContent=p.d;document.getElementById('msz').innerHTML='<b>Size</b> · '+p.size;var a=document.getElementById('madd');if(p.sold){a.textContent='Sold out';a.disabled=true;}else{a.textContent='Add to cart';a.disabled=false;}document.getElementById('ov').classList.add('show');}
+function closeModal(){document.getElementById('ov').classList.remove('show');}
+function addFromModal(){cart++;document.getElementById('ct').textContent=cart;toast(PRODUCTS[openId].t+' added to cart');closeModal();}
+function openCart(){toast(cart===0?'Your cart is empty':cart+' item'+(cart>1?'s':'')+' in your cart');}
+function pickSlot(el){[].forEach.call(document.querySelectorAll('.slot'),function(s){s.classList.remove('on');});el.classList.add('on');}
+var tt;function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('show');},2200);}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+render();
+</script>
+</body>
+</html>

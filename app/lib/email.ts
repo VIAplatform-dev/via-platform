@@ -2823,22 +2823,44 @@ function fmtMoney(cents: number, currency: string): string {
 /** Buyer's order confirmation — what they bought + that the seller will ship. */
 export async function sendBuyerOrderConfirmation(p: {
  buyerEmail: string;
+ orderId: string;
  itemTitle: string;
  imageUrl?: string | null;
- amountCents: number;
+ subtotalCents: number;
+ shippingCents: number;
  currency: string;
  storeName: string;
+ ship?: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal?: string | null; country?: string | null } | null;
  replyTo?: string | null; // the store's email, so replies reach the seller
 }): Promise<void> {
  if (!p.buyerEmail) return;
  const resend = getResend();
+ const totalCents = p.subtotalCents + p.shippingCents;
+ const orderNo = p.orderId.replace(/-/g, "").slice(-6).toUpperCase();
+ const addr = p.ship ? [p.ship.line1, p.ship.line2, [p.ship.city, p.ship.state, p.ship.postal].filter(Boolean).join(", "), p.ship.country].filter(Boolean).join("<br>") : "";
+ const row = (label: string, val: string, bold = false) => `<tr><td style="padding:5px 0;font-size:14px;color:rgba(93,15,23,0.7);font-family:Georgia,serif;">${label}</td><td align="right" style="padding:5px 0;font-size:14px;color:#5D0F17;font-family:Georgia,serif;${bold ? "font-weight:700;font-size:15px;" : ""}">${val}</td></tr>`;
  const content = `
- <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 20px;font-family:Georgia,serif;">Your order is confirmed — thank you. 🖤</p>
- <div style="background:#FFFDF8;border:1px solid rgba(93,15,23,0.15);padding:24px;margin:0 0 24px;">
- ${p.imageUrl ? `<img src="${p.imageUrl}" alt="" width="160" style="display:block;margin:0 0 14px;border:1px solid rgba(93,15,23,0.1);" />` : ""}
- <p style="font-size:16px;font-weight:700;color:#5D0F17;margin:0 0 6px;font-family:Georgia,serif;">${p.itemTitle}</p>
- <p style="font-size:14px;color:rgba(93,15,23,0.7);margin:0;font-family:Georgia,serif;">${fmtMoney(p.amountCents, p.currency)} · from ${p.storeName}</p>
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:rgba(93,15,23,0.5);margin:0 0 6px;font-family:Georgia,serif;">Order #${orderNo}</p>
+ <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 24px;font-family:Georgia,serif;">Your order is confirmed — thank you. 🖤</p>
+ <div style="background:#FFFDF8;border:1px solid rgba(93,15,23,0.15);padding:22px 24px;margin:0 0 20px;">
+ <table width="100%" cellpadding="0" cellspacing="0"><tr>
+ ${p.imageUrl ? `<td width="78" valign="top"><img src="${p.imageUrl}" alt="" width="66" style="display:block;border:1px solid rgba(93,15,23,0.1);" /></td>` : ""}
+ <td valign="top">
+ <p style="font-size:15px;font-weight:700;color:#5D0F17;margin:0 0 4px;font-family:Georgia,serif;">${p.itemTitle}</p>
+ <p style="font-size:13px;color:rgba(93,15,23,0.6);margin:0;font-family:Georgia,serif;">from ${p.storeName}</p>
+ </td>
+ <td align="right" valign="top" style="white-space:nowrap;"><span style="font-size:15px;color:#5D0F17;font-family:Georgia,serif;">${fmtMoney(p.subtotalCents, p.currency)}</span></td>
+ </tr></table>
+ <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border-top:1px solid rgba(93,15,23,0.12);padding-top:10px;">
+ ${row("Subtotal", fmtMoney(p.subtotalCents, p.currency))}
+ ${row("Shipping", p.shippingCents > 0 ? fmtMoney(p.shippingCents, p.currency) : "Free")}
+ ${row("Total", fmtMoney(totalCents, p.currency), true)}
+ </table>
  </div>
+ ${addr ? `<div style="margin:0 0 22px;">
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(93,15,23,0.5);margin:0 0 6px;font-family:Georgia,serif;">Shipping to</p>
+ <p style="font-size:14px;color:#5D0F17;line-height:1.6;margin:0;font-family:Georgia,serif;">${addr}</p>
+ </div>` : ""}
  <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0;font-family:Georgia,serif;">${p.storeName} will ship your piece soon — you'll get tracking by email once it's on the way.</p>
  `;
  const html = viaShell("Order confirmed", content);
@@ -2847,7 +2869,7 @@ export async function sendBuyerOrderConfirmation(p: {
  from: `${fromDisplayName(p.storeName)} <${orderSenderAddress()}>`,
  to: p.buyerEmail,
  ...(p.replyTo ? { replyTo: p.replyTo } : {}),
- subject: `Your order from ${p.storeName} — ${p.itemTitle}`,
+ subject: `Your order from ${p.storeName} — #${orderNo}`,
  html,
  });
 }
@@ -2879,11 +2901,11 @@ export async function sendSellerSaleNotification(p: {
  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(93,15,23,0.5);margin:0 0 8px;font-family:Georgia,serif;">Ship to</p>
  <p style="font-size:15px;color:#5D0F17;line-height:1.6;margin:0;font-family:Georgia,serif;">${addr || "(address on the order)"}</p>
  </div>
- <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 20px;font-family:Georgia,serif;">Buy your shipping label and mark it shipped from your dashboard.</p>
- <a href="${url}" style="display:inline-block;background:#5D0F17;color:#FFFDF8 !important;padding:14px 32px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-family:Georgia,serif;">Open the order →</a>
+ <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 20px;font-family:Georgia,serif;">Shipping's already paid — just generate your prepaid label, print it, and mark it shipped from your dashboard.</p>
+ <a href="${url}" style="display:inline-block;background:#5D0F17;color:#FFFDF8 !important;padding:14px 32px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-family:Georgia,serif;">Get your label →</a>
  `;
  const html = viaShell("You made a sale", content);
- await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: `You sold ${p.itemTitle}`, html });
+ await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: `You sold ${p.itemTitle} — ship it`, html });
 }
 
 /** Buyer's shipping/tracking email — sent when the order ships. From the store. */

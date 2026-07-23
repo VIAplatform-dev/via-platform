@@ -77,6 +77,15 @@ export default function OrderDetailPage() {
  setBusy(false);
  }
 
+ // Mark shipped via the label action so the buyer gets their tracking email (the generic status
+ // update doesn't send it). Works whether the label was auto-generated or bought manually.
+ async function markShipped() {
+ setBusy(true);
+ await fetch(`/api/store/orders/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "mark_shipped" }) }).catch(() => {});
+ setReloadKey((k) => k + 1);
+ setBusy(false);
+ }
+
  async function getQuote() {
  setLabelBusy(true); setLabelMsg(null); setQuote(null);
  try {
@@ -146,6 +155,7 @@ export default function OrderDetailPage() {
  <div className="px-5 py-4">
  {order.labelUrl ? (
  <div className="mb-4">
+ {order.status !== "shipped" && order.status !== "delivered" && <p className="mb-2 text-[13px] text-stone-600">✓ Prepaid label ready — print it, drop off, then <b>Mark shipped</b>.</p>}
  <a href={order.labelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-md bg-[#5D0F17] px-4 text-[13px] font-medium text-white transition hover:bg-[#4a0c12]">Print label ↗</a>
  {order.trackingNumber && <p className="mt-2.5 text-[13px] text-stone-500">Tracking: {order.trackingUrl ? <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#5D0F17] underline">{order.trackingNumber}</a> : order.trackingNumber}</p>}
  </div>
@@ -154,16 +164,16 @@ export default function OrderDetailPage() {
  <p className="text-[13px] text-stone-700">{quote.provider} {quote.service} — <b className="text-stone-900">{money(quote.costCents, cur)}</b>{quote.estDays ? ` · ~${quote.estDays}d` : ""}</p>
  <p className="mt-1 text-xs text-stone-500">{quote.sellerPays ? "This label cost will be charged to your card on file." : "The buyer already paid shipping — no charge to you."}</p>
  <div className="mt-3 flex gap-2">
- <Button size="sm" onClick={buyLabelNow} disabled={labelBusy}>{labelBusy ? "Buying…" : `Buy label — ${money(quote.costCents, cur)}`}</Button>
+ <Button size="sm" onClick={buyLabelNow} disabled={labelBusy}>{labelBusy ? (quote.sellerPays ? "Buying…" : "Generating…") : (quote.sellerPays ? `Buy label — ${money(quote.costCents, cur)}` : "Generate prepaid label")}</Button>
  <Button size="sm" variant="ghost" onClick={() => setQuote(null)}>Cancel</Button>
  </div>
  </div>
  ) : (
- <Button className="mb-4 w-full" onClick={getQuote} disabled={labelBusy}>{labelBusy ? "Getting rate…" : "Buy shipping label"}</Button>
+ <Button className="mb-4 w-full" onClick={getQuote} disabled={labelBusy}>{labelBusy ? "Getting rate…" : "Get shipping label"}</Button>
  )}
  {labelMsg && <p className="mb-3 text-xs text-red-600">{labelMsg}</p>}
  <div className="flex flex-wrap gap-2">
- {order.status === "paid" && <Button size="sm" variant="secondary" onClick={() => setStatus("shipped")} disabled={busy}>Mark shipped</Button>}
+ {order.status === "paid" && <Button size="sm" variant="secondary" onClick={markShipped} disabled={busy}>Mark shipped</Button>}
  {order.status === "shipped" && <Button size="sm" variant="secondary" onClick={() => setStatus("delivered")} disabled={busy}>Mark delivered</Button>}
  {order.status !== "refunded" && <Button size="sm" variant="danger" onClick={() => setStatus("refunded")} disabled={busy}>Refund order</Button>}
  </div>

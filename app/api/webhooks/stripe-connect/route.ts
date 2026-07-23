@@ -3,7 +3,9 @@ import Stripe from "stripe";
 import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
-import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, getOrdersNeedingConfirmation, markConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus } from "@/app/lib/db/orders";
+import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus } from "@/app/lib/db/orders";
+import { logError } from "@/app/lib/error-log";
+import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { sendBuyerOrderConfirmation, sendSellerSaleNotification } from "@/app/lib/email";
 import { fireAutomationTrigger } from "@/app/lib/automation-engine";
@@ -54,22 +56,35 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: sold.priceCents }).catch(() => {});
  markCheckoutRecovered(itemId).catch(() => {}); // sold → stop any abandoned-cart nudge
  delistEverywhere(itemId, "vya").catch(() => {}); // sold on VYA → pull from other marketplaces
+ // Buyer prepaid shipping → auto-generate the label now so the seller just prints it (VYA
+ // covers it from the collected shipping). Best-effort: awaited so it completes before the
+ // function freezes, but a failure (no ship-from / Shippo off) just leaves the manual button.
+ if (idx === 0 && o.shippingPaidCents > 0) {
+ const r = await generateOrderLabel(order.id).catch((e) => { logError("auto-generate-label", e, { context: { orderId: order.id } }); return { ok: false, reason: "threw" }; });
+ if (!r.ok && r.reason && r.reason !== "already-labeled") console.log(`[auto-label] order ${order.id}: ${r.reason}`);
+ }
  idx++;
  }
  }
  if (o.pi) {
- const pending = await getOrdersNeedingConfirmation(o.pi);
- for (const ord of pending) {
+ // Atomic claim — when checkout.session.completed and payment_intent.succeeded fire together,
+ // only ONE wins each order, so the buyer never gets a duplicate confirmation.
+ const claimed = await claimOrdersForConfirmation(o.pi);
+ for (const ord of claimed) {
  const img = Array.isArray(ord.itemImages) ? (ord.itemImages[0] as string) : null;
+ const ship = { line1: ord.shipLine1, line2: ord.shipLine2, city: ord.shipCity, state: ord.shipState, postal: ord.shipPostal, country: ord.shipCountry };
  try {
- if (ord.buyerEmail) await sendBuyerOrderConfirmation({ buyerEmail: ord.buyerEmail, itemTitle: ord.itemTitle || "your item", imageUrl: img, amountCents: ord.amountCents, currency: ord.currency, storeName: ord.sellerName || "the store", replyTo: ord.sellerEmail });
- if (ord.sellerEmail) await sendSellerSaleNotification({ sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship: { line1: ord.shipLine1, line2: ord.shipLine2, city: ord.shipCity, state: ord.shipState, postal: ord.shipPostal, country: ord.shipCountry }, orderId: ord.id });
- await markConfirmationSent(ord.id);
+ if (ord.buyerEmail) await sendBuyerOrderConfirmation({ buyerEmail: ord.buyerEmail, orderId: ord.id, itemTitle: ord.itemTitle || "your item", imageUrl: img, subtotalCents: ord.amountCents, shippingCents: ord.shippingPaidCents || 0, currency: ord.currency, storeName: ord.sellerName || "the store", ship, replyTo: ord.sellerEmail });
+ if (ord.sellerEmail) await sendSellerSaleNotification({ sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship, orderId: ord.id });
+ } catch (e) {
+ // Email failed — un-claim so a later event retries it (no duplicate, no silent miss).
+ await resetConfirmationSent(ord.id).catch(() => {});
+ await logError("order-confirmation-email", e, { context: { orderId: ord.id } });
+ }
  // Fire any "after an order" custom automations (a thank-you, a review ask…).
  if (ord.buyerEmail && ord.sellerSlug) fireAutomationTrigger(ord.sellerSlug, "order_placed", { email: ord.buyerEmail, name: ord.buyerName }, { item: ord.itemTitle || "your order" }).catch(() => {});
  // Push the order into the store's Klaviyo, if they've connected one (post-purchase flows, LTV).
  if (ord.buyerEmail && ord.sellerSlug) syncOrderToKlaviyo(ord.sellerSlug, { email: ord.buyerEmail, name: ord.buyerName, orderId: ord.id, valueCents: ord.amountCents, itemTitle: ord.itemTitle, currency: ord.currency }).catch(() => {});
- } catch (e) { console.error("confirmation email failed for order", ord.id, e); }
  }
  }
 }
@@ -85,6 +100,7 @@ async function unwindByPaymentIntent(pi: string | null, reason: string) {
  if (o.status === "refunded" || o.status === "removed") continue;
  await relistItem(o.itemId).catch(() => {});
  await reverseConsignedSale({ productId: o.itemId, orderId: o.id }).catch(() => {});
+ await voidOrderLabel(o.id).catch(() => {}); // recover the label cost if it hadn't shipped
  await updateOrderStatus(o.id, "refunded").catch(() => {});
  console.error(`[connect-webhook] unwound order ${o.id} (item ${o.itemId}) — ${reason}`);
  }

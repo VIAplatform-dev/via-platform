@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getOrderDetail, updateOrderStatus, setOrderShipped, markTrackingEmailSent, type OrderStatus } from "@/app/lib/db/orders";
+import { getOrderDetail, updateOrderStatus, setOrderLabel, markOrderShipped, markTrackingEmailSent, type OrderStatus } from "@/app/lib/db/orders";
 import { relistItem } from "@/app/lib/db/inventory";
 import { reverseConsignedSale } from "@/app/lib/consignment-db";
+import { voidOrderLabel } from "@/app/lib/order-label";
+import { recordLabelTransaction } from "@/app/lib/shippo-labels-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
@@ -72,6 +74,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  // If this was a consigned piece, undo the consignor's credit too — otherwise a refunded sale
  // still gets paid out at the next payout run. Reverts the item to available + debits the ledger.
  await reverseConsignedSale({ productId: r.order.itemId, orderId: id }).catch(() => {});
+ // Void the shipping label if it hasn't shipped — recover the label cost VYA fronted.
+ await voidOrderLabel(id).catch(() => {});
  await updateOrderStatus(id, "refunded");
  return NextResponse.json({ ok: true, status: "refunded", relisted: true });
  }
@@ -88,6 +92,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  if ("err" in r) return NextResponse.json({ error: r.err }, { status: r.code });
  const { order, slug, seller } = r;
  const body = await request.json().catch(() => null);
+
+ // Mark shipped — the label is already generated (auto or manual); this confirms drop-off and emails
+ // the buyer their tracking. Handled before the Shippo/rate checks since it needs neither.
+ if (body?.action === "mark_shipped") {
+ await markOrderShipped(id);
+ // Email the buyer their tracking if we have a label's tracking number (skip if they shipped their own way).
+ if (order.buyerEmail && order.trackingNumber) {
+ try {
+ await sendBuyerTrackingEmail({ buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, replyTo: seller.email });
+ await markTrackingEmailSent(id);
+ } catch (e) { await logError("tracking-email", e, { context: { orderId: id } }); }
+ }
+ return NextResponse.json({ ok: true, status: "shipped" });
+ }
 
  if (!isShippoConfigured()) return NextResponse.json({ error: "Shipping labels aren’t enabled yet." }, { status: 503 });
  const shipping = await getShippingSettings(slug);
@@ -127,15 +145,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  if (sellerPays) {
  await stripePost("payment_intents", { amount: String(label.costCents || cheapest.amountCents), currency: (order.currency || "usd").toLowerCase(), customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA shipping label — order ${id}` }, undefined, `ship-label-${id}`).catch((e) => logError("label-seller-charge", e, { context: { orderId: id, slug, costCents: label.costCents } }));
  }
- await setOrderShipped(id, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
- if (order.buyerEmail) {
- try {
- await sendBuyerTrackingEmail({ buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, replyTo: seller.email });
- await markTrackingEmailSent(id);
- } catch (e) {
- console.error("tracking email failed", e);
- }
- }
+ // Store the label WITHOUT marking shipped — the seller prints it, then hits "Mark shipped" when they
+ // actually drop it off (which is what emails the buyer their tracking).
+ await setOrderLabel(id, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
+ await recordLabelTransaction(id, label.transactionId); // so it can be voided if the order is refunded
  return NextResponse.json({ ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl });
  }
 

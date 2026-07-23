@@ -16,41 +16,19 @@
   window.addEventListener('resize',updateNav);
   updateNav();
 
-  // Mobile nav dropdown — the hamburger opens/closes the link list
-  var toggle=document.querySelector('.nav-toggle');
-  if(toggle&&nav){
-    toggle.addEventListener('click',function(){
-      var open=nav.classList.toggle('nav-open');
-      toggle.textContent=open?'✕':'☰';
-      toggle.setAttribute('aria-expanded',open?'true':'false');
-    });
-    nav.querySelectorAll('.nav-links a').forEach(function(a){
-      a.addEventListener('click',function(){ nav.classList.remove('nav-open'); toggle.textContent='☰'; toggle.setAttribute('aria-expanded','false'); });
-    });
-  }
-
   var io=new IntersectionObserver(function(entries){
     entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
   },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
   document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
 
-  // Styled forms — POST to Formspree when a real endpoint is set (data-formspree), otherwise show
-  // the local success state. Falls back to the local state while the endpoint is still the placeholder.
+  // Styled forms (ready to wire) — show a success state, no backend
   document.querySelectorAll('form[data-mock]').forEach(function(f){
     f.addEventListener('submit',function(ev){
       ev.preventDefault();
       if(!f.checkValidity()){ f.reportValidity(); return; }
       var ok=f.parentElement.querySelector('.form-ok');
-      function success(){ f.classList.add('hide'); if(ok) ok.classList.add('show'); }
-      var endpoint=f.getAttribute('data-formspree');
-      if(endpoint && endpoint.indexOf('YOUR_FORM_ID')===-1){
-        var btn=f.querySelector('button[type="submit"]'); if(btn){ btn.disabled=true; }
-        fetch(endpoint,{method:'POST',body:new FormData(f),headers:{'Accept':'application/json'}})
-          .then(function(r){ if(r.ok){ success(); } else { if(btn){btn.disabled=false;} alert('Something went wrong — please email hana@vyaplatform.com.'); } })
-          .catch(function(){ if(btn){btn.disabled=false;} alert('Something went wrong — please email hana@vyaplatform.com.'); });
-        return;
-      }
-      success();
+      f.classList.add('hide');
+      if(ok) ok.classList.add('show');
     });
   });
 })();
@@ -109,28 +87,4 @@
   if(reduce){ items.forEach(function(i){i.classList.add('show');}); return; }
   var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); } });},{threshold:0.4,rootMargin:'0px 0px -12% 0px'});
   items.forEach(function(i){ io.observe(i); });
-})();
-
-// Soft scroll — ease the native scroll toward a wheel-driven target so pages glide instead of
-// snapping. Real window.scrollTo keeps scroll events firing, so reveal animations still work.
-// Off for touch + reduced-motion.
-(function(){
-  var mm=window.matchMedia;
-  if(mm && (mm('(prefers-reduced-motion: reduce)').matches || mm('(pointer: coarse)').matches)) return;
-  var target=window.scrollY, current=target, active=false;
-  function maxY(){ return document.documentElement.scrollHeight - window.innerHeight; }
-  function loop(){
-    current += (target-current)*0.11;
-    if(Math.abs(target-current)<0.4){ current=target; window.scrollTo({top:current,behavior:'instant'}); active=false; return; }
-    window.scrollTo({top:current,behavior:'instant'});
-    requestAnimationFrame(loop);
-  }
-  window.addEventListener('wheel',function(e){
-    if(e.ctrlKey || !e.deltaY) return;
-    e.preventDefault();
-    var dy=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?window.innerHeight:1);
-    target=Math.max(0,Math.min(target+dy,maxY()));
-    if(!active){ active=true; current=window.scrollY; requestAnimationFrame(loop); }
-  },{passive:false});
-  window.addEventListener('scroll',function(){ if(!active){ target=current=window.scrollY; } },{passive:true});
 })();

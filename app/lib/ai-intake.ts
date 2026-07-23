@@ -122,9 +122,11 @@ function parseTag(t: any): ListingDraft["tag"] {
 }
 
 // Estimated shipping parcel with safe defaults (a medium poly mailer) when the
-// model omits a dimension — a label always needs a complete parcel.
+// model omits a dimension — a label always needs a complete parcel. Always round
+// UP (never down): a declared parcel that's slightly bigger/heavier than reality
+// only over-quotes a touch; one that's too small risks a carrier re-weigh charge.
 function parseParcel(p: any): { weightOz: number; lengthIn: number; widthIn: number; heightIn: number } {
- const n = (v: any, d: number) => (typeof v === "number" && v > 0 ? Math.round(v) : d);
+ const n = (v: any, d: number) => (typeof v === "number" && v > 0 ? Math.ceil(v) : d);
  return { weightOz: n(p?.weightOz, 16), lengthIn: n(p?.lengthIn, 12), widthIn: n(p?.widthIn, 9), heightIn: n(p?.heightIn, 3) };
 }
 

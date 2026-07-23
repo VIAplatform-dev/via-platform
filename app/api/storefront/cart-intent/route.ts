@@ -63,6 +63,9 @@ export async function POST(request: NextRequest) {
  const subtotalForShip = reserved.reduce((s, it) => s + it.priceCents, 0);
  const shipSettings = await getShippingSettings(seller.slug);
  const shipFree = shipSettings.mode === "store_pays" || (shipSettings.mode === "free_over" && shipSettings.freeThresholdCents != null && subtotalForShip >= shipSettings.freeThresholdCents);
+ // Flat-rate by size (Depop/Poshmark-style): the buyer pays one clean, consistent tier price for the
+ // bag's combined parcel — same number every time, no per-order variation. VYA buys the real discounted
+ // label at fulfillment and keeps the spread; margin is baked into the tier + kept safe by round-up dims.
  const shippingCostCents = shipFree ? 0 : flatRateCents({
  weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
  lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),

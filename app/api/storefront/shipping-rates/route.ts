@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getItem } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
-import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
-import { assignTier, buyerChargeCents, tierNeedsFloorCheck } from "@/app/lib/shipping-tiers";
-import { getRates, isShippoConfigured } from "@/app/lib/shippo";
+import { getShippingSettings } from "@/app/lib/store-shipping-db";
+import { assignTier, flatRateCents } from "@/app/lib/shipping-tiers";
 
 export const dynamic = "force-dynamic";
 
@@ -28,19 +27,11 @@ export async function POST(request: NextRequest) {
  if (free) return NextResponse.json({ free: true, rates: [] });
 
  // Flat-rate pricing: one clean tier price by the piece's size (auto-detected from its captured
- // weight/dimensions). VYA buys the real discounted label at fulfillment and keeps the spread —
- // so no ship-from or live-rate lookup is needed and the sale is never blocked.
+ // weight/dimensions). VYA buys the real discounted label at fulfillment and keeps the spread.
  const parcel = { weightOz: item.weightOz || 16, lengthIn: item.lengthIn || 12, widthIn: item.widthIn || 9, heightIn: item.heightIn || 3 };
  const tier = assignTier(parcel);
- // Guarantee margin: floor the Large tier against the live cheapest rate so VYA never ships at a loss.
- let liveCheapest: number | null = null;
- if (tierNeedsFloorCheck(tier.id) && isShippoConfigured() && hasShipFrom(shipping)) {
- const f = shipping.shipFrom!;
- const from = { name: f.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone };
- const dest = { name: to.name, street1: to.street1, street2: to.street2, city: to.city, state: to.state, zip: to.zip, country: to.country || "US", phone: to.phone };
- const rates = await getRates(from, dest, parcel).catch(() => []);
- if (rates.length) liveCheapest = rates[0].amountCents;
- }
- const charge = buyerChargeCents(parcel, liveCheapest);
+ // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
+ // exactly what checkout charges. No live-rate lookup, so it never varies by distance or blocks a sale.
+ const charge = flatRateCents(parcel);
  return NextResponse.json({ free: false, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: charge, estDays: null }] });
 }

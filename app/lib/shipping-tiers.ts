@@ -21,9 +21,11 @@ export const SHIPPING_TIERS: ShippingTier[] = [
  { id: "large", label: "Large", priceCents: 2400, maxWeightOz: Infinity, maxGirthIn: Infinity, typicalCostCents: [1600, 2200], examples: "Coats, boots, heavy knits, multi-item orders" },
 ];
 
-// The margin VYA must clear on every order. If a parcel's real label would eat the flat rate (a
-// heavy/cross-country outlier), the buyer's charge is floored at (real cost + this) so VYA never
-// ships at a loss. Small/Medium tiers always clear this comfortably; only Large is ever at risk.
+// The margin VYA wants to clear on a typical order — baked into each tier's flat price (buyer pays the
+// flat tier, VYA buys the real discounted label and keeps the spread). Not a per-order floor: buyer
+// pricing stays flat & consistent (Depop/Poshmark-style). This is also the loss-monitor threshold —
+// when a real label lands within/over this margin, we alert ops so the tier can be re-tuned. Round-up
+// dims (at intake) keep heavy items in the right tier so the flat price actually covers them.
 export const MIN_MARGIN_CENTS = 250;
 
 export type ParcelDims = { weightOz?: number | null; lengthIn?: number | null; widthIn?: number | null; heightIn?: number | null };
@@ -48,23 +50,6 @@ export function assignTier(p?: ParcelDims | null): ShippingTier {
 /** The flat price the buyer pays for a parcel (the assigned tier's price). */
 export function flatRateCents(p?: ParcelDims | null): number {
  return assignTier(p).priceCents;
-}
-
-/**
- * What to actually charge the buyer, guaranteeing VYA never loses. Normally the clean flat tier — but
- * if we have a live label cost and the flat wouldn't clear MIN_MARGIN over it (a heavy/far outlier),
- * the charge is floored at cost + MIN_MARGIN. Pass `liveCheapestCents` only when it's worth checking
- * (the Large tier); omit it and the buyer just pays the flat rate.
- */
-export function buyerChargeCents(p?: ParcelDims | null, liveCheapestCents?: number | null): number {
- const flat = flatRateCents(p);
- if (liveCheapestCents == null || liveCheapestCents <= 0) return flat;
- return Math.max(flat, liveCheapestCents + MIN_MARGIN_CENTS);
-}
-
-/** True when a tier's flat price could be eaten by a real label — i.e. worth a live floor check. */
-export function tierNeedsFloorCheck(id: TierId): boolean {
- return id === "large";
 }
 
 /** VYA's margin once the real label is bought: what the buyer paid minus the actual label cost. */

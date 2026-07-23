@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
  // (which used to leave sellers 2..N charged for a label the buyer never paid for).
  const shipSettings = await getShippingSettings(seller.slug);
  const shipFree = shipSettings.mode === "store_pays" || (shipSettings.mode === "free_over" && shipSettings.freeThresholdCents != null && subtotal >= shipSettings.freeThresholdCents);
+ // Flat-rate by size (Depop/Poshmark-style), PER SELLER — the buyer pays one clean, consistent tier
+ // price for this store's parcel, same number every time. VYA buys the real discounted label at
+ // fulfillment and keeps the spread; margin is baked into the tier + kept safe by round-up dims.
  const shipHere = shipFree ? 0 : flatRateCents({
  weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
  lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),

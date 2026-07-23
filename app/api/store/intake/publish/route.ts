@@ -8,6 +8,7 @@ import { createCrossListingsForItem, syncItemToApiPlatforms } from "@/app/lib/cr
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
 import { logCorrections, logPredictions, rememberItem } from "@/app/lib/intake-memory-db";
 import { recordIntakeExample } from "@/app/lib/training-data-db";
+import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,14 @@ export async function POST(request: NextRequest) {
  const title = String(body.title || "").trim().slice(0, 200);
  if (!title) return NextResponse.json({ error: "Title is required." }, { status: 400 });
 
+ // A LIVE listing must be shippable: without a ship-from we can't quote a live rate to floor the
+ // buyer's shipping (so VYA could lose money) or buy the label. Drafts are fine — the store can stage
+ // pieces and add the address before publishing the batch.
+ if (body.status !== "draft") {
+ const shipping = await getShippingSettings(slug);
+ if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping before publishing a live listing." }, { status: 400 });
+ }
+
  const store = stores.find((s) => s.slug === slug);
  const seller = await getOrCreateSeller(slug, store?.name || slug, storeContactEmails[slug] || "");
 
@@ -29,7 +38,8 @@ export async function POST(request: NextRequest) {
  const s = (typeof v === "string" ? v : "").trim();
  return s ? s.slice(0, n) : null;
  };
- const intOr = (v: unknown, d: number) => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 ? n : d; };
+ // Parcel dims round UP (never down) — a declared parcel smaller than reality risks a carrier re-weigh charge.
+ const dimUp = (v: unknown, d: number) => { const n = Math.ceil(Number(v)); return Number.isFinite(n) && n > 0 ? n : d; };
  const price = Math.max(0, Math.min(1_000_000, Number(body.price) || 0));
  const hasCost = body.cost !== undefined && body.cost !== null && body.cost !== "";
  const cost = Math.max(0, Math.min(1_000_000, Number(body.cost) || 0));
@@ -49,10 +59,10 @@ export async function POST(request: NextRequest) {
  condition: str(body.condition, 80),
  size: str(body.size, 40),
  category: str(body.category, 60),
- weightOz: intOr(body.weightOz, 16),
- lengthIn: intOr(body.lengthIn, 12),
- widthIn: intOr(body.widthIn, 9),
- heightIn: intOr(body.heightIn, 3),
+ weightOz: dimUp(body.weightOz, 16),
+ lengthIn: dimUp(body.lengthIn, 12),
+ widthIn: dimUp(body.widthIn, 9),
+ heightIn: dimUp(body.heightIn, 3),
  source: "ai",
  // Stores doing a drop stage pieces as drafts, then publish the batch at once.
  status: body.status === "draft" ? "draft" : "active",

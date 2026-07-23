@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Contact — VYA</title>
-<meta name="description" content="Get in touch with VYA. Questions about the platform, partnerships, press, or bringing your store on board." />
+<title>Payments & shipping — VYA</title>
+<meta name="description" content="Checkout, payouts, and shipping labels all live inside VYA. Get paid and ship every order without leaving the platform." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
@@ -20,7 +20,7 @@
       <a href="/infrastructure#features">Platform</a>
       <a href="/infrastructure#capabilities">Capabilities</a>
       <a href="/infrastructure/company">Company</a>
-      <a href="/infrastructure/contact" aria-current="page">Contact</a>
+      <a href="/infrastructure/contact">Contact</a>
     </nav>
     <div class="nav-right">
       <a href="https://calendly.com/vya-demo" target="_blank" rel="noopener" class="btn btn-soft">Log in</a>
@@ -31,69 +31,52 @@
 </header>
 
 <!-- HERO -->
-<section class="subhero" data-theme="light">
+<section class="subhero subhero-wide" data-theme="light">
   <div class="wrap reveal">
-    <span class="eyebrow">Contact</span>
-    <h1>Let's talk.</h1>
-    <p class="sub">Questions about the platform, partnerships, press, or bringing your store on board. Send a note and someone on our team will get back to you in 24-48 hours.</p>
+    <span class="eyebrow">Payments &amp; shipping</span>
+    <h1>Payments and shipping, built in.</h1>
+    <p class="sub">Checkout, payouts, and shipping labels all live inside VYA. You never leave to get paid or ship an order.</p>
   </div>
 </section>
 
-<!-- CONTACT -->
+<!-- ONE SECTION -->
 <section class="sec" data-theme="light">
-  <div class="contact-cols">
-    <div class="info-list reveal">
-      <div class="info-item">
-        <h4>General</h4>
-        <a href="mailto:hana@vyaplatform.com">hana@vyaplatform.com</a>
-      </div>
-      <div class="info-item">
-        <h4>Partnerships</h4>
-        <a href="mailto:partnerships@vyaplatform.com">partnerships@vyaplatform.com</a>
-      </div>
-      <div class="info-item">
-        <h4>Bring your store</h4>
-        <p>Want VYA for your shop? <a href="https://calendly.com/vya-demo" target="_blank" rel="noopener" style="color:#0f9e78;font-size:inherit;display:inline">Book a demo &rarr;</a></p>
-      </div>
-    </div>
-
-    <div class="form-wrap reveal" style="margin:0">
-      <div class="form-card">
-        <form class="form" data-mock novalidate>
-          <div class="form-row">
-            <div class="field">
-              <label for="c-name">Name</label>
-              <input id="c-name" name="name" type="text" placeholder="Your name" required />
-            </div>
-            <div class="field">
-              <label for="c-email">Email</label>
-              <input id="c-email" name="email" type="email" placeholder="you@store.com" required />
-            </div>
-          </div>
-          <div class="field">
-            <label for="c-topic">What's this about?</label>
-            <select id="c-topic" name="topic">
-              <option>General question</option>
-              <option>Bringing my store to VYA</option>
-              <option>Partnership</option>
-              <option>Press</option>
-              <option>Something else</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="c-msg">Message</label>
-            <textarea id="c-msg" name="message" placeholder="Tell us a little about what you're looking for..." required></textarea>
-          </div>
-          <button type="submit" class="btn btn-dark btn-lg">Send message
-            <svg class="arw" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-          <p class="form-note">By sending this you agree to be contacted by VYA. We'll never share your details.</p>
-        </form>
-        <div class="form-ok">
-          <div class="chk"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
-          <h3>Message sent.</h3>
-          <p>Thanks for reaching out, we'll get back to you shortly.</p>
+  <div class="feat-rows">
+    <div class="feat-row reveal">
+      <div class="fr-copy">
+        <h3>Get paid and ship, without leaving VYA</h3>
+        <p>When an order comes in, VYA collects payment, deposits your payout, and generates the shipping label. One flow, no extra tools to wire up.</p>
+        <div class="fr-list">
+          <span>Secure checkout and fast payouts to your bank</span>
+          <span>Prepaid shipping labels with live tracking</span>
+          <span>Every order handled in one place</span>
         </div>
       </div>
+      <div class="fr-visual"><div class="fv"><div class="mk" style="gap:13px;justify-content:center">
+        <div class="ps-card">
+          <div class="ps-h"><span class="ps-t">Payment</span><span class="mk-pill"><span class="d"></span>Paid</span></div>
+          <div class="ps-row"><span class="ps-k">Order #1042 · 1 item</span><span class="ps-v">$900.00</span></div>
+          <div class="ps-pay"><span class="mk-visa">VISA</span><div class="ps-pi"><div class="ps-pn">Deposited to your bank</div><div class="ps-ps">•••• 4242 · today</div></div><span class="mk-tick">✓</span></div>
+        </div>
+        <div class="ps-card">
+          <div class="ps-h"><span class="ps-t">Shipping</span><span class="mk-pill">Label ready</span></div>
+          <div class="ps-row"><span class="ps-k">USPS Priority · 1Z 999 AA1 0123</span><span class="ps-track">Track</span></div>
+          <div class="ps-prog"><span class="ps-step done">Ordered</span><span class="ps-line done"></span><span class="ps-step done">Shipped</span><span class="ps-line"></span><span class="ps-step">Out for delivery</span></div>
+        </div>
+      </div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="band cta" id="cta" data-theme="light">
+  <div class="wrap reveal">
+    <p class="display">Sell without the busywork.</p>
+    <p>VYA handles checkout, payouts, and shipping, so you can focus on sourcing and selling.</p>
+    <div class="cta-row">
+      <a href="https://calendly.com/vya-demo" target="_blank" rel="noopener" class="btn btn-dark btn-lg">Book a demo
+        <svg class="arw" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      <a href="/infrastructure/contact" class="btn btn-outline-d btn-lg">Talk to us</a>
     </div>
   </div>
 </section>
@@ -106,6 +89,7 @@
         <h5>Product</h5>
         <a href="/infrastructure#features">Platform</a>
         <a href="/infrastructure#capabilities">Capabilities</a>
+        <a href="/infrastructure/payments">Payments &amp; shipping</a>
         <a href="https://calendly.com/vya-demo" target="_blank" rel="noopener">Book a demo</a>
       </div>
       <div class="foot-col">
@@ -117,8 +101,8 @@
       </div>
       <div class="foot-col">
         <h5>Get started</h5>
-        <a href="https://calendly.com/vya-demo" target="_blank" rel="noopener">Book a demo</a>
-        <a href="https://calendly.com/vya-demo" target="_blank" rel="noopener">Log in</a>
+        <a href="/infrastructure/build-from-scratch">Start from scratch</a>
+        <a href="/infrastructure/import-store">Bring your own site</a>
         <a href="/infrastructure/contact">Talk to us</a>
       </div>
       <div class="foot-col">

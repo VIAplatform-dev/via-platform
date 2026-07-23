@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, inArray } from "drizzle-orm";
 import { getDb, orders, payouts, items, sellers } from "./index";
 import type { Order } from "./index";
 
@@ -106,6 +106,52 @@ export async function markConfirmationSent(orderId: string): Promise<void> {
  await getDb().update(orders).set({ confirmationSentAt: new Date() }).where(eq(orders.id, orderId));
 }
 
+/** Undo a confirmation claim so a failed send retries on the next webhook event. */
+export async function resetConfirmationSent(orderId: string): Promise<void> {
+ await getDb().update(orders).set({ confirmationSentAt: null }).where(eq(orders.id, orderId));
+}
+
+/**
+ * ATOMICALLY claim a PaymentIntent's orders for confirmation, then return their details. The claim
+ * (a single UPDATE ... WHERE sent IS NULL ... RETURNING) is the race gate: when checkout.session.
+ * completed and payment_intent.succeeded fire at once, only ONE of them wins each order, so the buyer
+ * never gets a duplicate confirmation. Replaces the old check-then-mark, which raced.
+ */
+export async function claimOrdersForConfirmation(pi: string) {
+ const db = getDb();
+ const claimed = await db.update(orders)
+ .set({ confirmationSentAt: new Date() })
+ .where(and(eq(orders.stripePaymentIntent, pi), isNull(orders.confirmationSentAt)))
+ .returning({ id: orders.id });
+ if (!claimed.length) return [] as Awaited<ReturnType<typeof detailsForOrders>>;
+ return detailsForOrders(claimed.map((r) => r.id));
+}
+
+async function detailsForOrders(ids: string[]) {
+ const db = getDb();
+ return db
+ .select({
+ id: orders.id,
+ amountCents: orders.amountCents,
+ feeCents: orders.feeCents,
+ shippingPaidCents: orders.shippingPaidCents,
+ currency: orders.currency,
+ buyerEmail: orders.buyerEmail,
+ buyerName: orders.buyerName,
+ shipLine1: orders.shipLine1, shipLine2: orders.shipLine2, shipCity: orders.shipCity,
+ shipState: orders.shipState, shipPostal: orders.shipPostal, shipCountry: orders.shipCountry,
+ itemTitle: items.title,
+ itemImages: items.images,
+ sellerName: sellers.name,
+ sellerSlug: sellers.slug,
+ sellerEmail: sellers.email,
+ })
+ .from(orders)
+ .leftJoin(items, eq(items.id, orders.itemId))
+ .leftJoin(sellers, eq(sellers.id, orders.sellerId))
+ .where(inArray(orders.id, ids));
+}
+
 /** Full order for the seller fulfillment view (item joined in). */
 export async function getOrderDetail(orderId: string) {
  const db = getDb();
@@ -139,6 +185,22 @@ export async function setOrderShipped(orderId: string, label: { labelUrl: string
  trackingUrl: label.trackingUrl,
  labelCostCents: label.labelCostCents,
  }).where(eq(orders.id, orderId));
+}
+
+/** Store a purchased label WITHOUT marking the order shipped — for auto-generate at order time, so
+ *  the seller prints a prepaid label and marks it shipped only when they actually drop it off. */
+export async function setOrderLabel(orderId: string, label: { labelUrl: string; trackingNumber: string; trackingUrl: string | null; labelCostCents: number }): Promise<void> {
+ await getDb().update(orders).set({
+ labelUrl: label.labelUrl,
+ trackingNumber: label.trackingNumber,
+ trackingUrl: label.trackingUrl,
+ labelCostCents: label.labelCostCents,
+ }).where(eq(orders.id, orderId));
+}
+
+/** Mark shipped once the seller confirms drop-off (the label was already generated). */
+export async function markOrderShipped(orderId: string): Promise<void> {
+ await getDb().update(orders).set({ status: "shipped", shippedAt: new Date() }).where(eq(orders.id, orderId));
 }
 
 export async function markTrackingEmailSent(orderId: string): Promise<void> {

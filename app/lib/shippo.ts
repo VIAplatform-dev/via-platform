@@ -64,7 +64,7 @@ export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parce
  .sort((a, b) => a.amountCents - b.amountCents);
 }
 
-export type PurchasedLabel = { labelUrl: string; trackingNumber: string; trackingUrl: string | null; costCents: number };
+export type PurchasedLabel = { labelUrl: string; trackingNumber: string; trackingUrl: string | null; costCents: number; transactionId: string };
 
 /** Buy a label for a previously-returned rate id. Returns null if it didn't succeed. */
 export async function buyLabel(rateId: string): Promise<PurchasedLabel | null> {
@@ -75,5 +75,15 @@ export async function buyLabel(rateId: string): Promise<PurchasedLabel | null> {
  trackingNumber: String(tx.tracking_number || ""),
  trackingUrl: tx.tracking_url_provider || null,
  costCents: Math.round(parseFloat((tx.rate?.amount as string) || "0") * 100),
+ transactionId: String(tx.object_id || ""), // needed to refund/void the label if the order is refunded
  };
+}
+
+/** Refund (void) an unused label so its cost is credited back — used when an order is refunded before
+ *  it ships. Best-effort: Shippo rejects labels that were already used/scanned, which is fine. */
+export async function voidLabel(transactionId: string): Promise<boolean> {
+ if (!transactionId) return false;
+ const r = await shippo("/refunds/", "POST", { transaction: transactionId, async: false });
+ // PENDING or SUCCESS both mean the refund was accepted (USPS refunds settle asynchronously).
+ return !!r && (r.status === "SUCCESS" || r.status === "PENDING");
 }
