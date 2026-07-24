@@ -1218,6 +1218,30 @@ export const stores = [
  "Returns accepted within 7 business days of delivery. Items must be in original condition with tags, original packaging, and any authentication papers. A $40 handling and reauthentication fee is deducted and refunds are issued as store credit. Domestic return labels are provided; international customers cover return shipping. Use the form below to initiate a return.",
  },
  {
+ slug: "the-vintage-new-yorker",
+ dashboardToken: "tvny-859a22edf219",
+ name: "The Vintage New Yorker",
+ location: "New York, NY",
+ description:
+ "The Vintage New Yorker is a vintage & pre-owned luxury boutique specializing in Handbags, Jewelry, & Accessories, inspired by iconic NYC style. As lovers of fashion history, we provide as much transparent detail as possible on each item in our collection. We require a strict two round authentication process, and are happy to be part of a circular movement promoting less waste and a longer life cycle of great fashion.",
+ website: "https://www.thevintagenewyorker.com",
+ contactEmail: "info@thevintagenewyorker.com",
+ dataSource: "the-vintage-new-yorker",
+ image: "/stores/the-vintage-new-yorker.jpg",
+ logo: "/stores/the-vintage-new-yorker.jpg",
+ logoBg: "#ffffff",
+ currency: "USD",
+ commissionType: "shopify-collabs" as const,
+ affiliatePath: "VYA",
+ collabsStoreId: "250595",
+ authenticityPolicy:
+ "The Vintage New Yorker requires a strict two-round authentication process on every piece in the collection, and provides as much transparent detail as possible on each item. As lovers of fashion history, we're proud to be part of a circular movement — promoting less waste and a longer life cycle for great fashion.",
+ shippingPolicy:
+ "Ships from New York, NY. Shipping rates are calculated at checkout.",
+ returnPolicy:
+ "Every item is presented with transparent detail — please review all descriptions and photos carefully before purchasing. For any questions about an order or a return, contact info@thevintagenewyorker.com.",
+ },
+ {
  slug: "thread-and-bloom",
  dashboardToken: "tb-5a8d3f9e1c2b",
  name: "Thread and Bloom",
@@ -1436,6 +1460,7 @@ export function getCommissionAmount(price: number): number {
  * Fill in each store's email address — leave blank to skip that store.
  */
 export const storeContactEmails: Record<string, string> = {
+ "the-vintage-new-yorker": "info@thevintagenewyorker.com",
  "lamash": "mollyashmore6@gmail.com",
  "stone-studio-vintage": "stonestudiovintage@gmail.com",
  "ascensio-vintage": "info@ascensiovintage.com",

@@ -483,6 +483,13 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  slug: "reine-revival",
  storeDomain: "reinerevival.com",
  },
+ {
+ type: "shopify",
+ name: "The Vintage New Yorker",
+ slug: "the-vintage-new-yorker",
+ storeDomain: "thevintagenewyorker.com",
+ scrapeProductPage: true,
+ },
 ];
 
 // Big Cartel stores (public JSON API — no token required)
