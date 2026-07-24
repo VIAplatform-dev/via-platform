@@ -18,33 +18,13 @@ const getResend = () => {
 const _rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || "vyaplatform.com";
 const BASE_URL = _rawBaseUrl.startsWith("http") ? _rawBaseUrl : `https://${_rawBaseUrl}`;
 const FROM_EMAIL = "VYA <hana@vyaplatform.com>";
-
-// Where operational alerts (failed/empty nightly ETL, etc.) are sent. Override with
-// OPS_ALERT_EMAIL in the environment.
+// Fallback recipient for ops/offer notifications when no store contact is set.
 const OPS_ALERT_EMAIL = process.env.OPS_ALERT_EMAIL || "helster@me.com";
 
-/**
- * Send an operational alert to the founder — used when a nightly ETL cron throws or
- * produces a suspiciously empty result, so silent failures surface instead of looking
- * like "no data". Best-effort: never throws, so an alert failure can't mask the original.
- */
-export async function sendOpsAlert(subject: string, body: string): Promise<void> {
- try {
- if (!process.env.RESEND_API_KEY) {
- console.error(`[ops-alert] ${subject}: ${body}`);
- return;
- }
- const esc = (s: string) => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c] as string));
- await getResend().emails.send({
- from: FROM_EMAIL,
- to: OPS_ALERT_EMAIL,
- subject: `⚠️ VYA ops: ${subject}`,
- html: `<pre style="font-family:monospace;white-space:pre-wrap">${esc(body)}</pre>`,
- });
- } catch (e) {
- console.error(`[ops-alert] failed to send "${subject}":`, e);
- }
-}
+// sendOpsAlert lives in the dependency-light ./ops-alert leaf (so db.ts → error-log can reach it
+// without pulling this whole module, which imports the server-only storefront sanitizer). Re-exported
+// here so existing callers that import it from ./email keep working.
+export { sendOpsAlert } from "./ops-alert";
 
 // ── Consumer offers (Depop/Poshmark-style negotiation) ──────────────────────────
 const offerMoney = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;

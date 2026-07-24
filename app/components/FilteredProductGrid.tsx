@@ -44,7 +44,7 @@ function colorOf(p: { imageColor?: string | null; title: string }): string | nul
  if (p.imageColor) return p.imageColor.charAt(0).toUpperCase() + p.imageColor.slice(1);
  return null;
 }
-import { sortSizes, expandSizeKeys } from "@/app/lib/inventory";
+import { sortSizes, expandSizeKeys } from "@/app/lib/sizeUtils";
 import ProductCard from "./ProductCard";
 import { formatPrice } from "@/app/lib/formatPrice";
 import type { CategoryLabel } from "@/app/lib/categoryMap";

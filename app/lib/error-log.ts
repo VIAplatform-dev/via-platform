@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { neon } from "@neondatabase/serverless";
-import { sendOpsAlert } from "./email";
+import { sendOpsAlert } from "./ops-alert";
 
 // Error-monitoring foundation. The codebase had no telemetry, so failures on important paths
 // vanished into swallowed catches (the sold_items bug hid for MONTHS this way). logError() records

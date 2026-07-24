@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { CategoryLabel } from "@/app/lib/categoryMap";
 import ImageCarousel from "./ImageCarousel";
 import FavoriteButton from "./FavoriteButton";
-import { normalizeSize, convertSizeToUS } from "@/app/lib/inventory";
+import { normalizeSize, convertSizeToUS } from "@/app/lib/sizeUtils";
 import { trackSelectItem } from "@/app/lib/firebase-analytics";
 
 const SIZE_LABELS: Record<string, string> = {
