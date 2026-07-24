@@ -671,22 +671,55 @@
   var sds=[].slice.call(document.querySelectorAll('.vs-sd'));
   var view=document.querySelector('.vs-stepview'), track=document.querySelector('.vs-track');
   var cur=-1, BH=260, ticking=false;
-  function measure(){ if(sds.length>1) BH=sds[1].offsetTop-sds[0].offsetTop; }
-  function setActive(i){ if(i===cur)return; cur=i;
-    tabs.forEach(function(t,k){t.classList.toggle('vs-on',k===i);});
-    assets.forEach(function(a,k){a.classList.toggle('vs-on',k===i);});
-    sds.forEach(function(s,k){s.classList.toggle('vs-on',k===i);}); }
-  function upd(){ ticking=false;
-    var r=sec.getBoundingClientRect(), total=sec.offsetHeight-window.innerHeight;
-    var p=(-r.top)/total; p=Math.max(0,Math.min(0.9999,p));
-    var f=p*(n-1); var focus=view.clientHeight*0.58;
-    track.style.transform='translateY('+(focus-f*BH).toFixed(1)+'px)';
-    setActive(Math.round(f));
+  function isMobile(){ return window.matchMedia('(max-width:900px)').matches; }
+
+  if(isMobile()){
+    // Mobile: paired scroll. Move each capability's asset into a device frame right under its own
+    // text, so you read a capability then see its demo, then scroll to the next. No scroll-jack/tabs.
+    sds.forEach(function(sd,i){
+      var a=assets[i]; if(!a) return;
+      var frame=document.createElement('div');
+      frame.className='vs-mobframe';
+      frame.appendChild(a);
+      sd.appendChild(frame);
+    });
+    var right=document.querySelector('.vs-right');
+    if(right && right.parentNode) right.parentNode.removeChild(right);
+    // Animate each asset as it scrolls into view: add .vs-on (fires the phone's bubble pops) and
+    // stagger the panel rows so trends/offers/messaging animate in too, not just Text-to-list.
+    var mAssets=[].slice.call(document.querySelectorAll('.vs-mobframe .vs-asset'));
+    var reveal=function(a){
+      if(a.classList.contains('vs-on')) return;
+      a.classList.add('vs-on');
+      var rows=a.querySelectorAll('.vs-tr-row,.vs-of-row,.vs-ms-bub');
+      for(var j=0;j<rows.length;j++){ rows[j].style.animationDelay=(0.12*j+0.1).toFixed(2)+'s'; }
+    };
+    var checkReveal=function(){
+      var vh=window.innerHeight;
+      mAssets.forEach(function(a){ if(a.classList.contains('vs-on')) return; var r=a.getBoundingClientRect(); if(r.top < vh*0.82 && r.bottom > 0) reveal(a); });
+    };
+    window.addEventListener('scroll', checkReveal, {passive:true});
+    window.addEventListener('resize', checkReveal);
+    checkReveal();
+  } else {
+    // Desktop: scroll-driven stepper — the 540vh section pins the device and swaps its asset.
+    var measure=function(){ if(sds.length>1) BH=sds[1].offsetTop-sds[0].offsetTop; };
+    var setActive=function(i){ if(i===cur)return; cur=i;
+      tabs.forEach(function(t,k){t.classList.toggle('vs-on',k===i);});
+      assets.forEach(function(a,k){a.classList.toggle('vs-on',k===i);});
+      sds.forEach(function(s,k){s.classList.toggle('vs-on',k===i);}); };
+    var upd=function(){ ticking=false;
+      var r=sec.getBoundingClientRect(), total=sec.offsetHeight-window.innerHeight;
+      var p=(-r.top)/total; p=Math.max(0,Math.min(0.9999,p));
+      var f=p*(n-1); var focus=view.clientHeight*0.58;
+      track.style.transform='translateY('+(focus-f*BH).toFixed(1)+'px)';
+      setActive(Math.round(f));
+    };
+    window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(upd);}});
+    window.addEventListener('resize',function(){measure();upd();});
+    tabs.forEach(function(t,k){t.onclick=function(){var total=sec.offsetHeight-window.innerHeight;window.scrollTo({top:sec.offsetTop+(k/(n-1))*total,behavior:'smooth'});};});
+    window.addEventListener('load',function(){measure();upd();}); measure(); upd();
   }
-  window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(upd);}});
-  window.addEventListener('resize',function(){measure();upd();});
-  tabs.forEach(function(t,k){t.onclick=function(){var total=sec.offsetHeight-window.innerHeight;window.scrollTo({top:sec.offsetTop+(k/(n-1))*total,behavior:'smooth'});};});
-  window.addEventListener('load',function(){measure();upd();}); measure(); upd();
 
 </script>
 </body>

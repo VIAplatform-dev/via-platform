@@ -459,7 +459,20 @@
   @keyframes ledPayIn{0%{transform:translateX(8px) scale(.9);opacity:0}60%{transform:translateX(-1px) scale(1.06)}100%{transform:none;opacity:1}}
   @keyframes ledAv{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:none;opacity:1}}
   @media (prefers-reduced-motion:reduce){.led-row.pop,.led-row.pop .led-pay,.led-row.pop .av,#ledPending.settled{animation:none}}
-  @media (max-width:900px){.fx-grid{flex-direction:column;gap:16px}.fx-card{min-height:auto}.fx-num{transform:none}.fx-more{max-height:6em;opacity:1;margin-top:14px}.fx-card .fx-num .w{color:#fff}}
+  @media (max-width:900px){
+    .fx-grid{flex-direction:column;gap:16px}
+    /* flex:1 1 0 collapses each card to nothing in a column with no fixed height — size to content
+       instead, give the mockup stage a real height, and force the demos visible (the scroll-reveal
+       that sets .seen doesn't always fire reliably on mobile, leaving the cards looking empty). */
+    .fx-card{min-height:auto;flex:0 0 auto}
+    /* a DEFINITE height (not just min-height) so the mockups' height:100% + top:% positioning
+       resolves — otherwise the Sell-everywhere network collapses into an overlapping pile. */
+    .fx-stage{flex:0 0 auto;height:320px;min-height:0}
+    .fx .anim{opacity:1;transform:none}
+    .fx-num{transform:none}
+    .fx-more{max-height:6em;opacity:1;margin-top:14px}
+    .fx-card .fx-num .w{color:#fff}
+  }
 
   /* ---------------- FALLBACK PLACEHOLDERS ---------------- */
   .fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
@@ -910,7 +923,28 @@ header.nav.theme-dark .brand-mark{filter:invert(1) brightness(2)}
   .vs-ms-bub.vs-in{background:rgba(255,255,255,0.06);display:inline-block}
   .vs-ms-bub.vs-out{background:#0b84ff;color:#fff;margin-left:auto;width:fit-content}
   .vs-ms-input{margin-top:16px;border:1px solid var(--line);border-radius:20px;padding:10px 15px;font:400 12.5px var(--g);color:var(--faint)}
-  @media(max-width:900px){.vs-wrap{grid-template-columns:1fr;gap:24px;padding:0 26px}.vs-left{height:auto;padding:70px 0 10px}.vs-stepview{height:auto;overflow:visible;-webkit-mask-image:none}.vs-track{position:relative;transform:none!important}.vs-sd{opacity:1;padding-bottom:34px}.vs-right{padding-bottom:60px}}
+  @media(max-width:900px){
+    /* Mobile: kill the 540vh scroll-jack and make it a normal PAIRED scroll — each capability's text
+       is followed by its own asset in a device frame (the JS moves each asset into a .vs-mobframe
+       under its step). You scroll from one capability to the next. No pinned device, no tab switcher. */
+    .vs-steps{height:auto}
+    .vs-sticky{position:static;height:auto;overflow:visible}
+    .vs-wrap{grid-template-columns:1fr;height:auto;gap:0;padding:56px 26px}
+    .vs-left{height:auto;padding:0}
+    .vs-stepview{height:auto;overflow:visible;-webkit-mask-image:none;mask-image:none;padding-left:0}
+    .vs-stepview::before{display:none}
+    .vs-track{position:relative;left:0;transform:none!important}
+    .vs-sd{opacity:1;padding-bottom:48px}
+    .vs-sd:last-child{padding-bottom:0}
+    .vs-mobframe{position:relative;margin-top:20px;color:#f2f3f5;background:linear-gradient(180deg,#0c0d10,#08090b);border:1px solid rgba(255,255,255,0.07);border-radius:22px;padding:22px;min-height:400px;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,0.4)}
+    /* panels (trends/offers/messaging) inherit the frame's light text; the phone sets its own colors */
+    .vs-mobframe .vs-mk,.vs-mobframe .vs-mk .vs-tn,.vs-mobframe .vs-mk .vs-mh,.vs-mobframe .vs-mk .vs-ms-ctx{color:#f2f3f5}
+    /* animate the panel rows/bubbles in when the asset scrolls into view (the JS adds .vs-on + a
+       staggered animation-delay per row). The phone already animates via its own .vs-pbub rules. */
+    .vs-mobframe .vs-asset.vs-on .vs-tr-row,.vs-mobframe .vs-asset.vs-on .vs-of-row,.vs-mobframe .vs-asset.vs-on .vs-ms-bub{animation:pop .5s both}
+    .vs-mobframe::before{content:"";position:absolute;inset:0;background:radial-gradient(46% 42% at 50% 60%,rgba(255,255,255,0.08),transparent 70%);pointer-events:none;z-index:0}
+    .vs-mobframe .vs-asset{position:static;opacity:1;transform:none;pointer-events:auto;padding:0;width:100%;z-index:1;display:flex;align-items:center;justify-content:center}
+  }
 
 .vs-steps{background:#060607;position:relative;z-index:1;color:#f2f3f5}
 
@@ -1103,6 +1137,12 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 
 /* ---- build-page mockup polish: generated preview + hero ---- */
 .mk-describe{justify-content:center;gap:14px}
+/* Mobile: the Describe-your-store mockup (chat + storefront preview) is taller than the 5/4 visual
+   box, so overflow:hidden was clipping the chat into the storefront. Let the card grow to fit it. */
+@media (max-width:820px){
+  .fr-visual:has(.mk-describe){aspect-ratio:auto;min-height:0;padding:clamp(14px,4vw,22px)}
+  .mk-describe{position:static;inset:auto;height:auto;max-height:none;width:100%}
+}
 .mk-gen{border:1px solid rgba(255,255,255,0.09);border-radius:12px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015));flex:none;box-shadow:0 14px 30px rgba(0,0,0,0.34)}
 .mk-gen-bar{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,0.07)}
 .mk-gen-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:10px}
