@@ -88,3 +88,12 @@
   var io=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target); } });},{threshold:0.4,rootMargin:'0px 0px -12% 0px'});
   items.forEach(function(i){ io.observe(i); });
 })();
+
+// Mobile nav menu — the hamburger toggles the links dropdown (subpages had no handler at all).
+(function(){
+  var nav=document.getElementById('nav');
+  var toggle=document.querySelector('.nav-toggle');
+  if(!nav||!toggle) return;
+  toggle.addEventListener('click',function(){ nav.classList.toggle('menu-open'); });
+  nav.querySelectorAll('.nav-links a').forEach(function(a){ a.addEventListener('click',function(){ nav.classList.remove('menu-open'); }); });
+})();

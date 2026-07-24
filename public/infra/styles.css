@@ -494,6 +494,27 @@
     .foot-cols{grid-template-columns:1fr 1fr}
     .nav-right .btn-soft{display:none}
     .hero{min-height:580px}
+    .band{padding:clamp(58px,13vw,150px) 0}
+  }
+
+  /* Mobile nav menu — the hamburger opens the links as a dropdown (they're hidden in the bar ≤900px,
+     and the toggle previously did nothing / just jumped to a section). Adapts to the light/dark nav. */
+  @media (max-width:900px){
+    .nav-links{
+      display:flex;flex-direction:column;gap:0;justify-content:flex-start;align-items:stretch;
+      position:fixed;top:var(--nav-h);left:0;right:0;
+      padding:4px clamp(18px,5vw,24px) 16px;
+      border-bottom:1px solid transparent;
+      opacity:0;transform:translateY(-10px);pointer-events:none;
+      transition:opacity .24s var(--ease),transform .24s var(--ease);
+    }
+    .nav.theme-dark .nav-links{background:rgba(10,10,10,0.95);border-bottom-color:var(--line-d2);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px)}
+    .nav.theme-light .nav-links{background:rgba(255,255,255,0.96);border-bottom-color:var(--line-2);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px)}
+    .nav.menu-open .nav-links{opacity:1;transform:none;pointer-events:auto}
+    .nav-links a{font-size:16px;opacity:1;padding:15px 2px}
+    .nav.theme-dark .nav-links a{border-bottom:1px solid var(--line-d2)}
+    .nav.theme-light .nav-links a{border-bottom:1px solid var(--line-2)}
+    .nav-links a:last-child{border-bottom:0}
   }
 
   /* ============ SCROLL-REVEAL STATEMENT ============ */

@@ -360,9 +360,12 @@
   });
 
   var toggle=document.querySelector('.nav-toggle');
-  if(toggle) toggle.addEventListener('click',function(){
-    document.getElementById('features').scrollIntoView({behavior:'smooth'});
-  });
+  var navEl=document.getElementById('nav');
+  if(toggle&&navEl){
+    toggle.addEventListener('click',function(){ navEl.classList.toggle('menu-open'); });
+    // Tapping any menu link closes the menu (so anchor scrolls/navigations feel right).
+    navEl.querySelectorAll('.nav-links a').forEach(function(a){ a.addEventListener('click',function(){ navEl.classList.remove('menu-open'); }); });
+  }
 
   // Flora-style expand-on-hover: all three cards stay visible with their demos;
   // hovering one expands it wider (and shrinks the others) and reveals its extra
