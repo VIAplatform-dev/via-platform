@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, Badge, Button } from "../../ui";
 import { useStoreBase } from "../../nav-base";
+import { fmtOrderNo } from "../page";
 
 type Order = {
  id: string;
+ orderNo: number;
  status: string;
  amountCents: number;
  feeCents: number | null;
@@ -126,7 +128,7 @@ export default function OrderDetailPage() {
  <div className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
  <Link href={`${base}/orders`} className="text-[13px] text-stone-500 transition hover:text-stone-900">← All orders</Link>
  <div className="mb-7 mt-3 flex items-center gap-3">
- <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-stone-900">Order</h1>
+ <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-stone-900">Order <span className="font-mono text-[18px] tabular-nums text-stone-400">{fmtOrderNo(order.orderNo)}</span></h1>
  <Badge tone={STATUS_TONE[order.status] || "neutral"} dot>{STATUS_LABEL[order.status] || order.status}</Badge>
  {order.paidAt && <span className="text-[13px] text-stone-400">{new Date(order.paidAt).toLocaleString()}</span>}
  </div>
@@ -161,7 +163,7 @@ export default function OrderDetailPage() {
  </div>
  ) : quote ? (
  <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
- <p className="text-[13px] text-stone-700">{quote.provider} {quote.service} — <b className="text-stone-900">{money(quote.costCents, cur)}</b>{quote.estDays ? ` · ~${quote.estDays}d` : ""}</p>
+ <p className="text-[13px] text-stone-700">{quote.provider} {quote.service}{quote.sellerPays ? <> — <b className="text-stone-900">{money(quote.costCents, cur)}</b></> : ""}{quote.estDays ? ` · ~${quote.estDays}d` : ""}</p>
  <p className="mt-1 text-xs text-stone-500">{quote.sellerPays ? "This label cost will be charged to your card on file." : "The buyer already paid shipping — no charge to you."}</p>
  <div className="mt-3 flex gap-2">
  <Button size="sm" onClick={buyLabelNow} disabled={labelBusy}>{labelBusy ? (quote.sellerPays ? "Buying…" : "Generating…") : (quote.sellerPays ? `Buy label — ${money(quote.costCents, cur)}` : "Generate prepaid label")}</Button>

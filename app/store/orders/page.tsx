@@ -8,6 +8,7 @@ import { useStoreBase } from "../nav-base";
 
 type Order = {
  id: string;
+ orderNo: number;
  itemTitle: string | null;
  amountCents: number;
  currency: string;
@@ -16,12 +17,28 @@ type Order = {
  paidAt: string | null;
 };
 
+// Fulfillment progression reads at a glance: delivered = done (green), shipped = in transit (blue),
+// paid = money in but still needs shipping (amber = your move), refunded/cancelled = grey.
 function tone(status: string): "success" | "warning" | "neutral" | "info" {
  const s = (status || "").toLowerCase();
- if (s.includes("paid") || s.includes("complete") || s.includes("fulfill")) return "success";
- if (s.includes("pend") || s.includes("process") || s.includes("unfulfill")) return "warning";
+ if (s.includes("deliver") || s.includes("complete")) return "success";
+ if (s.includes("ship") || s.includes("fulfill")) return "info";
  if (s.includes("refund") || s.includes("cancel")) return "neutral";
+ if (s.includes("paid") || s.includes("pend") || s.includes("process") || s.includes("unfulfill")) return "warning";
  return "info";
+}
+
+// Friendlier label — "paid" alone doesn't tell the seller it still needs shipping.
+function statusLabel(status: string): string {
+ const s = (status || "").toLowerCase();
+ if (s === "paid") return "needs shipping";
+ return status;
+}
+
+// Display an order's per-store sequence number as a real order # (starts at 1001 so it reads like
+// an established counter, not test data). The number itself is meaningful: 1 = the store's first sale.
+export function fmtOrderNo(n: number): string {
+ return "#" + (1000 + n);
 }
 
 export default function OrdersPage() {
@@ -75,6 +92,7 @@ export default function OrdersPage() {
  <table className="w-full text-[13px]">
  <thead>
  <tr className="border-b border-stone-100 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400">
+ <th className="px-5 py-2.5 font-medium">Order</th>
  <th className="px-5 py-2.5 font-medium">Item</th>
  <th className="px-5 py-2.5 font-medium">Customer</th>
  <th className="px-5 py-2.5 font-medium">Date</th>
@@ -85,10 +103,11 @@ export default function OrdersPage() {
  <tbody className="divide-y divide-stone-100">
  {orders.map((o) => (
  <tr key={o.id} onClick={() => router.push(`${base}/orders/${o.id}`)} className="cursor-pointer transition hover:bg-stone-50">
+ <td className="whitespace-nowrap px-5 py-3 font-mono text-[12px] tabular-nums text-stone-500">{fmtOrderNo(o.orderNo)}</td>
  <td className="max-w-[260px] truncate px-5 py-3 font-medium text-stone-900">{o.itemTitle || "Item"}</td>
  <td className="px-5 py-3 text-stone-600">{o.buyerEmail || "—"}</td>
  <td className="px-5 py-3 tabular-nums text-stone-500">{o.paidAt ? new Date(o.paidAt).toLocaleDateString() : "—"}</td>
- <td className="px-5 py-3"><Badge tone={tone(o.status)} dot>{o.status}</Badge></td>
+ <td className="px-5 py-3"><Badge tone={tone(o.status)} dot>{statusLabel(o.status)}</Badge></td>
  <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-900">${(o.amountCents / 100).toFixed(2)}</td>
  </tr>
  ))}

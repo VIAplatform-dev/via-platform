@@ -82,6 +82,13 @@ async function ensureTables() {
   UNIQUE (store_slug, item_id, platform)
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_cross_listing_stats_store ON cross_listing_stats (store_slug)`;
+ // One row per sale, tagged with the marketplace it sold on — powers per-channel revenue on the
+ // cross-listing dashboard. Written when a piece is marked sold (going forward; no backfill).
+ await sql`CREATE TABLE IF NOT EXISTS cross_listing_sales (
+  id SERIAL PRIMARY KEY, store_slug TEXT NOT NULL, item_id TEXT NOT NULL, platform TEXT NOT NULL,
+  price_cents INTEGER NOT NULL DEFAULT 0, sold_at TIMESTAMPTZ NOT NULL DEFAULT now()
+ )`;
+ await sql`CREATE INDEX IF NOT EXISTS idx_cross_listing_sales_store ON cross_listing_sales (store_slug)`;
  ensured = true;
 }
 
@@ -308,4 +315,53 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  stats: { totals, byPlatform },
  };
  });
+}
+
+// ── per-marketplace sales + rollup (dashboard) ────────────────────────────────
+/** Record a sale on a given marketplace at the item's current price (idempotency isn't needed —
+ *  markSold is a deliberate one-shot action). Looks up the item price itself. */
+export async function recordCrossListingSale(storeSlug: string, itemId: string, platform: string): Promise<void> {
+ await ensureTables();
+ const sql = db();
+ const rows = (await sql`SELECT price_cents FROM items WHERE id::text = ${itemId}`.catch(() => [])) as any[];
+ const priceCents = Number(rows[0]?.price_cents || 0);
+ await sql`INSERT INTO cross_listing_sales (store_slug, item_id, platform, price_cents) VALUES (${storeSlug}, ${itemId}, ${platform}, ${priceCents})`.catch(() => {});
+}
+
+export type MarketplaceRollup = {
+ platform: string; // channel key ('vya', 'ebay', 'depop', …)
+ listed: number; queued: number; error: number; // live board state
+ offers: number; likes: number; views: number; watchers: number; // engagement (extension/API/VYA-fed)
+ sold: number; revenueCents: number; // realised sales on this channel (forward-looking)
+};
+
+/** One aggregate row per marketplace the store touches — the dashboard's summary. */
+export async function getMarketplaceRollup(storeSlug: string): Promise<MarketplaceRollup[]> {
+ await ensureTables();
+ const sql = db();
+ const [listRows, statRows, saleRows, vyaOffers] = (await Promise.all([
+ sql`SELECT platform, status, COUNT(*)::int AS n FROM cross_listings WHERE store_slug = ${storeSlug} GROUP BY platform, status`.catch(() => []),
+ sql`SELECT platform, COALESCE(SUM(likes),0)::int AS likes, COALESCE(SUM(offers),0)::int AS offers, COALESCE(SUM(views),0)::int AS views, COALESCE(SUM(watchers),0)::int AS watchers FROM cross_listing_stats WHERE store_slug = ${storeSlug} GROUP BY platform`.catch(() => []),
+ sql`SELECT platform, COUNT(*)::int AS sold, COALESCE(SUM(price_cents),0)::int AS revenue FROM cross_listing_sales WHERE store_slug = ${storeSlug} GROUP BY platform`.catch(() => []),
+ sql`SELECT COUNT(*)::int AS offers FROM storefront_offers WHERE store_slug = ${storeSlug} AND status = 'pending' AND item_id IS NOT NULL`.catch(() => []),
+ ])) as [any[], any[], any[], any[]];
+
+ const map = new Map<string, MarketplaceRollup>();
+ const row = (k: string) => {
+ let r = map.get(k);
+ if (!r) { r = { platform: k, listed: 0, queued: 0, error: 0, offers: 0, likes: 0, views: 0, watchers: 0, sold: 0, revenueCents: 0 }; map.set(k, r); }
+ return r;
+ };
+ for (const r of listRows) {
+ const t = row(String(r.platform));
+ if (r.status === "listed") t.listed += Number(r.n) || 0;
+ else if (r.status === "pending") t.queued += Number(r.n) || 0;
+ else if (r.status === "error") t.error += Number(r.n) || 0;
+ }
+ for (const r of statRows) { const t = row(String(r.platform)); t.likes += Number(r.likes) || 0; t.offers += Number(r.offers) || 0; t.views += Number(r.views) || 0; t.watchers += Number(r.watchers) || 0; }
+ for (const r of saleRows) { const t = row(String(r.platform)); t.sold += Number(r.sold) || 0; t.revenueCents += Number(r.revenue) || 0; }
+ // VYA-native pending offers → the 'vya' channel (kept consistent with the board).
+ const vo = Number(vyaOffers[0]?.offers || 0);
+ if (vo > 0) row("vya").offers += vo;
+ return [...map.values()];
 }

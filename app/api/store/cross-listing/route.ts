@@ -4,7 +4,7 @@ import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { markSold } from "@/app/lib/db/inventory";
 import {
  PLATFORMS, getPlatformAccounts, upsertPlatformAccount, removePlatformAccount,
- getCrossListBoard, delistEverywhere, platformByKey,
+ getCrossListBoard, delistEverywhere, platformByKey, getMarketplaceRollup, recordCrossListingSale,
 } from "@/app/lib/cross-listing-db";
 import { ebayConfigured } from "@/app/lib/ebay";
 import { getEbayTokens, clearEbayTokens } from "@/app/lib/ebay-tokens-db";
@@ -19,12 +19,13 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const [accounts, board, ebayTok, depopTok, etsy] = await Promise.all([getPlatformAccounts(slug), getCrossListBoard(slug), getEbayTokens(slug).catch(() => null), getDepopTokens(slug).catch(() => null), etsyStatus(slug).catch(() => ({ configured: false, connected: false, shop: null }))]);
+ const [accounts, board, rollup, ebayTok, depopTok, etsy] = await Promise.all([getPlatformAccounts(slug), getCrossListBoard(slug), getMarketplaceRollup(slug).catch(() => []), getEbayTokens(slug).catch(() => null), getDepopTokens(slug).catch(() => null), etsyStatus(slug).catch(() => ({ configured: false, connected: false, shop: null }))]);
  return NextResponse.json({
  ok: true,
  platforms: PLATFORMS.filter((p) => p.live).map((p) => ({ key: p.key, name: p.name, hasApi: p.hasApi })),
  accounts,
  board,
+ rollup,
  ebay: { configured: ebayConfigured(), connected: !!ebayTok, user: ebayTok?.ebayUser || null },
  depop: { configured: depopConfigured(), connected: !!depopTok, user: depopTok?.depopUser || null },
  etsy,
@@ -65,6 +66,8 @@ export async function PATCH(request: NextRequest) {
  const itemId = String(b?.itemId || "");
  const soldOn = String(b?.platform || "");
  if (!itemId || !soldOn) return NextResponse.json({ error: "itemId + platform required" }, { status: 400 });
+ // Record which marketplace it sold on (at the item's price) for per-channel revenue.
+ await recordCrossListingSale(slug, itemId, soldOn).catch(() => {});
  // If it sold off-VYA, take it out of VYA inventory too.
  if (soldOn !== "vya") {
  const seller = await getSellerBySlug(slug).catch(() => null);

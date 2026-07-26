@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, Sparkles, Tag } from "lucide-react";
-import { Card, Button, cn } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, Toggle, cn } from "../ui";
 
 type Field = { value: string | null; confidence: number };
 type Draft = {
@@ -85,7 +85,7 @@ function PriceScale({ low, high, market, value }: { low: number; high: number; m
  <div className="mt-2">
  <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg,#10b98155,#f59e0b55,#ef444455)" }}>
  {market != null && <div className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-stone-900 shadow" style={{ left: pos(market) }} title={`AI rec $${market.toLocaleString()}`} />}
- {value > 0 && <div className="absolute -top-1 h-4 w-[3px] -translate-x-1/2 rounded bg-[#5D0F17]" style={{ left: pos(value) }} title={`Your price $${value.toLocaleString()}`} />}
+ {value > 0 && <div className="absolute -top-1 h-4 w-[3px] -translate-x-1/2 rounded bg-[var(--accent,#0e9f76)]" style={{ left: pos(value) }} title={`Your price $${value.toLocaleString()}`} />}
  </div>
  <div className="mt-1.5 flex items-center justify-between text-[10px] text-stone-400">
  <span>${low.toLocaleString()} <span className="text-stone-300">quick sale</span></span>
@@ -390,8 +390,8 @@ export default function IntakePage() {
  <p className="text-xl font-semibold text-stone-900">{savedDraft ? "Saved as draft" : "Listed"}</p>
  <p className="mt-1 text-sm text-stone-500">{savedDraft ? "It’s in your inventory — publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
  <div className="mt-6 flex items-center justify-center gap-3">
- <Button onClick={reset}>List another</Button>
- <Button variant="secondary" onClick={() => { window.location.href = "/infrastructure/admin/inventory"; }}>View inventory</Button>
+ <TechButton onClick={reset}>List another</TechButton>
+ <TechButton variant="secondary" onClick={() => { window.location.href = "/infrastructure/admin/inventory"; }}>View inventory</TechButton>
  </div>
  </div>
  </div>
@@ -409,7 +409,7 @@ export default function IntakePage() {
  <input className={cn(input, isFlagged && !confirmed[k] && "border-amber-400 bg-amber-50/50")} value={form[k]} onChange={(e) => set(k, e.target.value)} />
  {isFlagged && (
  <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-stone-500">
- <input type="checkbox" checked={!!confirmed[k]} onChange={(e) => setConfirmed((c) => ({ ...c, [k]: e.target.checked }))} className="accent-[#5D0F17]" />
+ <input type="checkbox" checked={!!confirmed[k]} onChange={(e) => setConfirmed((c) => ({ ...c, [k]: e.target.checked }))} className="accent-[var(--accent,#0e9f76)]" />
  Confirmed
  </label>
  )}
@@ -419,9 +419,12 @@ export default function IntakePage() {
 
  // ── Manual-first form ──
  return (
- <div className="mx-auto max-w-3xl px-6 py-10 sm:px-8">
- <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-stone-900">Add a listing</h1>
- <p className="mb-5 mt-1 text-[13px] text-stone-500">Add photos and fill in what you know — then let AI complete the rest. Anything you type, it keeps.</p>
+ <AdminPage className="max-w-3xl">
+ <AdminHeader
+ eyebrow="Sell · Add listing"
+ title="Add a listing"
+ subtitle="Add photos and fill in what you know — then let AI complete the rest. Anything you type, it keeps."
+ />
 
  {reverseImage && (
  reverseImage.brand
@@ -434,12 +437,12 @@ export default function IntakePage() {
  <div>
  {photos.length ? (
  <>
- <Card className="overflow-hidden">
+ <TechCard className="overflow-hidden">
  <div className="aspect-[3/4] w-full bg-stone-100">
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={ghost || photos[0]} alt="" className="h-full w-full object-cover" />
  </div>
- </Card>
+ </TechCard>
  <p className="mt-2 text-[11px] uppercase tracking-[0.08em] text-stone-400">{ghost ? "Ghost-mannequin cover" : "Your photo"}</p>
  <div className="mt-2 flex flex-wrap gap-1.5">
  {photos.map((p, i) => (
@@ -454,7 +457,7 @@ export default function IntakePage() {
  >
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={p} alt="" className="h-full w-full rounded object-cover ring-1 ring-stone-200" />
- {i === 0 && !ghost && <span className="absolute -left-1 -top-1 rounded bg-[#5D0F17] px-1 text-[8px] leading-tight text-white">cover</span>}
+ {i === 0 && !ghost && <span className="absolute -left-1 -top-1 rounded bg-[var(--accent,#0e9f76)] px-1 text-[8px] leading-tight text-white">cover</span>}
  <button type="button" onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] leading-none text-white group-hover:flex" aria-label="Remove">×</button>
  </div>
  ))}
@@ -471,9 +474,9 @@ export default function IntakePage() {
  onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
  onDrop={(e) => { e.preventDefault(); setDragOver(false); if (!busy) onPick(e.dataTransfer.files); }}
  onClick={() => !busy && fileRef.current?.click()}
- className={cn("flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center transition-colors", dragOver ? "border-[#5D0F17] bg-[#5D0F17]/[0.04]" : "border-stone-300 hover:border-stone-400")}
+ className={cn("flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center transition-colors", dragOver ? "border-[var(--accent,#0e9f76)] bg-[var(--accent-soft,#eafaf3)]" : "border-stone-300 hover:border-stone-400")}
  >
- <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#5D0F17]/[0.07] text-[#5D0F17]"><Camera size={20} /></span>
+ <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft,#eafaf3)] text-[var(--accent,#0e9f76)]"><Camera size={20} /></span>
  <p className="text-[13px] font-medium text-stone-700">{busy ? busyMsg : "Add photos"}</p>
  <p className="mt-1 text-[11px] text-stone-400">or drag here · up to 8 · include the tag</p>
  </div>
@@ -493,16 +496,16 @@ export default function IntakePage() {
  <p className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-[11px] text-stone-600">🎯 Looks like <span className="font-medium text-stone-800">{specificPiece.model}</span> <span className="text-stone-400">· {Math.round(specificPiece.similarity * 100)}% match{specificPiece.refPriceCents ? ` · refs ~$${Math.round(specificPiece.refPriceCents / 100)}` : ""}</span></p>
  )}
 
- <Button className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length || !form.brand.trim()}>
+ <TechButton className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length || !form.brand.trim()}>
  <Sparkles size={14} className="mr-1.5 inline" />{busy ? busyMsg : "Fill the rest with AI"}
- </Button>
+ </TechButton>
  <p className="mt-1.5 text-[11px] text-stone-400">{!form.brand.trim() ? "Enter the brand first — it anchors the price & description. (“Unbranded” is fine.)" : "Only fills blanks. Your price is always checked against live market comps."}</p>
 
  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
  </div>
 
  {/* Fields */}
- <Card className="space-y-4 p-5">
+ <TechCard className="space-y-4 p-5">
  <div>
  <label className={label}>Title</label>
  <input className={input} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. 1990s Prada nylon shoulder bag" />
@@ -537,7 +540,7 @@ export default function IntakePage() {
  <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
  <div className="flex items-center justify-between">
  <div><p className="text-[13px] font-medium text-stone-800">Consignment</p><p className="text-[11px] text-stone-400">Track this for a consignor &mdash; they&rsquo;re auto-credited their split when it sells.</p></div>
- <button type="button" onClick={toggleConsigned} className={`h-6 w-11 shrink-0 rounded-full p-0.5 transition ${consigned ? "bg-stone-900" : "bg-stone-200"}`} aria-label="Toggle consignment"><span className={`block h-5 w-5 rounded-full bg-white transition ${consigned ? "translate-x-5" : ""}`} /></button>
+ <Toggle on={consigned} onClick={toggleConsigned} />
  </div>
  {consigned && (
  <div className="mt-4 space-y-3">
@@ -581,14 +584,14 @@ export default function IntakePage() {
  const on = selectedCols.includes(c.title);
  return (
  <button key={c.id} type="button" onClick={() => setSelectedCols((s) => (on ? s.filter((t) => t !== c.title) : [...s, c.title]))}
- className={cn("rounded-full border px-3 py-1.5 text-xs transition", on ? "border-[#5D0F17] bg-[#5D0F17] text-white" : "border-stone-300 bg-white text-stone-600 hover:border-stone-400")}>
+ className={cn("rounded-full border px-3 py-1.5 text-xs transition", on ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white" : "border-stone-300 bg-white text-stone-600 hover:border-stone-400")}>
  {c.title}{c.itemCount ? ` ${c.itemCount}` : ""}
  </button>
  );
  })}
  {selectedCols.filter((t) => !cols.some((c) => c.title === t)).map((t) => (
  <button key={t} type="button" onClick={() => setSelectedCols((s) => s.filter((x) => x !== t))}
- className="rounded-full border border-[#5D0F17] bg-[#5D0F17] px-3 py-1.5 text-xs text-white">{t} ✕</button>
+ className="rounded-full border border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] px-3 py-1.5 text-xs text-white">{t} ✕</button>
  ))}
  </div>
  <input className={cn(input, "mt-2")} value={newCol} onChange={(e) => setNewCol(e.target.value)}
@@ -597,13 +600,13 @@ export default function IntakePage() {
  </div>
 
  <div className="flex items-center gap-4 border-t border-stone-100 pt-4">
- <Button onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</Button>
- <Button variant="secondary" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</Button>
+ <TechButton onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>
+ <TechButton variant="secondary" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</TechButton>
  {!allConfirmed && <span className="text-[11px] text-amber-600">Confirm the flagged fields to publish — or save as a draft for now</span>}
  {err && <span className="text-xs text-red-600">{err}</span>}
  </div>
- </Card>
+ </TechCard>
  </div>
- </div>
+ </AdminPage>
  );
 }

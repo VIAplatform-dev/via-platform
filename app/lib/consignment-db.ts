@@ -376,6 +376,82 @@ export async function getConsignorBalanceCents(consignorId: number): Promise<num
  return Number(rows[0]?.bal ?? 0);
 }
 
+// ── Dashboard summary — real balances, 8-week sales volume, and a payout activity feed ──
+export type ConsignmentSummary = {
+ availableCents: number; // payable now (past the return hold), store-wide
+ owedCents: number; // total owed to all consignors
+ onHoldCents: number; // owed but still within the return hold
+ paid7dCents: number; paidDeltaPct: number | null; // payouts made in the last 7d + WoW change
+ weeks: { label: string; value: number }[]; // consignor-net sales, by week, last 8 weeks
+ activity: { payee: string; type: string; item: string; grossCents: number; netCents: number; status: "payable" | "hold" }[];
+};
+
+export async function getConsignmentSummary(storeSlug: string): Promise<ConsignmentSummary> {
+ await ensureConsignmentTables();
+ const sql = db();
+ const settings = await getConsignmentSettings(storeSlug);
+ const hold = settings.holdDays;
+ const [owedRow, payableRow, paid7Row, paidPrevRow, weekRows, actRows] = (await Promise.all([
+ sql`SELECT COALESCE(SUM(amount_cents),0) AS c FROM consignor_ledger WHERE store_slug = ${storeSlug}`.catch(() => []),
+ sql`SELECT COALESCE(SUM(amount_cents),0) AS c FROM consignor_ledger WHERE store_slug = ${storeSlug} AND (type NOT IN ('sale_credit','sale_reversal') OR created_at <= NOW() - (${hold} || ' days')::interval)`.catch(() => []),
+ sql`SELECT COALESCE(SUM(amount_cents),0) AS c FROM consignor_payouts WHERE store_slug = ${storeSlug} AND status = 'paid' AND paid_at >= NOW() - INTERVAL '7 days'`.catch(() => []),
+ sql`SELECT COALESCE(SUM(amount_cents),0) AS c FROM consignor_payouts WHERE store_slug = ${storeSlug} AND status = 'paid' AND paid_at >= NOW() - INTERVAL '14 days' AND paid_at < NOW() - INTERVAL '7 days'`.catch(() => []),
+ sql`SELECT date_trunc('week', sold_at) AS wk, COALESCE(SUM(sold_price_cents * split_pct / 100.0),0)::int AS net
+  FROM consignment_items WHERE store_slug = ${storeSlug} AND sold_at IS NOT NULL AND sold_at >= NOW() - INTERVAL '56 days'
+  GROUP BY wk`.catch(() => []),
+ sql`SELECT ci.sold_price_cents, ci.split_pct, ci.sold_at, c.name AS payee, i.title
+  FROM consignment_items ci JOIN consignors c ON c.id = ci.consignor_id
+  LEFT JOIN items i ON i.id::text = ci.product_id
+  WHERE ci.store_slug = ${storeSlug} AND ci.sold_at IS NOT NULL
+  ORDER BY ci.sold_at DESC LIMIT 12`.catch(() => []),
+ ])) as Array<Array<Record<string, unknown>>>;
+
+ const owedCents = Number(owedRow[0]?.c ?? 0);
+ const availableCents = Number(payableRow[0]?.c ?? 0);
+ const paid7dCents = Number(paid7Row[0]?.c ?? 0);
+ const paidPrev = Number(paidPrevRow[0]?.c ?? 0);
+
+ // 8 fixed weekly buckets (oldest → newest), filled from the grouped rows.
+ const WEEK = 7 * 86400000;
+ const byWk = new Map<number, number>();
+ for (const r of weekRows) { const t = new Date(String(r.wk)).getTime(); byWk.set(t - (t % WEEK), Number(r.net) || 0); }
+ const now = Date.now();
+ const thisWeekStart = now - (now % WEEK);
+ const weeks: { label: string; value: number }[] = [];
+ for (let i = 7; i >= 0; i--) {
+ const start = thisWeekStart - i * WEEK;
+ // match on any bucket whose date_trunc('week') falls in this window
+ let value = 0;
+ for (const [k, v] of byWk) { if (k >= start && k < start + WEEK) value += v; }
+ weeks.push({ label: new Date(start).toLocaleDateString(undefined, { month: "short", day: "numeric" }), value: Math.round(value / 100) });
+ }
+
+ const activity = actRows.map((r) => {
+ const gross = Number(r.sold_price_cents) || 0;
+ const split = Number(r.split_pct) || 0;
+ const soldAt = r.sold_at ? new Date(String(r.sold_at)).getTime() : 0;
+ const cleared = soldAt > 0 && soldAt <= now - hold * 86400000;
+ return {
+ payee: String(r.payee || "Consignor"),
+ type: "Consignor",
+ item: `${String(r.title || "Item")} · ${split}/${100 - split}`,
+ grossCents: gross,
+ netCents: Math.round((gross * split) / 100),
+ status: (cleared ? "payable" : "hold") as "payable" | "hold",
+ };
+ });
+
+ return {
+ availableCents,
+ owedCents,
+ onHoldCents: Math.max(0, owedCents - availableCents),
+ paid7dCents,
+ paidDeltaPct: paidPrev > 0 ? Math.round(((paid7dCents - paidPrev) / paidPrev) * 100) : null,
+ weeks,
+ activity,
+ };
+}
+
 /** Balance eligible for payout now: sale credits older than the store's return-hold, minus payouts. */
 export async function getPayableBalanceCents(consignorId: number, holdDays: number): Promise<number> {
  await ensureConsignmentTables();

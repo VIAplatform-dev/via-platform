@@ -22,7 +22,10 @@ type Offer = {
 };
 type Settings = { messagingEnabled: boolean; offersEnabled: boolean; offersBinding: boolean; minOfferPct: number };
 
-const WINE = "#5D0F17";
+// Accent is theme-scoped: green inside /infrastructure/admin (via --accent), wine on the seller
+// /store portal (the fallback). --accent-soft is the matching tint for hover/active surfaces.
+const ACCENT = "var(--accent,#5D0F17)";
+const SOFT = "var(--accent-soft,rgba(93,15,23,0.07))";
 const money = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
 
 function initials(name: string | null, email: string | null): string {
@@ -45,7 +48,8 @@ function timeAgo(iso: string): string {
 
 function Avatar({ name, email, className }: { name: string | null; email: string | null; className?: string }) {
  return (
- <div className={cn("flex shrink-0 items-center justify-center rounded-full bg-[#5D0F17]/10 text-[11px] font-semibold text-[#5D0F17]", className || "h-9 w-9")}>
+ <div className={cn("flex shrink-0 items-center justify-center rounded-full text-[11px] font-semibold", className || "h-9 w-9")}
+ style={{ background: SOFT, color: ACCENT }}>
  {initials(name, email)}
  </div>
  );
@@ -61,13 +65,14 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
  return (
  <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)}
- className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5D0F17]/40", on ? "bg-[#5D0F17]" : "bg-stone-300")}>
+ className="relative h-6 w-11 shrink-0 rounded-full transition-colors focus:outline-none"
+ style={{ background: on ? ACCENT : "#d6d3d1" }}>
  <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all", on ? "left-[22px]" : "left-0.5")} />
  </button>
  );
 }
 
-const CARD = "rounded-2xl border border-stone-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]";
+const CARD = "rounded-2xl border border-stone-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-16px_rgba(16,24,40,0.12)]";
 
 export default function InboxPage() {
  const [tab, setTab] = useState<"messages" | "offers">("messages");
@@ -137,8 +142,9 @@ export default function InboxPage() {
  subtitle="Messages and offers from your shoppers."
  actions={
  <button onClick={() => setShowSettings((s) => !s)}
- className={cn("inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition", showSettings ? "border-[#5D0F17]/30 bg-[#5D0F17]/5 text-[#5D0F17]" : "border-stone-200 text-stone-600 hover:bg-stone-50")}>
- <Settings2 size={14} /> Settings
+ className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition"
+ style={showSettings ? { borderColor: ACCENT, background: SOFT, color: ACCENT } : undefined}>
+ <Settings2 size={14} className={showSettings ? "" : "text-stone-500"} /> <span className={showSettings ? "" : "text-stone-600"}>Settings</span>
  </button>
  }
  />
@@ -168,7 +174,7 @@ export default function InboxPage() {
  {/* tabs */}
  <div className="mb-6 flex gap-6 border-b border-stone-200">
  {([
- { key: "messages", label: "Messages", icon: MessageCircle, badge: 0 },
+ { key: "messages", label: "Messages", icon: MessageCircle, badge: convs.reduce((s, c) => s + (c.storeUnread > 0 ? 1 : 0), 0) },
  { key: "offers", label: "Offers", icon: Tag, badge: pending },
  ] as const).map((t) => {
  const on = tab === t.key;
@@ -176,8 +182,8 @@ export default function InboxPage() {
  <button key={t.key} onClick={() => setTab(t.key)}
  className={cn("relative flex items-center gap-1.5 pb-2.5 text-[13.5px] font-medium transition", on ? "text-stone-900" : "text-stone-400 hover:text-stone-600")}>
  <t.icon size={15} /> {t.label}
- {t.badge > 0 && <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-[#5D0F17] px-1 text-[10px] font-semibold text-white" style={{ height: 18, minWidth: 18 }}>{t.badge}</span>}
- {on && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full" style={{ background: WINE }} />}
+ {t.badge > 0 && <span className="ml-0.5 inline-flex items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white" style={{ height: 18, minWidth: 18, background: ACCENT }}>{t.badge}</span>}
+ {on && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full" style={{ background: ACCENT }} />}
  </button>
  );
  })}
@@ -185,17 +191,22 @@ export default function InboxPage() {
 
  {/* ── MESSAGES ── */}
  {tab === "messages" && (
+ loading ? (
+ <div className={cn(CARD, "flex items-center justify-center py-20 text-[13px] text-stone-400")}>Loading…</div>
+ ) : convs.length === 0 ? (
+ <div className={cn(CARD, "py-14")}>
+ <EmptyState icon={<MessageCircle size={26} strokeWidth={1.5} />} title="No messages yet" body="When a shopper asks about one of your pieces, the conversation lands here to read and reply." />
+ </div>
+ ) : (
  <div className="grid gap-5 md:grid-cols-[340px_1fr]">
  <div className={cn(CARD, "overflow-hidden")}>
- {loading ? (
- <p className="p-5 text-[13px] text-stone-400">Loading…</p>
- ) : convs.length === 0 ? (
- <p className="p-6 text-[13px] text-stone-400">No messages yet.</p>
- ) : (
  <div className="divide-y divide-stone-100">
- {convs.map((c) => (
+ {convs.map((c) => {
+ const on = active?.id === c.id;
+ return (
  <button key={c.id} onClick={() => open(c)}
- className={cn("flex w-full items-start gap-3 px-4 py-3.5 text-left transition", active?.id === c.id ? "bg-[#5D0F17]/[0.04]" : "hover:bg-stone-50")}>
+ className={cn("flex w-full items-start gap-3 px-4 py-3.5 text-left transition", on ? "" : "hover:bg-stone-50")}
+ style={on ? { background: SOFT } : undefined}>
  <Avatar name={c.buyerName} email={c.buyerEmail} />
  <div className="min-w-0 flex-1">
  <div className="flex items-center justify-between gap-2">
@@ -204,17 +215,17 @@ export default function InboxPage() {
  </div>
  {c.itemTitle && <span className="mt-0.5 block truncate text-[11px] text-stone-400">{c.itemTitle}</span>}
  <div className="mt-0.5 flex items-center justify-between gap-2">
- <span className="line-clamp-1 text-[12.5px] text-stone-500">{c.lastMessage}</span>
- {c.storeUnread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-[#5D0F17]" />}
+ <span className={cn("line-clamp-1 text-[12.5px]", c.storeUnread > 0 ? "font-medium text-stone-700" : "text-stone-500")}>{c.lastMessage}</span>
+ {c.storeUnread > 0 && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: ACCENT }} />}
  </div>
  </div>
  </button>
- ))}
+ );
+ })}
  </div>
- )}
  </div>
 
- <div className={cn(CARD, "flex min-h-[420px] flex-col")}>
+ <div className={cn(CARD, "flex min-h-[440px] flex-col")}>
  {!active ? (
  <div className="flex flex-1 items-center justify-center p-8">
  <EmptyState icon={<MessageCircle size={26} strokeWidth={1.5} />} title="Select a conversation" body="Pick a shopper on the left to read and reply." />
@@ -231,8 +242,8 @@ export default function InboxPage() {
  <div className="flex max-h-[52vh] flex-1 flex-col gap-3 overflow-y-auto px-5 py-5">
  {messages.map((m) => (
  <div key={m.id} className={cn("flex flex-col", m.sender === "store" ? "items-end" : "items-start")}>
- <div className={cn("max-w-[78%] px-3.5 py-2 text-[13px] leading-relaxed",
- m.sender === "store" ? "rounded-2xl rounded-tr-sm bg-[#5D0F17] text-white" : "rounded-2xl rounded-tl-sm bg-stone-100 text-stone-800")}>
+ <div className={cn("max-w-[78%] px-3.5 py-2 text-[13px] leading-relaxed", m.sender === "store" ? "rounded-2xl rounded-tr-sm text-white" : "rounded-2xl rounded-tl-sm bg-stone-100 text-stone-800")}
+ style={m.sender === "store" ? { background: ACCENT } : undefined}>
  {m.body}
  </div>
  <span className="mt-1 px-1 text-[10px] text-stone-400">{timeAgo(m.createdAt)}</span>
@@ -242,9 +253,9 @@ export default function InboxPage() {
  </div>
  <form onSubmit={reply} className="flex items-center gap-2 border-t border-stone-100 px-4 py-3">
  <input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write a reply…"
- className="flex-1 rounded-full border border-stone-200 bg-stone-50 px-4 py-2.5 text-[13px] outline-none transition focus:border-[#5D0F17]/40 focus:bg-white" />
+ className="flex-1 rounded-full border border-stone-200 bg-stone-50 px-4 py-2.5 text-[13px] outline-none transition focus:bg-white" />
  <button type="submit" disabled={!body.trim()}
- className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-30" style={{ background: WINE }} aria-label="Send">
+ className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white transition disabled:opacity-30" style={{ background: ACCENT }} aria-label="Send">
  <Send size={16} />
  </button>
  </form>
@@ -252,12 +263,13 @@ export default function InboxPage() {
  )}
  </div>
  </div>
+ )
  )}
 
  {/* ── OFFERS ── */}
  {tab === "offers" && (
  offers.length === 0 ? (
- <div className={cn(CARD, "py-10")}>
+ <div className={cn(CARD, "py-14")}>
  <EmptyState icon={<Tag size={26} strokeWidth={1.5} />} title="No offers yet" body="When shoppers make price offers on your pieces, they land here to accept, counter, or pass." />
  </div>
  ) : (
@@ -301,16 +313,16 @@ export default function InboxPage() {
  <label className="mb-1 block text-[11px] text-stone-500">Counter price</label>
  <input type="number" min={1} autoFocus value={counterVal} onChange={(e) => setCounterVal(e.target.value)}
  placeholder={String(Math.round(o.listPriceCents / 100))}
- className="w-full rounded-lg border border-stone-200 px-2.5 py-1.5 text-[13px] tabular-nums outline-none focus:border-[#5D0F17]/40" />
+ className="w-full rounded-lg border border-stone-200 px-2.5 py-1.5 text-[13px] tabular-nums outline-none focus:border-stone-400" />
  </div>
  <button onClick={() => respondOffer(o.id, "counter", Math.round(parseFloat(counterVal) * 100))} disabled={!counterVal}
- className="rounded-lg px-4 py-2 text-[12.5px] font-medium text-white transition disabled:opacity-30" style={{ background: WINE }}>Send counter</button>
+ className="rounded-lg px-4 py-2 text-[12.5px] font-medium text-white transition disabled:opacity-30" style={{ background: ACCENT }}>Send counter</button>
  <button onClick={() => { setCounterFor(null); setCounterVal(""); }} className="px-2 py-2 text-[12px] text-stone-400 hover:text-stone-700">Cancel</button>
  </div>
  ) : (
  <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3.5">
  <button onClick={() => respondOffer(o.id, "accept")}
- className="rounded-lg px-4 py-2 text-[12.5px] font-medium text-white transition hover:opacity-90" style={{ background: WINE }}>Accept {money(o.amountCents)}</button>
+ className="rounded-lg px-4 py-2 text-[12.5px] font-medium text-white transition hover:opacity-90" style={{ background: ACCENT }}>Accept {money(o.amountCents)}</button>
  <button onClick={() => setCounterFor(o.id)}
  className="rounded-lg border border-stone-200 px-3.5 py-2 text-[12.5px] font-medium text-stone-700 transition hover:bg-stone-50">Counter</button>
  <button onClick={() => respondOffer(o.id, "decline")}

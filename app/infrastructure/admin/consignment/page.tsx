@@ -1,130 +1,130 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Users, Settings2, UserPlus } from "lucide-react";
+import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, AreaChart, TH, TD, cn } from "../ui";
 
-type Consignor = { id: number; name: string; email: string | null; phone: string | null; defaultSplitPct: number | null; payoutMethod: string | null; status: string; balanceCents: number };
+type Activity = { payee: string; type: string; item: string; grossCents: number; netCents: number; status: "payable" | "hold" };
+type Summary = {
+ availableCents: number; owedCents: number; onHoldCents: number;
+ paid7dCents: number; paidDeltaPct: number | null;
+ weeks: { label: string; value: number }[];
+ activity: Activity[];
+};
 
-const label = "block text-[11px] font-medium uppercase tracking-wide text-stone-500 mb-1";
-const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400";
-const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+const money = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
+const initials = (n: string) => (n || "?").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
 export default function ConsignmentPage() {
- const [rows, setRows] = useState<Consignor[]>([]);
+ const [sum, setSum] = useState<Summary | null>(null);
  const [loading, setLoading] = useState(true);
- const [form, setForm] = useState({ name: "", email: "", phone: "", defaultSplitPct: "" });
- const [saving, setSaving] = useState(false);
- const [err, setErr] = useState<string | null>(null);
 
- async function reload() {
- const r = await fetch("/api/store/consignment/consignors");
- const d = await r.json().catch(() => null);
- if (r.ok && d) setRows(d.consignors || []);
- }
  useEffect(() => {
- fetch("/api/store/consignment/consignors").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setRows(d.consignors || []); }).catch(() => {}).finally(() => setLoading(false));
+ let active = true;
+ fetch("/api/store/consignment/summary").then((r) => (r.ok ? r.json() : null)).then((d) => { if (active && d?.ok) setSum(d); }).catch(() => {}).finally(() => { if (active) setLoading(false); });
+ return () => { active = false; };
  }, []);
 
- async function add(e: React.FormEvent) {
- e.preventDefault();
- if (!form.name.trim()) { setErr("A name is required."); return; }
- setSaving(true); setErr(null);
- const r = await fetch("/api/store/consignment/consignors", {
- method: "POST", headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ name: form.name.trim(), email: form.email.trim() || null, phone: form.phone.trim() || null, defaultSplitPct: form.defaultSplitPct ? Number(form.defaultSplitPct) : null }),
- });
- const d = await r.json().catch(() => null);
- setSaving(false);
- if (!r.ok) { setErr(d?.error || "Couldn't add the consignor."); return; }
- setForm({ name: "", email: "", phone: "", defaultSplitPct: "" });
- reload();
- }
+ const actions = (
+ <>
+ <TechButtonLink variant="secondary" href="/infrastructure/admin/consignment/settings"><Settings2 size={14} /> Settings</TechButtonLink>
+ <TechButtonLink href="/infrastructure/admin/consignment/consignors"><UserPlus size={14} /> Consignors</TechButtonLink>
+ </>
+ );
 
- async function patchConsignor(id: number, patch: Record<string, unknown>) {
- await fetch("/api/store/consignment/consignors", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...patch }) });
- reload();
- }
-
- async function removeConsignor(id: number, name: string) {
- if (!window.confirm(`Remove ${name}? This deletes their consignment records. To just hide them instead, click their status to deactivate.`)) return;
- await fetch(`/api/store/consignment/consignors?id=${id}`, { method: "DELETE" });
- reload();
- }
-
- const owed = rows.reduce((s, c) => s + c.balanceCents, 0);
+ const weeks = sum?.weeks ?? [];
+ const hasData = !!sum && (sum.owedCents !== 0 || sum.paid7dCents !== 0 || sum.activity.length > 0 || weeks.some((w) => w.value > 0));
 
  return (
- <div className="mx-auto max-w-4xl px-8 py-10">
- <div className="flex items-end justify-between">
+ <AdminPage>
+ <AdminHeader
+ eyebrow="Sell · Consignment"
+ title="Consignment"
+ subtitle="What you owe your consignors, what’s cleared to pay out, and where the sales are coming from."
+ actions={actions}
+ />
+
+ {loading ? (
+ <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>
+ ) : !hasData ? (
+ <TechEmpty
+ icon={<Users size={28} strokeWidth={1.5} />}
+ title="No consignment activity yet"
+ body="Add your consignors and mark their pieces sold — balances, payouts and sales volume all show up here."
+ action={<TechButtonLink href="/infrastructure/admin/consignment/consignors">Add a consignor</TechButtonLink>}
+ />
+ ) : (
+ <>
+ {/* Balances — all real, from the consignor ledger + payouts. */}
+ <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+ <MetricCard label="Available balance" value={money(sum!.availableCents)} sub="Cleared the return hold" />
+ <MetricCard label="Paid · 7 days" value={money(sum!.paid7dCents)} delta={sum!.paidDeltaPct != null ? `${Math.abs(sum!.paidDeltaPct)}%` : undefined} up={sum!.paidDeltaPct == null || sum!.paidDeltaPct >= 0} sub="Payouts made" />
+ <MetricCard label="Pending" value={money(sum!.onHoldCents)} sub="Owed, still within hold" />
+ </div>
+
+ {/* Sales volume — net-to-consignor by week (more meaningful early than payout volume). */}
+ <TechCard className="mb-5 p-5">
+ <div className="mb-3 flex items-baseline justify-between">
  <div>
- <h1 className="text-[22px] font-semibold tracking-tight text-stone-900">Consignment</h1>
- <p className="mt-1 text-[13px] text-stone-500">Your consignors, their splits, and what they&rsquo;re owed.</p>
+ <h3 className="text-[13px] font-semibold text-stone-900">Consignment sales</h3>
+ <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-stone-400">Net to consignors · last 8 weeks</p>
  </div>
- <Link href="/infrastructure/admin/consignment/settings" className="rounded-lg border border-stone-200 px-3.5 py-2 text-[13px] text-stone-700 transition hover:bg-stone-50">Settings</Link>
+ <span className="text-[13px] font-semibold tabular-nums text-stone-500">{money(weeks.reduce((s, w) => s + w.value, 0) * 100)}</span>
  </div>
+ <AreaChart data={weeks.map((w) => w.value)} />
+ <div className="mt-1 flex justify-between font-mono text-[9px] uppercase tracking-[0.08em] text-stone-300">
+ <span>{weeks[0]?.label}</span>
+ <span>{weeks[weeks.length - 1]?.label}</span>
+ </div>
+ </TechCard>
 
- {rows.length > 0 && (
- <div className="mt-5 inline-flex items-baseline gap-2 rounded-lg bg-stone-900 px-4 py-2.5 text-white">
- <span className="text-[12px] text-stone-300">Total owed to consignors</span>
- <span className="text-[15px] font-semibold tabular-nums">{money(owed)}</span>
+ {/* Payout activity */}
+ <TechCard className="overflow-hidden">
+ <div className="border-b border-stone-100 px-5 py-4">
+ <h3 className="text-[13px] font-semibold text-stone-900">Recent payouts</h3>
+ <p className="mt-0.5 text-[12px] text-stone-500">Each sold consignment piece — the consignor’s cut and whether it’s cleared to pay.</p>
  </div>
- )}
-
- <form onSubmit={add} className="mt-6 rounded-xl border border-stone-200 bg-white p-4">
- <p className="mb-3 text-[12px] font-medium text-stone-700">Add a consignor</p>
- <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
- <div><label className={label}>Name</label><input className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Jane Doe" /></div>
- <div><label className={label}>Email</label><input className={input} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="optional" /></div>
- <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="optional" /></div>
- <div><label className={label}>Default split %</label><input className={input} value={form.defaultSplitPct} onChange={(e) => setForm({ ...form, defaultSplitPct: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" placeholder="e.g. 60" /></div>
- </div>
- {err && <p className="mt-2 text-[12px] text-rose-600">{err}</p>}
- <div className="mt-3"><button disabled={saving} className="rounded-lg bg-stone-900 px-4 py-2 text-[13px] font-medium text-white transition hover:bg-stone-800 disabled:opacity-50">{saving ? "Adding…" : "Add consignor"}</button></div>
- <p className="mt-2 text-[11px] text-stone-400">Leave the split blank to use your store rules. Set it here to override for this person.</p>
- </form>
-
- <div className="mt-6 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+ {sum!.activity.length === 0 ? (
+ <div className="px-5 py-10 text-center text-[13px] text-stone-400">No sold consignment pieces yet.</div>
+ ) : (
+ <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
- <tr className="border-b border-stone-100 text-left text-[11px] uppercase tracking-wide text-stone-400">
- <th className="px-4 py-3 font-medium">Consignor</th>
- <th className="px-4 py-3 font-medium">Default split</th>
- <th className="px-4 py-3 text-right font-medium">Balance owed</th>
- <th className="px-4 py-3 font-medium">Status</th>
+ <tr>
+ <TH className="px-5">Payee</TH>
+ <TH className="px-4">Type</TH>
+ <TH className="px-4">Item</TH>
+ <TH right className="px-4">Gross</TH>
+ <TH right className="px-4">Net</TH>
+ <TH className="px-5">Status</TH>
  </tr>
  </thead>
  <tbody>
- {loading ? (
- <tr><td colSpan={4} className="px-4 py-10 text-center text-stone-400">Loading&hellip;</td></tr>
- ) : rows.length === 0 ? (
- <tr><td colSpan={4} className="px-4 py-10 text-center text-stone-400">No consignors yet &mdash; add your first above.</td></tr>
- ) : rows.map((c) => (
- <tr key={c.id} className="border-b border-stone-50 last:border-0">
- <td className="px-4 py-3">
- <div className="font-medium text-stone-900">{c.name}</div>
- <div className="text-[12px] text-stone-400">{[c.email, c.phone].filter(Boolean).join(" · ") || "—"}</div>
- </td>
- <td className="px-4 py-3">
- <input
- defaultValue={c.defaultSplitPct ?? ""}
- onBlur={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); patchConsignor(c.id, { defaultSplitPct: v ? Number(v) : null }); }}
- className="w-16 rounded border border-stone-200 px-2 py-1 text-[13px] tabular-nums outline-none focus:border-stone-400"
- inputMode="numeric" placeholder="store rule" aria-label={`Default split for ${c.name}`}
- />
- {c.defaultSplitPct != null && <span className="ml-1 text-stone-400">%</span>}
- </td>
- <td className="px-4 py-3 text-right font-medium tabular-nums text-stone-900">{money(c.balanceCents)}</td>
- <td className="px-4 py-3">
- <div className="flex items-center gap-3">
- <button onClick={() => patchConsignor(c.id, { status: c.status === "active" ? "inactive" : "active" })} className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition ${c.status === "active" ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "bg-stone-100 text-stone-500 hover:bg-stone-200"}`}>{c.status}</button>
- <button onClick={() => removeConsignor(c.id, c.name)} className="text-[16px] leading-none text-stone-300 transition hover:text-rose-500" title="Remove consignor" aria-label={`Remove ${c.name}`}>&times;</button>
- </div>
- </td>
+ {sum!.activity.map((a, i) => (
+ <tr key={i} className="transition hover:bg-stone-50/70">
+ <TD className="px-5">
+ <span className="flex items-center gap-2.5">
+ <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] text-[10px] font-semibold text-[var(--accent-ink,#0b7a5c)]">{initials(a.payee)}</span>
+ <span className="font-medium text-stone-800">{a.payee}</span>
+ </span>
+ </TD>
+ <TD className="px-4 text-stone-500">{a.type}</TD>
+ <TD className="px-4 text-stone-600">{a.item}</TD>
+ <TD right className="px-4 text-stone-500">{money(a.grossCents)}</TD>
+ <TD right className="px-4"><span className="font-semibold text-[var(--accent-ink,#0b7a5c)]">+{money(a.netCents)}</span></TD>
+ <TD className="px-5"><StatusPill tone={a.status === "payable" ? "live" : "pending"} dot={a.status === "payable"}>{a.status === "payable" ? "Payable" : "On hold"}</StatusPill></TD>
  </tr>
  ))}
  </tbody>
  </table>
  </div>
+ )}
+ <div className="flex items-center justify-end border-t border-stone-100 px-5 py-3">
+ <TechButtonLink variant="secondary" href="/infrastructure/admin/consignment/payouts" className={cn("text-[12px]")}>Pay out consignors →</TechButtonLink>
  </div>
+ </TechCard>
+ </>
+ )}
+ </AdminPage>
  );
 }

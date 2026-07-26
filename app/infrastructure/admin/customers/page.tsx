@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { Users } from "lucide-react";
-import { Card, PageHeader, Button, EmptyState, Input, Field, inputCls, cn } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, TH, TD, cn } from "../ui";
+import { Input, Field, inputCls } from "@/app/store/ui";
 
 type Customer = {
  email: string;
@@ -122,29 +124,30 @@ export default function CustomersPage() {
  if (loading) return <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>;
 
  return (
- <div className="mx-auto max-w-5xl px-6 py-10 sm:px-8">
- <PageHeader
+ <AdminPage>
+ <AdminHeader
+ eyebrow="Store · Customers"
  title="Customers"
  subtitle={`${count.toLocaleString()} ${count === 1 ? "customer" : "customers"} · 100% of your customer base`}
  actions={
  <div className="flex items-center gap-2">
- {customers.length > 0 && <Button variant="ghost" onClick={exportCsv}>Export</Button>}
- <Button variant="ghost" onClick={() => setShowImport((v) => !v)}>{showImport ? "Close import" : "Import"}</Button>
- <Button onClick={() => { setAddErr(null); setAdding(true); }}>Add customer</Button>
+ {customers.length > 0 && <TechButton variant="ghost" onClick={exportCsv}>Export</TechButton>}
+ <TechButton variant="ghost" onClick={() => setShowImport((v) => !v)}>{showImport ? "Close import" : "Import"}</TechButton>
+ <TechButton onClick={() => { setAddErr(null); setAdding(true); }}>Add customer</TechButton>
  </div>
  }
  />
 
  {/* Import panel — toggled from the header. */}
  {showImport && (
- <Card className="mb-6 p-6">
+ <TechCard className="mb-6 p-6">
  {result ? (
  <div>
- <p className="text-[15px] font-semibold text-emerald-700">Imported</p>
+ <p className="text-[15px] font-semibold text-[var(--accent-ink,#0b7a5c)]">Imported</p>
  <p className="mt-1 text-[13px] text-stone-600">
  Read <b>{result.found}</b> {result.found === 1 ? "contact" : "contacts"} · added <b>{result.added}</b> new · you now have <b>{result.total}</b> total.
  </p>
- <Button variant="ghost" className="mt-3 px-0" onClick={() => setResult(null)}>Upload another list</Button>
+ <TechButton variant="ghost" className="mt-3 px-0" onClick={() => setResult(null)}>Upload another list</TechButton>
  </div>
  ) : (
  <>
@@ -159,23 +162,23 @@ export default function CustomersPage() {
  placeholder={"email,first name,last name\njane@example.com,Jane,Doe\nbob@shop.co,Bob,Smith"}
  />
  <div className="mt-4 flex items-center gap-3">
- <Button onClick={importNow} disabled={busy || !csv.trim()}>{busy ? "Importing…" : "Import customers"}</Button>
+ <TechButton onClick={importNow} disabled={busy || !csv.trim()}>{busy ? "Importing…" : "Import customers"}</TechButton>
  {err && <span className="text-xs text-red-600">{err}</span>}
  </div>
  </>
  )}
- </Card>
+ </TechCard>
  )}
 
  {customers.length === 0 ? (
- <EmptyState
+ <TechEmpty
  icon={<Users size={28} strokeWidth={1.5} />}
  title="No customers yet"
  body="As people buy from you they’ll appear here. Already have a list? Import it to bring your audience with you."
- action={<Button onClick={() => setShowImport(true)}>Import list</Button>}
+ action={<TechButton onClick={() => setShowImport(true)}>Import list</TechButton>}
  />
  ) : (
- <Card className="overflow-hidden">
+ <TechCard className="overflow-hidden">
  <div className="border-b border-stone-100 px-4 py-3">
  <input
  value={q}
@@ -187,31 +190,33 @@ export default function CustomersPage() {
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
- <tr className="border-b border-stone-100 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-stone-400">
- <th className="w-9 px-4 py-2.5"><input type="checkbox" disabled className="h-3.5 w-3.5 accent-stone-800" aria-label="Select all" /></th>
- <th className="px-3 py-2.5 font-medium">Customer name</th>
- <th className="px-5 py-2.5 font-medium">Email subscription</th>
- <th className="px-5 py-2.5 font-medium">Location</th>
- <th className="px-5 py-2.5 text-right font-medium">Orders</th>
- <th className="px-5 py-2.5 text-right font-medium">Amount spent</th>
+ <tr>
+ <TH className="px-4 w-9"><input type="checkbox" disabled className="h-3.5 w-3.5 accent-[var(--accent,#0e9f76)]" aria-label="Select all" /></TH>
+ <TH className="px-3">Customer name</TH>
+ <TH className="px-5">Email subscription</TH>
+ <TH className="px-5">Location</TH>
+ <TH right className="px-5">Orders</TH>
+ <TH right className="px-5">Amount spent</TH>
  </tr>
  </thead>
- <tbody className="divide-y divide-stone-100">
+ <tbody>
  {filtered.map((c) => (
- <tr key={c.email} className="transition hover:bg-stone-50">
- <td className="px-4 py-3"><input type="checkbox" className="h-3.5 w-3.5 cursor-pointer accent-stone-800" aria-label={`Select ${c.email}`} /></td>
- <td className="px-3 py-3">
- <div className="font-medium text-stone-900">{c.name || c.email}</div>
+ <tr key={c.email} className="transition hover:bg-stone-50/70">
+ <TD className="px-4"><input type="checkbox" className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${c.email}`} /></TD>
+ <TD className="px-3">
+ <Link href={`/infrastructure/admin/customers/${encodeURIComponent(c.email)}`} className="group/name inline-block">
+ <div className="font-medium text-stone-900 group-hover/name:underline">{c.name || c.email}</div>
  {c.name && <div className="text-[12px] text-stone-400">{c.email}</div>}
- </td>
- <td className="px-5 py-3">
+ </Link>
+ </TD>
+ <TD className="px-5">
  {c.subscribed
- ? <span className="text-emerald-700">Subscribed</span>
- : <span className="text-stone-400">Not subscribed</span>}
- </td>
- <td className="px-5 py-3 text-stone-500">{c.location || "—"}</td>
- <td className="px-5 py-3 text-right tabular-nums text-stone-600">{c.orders}</td>
- <td className="px-5 py-3 text-right tabular-nums text-stone-900">{money(c.spentCents)}</td>
+ ? <StatusPill tone="live" dot>Subscribed</StatusPill>
+ : <StatusPill tone="neutral">Not subscribed</StatusPill>}
+ </TD>
+ <TD className="px-5 text-stone-500">{c.location || "—"}</TD>
+ <TD right className="px-5 text-stone-600">{c.orders}</TD>
+ <TD right className="px-5 text-stone-900">{money(c.spentCents)}</TD>
  </tr>
  ))}
  {filtered.length === 0 && (
@@ -220,7 +225,7 @@ export default function CustomersPage() {
  </tbody>
  </table>
  </div>
- </Card>
+ </TechCard>
  )}
 
  <p className="mt-4 text-xs text-stone-400">Your list stays yours.</p>
@@ -236,12 +241,12 @@ export default function CustomersPage() {
  </div>
  {addErr && <p className="mt-3 text-xs text-red-600">{addErr}</p>}
  <div className="mt-5 flex items-center justify-end gap-2">
- <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
- <Button disabled={savingNew || !newC.email.trim()} onClick={addCustomer}>{savingNew ? "Adding…" : "Add customer"}</Button>
+ <TechButton variant="ghost" onClick={() => setAdding(false)}>Cancel</TechButton>
+ <TechButton disabled={savingNew || !newC.email.trim()} onClick={addCustomer}>{savingNew ? "Adding…" : "Add customer"}</TechButton>
  </div>
  </div>
  </div>
  )}
- </div>
+ </AdminPage>
  );
 }

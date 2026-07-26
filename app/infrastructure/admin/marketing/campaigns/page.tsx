@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardHeader, PageHeader, Button, Input, Field } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton } from "../../ui";
+import { Input, Field } from "@/app/store/ui";
 import EmailEditor from "@/app/store/EmailEditor";
 
 export default function CampaignsPage() {
@@ -31,23 +32,28 @@ export default function CampaignsPage() {
  }
 
  return (
- <div className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
- <PageHeader title="Campaigns" subtitle="Write, format, and preview an email — then send it as your store." />
- <Card>
- <CardHeader title="New email" subtitle={`Sends as ${camp?.storeName || "your store"} — replies go to ${camp?.storeEmail || "your contact email"}`} />
+ <AdminPage className="max-w-4xl">
+ <AdminHeader eyebrow="Store · Marketing · Campaigns" title="Campaigns" subtitle="Write, format, and preview an email — then send it as your store." />
+ <TechCard>
+ <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-5 py-3.5">
+ <div className="min-w-0">
+ <h3 className="text-[13px] font-semibold text-stone-900">New email</h3>
+ <p className="mt-0.5 text-xs text-stone-500">Sends as {camp?.storeName || "your store"} — replies go to {camp?.storeEmail || "your contact email"}</p>
+ </div>
+ </div>
  <div className="space-y-4 px-5 py-4">
  <Field label="Subject"><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="New drop just landed ✨" /></Field>
  <EmailEditor body={msg} onBody={setMsg} subject={subject} link={link} storeName={camp?.storeName}
  placeholder={"Write to your customers…\n\n## A heading\nUse **bold**, *italic*, [links](https://…), and\n- bullet points"} />
  <Field label="Button link" hint="Where “Shop now” points. Defaults to your store."><Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://yourstore.com" /></Field>
  <div className="flex flex-wrap items-center gap-2 pt-1">
- <Button variant="secondary" onClick={() => send(true)} disabled={sending}>Send test to myself</Button>
- <Button onClick={() => send(false)} disabled={sending || !camp?.recipientCount}>{sending ? "Sending…" : `Send to ${camp?.recipientCount ?? 0} customer${camp?.recipientCount === 1 ? "" : "s"}`}</Button>
+ <TechButton variant="secondary" onClick={() => send(true)} disabled={sending}>Send test to myself</TechButton>
+ <TechButton onClick={() => send(false)} disabled={sending || !camp?.recipientCount}>{sending ? "Sending…" : `Send to ${camp?.recipientCount ?? 0} customer${camp?.recipientCount === 1 ? "" : "s"}`}</TechButton>
  {campMsg && <span className="text-xs text-stone-600">{campMsg}</span>}
  </div>
  <p className="text-[11px] text-stone-400">Tip: send a test first. Links are tagged so email traffic shows up in Analytics.</p>
  </div>
- </Card>
- </div>
+ </TechCard>
+ </AdminPage>
  );
 }

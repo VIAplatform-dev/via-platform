@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, ne, sql, getTableColumns } from "drizzle-orm";
 import { getDb, items, reservations, orders, payouts } from "./index";
 import type { Item, NewItem, Reservation } from "./index";
 import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-core";
@@ -189,10 +189,18 @@ export async function listAvailableItems(sellerId: string): Promise<Item[]> {
  return db.select().from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));
 }
 
-/** All of a seller's items, any status — for the manage view. */
-export async function listSellerItems(sellerId: string): Promise<Item[]> {
+/** All of a seller's items, any status — for the manage view. `sku` is a per-store sequence by
+ *  creation order (1 = the store's first item), so every piece has a stable, meaningful ID. */
+export async function listSellerItems(sellerId: string): Promise<(Item & { sku: number })[]> {
  const db = getDb();
- return db.select().from(items).where(eq(items.sellerId, sellerId)).orderBy(desc(items.createdAt));
+ return db
+ .select({
+ ...getTableColumns(items),
+ sku: sql<number>`row_number() over (order by ${items.createdAt} asc, ${items.id} asc)`.mapWith(Number),
+ })
+ .from(items)
+ .where(eq(items.sellerId, sellerId))
+ .orderBy(desc(items.createdAt));
 }
 
 /** Fetch one item (e.g. to verify ownership before a mutation). */

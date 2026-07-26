@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X } from "lucide-react";
-import { Card, PageHeader, Badge, Button, Input, cn } from "@/app/store/ui";
+import { Tag, X } from "lucide-react";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, MetricCard, TH, TD, cn } from "../ui";
+import { Input } from "@/app/store/ui";
 
 type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean };
 
-const selectCls = "h-9 rounded-md border border-stone-300 bg-white px-2 text-[13px] text-stone-900 outline-none focus:border-stone-400";
+const selectCls = "h-9 rounded-lg border border-stone-200 bg-white px-2 text-[13px] text-stone-900 outline-none focus:border-stone-400";
 
 function kindLabel(d: Discount): string {
  if (d.kind === "percent") return d.value ? `${d.value}% off` : "% off";
@@ -51,33 +52,64 @@ export default function DiscountsPage() {
  const active = discounts.filter((d) => d.active).length;
 
  return (
- <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
- <PageHeader title="Discounts" subtitle="Codes shoppers get when they click through from VYA. Star one to auto-apply it on click-through." />
+ <AdminPage>
+ <AdminHeader
+ eyebrow="Store · Discounts"
+ title="Discounts"
+ subtitle="Codes shoppers get when they click through from VYA. Star one to auto-apply it on click-through."
+ />
 
  <div className="mb-5 grid grid-cols-3 gap-3">
- <Card className="p-4"><p className="text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">Codes</p><p className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">{discounts.length}</p></Card>
- <Card className="p-4"><p className="text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">Active</p><p className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">{active}</p></Card>
- <Card className="p-4"><p className="text-[11px] font-medium uppercase tracking-[0.08em] text-stone-400">Auto-applies</p><p className="mt-1 text-2xl font-semibold tabular-nums text-stone-900">{discounts.filter((d) => d.autoApply).length}</p></Card>
+ <MetricCard label="Codes" value={discounts.length} />
+ <MetricCard label="Active" value={active} />
+ <MetricCard label="Auto-applies" value={discounts.filter((d) => d.autoApply).length} />
  </div>
 
- <Card className="p-5">
- {discounts.length > 0 && (
- <div className="mb-4 divide-y divide-stone-100 overflow-hidden rounded-lg border border-stone-200">
+ {discounts.length === 0 ? (
+ <TechEmpty
+ icon={<Tag size={28} strokeWidth={1.5} />}
+ title="No discount codes yet"
+ body="Add a code below so shoppers get it automatically when they click through from VYA."
+ />
+ ) : (
+ <TechCard className="mb-5 overflow-hidden">
+ <div className="overflow-x-auto">
+ <table className="w-full text-[13px]">
+ <thead>
+ <tr>
+ <TH className="px-5">Code</TH>
+ <TH className="px-5">Discount</TH>
+ <TH className="px-5">Status</TH>
+ <TH right className="px-5">Actions</TH>
+ </tr>
+ </thead>
+ <tbody>
  {discounts.map((d) => (
- <div key={d.id} className="flex items-center gap-2.5 px-3 py-2.5">
- <span className="font-mono text-[13px] font-medium text-stone-900">{d.code}</span>
- <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[11px] text-stone-500">{kindLabel(d)}</span>
- {d.autoApply && <Badge tone="accent">Auto-applies</Badge>}
- {!d.active && <Badge tone="neutral">Off</Badge>}
- <div className="ml-auto flex items-center gap-3">
- <button onClick={() => patch(d.id, { autoApply: !d.autoApply })} title="Auto-apply on click-through (only one)" className={cn("text-sm leading-none", d.autoApply ? "text-[#5D0F17]" : "text-stone-300 hover:text-stone-500")}>{d.autoApply ? "★" : "☆"}</button>
- <button onClick={() => patch(d.id, { active: !d.active })} className={cn("text-[11px] font-medium", d.active ? "text-stone-500 hover:text-stone-900" : "text-emerald-600")}>{d.active ? "Disable" : "Enable"}</button>
- <button onClick={() => remove(d.id)} className="text-stone-300 transition hover:text-red-600"><X size={14} /></button>
+ <tr key={d.id} className="transition hover:bg-stone-50/70">
+ <TD className="px-5 font-mono font-medium text-stone-900">{d.code}</TD>
+ <TD className="px-5 text-stone-500">{kindLabel(d)}</TD>
+ <TD className="px-5">
+ <div className="flex flex-wrap items-center gap-1.5">
+ <StatusPill tone={d.active ? "live" : "neutral"} dot={d.active}>{d.active ? "Active" : "Off"}</StatusPill>
+ {d.autoApply && <StatusPill tone="info">Auto-applies</StatusPill>}
  </div>
+ </TD>
+ <TD right className="px-5">
+ <div className="flex items-center justify-end gap-2">
+ <button onClick={() => patch(d.id, { autoApply: !d.autoApply })} title="Auto-apply on click-through (only one)" className={cn("text-sm leading-none", d.autoApply ? "text-[var(--accent,#0e9f76)]" : "text-stone-300 hover:text-stone-500")}>{d.autoApply ? "★" : "☆"}</button>
+ <TechButton variant="ghost" className="px-2.5 py-1 text-[12px]" onClick={() => patch(d.id, { active: !d.active })}>{d.active ? "Disable" : "Enable"}</TechButton>
+ <TechButton variant="ghost" className="px-2 py-1 text-[12px] text-stone-300 hover:text-red-600" onClick={() => remove(d.id)}><X size={14} /></TechButton>
  </div>
+ </TD>
+ </tr>
  ))}
+ </tbody>
+ </table>
  </div>
+ </TechCard>
  )}
+
+ <TechCard className="p-5">
  <div className="flex flex-wrap items-center gap-2">
  <div className="w-36"><Input value={newCode} onChange={(e) => setNewCode(e.target.value.toUpperCase().replace(/\s/g, ""))} placeholder="WELCOME10" /></div>
  <select value={newKind} onChange={(e) => setNewKind(e.target.value)} className={selectCls}>
@@ -87,10 +119,10 @@ export default function DiscountsPage() {
  <option value="other">Other</option>
  </select>
  {(newKind === "percent" || newKind === "fixed") && <div className="w-20"><Input value={newValue} onChange={(e) => setNewValue(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={newKind === "percent" ? "10" : "25"} /></div>}
- <Button onClick={add} disabled={busy || !newCode.trim()}>Add code</Button>
+ <TechButton disabled={busy || !newCode.trim()} onClick={add}>Add code</TechButton>
  </div>
  <p className="mt-2 text-[11px] text-stone-400">★ auto-applies the code when a shopper clicks through from VYA — only one can. Others are for campaigns + your store page.</p>
- </Card>
- </div>
+ </TechCard>
+ </AdminPage>
  );
 }

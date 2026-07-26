@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ShoppingCart, Sparkles, Heart, Eye, RotateCcw, Zap, Plus, X } from "lucide-react";
-import { Card, PageHeader, Button, Input, Field, cn } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, SectionLabel, Toggle } from "../../ui";
+import { Input, Field } from "@/app/store/ui";
 import EmailEditor from "@/app/store/EmailEditor";
 
 type Builtin = { kind: "builtin"; key: string; name: string; body: string; cadence: string; enabled: boolean };
@@ -11,14 +12,6 @@ type Trigger = { value: string; label: string };
 type Data = { builtin: Builtin[]; custom: Custom[]; triggers: Trigger[] };
 
 const ICONS: Record<string, typeof ShoppingCart> = { abandoned_cart: ShoppingCart, new_arrivals: Sparkles, saved_search: Heart, viewed_item: Eye, winback: RotateCcw };
-
-function Toggle({ on, onClick, busy }: { on: boolean; onClick: () => void; busy?: boolean }) {
- return (
- <button onClick={onClick} disabled={busy} role="switch" aria-checked={on} className={cn("relative h-5 w-9 shrink-0 rounded-full transition", on ? "bg-emerald-500" : "bg-stone-300", busy && "opacity-60")}>
- <span className={cn("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all", on ? "left-[18px]" : "left-0.5")} />
- </button>
- );
-}
 
 export default function AutomationsPage() {
  const [data, setData] = useState<Data | null>(null);
@@ -59,51 +52,56 @@ export default function AutomationsPage() {
  const triggerLabel = (v: string) => data?.triggers.find((t) => t.value === v)?.label || v;
 
  return (
- <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
- <PageHeader
+ <AdminPage>
+ <AdminHeader
+ eyebrow="Store · Marketing · Automations"
  title="Automations"
  subtitle="Emails that send for you automatically. Toggle VYA’s flows, or build your own."
- actions={<Button onClick={() => { setErr(null); setAdding(true); }}><Plus size={15} className="-ml-0.5 mr-1 inline" />New automation</Button>}
+ actions={<TechButton onClick={() => { setErr(null); setAdding(true); }}><Plus size={15} className="-ml-0.5 mr-1 inline" />New automation</TechButton>}
  />
 
  {/* Built-in flows */}
- <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-400">VYA flows</p>
+ <SectionLabel className="mb-2">VYA flows</SectionLabel>
  <div className="mb-6 space-y-2.5">
  {(data?.builtin || []).map((f) => {
  const Icon = ICONS[f.key] || Zap;
+ const busy = busyKey === f.key;
  return (
- <Card key={f.key} className="flex items-start gap-3.5 p-4">
- <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#5D0F17]/[0.07] text-[#5D0F17]"><Icon size={17} strokeWidth={1.75} /></span>
+ <TechCard key={f.key} className="flex items-start gap-3.5 p-4">
+ <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft,#eafaf3)] text-[var(--accent-ink,#0b7a5c)]"><Icon size={17} strokeWidth={1.75} /></span>
  <div className="min-w-0 flex-1">
  <p className="text-[14px] font-medium text-stone-900">{f.name}</p>
  <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">{f.body}</p>
  <p className="mt-1 text-[11px] text-stone-400">{f.cadence}</p>
  </div>
- <Toggle on={f.enabled} busy={busyKey === f.key} onClick={() => toggle({ kind: "builtin", key: f.key, enabled: !f.enabled }, f.key)} />
- </Card>
+ <Toggle on={f.enabled} className={busy ? "opacity-60 pointer-events-none" : undefined} onClick={() => toggle({ kind: "builtin", key: f.key, enabled: !f.enabled }, f.key)} />
+ </TechCard>
  );
  })}
  </div>
 
  {/* Custom automations */}
- <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-400">Your automations</p>
+ <SectionLabel className="mb-2">Your automations</SectionLabel>
  {data && data.custom.length === 0 && !adding && (
- <Card className="p-6 text-center text-[13px] text-stone-500">No custom automations yet. <button onClick={() => setAdding(true)} className="font-medium text-[#5D0F17] underline">Create one</button> to email customers on a trigger you choose.</Card>
+ <TechCard className="p-6 text-center text-[13px] text-stone-500">No custom automations yet. <button onClick={() => setAdding(true)} className="font-medium text-[var(--accent,#0e9f76)] underline">Create one</button> to email customers on a trigger you choose.</TechCard>
  )}
  <div className="space-y-2.5">
- {(data?.custom || []).map((c) => (
- <Card key={c.id} className="flex items-start gap-3.5 p-4">
+ {(data?.custom || []).map((c) => {
+ const busy = busyKey === `c${c.id}`;
+ return (
+ <TechCard key={c.id} className="flex items-start gap-3.5 p-4">
  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-500"><Zap size={17} strokeWidth={1.75} /></span>
  <div className="min-w-0 flex-1">
  <p className="text-[14px] font-medium text-stone-900">{c.name}</p>
  <p className="mt-0.5 text-[12px] text-stone-500">{triggerLabel(c.trigger)} → “{c.subject}”</p>
  </div>
  <div className="flex shrink-0 items-center gap-3">
- <Toggle on={c.enabled} busy={busyKey === `c${c.id}`} onClick={() => toggle({ kind: "custom", id: c.id, enabled: !c.enabled }, `c${c.id}`)} />
- <button onClick={() => removeCustom(c.id)} className="text-stone-300 transition hover:text-red-600"><X size={15} /></button>
+ <Toggle on={c.enabled} className={busy ? "opacity-60 pointer-events-none" : undefined} onClick={() => toggle({ kind: "custom", id: c.id, enabled: !c.enabled }, `c${c.id}`)} />
+ <button onClick={() => removeCustom(c.id)} className="text-stone-300 transition hover:text-rose-500"><X size={15} /></button>
  </div>
- </Card>
- ))}
+ </TechCard>
+ );
+ })}
  </div>
 
  <p className="mt-4 text-[11px] text-stone-400">Automations honor each customer’s email-subscription status.</p>
@@ -125,12 +123,12 @@ export default function AutomationsPage() {
  </div>
  {err && <p className="mt-3 text-xs text-red-600">{err}</p>}
  <div className="mt-5 flex items-center justify-end gap-2">
- <Button variant="ghost" onClick={() => setAdding(false)}>Cancel</Button>
- <Button disabled={saving || !form.name.trim() || !form.subject.trim() || !form.body.trim()} onClick={create}>{saving ? "Saving…" : "Create automation"}</Button>
+ <TechButton variant="ghost" onClick={() => setAdding(false)}>Cancel</TechButton>
+ <TechButton disabled={saving || !form.name.trim() || !form.subject.trim() || !form.body.trim()} onClick={create}>{saving ? "Saving…" : "Create automation"}</TechButton>
  </div>
  </div>
  </div>
  )}
- </div>
+ </AdminPage>
  );
 }

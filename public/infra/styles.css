@@ -833,7 +833,7 @@ header.nav.theme-dark .brand-mark{filter:invert(1) brightness(2)}
 .who-line::before{content:"";position:absolute;left:0;top:-3px;width:7px;height:7px;background:#fff}
 .who-ring{flex:none;width:min(46%,360px);height:60px;display:block}
 @keyframes whoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-@media (max-width:860px){.who-txt{width:auto}.who-line,.who-ring{display:none}.who-glow{justify-content:center;margin-bottom:10px}.who-glow svg{width:220px}}
+@media (max-width:860px){.who-txt{width:auto}.who-line,.who-ring{display:none}.who-glow{display:none}}
 @media (prefers-reduced-motion:reduce){.who-glow svg{animation:none}}
 
 
@@ -1137,11 +1137,15 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 
 /* ---- build-page mockup polish: generated preview + hero ---- */
 .mk-describe{justify-content:center;gap:14px}
-/* Mobile: the Describe-your-store mockup (chat + storefront preview) is taller than the 5/4 visual
-   box, so overflow:hidden was clipping the chat into the storefront. Let the card grow to fit it. */
+/* Mobile: the build-from-scratch mockups are taller/wider than the 5/4 visual box, so overflow:hidden
+   clipped them (chat into storefront, price onto the divider, etc.). Let every card grow to fit its
+   content instead of cropping, and give the go-live table's product names room by dropping the
+   cross-listed-to logo column (the least essential) so the titles are readable. */
 @media (max-width:820px){
-  .fr-visual:has(.mk-describe){aspect-ratio:auto;min-height:0;padding:clamp(14px,4vw,22px)}
-  .mk-describe{position:static;inset:auto;height:auto;max-height:none;width:100%}
+  .fr-visual{aspect-ratio:auto;min-height:0;padding:clamp(14px,4vw,22px);display:block}
+  .fr-visual>.mk{position:static;inset:auto;height:auto;max-height:none;width:100%}
+  .mk-lt-head,.mk-lt-row{grid-template-columns:minmax(0,1fr) auto auto;gap:10px}
+  .mk-lt-head span:nth-child(3),.mk-lt-chips{display:none}
 }
 .mk-gen{border:1px solid rgba(255,255,255,0.09);border-radius:12px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.015));flex:none;box-shadow:0 14px 30px rgba(0,0,0,0.34)}
 .mk-gen-bar{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,0.07)}

@@ -18,7 +18,7 @@ type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
 type BtnSize = "sm" | "md" | "lg";
 const BTN_SIZES: Record<BtnSize, string> = { sm: "h-8 px-3 text-xs", md: "h-9 px-3.5 text-[13px]", lg: "h-10 px-4 text-sm" };
 const BTN_VARIANTS: Record<BtnVariant, string> = {
- primary: "bg-[#5D0F17] text-white hover:bg-[#4a0c12] shadow-sm",
+ primary: "bg-[var(--accent,#5D0F17)] text-white hover:bg-[var(--accent-hover,#4a0c12)] shadow-sm",
  secondary: "bg-white text-stone-700 border border-stone-300 hover:bg-stone-50 shadow-sm",
  ghost: "text-stone-600 hover:bg-stone-100",
  danger: "bg-white text-red-600 border border-red-200 hover:bg-red-50",
@@ -55,7 +55,7 @@ const TONES: Record<Tone, string> = {
  warning: "bg-amber-50 text-amber-700 ring-1 ring-amber-600/10",
  critical: "bg-red-50 text-red-700 ring-1 ring-red-600/10",
  info: "bg-blue-50 text-blue-700 ring-1 ring-blue-600/10",
- accent: "bg-[#5D0F17]/[0.07] text-[#5D0F17]",
+ accent: "bg-[var(--accent-soft,rgba(93,15,23,0.07))] text-[var(--accent,#5D0F17)]",
 };
 export function Badge({ tone = "neutral", dot, className, children }: { tone?: Tone; dot?: boolean; className?: string; children: React.ReactNode }) {
  return (

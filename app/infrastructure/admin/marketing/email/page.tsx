@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { Card, CardHeader, PageHeader, Button, Input, Field } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, TH, TD } from "../../ui";
+import { Input, Field } from "@/app/store/ui";
 
 type DnsRecord = { record?: string; name?: string; type?: string; value?: string; ttl?: string; status?: string; priority?: number };
 type Settings = { fromName: string | null; replyTo: string | null; domain: string | null; sendingEmail: string | null; verified: boolean; dnsRecords: DnsRecord[] | null };
@@ -61,64 +62,70 @@ export default function EmailSenderPage() {
  }
 
  return (
- <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
- <PageHeader title="Sender" subtitle="How your marketing emails send — the name customers see, where replies go, and (optionally) your own domain." />
+ <AdminPage className="max-w-2xl">
+ <AdminHeader eyebrow="Store · Marketing · Sender" title="Sender" subtitle="How your marketing emails send — the name customers see, where replies go, and (optionally) your own domain." />
 
  {/* Sender identity */}
- <Card className="mb-5">
- <CardHeader title="Sender identity" subtitle="Shown as the sender on every automation + campaign." />
+ <TechCard className="mb-5">
+ <div className="border-b border-stone-100 px-5 py-3.5">
+ <h3 className="text-[13px] font-semibold text-stone-900">Sender identity</h3>
+ <p className="mt-0.5 text-xs text-stone-500">Shown as the sender on every automation + campaign.</p>
+ </div>
  <div className="space-y-3 px-5 py-4">
  <Field label="From name"><Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your store name" /></Field>
  <Field label="Reply-to email" hint="Where customer replies land."><Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="you@yourstore.com" /></Field>
  <div className="flex items-center gap-3 pt-1">
- <Button onClick={saveIdentity} disabled={busy === "identity"}>{busy === "identity" ? "Saving…" : "Save"}</Button>
+ <TechButton onClick={saveIdentity} disabled={busy === "identity"}>{busy === "identity" ? "Saving…" : "Save"}</TechButton>
  {sender && <span className="text-[12px] text-stone-500">Currently sends as <b className="text-stone-700">{sender.fromName}</b> &lt;{sender.fromAddress}&gt;</span>}
  </div>
  </div>
- </Card>
+ </TechCard>
 
  {/* Domain authentication */}
- <Card>
- <CardHeader title="Send from your own domain" subtitle="Authenticate your domain so emails send FROM your address — better trust + deliverability." />
+ <TechCard>
+ <div className="border-b border-stone-100 px-5 py-3.5">
+ <h3 className="text-[13px] font-semibold text-stone-900">Send from your own domain</h3>
+ <p className="mt-0.5 text-xs text-stone-500">Authenticate your domain so emails send FROM your address — better trust + deliverability.</p>
+ </div>
  <div className="px-5 py-4">
  {settings?.verified ? (
- <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3">
- <p className="text-[13px] font-medium text-emerald-800">✓ {settings.domain} is verified</p>
- <p className="mt-0.5 text-[12px] text-emerald-700/80">Emails now send from <b>{settings.sendingEmail}</b>.</p>
+ <div className="rounded-lg border border-[var(--accent,#0e9f76)]/25 bg-[var(--accent-soft,#eafaf3)] px-4 py-3">
+ <p className="text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">✓ {settings.domain} is verified</p>
+ <p className="mt-0.5 text-[12px] text-[var(--accent-ink,#0b7a5c)]/80">Emails now send from <b>{settings.sendingEmail}</b>.</p>
  </div>
  ) : settings?.domain ? (
  <>
  <p className="mb-3 text-[13px] text-stone-600">Add these records to <b>{settings.domain}</b>’s DNS, then verify. (At your registrar — GoDaddy, Namecheap, Cloudflare, etc.)</p>
  <div className="overflow-x-auto rounded-lg border border-stone-200">
  <table className="w-full text-[12px]">
- <thead><tr className="border-b border-stone-100 bg-stone-50 text-left text-[11px] uppercase tracking-[0.06em] text-stone-400"><th className="px-3 py-2 font-medium">Type</th><th className="px-3 py-2 font-medium">Name</th><th className="px-3 py-2 font-medium">Value</th></tr></thead>
- <tbody className="divide-y divide-stone-100">
+ <thead><tr><TH className="px-3">Type</TH><TH className="px-3">Name</TH><TH className="px-3">Value</TH></tr></thead>
+ <tbody>
  {(settings.dnsRecords || []).map((rec, i) => (
  <tr key={i}>
- <td className="whitespace-nowrap px-3 py-2 font-mono text-stone-700">{rec.type}</td>
- <td className="px-3 py-2 font-mono text-stone-600"><span className="flex items-center gap-1"><span className="max-w-[140px] truncate">{rec.name}</span><button onClick={() => copy(`n${i}`, rec.name || "")} className="text-stone-300 hover:text-stone-600">{copied === `n${i}` ? <Check size={12} /> : <Copy size={12} />}</button></span></td>
- <td className="px-3 py-2 font-mono text-stone-600"><span className="flex items-center gap-1"><span className="max-w-[200px] truncate">{rec.value}</span><button onClick={() => copy(`v${i}`, rec.value || "")} className="text-stone-300 hover:text-stone-600">{copied === `v${i}` ? <Check size={12} /> : <Copy size={12} />}</button></span></td>
+ <TD className="whitespace-nowrap px-3 font-mono text-stone-700">{rec.type}</TD>
+ <TD className="px-3 font-mono text-stone-600"><span className="flex items-center gap-1"><span className="max-w-[140px] truncate">{rec.name}</span><button onClick={() => copy(`n${i}`, rec.name || "")} className="text-stone-300 hover:text-stone-600">{copied === `n${i}` ? <Check size={12} /> : <Copy size={12} />}</button></span></TD>
+ <TD className="px-3 font-mono text-stone-600"><span className="flex items-center gap-1"><span className="max-w-[200px] truncate">{rec.value}</span><button onClick={() => copy(`v${i}`, rec.value || "")} className="text-stone-300 hover:text-stone-600">{copied === `v${i}` ? <Check size={12} /> : <Copy size={12} />}</button></span></TD>
  </tr>
  ))}
  </tbody>
  </table>
  </div>
  <div className="mt-3 flex items-center gap-3">
- <Button onClick={verify} disabled={busy === "verify"}>{busy === "verify" ? "Checking…" : "Verify domain"}</Button>
+ <TechButton onClick={verify} disabled={busy === "verify"}>{busy === "verify" ? "Checking…" : "Verify domain"}</TechButton>
  <span className="text-[11px] text-stone-400">DNS changes can take minutes to a few hours.</span>
  </div>
  </>
  ) : (
  <div className="flex flex-wrap items-end gap-2">
  <div className="flex-1"><Field label="Your domain"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="yourstore.com" /></Field></div>
- <Button onClick={addDomain} disabled={busy === "domain" || !domain.trim()}>{busy === "domain" ? "Adding…" : "Authenticate"}</Button>
+ <TechButton onClick={addDomain} disabled={busy === "domain" || !domain.trim()}>{busy === "domain" ? "Adding…" : "Authenticate"}</TechButton>
  </div>
  )}
  </div>
- </Card>
+ </TechCard>
 
  {msg && <p className="mt-3 text-[12px] text-stone-600">{msg}</p>}
  <p className="mt-3 text-[11px] text-stone-400">Until you authenticate a domain, emails send from your name via VYA’s shared sending domain — replies still route to you.</p>
- </div>
+ </AdminPage>
  );
 }

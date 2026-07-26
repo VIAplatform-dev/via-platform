@@ -1,15 +1,21 @@
-import { and, desc, eq, isNull, inArray } from "drizzle-orm";
+import { and, desc, eq, isNull, inArray, sql } from "drizzle-orm";
 import { getDb, orders, payouts, items, sellers } from "./index";
 import type { Order } from "./index";
 
 export type SellerOrderRow = {
  id: string;
+ orderNo: number; // per-store sequence by creation order (1 = the store's first order)
+ itemId: string | null;
  itemTitle: string | null;
  amountCents: number;
+ feeCents: number | null;
+ shippingPaidCents: number | null;
+ costCents: number | null; // the seller's cost for the item (COGS), from the joined item
  currency: string;
  buyerEmail: string | null;
  status: string;
  paidAt: Date | null;
+ createdAt: Date | null;
 };
 
 /** A seller's orders (most recent first), with the item title joined in. */
@@ -18,12 +24,20 @@ export async function listSellerOrders(sellerId: string): Promise<SellerOrderRow
  return db
  .select({
  id: orders.id,
+ // Sequential per-store order number by creation order. The window sees every row matching the
+ // WHERE (all of this seller's orders) before ORDER BY/LIMIT, so recent orders keep their true #.
+ orderNo: sql<number>`row_number() over (order by ${orders.createdAt} asc, ${orders.id} asc)`.mapWith(Number),
+ itemId: orders.itemId,
  itemTitle: items.title,
  amountCents: orders.amountCents,
+ feeCents: orders.feeCents,
+ shippingPaidCents: orders.shippingPaidCents,
+ costCents: items.costCents,
  currency: orders.currency,
  buyerEmail: orders.buyerEmail,
  status: orders.status,
  paidAt: orders.paidAt,
+ createdAt: orders.createdAt,
  })
  .from(orders)
  .leftJoin(items, eq(items.id, orders.itemId))
@@ -158,6 +172,8 @@ export async function getOrderDetail(orderId: string) {
  const rows = await db
  .select({
  id: orders.id, status: orders.status, sellerId: orders.sellerId, itemId: orders.itemId,
+ // Same per-store sequence as the list, computed for this single order via a correlated count.
+ orderNo: sql<number>`(select count(*) from ${orders} o2 where o2.seller_id = ${orders.sellerId} and (o2.created_at < ${orders.createdAt} or (o2.created_at = ${orders.createdAt} and o2.id <= ${orders.id})))`.mapWith(Number),
  stripePaymentIntent: orders.stripePaymentIntent,
  amountCents: orders.amountCents, feeCents: orders.feeCents, shippingPaidCents: orders.shippingPaidCents, currency: orders.currency,
  buyerEmail: orders.buyerEmail, buyerName: orders.buyerName, buyerPhone: orders.buyerPhone,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PageHeader, Button, Input, Field } from "@/app/store/ui";
+import { Input, Field } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill } from "../ui";
 import { Mail, Megaphone, ShoppingBag, X, Check } from "lucide-react";
 
 type KStatus = { connected: boolean; accountName: string | null; oauth?: boolean };
@@ -62,48 +63,54 @@ export default function AppsPage() {
  </ol>
  <Field label="Klaviyo private API key"><Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="pk_••••••••••••••••" /></Field>
  <div className="flex flex-wrap items-center gap-2">
- <Button onClick={connectKey} disabled={busy || !apiKey.trim()}>{busy ? "Connecting…" : "Connect"}</Button>
+ <TechButton onClick={connectKey} disabled={busy || !apiKey.trim()}>{busy ? "Connecting…" : "Connect"}</TechButton>
  {err && <span className="text-[12px] text-rose-600">{err}</span>}
  </div>
  </div>
  );
 
  return (
- <div className="mx-auto max-w-3xl px-6 py-10 sm:px-8">
- <PageHeader title="Apps & integrations" subtitle="Optional add-ons to extend your store." />
+ <AdminPage className="max-w-3xl">
+ <AdminHeader eyebrow="Apps · Integrations" title="Apps & integrations" subtitle="Optional add-ons to extend your store." />
 
- {notice && <div className="mb-4 rounded-lg bg-emerald-50 px-4 py-2.5 text-[13px] font-medium text-emerald-700 ring-1 ring-emerald-100">{notice}</div>}
+ {notice && <div className="mb-4 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-4 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">{notice}</div>}
 
  <div className="mb-5 rounded-xl border border-stone-200/70 bg-stone-50/70 px-4 py-3 text-[12.5px] leading-relaxed text-stone-500">
  Everything in VYA works without these. Your storefront, checkout, email <span className="font-medium text-stone-600">Campaigns</span>, and <span className="font-medium text-stone-600">Automations</span> all run on their own — connect an app only if you want its extra power.
  </div>
 
  <div className="grid gap-3 sm:grid-cols-2">
- <button onClick={() => setOpen(true)} className="flex flex-col rounded-2xl border border-stone-200/70 bg-white p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-stone-300">
+ <TechCard
+ role="button"
+ tabIndex={0}
+ onClick={() => setOpen(true)}
+ onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(true); } }}
+ className="flex cursor-pointer flex-col p-4 text-left transition hover:border-stone-300"
+ >
  <div className="flex items-center gap-3">
  <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ background: "#232426" }}><Mail size={18} /></span>
  <div>
  <p className="text-[14px] font-semibold text-stone-900">Klaviyo</p>
  <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">Email marketing</p>
  </div>
- {k?.connected && <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-100"><Check size={11} /> Connected</span>}
+ {k?.connected && <StatusPill tone="live" dot className="ml-auto">Connected</StatusPill>}
  </div>
  <p className="mt-3 text-[12.5px] leading-relaxed text-stone-500">Sends your customers + orders to Klaviyo so you can build powerful emails and automated flows there.</p>
- <span className="mt-3 text-[12px] font-medium text-[#5D0F17]">{k?.connected ? "Manage →" : "Connect →"}</span>
- </button>
+ <span className="mt-3 text-[12px] font-medium text-[var(--accent-ink,#0b7a5c)]">{k?.connected ? "Manage →" : "Connect →"}</span>
+ </TechCard>
 
  {COMING.map((a) => (
- <div key={a.name} className="flex flex-col rounded-2xl border border-stone-200/60 bg-stone-50/40 p-4">
+ <TechCard key={a.name} className="flex flex-col border-stone-200/60 bg-stone-50/40 p-4 shadow-none">
  <div className="flex items-center gap-3">
  <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white opacity-70" style={{ background: a.tint }}><a.icon size={18} /></span>
  <div>
  <p className="text-[14px] font-semibold text-stone-500">{a.name}</p>
  <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">{a.category}</p>
  </div>
- <span className="ml-auto rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-400">Soon</span>
+ <StatusPill tone="neutral" className="ml-auto">Soon</StatusPill>
  </div>
  <p className="mt-3 text-[12.5px] leading-relaxed text-stone-400">{a.blurb}</p>
- </div>
+ </TechCard>
  ))}
  </div>
 
@@ -118,10 +125,10 @@ export default function AppsPage() {
 
  {k?.connected ? (
  <div className="space-y-4">
- <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5 text-[13px] font-medium text-emerald-700 ring-1 ring-emerald-100"><Check size={14} /> Connected{k.accountName ? ` to ${k.accountName}` : ""}</div>
+ <div className="flex items-center gap-2 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-3 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]"><Check size={14} /> Connected{k.accountName ? ` to ${k.accountName}` : ""}</div>
  <p className="text-[13px] leading-relaxed text-stone-600">New orders sync automatically. Back-fill your existing customers so your Klaviyo flows have an audience:</p>
  <div className="flex flex-wrap items-center gap-2">
- <Button onClick={sync} disabled={busy}>{busy ? "Syncing…" : "Sync my customers now"}</Button>
+ <TechButton onClick={sync} disabled={busy}>{busy ? "Syncing…" : "Sync my customers now"}</TechButton>
  {syncMsg && <span className="text-[12px] text-stone-600">{syncMsg}</span>}
  </div>
  <button onClick={disconnect} className="text-[12px] text-stone-400 transition hover:text-rose-600">Disconnect</button>
@@ -144,6 +151,6 @@ export default function AppsPage() {
  )}
 
  <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Not sure? Skip this entirely — VYA’s built-in Campaigns and Automations cover email on their own.</p>
- </div>
+ </AdminPage>
  );
 }
