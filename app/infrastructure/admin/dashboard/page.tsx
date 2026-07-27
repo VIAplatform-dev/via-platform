@@ -30,7 +30,9 @@ type Overview = {
 
 type ChannelRow = { channel: string; clicks: number; orders: number; sales: number; convPct: number; aov: number };
 type Traffic = { total: number; byType: { type: string; sessions: number }[]; topSources: { source: string; type: string; sessions: number }[] };
-type Perf = { rows: ChannelRow[]; attributedSales: number; totalSales: number; traffic: Traffic };
+type TopPages = { total: number; byType: { type: string; views: number }[]; pages: { path: string; type: string; title: string | null; views: number; visitors: number }[] };
+type Trend = { days: string[]; series: { channel: string; counts: number[] }[] };
+type Perf = { rows: ChannelRow[]; attributedSales: number; totalSales: number; traffic: Traffic; topPages?: TopPages; trend?: Trend; newCustomers?: number; returningCustomers?: number };
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const dollars = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
@@ -45,6 +47,31 @@ const TABS = [
  { key: "demand", label: "Demand" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
+
+// Multi-line channel-click trend (renders nothing until there's UTM-tagged click traffic).
+function TrendChart({ days, series }: Trend) {
+ if (!series.length || !days.length || series.every((s) => s.counts.every((c) => c === 0))) return null;
+ const max = Math.max(1, ...series.flatMap((s) => s.counts));
+ const W = 100, H = 36;
+ const xAt = (i: number) => (days.length > 1 ? (i / (days.length - 1)) * W : 0);
+ const yAt = (v: number) => H - (v / max) * H;
+ return (
+ <TechCard className="p-5">
+ <CardTitle>Channel trend</CardTitle>
+ <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-3 h-28 w-full">
+ {series.map((s, si) => (
+ <polyline key={s.channel} fill="none" stroke={DONUT_COLORS[si % DONUT_COLORS.length]} strokeWidth="1" vectorEffect="non-scaling-stroke" strokeLinejoin="round" points={s.counts.map((c, i) => `${xAt(i)},${yAt(c)}`).join(" ")} />
+ ))}
+ </svg>
+ <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+ {series.map((s, si) => (
+ <span key={s.channel} className="flex items-center gap-1.5 text-[11px] text-stone-500"><i className="h-2 w-2 rounded-full" style={{ background: DONUT_COLORS[si % DONUT_COLORS.length] }} />{s.channel}</span>
+ ))}
+ </div>
+ <div className="mt-0.5 flex justify-between text-[10px] text-stone-400"><span>{days[0]}</span><span>{days[days.length - 1]}</span></div>
+ </TechCard>
+ );
+}
 
 // KPI stat — reskinned onto the shared MetricCard. A numeric delta becomes the
 // green/rose delta pill (up = delta >= 0); the "vs prior" copy moves to the sub line.
@@ -122,6 +149,11 @@ function Leaderboard({ rows }: { rows: { name: string; sold: number; revenueCent
 export default function AnalyticsPage() {
  const [range, setRange] = useState<"30" | "90" | "all">("30");
  const [tab, setTab] = useState<TabKey>("overview");
+ // Deep-link a tab via ?tab= (e.g. the old Audience page redirects here to Traffic).
+ useEffect(() => {
+ const t = new URLSearchParams(window.location.search).get("tab");
+ if (t && TABS.some((x) => x.key === t)) { const id = setTimeout(() => setTab(t as TabKey), 0); void id; }
+ }, []);
  const [data, setData] = useState<Overview | null>(null);
  const [perf, setPerf] = useState<Perf | null>(null);
  const [loading, setLoading] = useState(true);
@@ -158,6 +190,9 @@ export default function AnalyticsPage() {
  const totalSales = perf?.totalSales || 0;
  const attribPct = pct(attributed, totalSales);
  const hasTraffic = traffic.total > 0 || channels.length > 0;
+ const topPages = perf?.topPages || { total: 0, byType: [], pages: [] };
+ const newC = perf?.newCustomers || 0;
+ const retC = perf?.returningCustomers || 0;
 
  // Share a colour across the traffic donut, its legend, and the top-sources bars.
  const typeIdx = Object.fromEntries(traffic.byType.map((t, i) => [t.type, i] as const));
@@ -284,6 +319,9 @@ export default function AnalyticsPage() {
  {tab === "traffic" && (
  hasTraffic ? (
  <div className="space-y-4">
+ {(newC > 0 || retC > 0) && (
+ <p className="text-[13px] text-stone-600"><b className="tabular-nums text-stone-900">{newC}</b> new · <b className="tabular-nums text-stone-900">{retC}</b> returning buyer{newC + retC === 1 ? "" : "s"} this period</p>
+ )}
  {traffic.total > 0 && (
  <TechCard className="p-5">
  <div className="mb-4 flex items-baseline justify-between">
@@ -358,6 +396,46 @@ export default function AnalyticsPage() {
  </div>
  <p className="mt-3 text-[11px] text-stone-400">Add <span className="font-mono">?utm_source=</span> to the links you share to populate channel conversion.</p>
  </div>
+ )}
+
+ <TrendChart {...(perf?.trend || { days: [], series: [] })} />
+
+ {topPages.total > 0 && (
+ <TechCard className="p-5">
+ <div className="mb-3 flex items-baseline justify-between">
+ <CardTitle>Top pages</CardTitle>
+ <p className="text-[12px] text-stone-400"><b className="tabular-nums text-stone-700">{topPages.total.toLocaleString()}</b> views</p>
+ </div>
+ {topPages.byType.length > 0 && (
+ <div className="mb-3 flex flex-wrap gap-1.5">
+ {topPages.byType.map((t) => (
+ <span key={t.type} className="inline-flex items-center gap-1.5 rounded-full bg-stone-50 px-2.5 py-1 text-[12px] text-stone-600 ring-1 ring-stone-200"><span className="capitalize">{t.type}</span> <span className="tabular-nums text-stone-400">{t.views.toLocaleString()}</span></span>
+ ))}
+ </div>
+ )}
+ <div className="overflow-x-auto">
+ <table className="w-full text-[13px]">
+ <thead>
+ <tr>
+ <TH className="pr-3">Page</TH>
+ <TH className="px-3">Type</TH>
+ <TH right className="px-3">Views</TH>
+ <TH right className="pl-3">Visitors</TH>
+ </tr>
+ </thead>
+ <tbody>
+ {topPages.pages.map((p) => (
+ <tr key={`${p.path}-${p.type}`}>
+ <TD className="max-w-[240px] truncate pr-3 font-medium text-stone-800">{p.title || p.path}</TD>
+ <TD className="px-3 capitalize text-stone-500">{p.type}</TD>
+ <TD right className="px-3">{p.views.toLocaleString()}</TD>
+ <TD right className="pl-3">{p.visitors.toLocaleString()}</TD>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ </TechCard>
  )}
  </div>
  ) : (

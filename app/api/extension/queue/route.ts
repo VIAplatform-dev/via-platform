@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
-import { getListingsByStore } from "@/app/lib/listings-db";
+import { getSellerBySlug } from "@/app/lib/db/sellers";
+import { listAvailableItems } from "@/app/lib/db/inventory";
 import { crossPostContent, platformByKey, getCrossListingsByPlatform } from "@/app/lib/cross-listing-db";
+import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,27 +20,31 @@ export async function GET(request: NextRequest) {
  const requested = new URL(request.url).searchParams.get("platform") || "depop";
  const platform = platformByKey(requested) ? requested : "depop";
 
- const [listings, alreadyListed] = await Promise.all([
- getListingsByStore(slug, true).catch(() => []),
+ const seller = await getSellerBySlug(slug);
+ const [rawItems, alreadyListed] = await Promise.all([
+ seller ? listAvailableItems(seller.id).catch(() => []) : Promise.resolve([]),
  getCrossListingsByPlatform(slug, platform).catch(() => []),
  ]);
- // Don't re-surface items already listed (or pending) on this marketplace — the queue is what's
- // still TO list, so the popup's "N ready" count is honest.
- const listedIds = new Set(alreadyListed.map((c) => c.itemId));
- const items = listings.filter((l) => !listedIds.has(l.id)).map((l) => {
+ // Hide only items actually PUBLISHED on this marketplace (status 'listed'). A 'pending' marker
+ // means a fill was started but not published — keep those in the queue so they can be retried.
+ const listedIds = new Set(alreadyListed.filter((c) => c.status === "listed").map((c) => c.itemId));
+ const items = rawItems.filter((it) => it.status !== "removed" && !listedIds.has(it.id)).map((it) => {
+ const brand = it.brand || inferBrandFromTitle(it.title) || null;
  const c = crossPostContent(
- { title: l.title, size: l.size, category: l.category, priceCents: Math.round(l.price * 100), description: l.description },
+ { title: it.title, brand, condition: it.condition, size: it.size, category: it.category, priceCents: it.priceCents, description: it.description },
  platform,
  );
  return {
- id: l.id,
+ id: it.id,
  title: c.title,
  body: c.body, // caption (with inline #hashtags on hashtag-driven feeds) — the "description" field
  tags: c.tags,
- priceDollars: Math.round(l.price),
- size: l.size,
- category: l.category,
- images: Array.isArray(l.images) ? l.images.slice(0, 8) : [],
+ priceDollars: Math.round((it.priceCents || 0) / 100),
+ size: it.size,
+ category: it.category,
+ brand, // for the marketplace brand picker
+ condition: it.condition || null, // for the marketplace condition picker
+ images: Array.isArray(it.images) ? it.images.slice(0, 8) : [],
  };
  });
 

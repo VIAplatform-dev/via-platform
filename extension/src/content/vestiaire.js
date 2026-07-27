@@ -14,11 +14,31 @@ const SEL = {
   price: 'input[name="price"], input[id*="price" i], input[data-testid*="price" i], input[inputmode="decimal"], input[type="number"]',
 };
 
+console.log("[VYA] Cross-Lister content script loaded on", location.href);
+
+// Wait for an element to appear (the sell wizard renders fields a beat after navigation).
+function waitFor(selector, timeoutMs = 12000) {
+  return new Promise((resolve) => {
+    const hit = document.querySelector(selector);
+    if (hit) return resolve(hit);
+    const start = Date.now();
+    const iv = setInterval(() => {
+      const el = document.querySelector(selector);
+      if (el || Date.now() - start > timeoutMs) { clearInterval(iv); resolve(el || null); }
+    }, 300);
+  });
+}
+
 // Fetch an image URL and turn it into a File the browser will accept in a file input.
 async function urlToFile(url, name) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return new File([blob], name, { type: blob.type || "image/jpeg" });
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new File([blob], name, { type: blob.type || "image/jpeg" });
+  } catch (e) {
+    console.warn("[VYA] image fetch failed (CORS?):", url, e && e.message);
+    throw e;
+  }
 }
 
 // Inject images into the file input via a synthetic DataTransfer (the standard technique).
@@ -46,14 +66,22 @@ function setNativeValue(el, value) {
 
 async function fillListing(item) {
   const filled = { photos: 0, description: false, price: false };
+  console.log("[VYA] fillListing start", { images: (item.images || []).length, hasBody: !!item.body, price: item.priceDollars });
 
+  const photoInput = await waitFor(SEL.photoInput, 12000);
+  console.log("[VYA] photo input found:", !!photoInput);
   filled.photos = await uploadPhotos(item.images || []);
+  console.log("[VYA] photos injected:", filled.photos);
 
-  const desc = document.querySelector(SEL.description);
+  const desc = await waitFor(SEL.description, 4000);
+  console.log("[VYA] description field found:", !!desc);
   if (desc) { setNativeValue(desc, item.body || item.title || ""); filled.description = true; }
 
-  const price = document.querySelector(SEL.price);
+  const price = await waitFor(SEL.price, 2000);
+  console.log("[VYA] price field found:", !!price);
   if (price && item.priceDollars != null) { setNativeValue(price, String(item.priceDollars)); filled.price = true; }
+
+  console.log("[VYA] fill result:", filled);
 
   // Stash the item id so we can attribute the published URL back to VYA once the seller submits.
   try { sessionStorage.setItem("vya_pending_item", item.id); } catch { /* ignore */ }

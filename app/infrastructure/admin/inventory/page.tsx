@@ -91,7 +91,8 @@ export default function ItemsPage() {
  useEffect(() => {
  (async () => { await load(); })();
  fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
- // Cross-listing board → which channels each item is posted on (listed) or queued for (pending).
+ // Cross-listing board → which channels each item is ACTUALLY published on. "Posted on" should
+ // only reflect a real, completed listing — not a started-but-unpublished ('pending') or failed one.
  fetch("/api/store/cross-listing").then((r) => (r.ok ? r.json() : null)).then((r) => {
  if (!r) return;
  const names: Record<string, string> = {};
@@ -100,7 +101,7 @@ export default function ItemsPage() {
  const map: Record<string, { key: string; status: string }[]> = {};
  (r.board || []).forEach((b: { itemId: string; listings?: Record<string, string> }) => {
  const posted = Object.entries(b.listings || {})
- .filter(([, s]) => s === "listed" || s === "pending")
+ .filter(([, s]) => s === "listed")
  .map(([key, status]) => ({ key, status: String(status) }));
  if (posted.length) map[b.itemId] = posted;
  });
@@ -243,7 +244,7 @@ export default function ItemsPage() {
  {live && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[var(--accent-bright,#2fd39b)]" />}
  </span>
  {chs.map((c) => (
- <span key={c.key} title={c.status === "pending" ? "Queued" : "Listed"} className={cn(chipCls, c.status === "pending" ? "bg-amber-50 text-amber-600" : "bg-stone-100 text-stone-600")}>
+ <span key={c.key} title="Live listing" className={cn(chipCls, "bg-stone-100 text-stone-600")}>
  {platformNames[c.key] || c.key}
  </span>
  ))}

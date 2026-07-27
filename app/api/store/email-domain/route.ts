@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getEmailSettings, upsertEmailSettings, resolveStoreSender } from "@/app/lib/email-settings-db";
+import { auth } from "@/app/lib/auth";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +13,21 @@ function resend() {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// GET — current sender + domain status (DNS records, verified).
+// GET — current sender + domain status (DNS records, verified), plus sensible defaults to
+// pre-fill: the email the store signed into VYA with (reply-to), and the storefront's own
+// custom domain (domain authentication) so they don't have to retype what VYA already knows.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const [settings, sender] = await Promise.all([getEmailSettings(slug), resolveStoreSender(slug)]);
- return NextResponse.json({ ok: true, sender, settings });
+ const [settings, sender, session, sf] = await Promise.all([
+ getEmailSettings(slug),
+ resolveStoreSender(slug),
+ auth().catch(() => null),
+ getStorefrontBySlug(slug).catch(() => null),
+ ]);
+ const accountEmail = session?.user?.email || null; // what they signed in with
+ const storefrontDomain = sf?.customDomain || null; // domain added during storefront setup
+ return NextResponse.json({ ok: true, sender, settings, accountEmail, storefrontDomain });
 }
 
 // PATCH { fromName?, replyTo?, sendingEmail? } — the store's display name + reply-to,

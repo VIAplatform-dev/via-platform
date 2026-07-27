@@ -63,10 +63,13 @@ export default function SettingsPage() {
  const [eMsg, setEMsg] = useState<string | null>(null);
  const [copied, setCopied] = useState<string | null>(null);
 
- function applySender(d: { settings: SenderSettings; sender: SenderInfo }) {
+ function applySender(d: { settings: SenderSettings; sender: SenderInfo; accountEmail?: string | null; storefrontDomain?: string | null }) {
  setSnd(d.settings); setSender(d.sender);
  setFromName(d.settings?.fromName || d.sender?.fromName || "");
- setReplyTo(d.settings?.replyTo || d.sender?.replyTo || "");
+ // Reply-to defaults to what they signed into VYA with, unless they've saved a different one.
+ setReplyTo(d.settings?.replyTo || d.accountEmail || d.sender?.replyTo || "");
+ // Pre-fill the domain field with the store's storefront domain (until they authenticate one).
+ if (!d.settings?.domain && d.storefrontDomain) setDomain(d.storefrontDomain);
  }
 
  useEffect(() => {

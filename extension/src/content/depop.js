@@ -7,18 +7,73 @@
 //    changes its UI, so treat these as the starting point. Everything else (photo injection, React
 //    value setting, message plumbing) is production-grade and reusable across marketplaces.
 
+// Depop's create form uses stable ids (Downshift autocompletes: #brand-input/#condition-input etc.).
 const SEL = {
-  photoInput: 'input[type="file"][accept*="image"], input[type="file"]',
-  description: 'textarea[name="description"], textarea[data-testid="description__textArea"], textarea[aria-label*="escription"]',
-  price: 'input[name="price"], input[data-testid="price__input"], input[inputmode="decimal"]',
+  photoInput: '#upload-input__input, input[type="file"][accept*="image"], input[type="file"]',
+  description: '#description, textarea[name="description"], textarea[aria-label*="escription" i], textarea[placeholder*="worn" i], textarea',
+  price: '#priceAmount__input, input[name="price"], input[inputmode="decimal"], input[type="number"]',
   publishedUrlAnchor: 'a[href*="/products/"]',
 };
 
+// Map a VYA condition to a Depop condition search query + the option text to match.
+function depopConditionQuery(cond) {
+  const c = String(cond || "").toLowerCase();
+  if (/new.*(tag|packag)|nwt|bnwt|brand ?new/.test(c)) return { q: "Brand new", match: "brand new" };
+  if (/like ?new|mint/.test(c)) return { q: "Like new", match: "like new" };
+  if (/excellent/.test(c)) return { q: "Excellent", match: "excellent" };
+  if (/very good|good/.test(c)) return { q: "Good", match: "good" };
+  if (/fair|worn|distress/.test(c)) return { q: "Fair", match: "fair" };
+  return { q: String(cond || ""), match: "" };
+}
+
+// Fill a Depop Downshift autocomplete (#<field>-input + #<field>-menu): type the query, wait for
+// options to render, then click the best text match. Best-effort — returns false if nothing matched.
+async function fillAutocomplete(inputId, query, matchText) {
+  if (!query) return false;
+  const input = document.querySelector(`#${inputId}`);
+  if (!input) return false;
+  input.focus();
+  setNativeValue(input, query);
+  const menuId = inputId.replace("-input", "-menu");
+  let opts = [];
+  const start = Date.now();
+  while (Date.now() - start < 3500) {
+    opts = [...document.querySelectorAll(`#${menuId} [role="option"]`)];
+    if (opts.length) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!opts.length) return false;
+  const want = (matchText || query).toLowerCase();
+  const pick = opts.find((o) => (o.textContent || "").toLowerCase().includes(want)) || opts[0];
+  pick.click();
+  return true;
+}
+
+console.log("[VYA] Cross-Lister content script loaded on", location.href);
+
+// Wait for an element to appear (Depop renders the sell form a beat after navigation).
+function waitFor(selector, timeoutMs = 12000) {
+  return new Promise((resolve) => {
+    const hit = document.querySelector(selector);
+    if (hit) return resolve(hit);
+    const start = Date.now();
+    const iv = setInterval(() => {
+      const el = document.querySelector(selector);
+      if (el || Date.now() - start > timeoutMs) { clearInterval(iv); resolve(el || null); }
+    }, 300);
+  });
+}
+
 // Fetch an image URL and turn it into a File the browser will accept in a file input.
 async function urlToFile(url, name) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  return new File([blob], name, { type: blob.type || "image/jpeg" });
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new File([blob], name, { type: blob.type || "image/jpeg" });
+  } catch (e) {
+    console.warn("[VYA] image fetch failed (CORS?):", url, e && e.message);
+    throw e;
+  }
 }
 
 // Inject images into Depop's file input via a synthetic DataTransfer (the standard technique).
@@ -45,15 +100,32 @@ function setNativeValue(el, value) {
 }
 
 async function fillListing(item) {
-  const filled = { photos: 0, description: false, price: false };
+  const filled = { photos: 0, description: false, price: false, condition: false, brand: false };
+  console.log("[VYA] fillListing start", { images: (item.images || []).length, hasBody: !!item.body, price: item.priceDollars, brand: item.brand, condition: item.condition });
 
+  // Wait for the sell form to actually render before touching it (SPA race).
+  const photoInput = await waitFor(SEL.photoInput, 12000);
+  console.log("[VYA] photo input found:", !!photoInput);
   filled.photos = await uploadPhotos(item.images || []);
+  console.log("[VYA] photos injected:", filled.photos);
 
-  const desc = document.querySelector(SEL.description);
+  const desc = await waitFor(SEL.description, 4000);
+  console.log("[VYA] description field found:", !!desc, desc && (desc.getAttribute("placeholder") || desc.name || ""));
   if (desc) { setNativeValue(desc, item.body || item.title || ""); filled.description = true; }
 
-  const price = document.querySelector(SEL.price);
+  const price = await waitFor(SEL.price, 2000);
+  console.log("[VYA] price field found:", !!price, price && (price.getAttribute("placeholder") || price.name || ""));
   if (price && item.priceDollars != null) { setNativeValue(price, String(item.priceDollars)); filled.price = true; }
+
+  // Best-effort pickers VYA reliably knows. Category/size stay for the seller to confirm.
+  try {
+    if (item.condition) { const { q, match } = depopConditionQuery(item.condition); filled.condition = await fillAutocomplete("condition-input", q, match); console.log("[VYA] condition:", filled.condition, "→", q); }
+  } catch (e) { console.warn("[VYA] condition fill error", e && e.message); }
+  try {
+    if (item.brand) { filled.brand = await fillAutocomplete("brand-input", item.brand, item.brand); console.log("[VYA] brand:", filled.brand, "→", item.brand); }
+  } catch (e) { console.warn("[VYA] brand fill error", e && e.message); }
+
+  console.log("[VYA] fill result:", filled);
 
   // Stash the item id so we can attribute the published URL back to VYA once the seller publishes.
   try { sessionStorage.setItem("vya_pending_item", item.id); } catch { /* ignore */ }
