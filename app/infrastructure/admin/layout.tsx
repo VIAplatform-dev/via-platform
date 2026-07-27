@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, type LucideIcon } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, type LucideIcon } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
+import CommandBar from "./CommandBar";
 
 type Sub = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: LucideIcon; children?: Sub[]; match?: string[] };
@@ -129,6 +130,14 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </p>
  </div>
  </div>
+ {/* Global search trigger — opens the ⌘K command bar */}
+ <button
+ onClick={() => window.dispatchEvent(new Event("vya:search"))}
+ className="mx-3 mb-4 flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-[12.5px] text-stone-400 transition hover:border-stone-300 hover:text-stone-600"
+ >
+ <Search size={14} /> <span className="flex-1 text-left">Search…</span>
+ <kbd className="rounded border border-stone-200 px-1 font-mono text-[9.5px] leading-4">⌘K</kbd>
+ </button>
  <nav className="flex-1" onClick={() => setNavOpen(false)}>
  {GROUPS.map((g, gi) => (
  <div key={gi} className={gi === 0 ? "" : "mt-5"}>
@@ -175,6 +184,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </aside>
  <main className="ml-0 flex-1 pt-14 md:ml-[228px] md:pt-0">{children}</main>
  <Sidekick />
+ <CommandBar />
  </div>
  </>
  );

@@ -7,6 +7,7 @@ const VYA = "https://vyaplatform.com";
 // Each marketplace's "create listing" page. Add a key here + a content-script adapter to support more.
 const CREATE_URL = {
   depop: "https://www.depop.com/products/create/",
+  vestiaire: "https://www.vestiairecollective.com/sell/",
   poshmark: "https://poshmark.com/create-listing",
 };
 
@@ -80,6 +81,7 @@ async function reportStats(itemId, platform, stats) {
 function shopUrl(platform, handle) {
   const h = encodeURIComponent(handle);
   if (platform === "depop") return `https://www.depop.com/${h}/`;
+  if (platform === "vestiaire") return `https://www.vestiairecollective.com/profile/${h}/`;
   if (platform === "poshmark") return `https://poshmark.com/closet/${h}`;
   return null;
 }

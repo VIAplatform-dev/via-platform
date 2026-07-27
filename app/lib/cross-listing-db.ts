@@ -12,21 +12,23 @@ import { listOnEtsy, endOnEtsy, etsyConnected, type EtsyResult } from "./etsy";
 // content and track status, and tell the seller exactly where to pull a sold item.
 // eBay/Etsy DO have APIs (hasApi), so real auto-post/remove can plug in there later.
 
-export type Platform = { key: string; name: string; hasApi: boolean; live?: boolean; titleMax: number; profileUrl: (handle: string) => string };
+// mode = how a piece actually gets posted: "api" (server auto-posts via the marketplace API — eBay only),
+// "extension" (the browser extension fills the seller's own logged-in form — Depop, Vestiaire first),
+// "soon" (not available yet — shown greyed as Coming soon). Only eBay has a usable public API.
+export type PlatformMode = "api" | "extension" | "soon";
+export type Platform = { key: string; name: string; hasApi: boolean; live?: boolean; mode: PlatformMode; titleMax: number; profileUrl: (handle: string) => string };
 
 export const PLATFORMS: Platform[] = [
- // eBay is the one live API integration (auto-posts + auto-removes). The rest are "copy" channels:
- // VYA writes each a title within its char limit + tags, and the seller pastes it.
- { key: "ebay", name: "eBay", hasApi: true, live: true, titleMax: 80, profileUrl: (h) => `https://www.ebay.com/usr/${h}` },
- { key: "depop", name: "Depop", hasApi: false, live: true, titleMax: 65, profileUrl: (h) => `https://www.depop.com/${h}` },
- { key: "poshmark", name: "Poshmark", hasApi: false, live: true, titleMax: 80, profileUrl: (h) => `https://poshmark.com/closet/${h}` },
- { key: "etsy", name: "Etsy", hasApi: true, live: true, titleMax: 140, profileUrl: (h) => `https://www.etsy.com/shop/${h}` },
- { key: "vestiaire", name: "Vestiaire Collective", hasApi: false, live: true, titleMax: 50, profileUrl: (h) => `https://www.vestiairecollective.com/profile/${h}/` },
- { key: "vinted", name: "Vinted", hasApi: false, live: true, titleMax: 100, profileUrl: (h) => `https://www.vinted.com/member/${h}` },
- { key: "mercari", name: "Mercari", hasApi: false, live: true, titleMax: 80, profileUrl: (h) => `https://www.mercari.com/u/${h}/` },
- { key: "grailed", name: "Grailed", hasApi: false, live: true, titleMax: 60, profileUrl: (h) => `https://www.grailed.com/${h}` },
- { key: "instagram", name: "Instagram", hasApi: false, live: true, titleMax: 125, profileUrl: (h) => `https://www.instagram.com/${h}/` },
- { key: "facebook", name: "Facebook Marketplace", hasApi: false, live: true, titleMax: 100, profileUrl: (h) => `https://www.facebook.com/${h}` },
+ { key: "ebay", name: "eBay", hasApi: true, live: true, mode: "api", titleMax: 80, profileUrl: (h) => `https://www.ebay.com/usr/${h}` },
+ { key: "depop", name: "Depop", hasApi: false, live: true, mode: "extension", titleMax: 65, profileUrl: (h) => `https://www.depop.com/${h}` },
+ { key: "vestiaire", name: "Vestiaire Collective", hasApi: false, live: true, mode: "extension", titleMax: 50, profileUrl: (h) => `https://www.vestiairecollective.com/profile/${h}/` },
+ { key: "poshmark", name: "Poshmark", hasApi: false, live: true, mode: "soon", titleMax: 80, profileUrl: (h) => `https://poshmark.com/closet/${h}` },
+ { key: "etsy", name: "Etsy", hasApi: true, live: true, mode: "soon", titleMax: 140, profileUrl: (h) => `https://www.etsy.com/shop/${h}` },
+ { key: "vinted", name: "Vinted", hasApi: false, live: true, mode: "soon", titleMax: 100, profileUrl: (h) => `https://www.vinted.com/member/${h}` },
+ { key: "mercari", name: "Mercari", hasApi: false, live: true, mode: "soon", titleMax: 80, profileUrl: (h) => `https://www.mercari.com/u/${h}/` },
+ { key: "grailed", name: "Grailed", hasApi: false, live: true, mode: "soon", titleMax: 60, profileUrl: (h) => `https://www.grailed.com/${h}` },
+ { key: "instagram", name: "Instagram", hasApi: false, live: true, mode: "soon", titleMax: 125, profileUrl: (h) => `https://www.instagram.com/${h}/` },
+ { key: "facebook", name: "Facebook Marketplace", hasApi: false, live: true, mode: "soon", titleMax: 100, profileUrl: (h) => `https://www.facebook.com/${h}` },
 ];
 export const platformByKey = (k: string) => PLATFORMS.find((p) => p.key === k) || null;
 

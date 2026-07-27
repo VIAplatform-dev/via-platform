@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
  const [accounts, board, rollup, ebayTok, depopTok, etsy] = await Promise.all([getPlatformAccounts(slug), getCrossListBoard(slug), getMarketplaceRollup(slug).catch(() => []), getEbayTokens(slug).catch(() => null), getDepopTokens(slug).catch(() => null), etsyStatus(slug).catch(() => ({ configured: false, connected: false, shop: null }))]);
  return NextResponse.json({
  ok: true,
- platforms: PLATFORMS.filter((p) => p.live).map((p) => ({ key: p.key, name: p.name, hasApi: p.hasApi })),
+ platforms: PLATFORMS.filter((p) => p.live).map((p) => ({ key: p.key, name: p.name, hasApi: p.hasApi, mode: p.mode })),
  accounts,
  board,
  rollup,

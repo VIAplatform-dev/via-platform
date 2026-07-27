@@ -21,7 +21,7 @@ export async function createItem(item: NewItem): Promise<Item> {
  * touch availability locks (use reserve/markSold for those). */
 export async function updateItem(
  itemId: string,
- patch: Partial<Pick<NewItem, "title" | "priceCents" | "currency" | "images" | "size" | "description" | "category" | "status">>,
+ patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn">>,
 ): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();

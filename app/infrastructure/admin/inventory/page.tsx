@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Package, Search } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD, cn } from "../ui";
-import { Input, Field } from "@/app/store/ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TH, TD, cn } from "../ui";
+import { Input, Field, inputCls } from "@/app/store/ui";
 
+type ItemStatus = "draft" | "active" | "reserved" | "sold" | "removed";
 type Item = {
  id: string;
  sku: number; // per-store sequence by creation order (1 = the store's first item)
@@ -14,10 +15,18 @@ type Item = {
  costCents: number | null; // seller's cost (COGS) if recorded — powers the margin column
  currency: string;
  images: string[];
+ brand: string | null;
+ era: string | null;
+ material: string | null;
+ condition: string | null;
  size: string | null;
  category: string | null;
  description: string | null;
- status: "draft" | "active" | "reserved" | "sold" | "removed";
+ status: ItemStatus;
+ weightOz: number | null;
+ lengthIn: number | null;
+ widthIn: number | null;
+ heightIn: number | null;
  collections?: string[];
 };
 
@@ -29,10 +38,17 @@ const TONE: Record<Item["status"], "live" | "pending" | "neutral" | "down" | "in
  removed: "down",
 };
 
-type EditForm = { title: string; price: string; size: string; category: string; description: string };
+type EditForm = {
+ title: string; price: string; cost: string; brand: string; era: string; material: string;
+ condition: string; size: string; category: string; description: string; status: ItemStatus;
+ weightOz: string; lengthIn: string; widthIn: string; heightIn: string;
+};
 
 export default function ItemsPage() {
  const pathname = usePathname();
+ const searchParams = useSearchParams();
+ const deepLinkId = searchParams.get("item"); // ?item=<id> from global search → open its editor
+ const handledDeepLink = useRef<string | null>(null);
  const statusFilter = pathname.endsWith("/drafts") ? "draft" : pathname.endsWith("/sold") ? "sold" : null;
  const [loading, setLoading] = useState(true);
  const [authErr, setAuthErr] = useState<string | null>(null);
@@ -46,7 +62,10 @@ export default function ItemsPage() {
  const [selected, setSelected] = useState<Set<string>>(new Set());
  const [bulkBusy, setBulkBusy] = useState(false);
  const [editing, setEditing] = useState<Item | null>(null);
- const [editForm, setEditForm] = useState<EditForm>({ title: "", price: "", size: "", category: "", description: "" });
+ const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: "", description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+ const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
+ const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
+ const [uploading, setUploading] = useState(false);
  const [savingEdit, setSavingEdit] = useState(false);
  // Collections: the store's collections + the ones selected for the item being edited.
  const [cols, setCols] = useState<{ id: string; title: string; itemCount?: number }[]>([]);
@@ -89,6 +108,14 @@ export default function ItemsPage() {
  }).catch(() => {});
  }, []);
 
+ // Deep link from the global ⌘K search (?item=<id>) → open that item's editor once it's loaded.
+ useEffect(() => {
+ if (!deepLinkId || !items.length || handledDeepLink.current === deepLinkId) return;
+ const it = items.find((i) => i.id === deepLinkId);
+ if (it) { handledDeepLink.current = deepLinkId; openEdit(it); }
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [deepLinkId, items]);
+
  async function act(id: string, action: "sold" | "remove" | "publish") {
  if (action === "remove" && !confirm("Remove this item?")) return;
  setBusyId(id);
@@ -126,20 +153,48 @@ export default function ItemsPage() {
  setBulkBusy(false);
  }
 
- // ── Edit a single item (any status, including drafts) ──
+ // ── Edit a single item (any status, including drafts) — full listing edit ──
+ const cents2str = (c: number | null) => (c == null ? "" : (c / 100).toFixed(0));
+ const num2str = (n: number | null) => (n == null ? "" : String(n));
  function openEdit(it: Item) {
  setEditing(it);
- setEditForm({ title: it.title, price: (it.priceCents / 100).toFixed(0), size: it.size || "", category: it.category || "", description: it.description || "" });
+ setEditForm({
+ title: it.title, price: cents2str(it.priceCents), cost: cents2str(it.costCents),
+ brand: it.brand || "", era: it.era || "", material: it.material || "", condition: it.condition || "",
+ size: it.size || "", category: it.category || "", description: it.description || "", status: it.status,
+ weightOz: num2str(it.weightOz), lengthIn: num2str(it.lengthIn), widthIn: num2str(it.widthIn), heightIn: num2str(it.heightIn),
+ });
+ setEditImages(it.images || []);
  setSelCols(it.collections || []);
  setNewCol("");
  }
+ async function uploadImages(files: FileList | null) {
+ if (!files || !files.length) return;
+ setUploading(true);
+ for (const file of Array.from(files)) {
+ const fd = new FormData(); fd.append("file", file);
+ const r = await fetch("/api/store/listings/upload", { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ if (r?.url) setEditImages((imgs) => [...imgs, r.url]);
+ }
+ setUploading(false);
+ }
+ function moveImage(i: number, dir: -1 | 1) {
+ setEditImages((imgs) => { const a = [...imgs]; const j = i + dir; if (j < 0 || j >= a.length) return a; [a[i], a[j]] = [a[j], a[i]]; return a; });
+ }
  async function saveEdit() {
  if (!editing) return;
+ const n = (s: string) => (s.trim() === "" ? null : Number(s));
  setSavingEdit(true);
  await fetch(`/api/store/items/${editing.id}`, {
  method: "PATCH",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ title: editForm.title, price: Number(editForm.price) || 0, size: editForm.size, category: editForm.category, description: editForm.description, collections: selCols }),
+ body: JSON.stringify({
+ title: editForm.title, price: Number(editForm.price) || 0, cost: editForm.cost.trim() === "" ? null : Number(editForm.cost),
+ brand: editForm.brand, era: editForm.era, material: editForm.material, condition: editForm.condition,
+ size: editForm.size, category: editForm.category, description: editForm.description, status: editForm.status,
+ weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
+ images: editImages, collections: selCols,
+ }),
  }).catch(() => {});
  setSavingEdit(false);
  setEditing(null);
@@ -312,21 +367,76 @@ export default function ItemsPage() {
  {/* Edit modal */}
  {editing && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setEditing(null)}>
- <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+ <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
  <div className="mb-4 flex items-center justify-between">
+ <div>
  <h2 className="text-base font-semibold text-stone-900">Edit listing</h2>
- <StatusPill tone={TONE[editing.status]}>{editing.status}</StatusPill>
+ <p className="font-mono text-[11px] tabular-nums text-stone-400">SKU-{1000 + editing.sku}</p>
  </div>
+ <StatusPill tone={TONE[editForm.status]} dot={editForm.status === "active"}>{editForm.status}</StatusPill>
+ </div>
+
+ {/* Photos — reorder (‹ ›), remove (✕), add (upload). First = cover. */}
+ <SectionLabel className="mb-2">Photos</SectionLabel>
+ <div className="mb-4 flex flex-wrap gap-2">
+ {editImages.map((src, i) => (
+ <div key={`${src}-${i}`} className="group relative h-20 w-16 overflow-hidden rounded-md ring-1 ring-stone-200">
+ {/* eslint-disable-next-line @next/next/no-img-element */}
+ <img src={src} alt="" className="h-full w-full object-cover" />
+ {i === 0 && <span className="absolute left-0 top-0 rounded-br bg-[var(--accent,#0e9f76)] px-1 text-[8px] font-bold text-white">COVER</span>}
+ <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/50 px-1 py-0.5 text-[12px] leading-none text-white opacity-0 transition group-hover:opacity-100">
+ <button type="button" aria-label="Move left" onClick={() => moveImage(i, -1)} disabled={i === 0} className="disabled:opacity-30">‹</button>
+ <button type="button" aria-label="Remove" onClick={() => setEditImages((a) => a.filter((_, k) => k !== i))} className="hover:text-rose-300">✕</button>
+ <button type="button" aria-label="Move right" onClick={() => moveImage(i, 1)} disabled={i === editImages.length - 1} className="disabled:opacity-30">›</button>
+ </div>
+ </div>
+ ))}
+ <label className="flex h-20 w-16 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-stone-300 text-[10px] text-stone-400 transition hover:border-[var(--accent,#0e9f76)] hover:text-[var(--accent,#0e9f76)]">
+ {uploading ? "Uploading…" : "+ Add"}
+ <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { uploadImages(e.target.files); e.currentTarget.value = ""; }} />
+ </label>
+ </div>
+
  <div className="space-y-3">
  <Field label="Title"><Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} /></Field>
  <div className="grid grid-cols-2 gap-3">
- <Field label="Price (USD)"><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
+ <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Fendi" /></Field>
+ <Field label="Era"><Input value={editForm.era} onChange={(e) => setEditForm((f) => ({ ...f, era: e.target.value }))} placeholder="e.g. 1990s" /></Field>
+ </div>
+ <div className="grid grid-cols-3 gap-3">
+ <Field label="Condition"><Input value={editForm.condition} onChange={(e) => setEditForm((f) => ({ ...f, condition: e.target.value }))} placeholder="Excellent" /></Field>
+ <Field label="Material"><Input value={editForm.material} onChange={(e) => setEditForm((f) => ({ ...f, material: e.target.value }))} /></Field>
  <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} /></Field>
  </div>
  <Field label="Category"><Input value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))} /></Field>
+ <div className="grid grid-cols-3 gap-3">
+ <Field label="Price (USD)"><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
+ <Field label="Cost (USD)"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
+ <Field label="Margin">
+ {(() => {
+ const p = Number(editForm.price) || 0; const hasCost = editForm.cost.trim() !== ""; const c = Number(editForm.cost) || 0;
+ if (!hasCost || p <= 0) return <div className="flex h-9 items-center text-[13px] text-stone-300">—</div>;
+ const m = Math.round(((p - c) / p) * 100);
+ return <div className={cn("flex h-9 items-center text-[13px] font-semibold tabular-nums", m >= 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-rose-500")}>{m}%</div>;
+ })()}
+ </Field>
+ </div>
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>
+ <div className="grid grid-cols-2 gap-3">
+ <Field label="Status">
+ <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as ItemStatus }))} className={inputCls}>
+ {(["draft", "active", "reserved", "sold", "removed"] as ItemStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
+ </select>
+ </Field>
+ <Field label="Weight (oz)"><Input type="number" inputMode="numeric" value={editForm.weightOz} onChange={(e) => setEditForm((f) => ({ ...f, weightOz: e.target.value }))} placeholder="for shipping" /></Field>
+ </div>
+ <div className="grid grid-cols-3 gap-3">
+ <Field label="Length (in)"><Input type="number" inputMode="numeric" value={editForm.lengthIn} onChange={(e) => setEditForm((f) => ({ ...f, lengthIn: e.target.value }))} /></Field>
+ <Field label="Width (in)"><Input type="number" inputMode="numeric" value={editForm.widthIn} onChange={(e) => setEditForm((f) => ({ ...f, widthIn: e.target.value }))} /></Field>
+ <Field label="Height (in)"><Input type="number" inputMode="numeric" value={editForm.heightIn} onChange={(e) => setEditForm((f) => ({ ...f, heightIn: e.target.value }))} /></Field>
+ </div>
  <div>
  <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Collections <span className="font-normal text-stone-400">— where it shows on your store</span></label>
  <div className="flex flex-wrap gap-2">

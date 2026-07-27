@@ -33,8 +33,9 @@ export async function POST(request: NextRequest, { params }: Ctx) {
  return NextResponse.json({ ok: true, item: result });
 }
 
-// PATCH — edit one of the acting store's items (title/price/size/category/description).
-// Works on any status, so drafts staged for a drop can be tweaked before going live.
+// PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material,
+// condition, size, category, description, status, images, shipping dims, and collections. Every field
+// is optional (only sent fields change). Works on any status, so drafts can be tweaked before going live.
 export async function PATCH(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,12 +50,31 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
  const body = await request.json().catch(() => ({}));
  const trimOrNull = (v: unknown, n: number) => { const s = String(v ?? "").trim().slice(0, n); return s || null; };
 
- const patch: Partial<{ title: string; priceCents: number; size: string | null; category: string | null; description: string | null }> = {};
+ const cents = (v: unknown) => Math.round(Math.max(0, Math.min(1_000_000, Number(v) || 0)) * 100);
+ const intOrNull = (v: unknown) => { if (v === null || v === "" || v === undefined) return null; const n = Math.round(Number(v)); return Number.isFinite(n) && n >= 0 ? Math.min(n, 100_000) : null; };
+ const STATUSES = ["draft", "active", "reserved", "sold", "removed"] as const;
+
+ const patch: Partial<{
+ title: string; priceCents: number; costCents: number | null; size: string | null; category: string | null; description: string | null;
+ brand: string | null; era: string | null; material: string | null; condition: string | null;
+ status: (typeof STATUSES)[number]; images: string[]; weightOz: number | null; lengthIn: number | null; widthIn: number | null; heightIn: number | null;
+ }> = {};
  if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 200);
- if (body.price !== undefined) patch.priceCents = Math.round(Math.max(0, Math.min(1_000_000, Number(body.price) || 0)) * 100);
+ if (body.price !== undefined) patch.priceCents = cents(body.price);
+ if (body.cost !== undefined) patch.costCents = body.cost === null || body.cost === "" ? null : cents(body.cost);
  if (body.size !== undefined) patch.size = trimOrNull(body.size, 40);
  if (body.category !== undefined) patch.category = trimOrNull(body.category, 60);
  if (body.description !== undefined) patch.description = trimOrNull(body.description, 2000);
+ if (body.brand !== undefined) patch.brand = trimOrNull(body.brand, 80);
+ if (body.era !== undefined) patch.era = trimOrNull(body.era, 40);
+ if (body.material !== undefined) patch.material = trimOrNull(body.material, 80);
+ if (body.condition !== undefined) patch.condition = trimOrNull(body.condition, 60);
+ if (typeof body.status === "string" && (STATUSES as readonly string[]).includes(body.status)) patch.status = body.status as (typeof STATUSES)[number];
+ if (Array.isArray(body.images)) patch.images = body.images.filter((x: unknown) => typeof x === "string" && (x as string).trim()).map((x: string) => x.trim()).slice(0, 20);
+ if (body.weightOz !== undefined) patch.weightOz = intOrNull(body.weightOz);
+ if (body.lengthIn !== undefined) patch.lengthIn = intOrNull(body.lengthIn);
+ if (body.widthIn !== undefined) patch.widthIn = intOrNull(body.widthIn);
+ if (body.heightIn !== undefined) patch.heightIn = intOrNull(body.heightIn);
  // Collections (titles). Only touched when the field is sent; an array (even empty) sets membership.
  const cols = Array.isArray(body.collections)
  ? body.collections.filter((x: unknown) => typeof x === "string" && (x as string).trim()).map((x: string) => x.trim().slice(0, 80)).slice(0, 20)

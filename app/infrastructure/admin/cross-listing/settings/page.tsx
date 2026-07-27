@@ -2,21 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Puzzle, Download } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, Toggle } from "../../ui";
+
+// The VYA Cross-Lister browser extension on the Chrome Web Store (Unlisted). Live once Google's
+// review passes; the ID is fixed from the dev-console item.
+const EXTENSION_URL = "https://chromewebstore.google.com/detail/jcbjeoingkdkodflfbachfpllmkgojkp";
 import { Input } from "@/app/store/ui";
 
-type Platform = { key: string; name: string; hasApi: boolean };
+type Platform = { key: string; name: string; hasApi: boolean; mode: "api" | "extension" | "soon" };
 type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { configured: boolean; connected: boolean; user: string | null };
-type Etsy = { configured: boolean; connected: boolean; shop: string | null };
 type EbayReady = { readyToList: boolean; tokenValid: boolean; policies: { fulfillment: boolean; payment: boolean; return: boolean } };
+
+// Sort order in the list: real API first, extension channels next, coming-soon last.
+const RANK: Record<Platform["mode"], number> = { api: 0, extension: 1, soon: 2 };
 
 export default function CrossListingSettingsPage() {
  const [platforms, setPlatforms] = useState<Platform[]>([]);
  const [accounts, setAccounts] = useState<Account[]>([]);
  const [ebay, setEbay] = useState<Ebay | null>(null);
- const [etsy, setEtsy] = useState<Etsy | null>(null);
  const [loading, setLoading] = useState(true);
  const [handles, setHandles] = useState<Record<string, string>>({});
  const [ebayReady, setEbayReady] = useState<EbayReady | null>(null);
@@ -24,14 +29,14 @@ export default function CrossListingSettingsPage() {
 
  async function load() {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
- if (r) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay); setEtsy(r.etsy); }
+ if (r) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay); }
  setLoading(false);
  }
  useEffect(() => {
  let active = true;
  (async () => {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
- if (r && active) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay); setEtsy(r.etsy); }
+ if (r && active) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay); }
  if (active) setLoading(false);
  })();
  return () => { active = false; };
@@ -74,18 +79,42 @@ export default function CrossListingSettingsPage() {
  <Link href="/infrastructure/admin/cross-listing" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Cross-listing</Link>
  <AdminHeader eyebrow="Sell · Cross-listing · Settings" title="Connected marketplaces" subtitle="Connect the shops you also sell on. New VYA listings queue to every auto-list channel automatically, and a sale anywhere pulls the piece from everywhere so it never double-sells." />
 
+ {/* Extension install — required for the Depop/Vestiaire (extension) channels to auto-fill. */}
+ <TechCard className="mb-5 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+ <div className="flex items-start gap-3">
+ <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft,#eafaf3)] text-[var(--accent-ink,#0b7a5c)]"><Puzzle size={18} /></span>
+ <div>
+ <p className="text-[14px] font-semibold text-stone-900">Install the VYA Cross-Lister extension</p>
+ <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">One-time, installs in seconds. It auto-fills your Depop &amp; Vestiaire listings right in your own browser — nothing leaves your session. Required for those channels.</p>
+ </div>
+ </div>
+ <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener" className="shrink-0"><Download size={14} /> Add to Chrome</TechButtonLink>
+ </TechCard>
+
  <TechCard className="overflow-hidden">
  {loading ? (
  <div className="flex items-center justify-center py-16 text-sm text-stone-400">Loading…</div>
  ) : (
  <div className="divide-y divide-stone-100">
- {platforms.map((p) => {
+ {[...platforms].sort((x, y) => RANK[x.mode] - RANK[y.mode]).map((p) => {
  const a = acct(p.key);
- // eBay uses OAuth (real auto-posting), not a handle.
+
+ // Coming soon — greyed, not connectable.
+ if (p.mode === "soon") {
+ return (
+ <div key={p.key} className="flex items-center gap-3 px-5 py-3.5 opacity-55">
+ <div className="w-40 shrink-0 text-[13px] font-medium text-stone-500">{p.name}</div>
+ <span className="flex-1 text-[12px] text-stone-400">Not available yet</span>
+ <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-400">Coming soon</span>
+ </div>
+ );
+ }
+
+ // eBay — the one real API integration (OAuth, auto-posts + auto-removes).
  if (p.key === "ebay") {
  return (
  <div key={p.key} className="flex items-center gap-3 px-5 py-3.5">
- <div className="w-28 shrink-0"><span className="text-[13px] font-medium text-stone-800">eBay</span><span className="ml-1 rounded bg-[var(--accent-soft,#eafaf3)] px-1 text-[10px] text-[var(--accent-ink,#0b7a5c)]">API</span></div>
+ <div className="w-40 shrink-0"><span className="text-[13px] font-medium text-stone-800">eBay</span><span className="ml-1.5 rounded bg-[var(--accent-soft,#eafaf3)] px-1 text-[10px] text-[var(--accent-ink,#0b7a5c)]">API</span></div>
  {!ebay?.configured ? (
  <span className="flex-1 text-[12px] text-stone-400">Not set up on the server yet (needs eBay app keys).</span>
  ) : ebay?.connected ? (
@@ -112,32 +141,14 @@ export default function CrossListingSettingsPage() {
  </div>
  );
  }
- // Etsy uses OAuth (real auto-posting + auto-delisting), not a handle.
- if (p.key === "etsy") {
+
+ // Extension channels (Depop, Vestiaire) — connect a handle; the VYA browser extension posts on
+ // your own logged-in session and reports engagement back. No credentials leave your browser.
  return (
  <div key={p.key} className="flex items-center gap-3 px-5 py-3.5">
- <div className="w-28 shrink-0"><span className="text-[13px] font-medium text-stone-800">Etsy</span><span className="ml-1 rounded bg-[var(--accent-soft,#eafaf3)] px-1 text-[10px] text-[var(--accent-ink,#0b7a5c)]">API</span></div>
- {!etsy?.configured ? (
- <span className="flex-1 text-[12px] text-stone-400">Not set up on the server yet (needs Etsy app keys).</span>
- ) : etsy?.connected ? (
- <>
- <span className="flex-1 truncate text-[13px] text-[var(--accent-ink,#0b7a5c)]">✓ Connected{etsy.shop ? ` · ${etsy.shop}` : ""} — auto-posts &amp; delists</span>
- <button onClick={() => disconnect("etsy")} className="text-[12px] text-stone-400 hover:text-rose-600">Disconnect</button>
- </>
- ) : (
- <>
- <span className="flex-1 text-[12px] text-stone-500">Connect your Etsy shop to auto-post &amp; auto-delist.</span>
- <TechButtonLink href="/api/store/cross-listing/etsy/connect">Connect Etsy</TechButtonLink>
- </>
- )}
- </div>
- );
- }
- return (
- <div key={p.key} className="flex items-center gap-3 px-5 py-3.5">
- <div className="w-28 shrink-0">
+ <div className="w-40 shrink-0">
  <span className="text-[13px] font-medium text-stone-800">{p.name}</span>
- {!p.hasApi && <span className="ml-1 text-[10px] text-stone-400">copy</span>}
+ <span className="ml-1.5 rounded bg-sky-50 px-1 text-[10px] text-sky-600">Extension</span>
  </div>
  {a ? (
  <>
@@ -159,7 +170,7 @@ export default function CrossListingSettingsPage() {
  </div>
  )}
  </TechCard>
- <p className="mt-3 text-[11px] text-stone-400">eBay &amp; Etsy connect over their API and auto-post/auto-delist. The rest are copy channels — VYA writes each a tailored title &amp; description; the browser extension posts them and reports likes, offers &amp; views back to your dashboard.</p>
+ <p className="mt-3 text-[11px] text-stone-400">eBay connects over its API and auto-posts/auto-removes for real. Depop &amp; Vestiaire post through the VYA browser extension — it fills the listing on your own logged-in session (no credentials leave your browser) and reports likes, offers &amp; views back to your dashboard. More marketplaces are coming soon.</p>
  </AdminPage>
  );
 }

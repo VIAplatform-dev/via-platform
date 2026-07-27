@@ -2,8 +2,11 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useState } from "react";
-import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2 } from "lucide-react";
+import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD } from "../ui";
+
+// VYA Cross-Lister on the Chrome Web Store (Unlisted) — live once Google's review passes.
+const EXTENSION_URL = "https://chromewebstore.google.com/detail/jcbjeoingkdkodflfbachfpllmkgojkp";
 
 type Platform = { key: string; name: string; hasApi: boolean };
 type Account = { platform: string; handle: string; autoList: boolean };
@@ -104,6 +107,7 @@ export default function CrossListingPage() {
  const crossListedCount = board.filter((it) => Object.entries(it.listings).some(([k, st]) => k !== "vya" && (st === "listed" || st === "pending"))).length;
 
  const settingsBtn = <TechButtonLink variant="secondary" href="/infrastructure/admin/cross-listing/settings"><Settings2 size={14} /> Marketplace settings</TechButtonLink>;
+ const installBtn = <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Get the extension</TechButtonLink>;
 
  return (
  <AdminPage>
@@ -111,7 +115,7 @@ export default function CrossListingPage() {
  eyebrow="Sell · Cross-listing"
  title="Cross-listing"
  subtitle="Every piece across your marketplaces — what's live, what's getting offers, and where the sales are coming from."
- actions={settingsBtn}
+ actions={<>{installBtn}{settingsBtn}</>}
  />
 
  {loading ? (
