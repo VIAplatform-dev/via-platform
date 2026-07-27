@@ -165,6 +165,36 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  return [...map.values()].sort((a, b) => b.spentCents - a.spentCents || ts(b).localeCompare(ts(a)));
 }
 
+/**
+ * The real email audience: the UNIFIED customer list (imported + anyone who bought), deduped by
+ * email and limited to those who are subscribed and have a valid address. This — not the raw
+ * imported table — is who a campaign actually reaches, so campaigns count and send consistently.
+ */
+export async function listSubscribers(storeSlug: string): Promise<{ email: string; name: string | null }[]> {
+ const profiles = await listCustomerProfiles(storeSlug);
+ const seen = new Set<string>();
+ const out: { email: string; name: string | null }[] = [];
+ for (const p of profiles) {
+ const e = (p.email || "").toLowerCase().trim();
+ if (!p.subscribed || !e.includes("@") || seen.has(e)) continue;
+ seen.add(e);
+ out.push({ email: p.email, name: p.name });
+ }
+ return out;
+}
+
+/** A transparent breakdown of the audience so the count is verifiable, not a mystery number. */
+export async function getAudienceBreakdown(storeSlug: string): Promise<{ subscribers: number; unsubscribed: number; buyers: number; imported: number; total: number }> {
+ const profiles = await listCustomerProfiles(storeSlug);
+ let subscribers = 0, unsubscribed = 0, buyers = 0, imported = 0;
+ for (const p of profiles) {
+ if (p.subscribed) subscribers++; else unsubscribed++;
+ if (p.source === "buyer" || p.source === "both") buyers++;
+ if (p.source === "imported" || p.source === "both") imported++;
+ }
+ return { subscribers, unsubscribed, buyers, imported, total: profiles.length };
+}
+
 /** Add a single customer by hand (the "Add customer" button). Upsert-safe. */
 export async function addCustomer(storeSlug: string, email: string, name: string | null): Promise<void> {
  await importCustomers(storeSlug, [{ email, name, phone: null }], "manual");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getListingsByStore } from "@/app/lib/listings-db";
-import { crossPostContent, platformByKey } from "@/app/lib/cross-listing-db";
+import { crossPostContent, platformByKey, getCrossListingsByPlatform } from "@/app/lib/cross-listing-db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +18,14 @@ export async function GET(request: NextRequest) {
  const requested = new URL(request.url).searchParams.get("platform") || "depop";
  const platform = platformByKey(requested) ? requested : "depop";
 
- const listings = await getListingsByStore(slug, true).catch(() => []);
- const items = listings.map((l) => {
+ const [listings, alreadyListed] = await Promise.all([
+ getListingsByStore(slug, true).catch(() => []),
+ getCrossListingsByPlatform(slug, platform).catch(() => []),
+ ]);
+ // Don't re-surface items already listed (or pending) on this marketplace — the queue is what's
+ // still TO list, so the popup's "N ready" count is honest.
+ const listedIds = new Set(alreadyListed.map((c) => c.itemId));
+ const items = listings.filter((l) => !listedIds.has(l.id)).map((l) => {
  const c = crossPostContent(
  { title: l.title, size: l.size, category: l.category, priceCents: Math.round(l.price * 100), description: l.description },
  platform,

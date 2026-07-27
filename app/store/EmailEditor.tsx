@@ -130,7 +130,7 @@ export default function EmailEditor({ body, onBody, subject, link, storeName, pl
  return (
  <div className="grid gap-4 md:grid-cols-2">
  <div>
- <div className="overflow-hidden rounded-lg border border-stone-200 focus-within:border-[#5D0F17]/40">
+ <div className="overflow-hidden rounded-lg border border-stone-200 focus-within:border-[var(--accent,#5D0F17)]">
  <div className="flex items-center gap-0.5 border-b border-stone-100 bg-stone-50/70 px-1.5 py-1">
  {tools.map((t) => (
  <button key={t.label} type="button" title={t.label} onMouseDown={(e) => e.preventDefault()} onClick={t.run}
@@ -145,8 +145,8 @@ export default function EmailEditor({ body, onBody, subject, link, storeName, pl
  </div>
  {linkOpen && (
  <div className="flex items-center gap-2 border-b border-stone-100 bg-white px-2 py-1.5">
- <input autoFocus value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyLink(); } if (e.key === "Escape") setLinkOpen(false); }} placeholder="Paste a link (https://…)" className="flex-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] outline-none focus:border-[#5D0F17]/40" />
- <button type="button" onClick={applyLink} className="rounded-md bg-[#5D0F17] px-2.5 py-1 text-[12px] font-medium text-white">Add</button>
+ <input autoFocus value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyLink(); } if (e.key === "Escape") setLinkOpen(false); }} placeholder="Paste a link (https://…)" className="flex-1 rounded-md border border-stone-200 px-2 py-1 text-[12px] outline-none focus:border-[var(--accent,#5D0F17)]" />
+ <button type="button" onClick={applyLink} className="rounded-md bg-[var(--accent,#5D0F17)] px-2.5 py-1 text-[12px] font-medium text-white">Add</button>
  <button type="button" onClick={() => setLinkOpen(false)} className="text-[12px] text-stone-400 hover:text-stone-600">Cancel</button>
  </div>
  )}
@@ -156,7 +156,7 @@ export default function EmailEditor({ body, onBody, subject, link, storeName, pl
  contentEditable
  suppressContentEditableWarning
  onInput={sync}
- className="min-h-[16rem] w-full px-3.5 py-3 text-[14px] leading-relaxed text-stone-900 outline-none [&_a]:text-[#5D0F17] [&_a]:underline [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:text-[18px] [&_h2]:font-semibold [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-md [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
+ className="min-h-[16rem] w-full px-3.5 py-3 text-[14px] leading-relaxed text-stone-900 outline-none [&_a]:text-[var(--accent,#5D0F17)] [&_a]:underline [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:text-[18px] [&_h2]:font-semibold [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-md [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
  />
  {empty && <div className="pointer-events-none absolute left-3.5 top-3 text-[14px] leading-relaxed text-stone-400">{placeholder || "Write like you're talking to a customer…"}</div>}
  </div>
@@ -167,7 +167,7 @@ export default function EmailEditor({ body, onBody, subject, link, storeName, pl
  <div>
  <div className="mb-1.5 flex items-center justify-between gap-2">
  <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-stone-400">Preview</p>
- <span className="inline-flex items-center gap-1 rounded-full bg-[#5D0F17]/[0.06] px-2 py-0.5 text-[10px] font-medium text-[#5D0F17]"><Sparkles size={10} strokeWidth={2.25} /> Styled with your store’s brand</span>
+ <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-soft,rgba(93,15,23,0.06))] px-2 py-0.5 text-[10px] font-medium text-[var(--accent,#5D0F17)]"><Sparkles size={10} strokeWidth={2.25} /> Styled with your store’s brand</span>
  </div>
  <div className="overflow-hidden rounded-xl border border-stone-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
  <div className="border-b border-stone-100 px-4 py-2.5">

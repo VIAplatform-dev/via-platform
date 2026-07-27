@@ -77,6 +77,7 @@ function ensureTable(): Promise<void> {
  )
  `;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme JSONB`;
+ await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme_prev JSONB`;
  })().catch((e) => {
  tableReady = null; // allow retry on transient failure
  throw e;
@@ -101,12 +102,22 @@ function rowToSettings(r: any): StorefrontSettings {
  };
 }
 
-/** Save the extracted design theme (fonts/colors/logo) for a store. */
+/** Save the extracted design theme (fonts/colors/logo) for a store. The previous theme is kept in
+ *  theme_prev so a single change can be reverted (see revertStorefrontTheme). */
 export async function setStorefrontTheme(storeSlug: string, theme: StorefrontTheme | null): Promise<void> {
  await ensureTable();
  const clean = scrubThemeHtml(theme);
  const sql = neon(getDatabaseUrl());
- await sql`UPDATE storefront_settings SET theme = ${clean ? JSON.stringify(clean) : null}::jsonb, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
+ await sql`UPDATE storefront_settings SET theme_prev = theme, theme = ${clean ? JSON.stringify(clean) : null}::jsonb, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
+}
+
+/** Undo the last storefront theme change: swap theme ↔ theme_prev (so a second call redoes it).
+ *  Returns true if there was a previous state to restore. */
+export async function revertStorefrontTheme(storeSlug: string): Promise<boolean> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ const rows = await sql`UPDATE storefront_settings SET theme = theme_prev, theme_prev = theme, updated_at = NOW() WHERE store_slug = ${storeSlug} AND theme_prev IS NOT NULL RETURNING store_slug`;
+ return rows.length > 0;
 }
 
 /** Remove a store's storefront entirely — settings, theme, pages, handle, publish state. A clean

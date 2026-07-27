@@ -43,7 +43,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  href: `${B}/marketing`, label: "Marketing", icon: Megaphone,
  children: [
  { href: `${B}/marketing/campaigns`, label: "Campaigns" },
- { href: `${B}/marketing/email`, label: "Sender" },
+ { href: `${B}/marketing/design`, label: "Email design" },
  { href: `${B}/marketing/audience`, label: "Audience" },
  { href: `${B}/marketing/share-links`, label: "Share links" },
  { href: `${B}/marketing/automations`, label: "Automations" },

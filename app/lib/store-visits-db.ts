@@ -80,6 +80,60 @@ export async function captureStorefrontEntry(req: NextRequest, slug: string): Pr
  }
 }
 
+// ── Page-level analytics: every page view per store (NOT session-gated), so a store can see what
+// pages/products shoppers actually browse — clean, per-store data across marketplace + storefront.
+let pvEnsured = false;
+async function ensurePageviews() {
+ if (pvEnsured) return;
+ const sql = db();
+ await sql`CREATE TABLE IF NOT EXISTS store_pageviews (
+ id SERIAL PRIMARY KEY,
+ store_slug TEXT NOT NULL,
+ path TEXT NOT NULL,
+ page_type TEXT NOT NULL,
+ title TEXT,
+ session_id TEXT,
+ surface TEXT NOT NULL DEFAULT 'marketplace',
+ timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
+ )`;
+ await sql`CREATE INDEX IF NOT EXISTS idx_store_pageviews_store_ts ON store_pageviews (store_slug, timestamp)`;
+ pvEnsured = true;
+}
+
+export async function recordStorePageview(v: {
+ storeSlug: string; path: string; pageType: string; title?: string | null; sessionId?: string | null; surface?: string;
+}): Promise<void> {
+ await ensurePageviews();
+ await db()`INSERT INTO store_pageviews (store_slug, path, page_type, title, session_id, surface)
+ VALUES (${v.storeSlug}, ${v.path.slice(0, 500)}, ${v.pageType}, ${v.title ?? null}, ${v.sessionId ?? null}, ${v.surface || "marketplace"})`;
+}
+
+export type TopPages = {
+ total: number;
+ byType: { type: string; views: number }[];
+ pages: { path: string; type: string; title: string | null; views: number; visitors: number }[];
+};
+
+export async function getTopPages(storeSlug: string, sinceDays?: number, limit = 12): Promise<TopPages> {
+ await ensurePageviews();
+ const sql = db();
+ const cutoff = sinceDays ? new Date(Date.now() - sinceDays * 86400000).toISOString() : null;
+ const byType = (cutoff
+ ? await sql`SELECT page_type AS type, COUNT(*)::int AS views FROM store_pageviews WHERE store_slug = ${storeSlug} AND timestamp >= ${cutoff} GROUP BY 1 ORDER BY 2 DESC`
+ : await sql`SELECT page_type AS type, COUNT(*)::int AS views FROM store_pageviews WHERE store_slug = ${storeSlug} GROUP BY 1 ORDER BY 2 DESC`) as { type: string; views: number }[];
+ const pages = (cutoff
+ ? await sql`SELECT path, page_type AS type, MAX(title) AS title, COUNT(*)::int AS views, COUNT(DISTINCT session_id)::int AS visitors
+ FROM store_pageviews WHERE store_slug = ${storeSlug} AND timestamp >= ${cutoff} GROUP BY 1, 2 ORDER BY 4 DESC LIMIT ${limit}`
+ : await sql`SELECT path, page_type AS type, MAX(title) AS title, COUNT(*)::int AS views, COUNT(DISTINCT session_id)::int AS visitors
+ FROM store_pageviews WHERE store_slug = ${storeSlug} GROUP BY 1, 2 ORDER BY 4 DESC LIMIT ${limit}`) as { path: string; type: string; title: string | null; views: number; visitors: number }[];
+ const total = byType.reduce((s, r) => s + Number(r.views), 0);
+ return {
+ total,
+ byType: byType.map((r) => ({ type: String(r.type), views: Number(r.views) })),
+ pages: pages.map((r) => ({ path: String(r.path), type: String(r.type), title: r.title ? String(r.title) : null, views: Number(r.views), visitors: Number(r.visitors) })),
+ };
+}
+
 export type TrafficSources = {
  total: number;
  byType: { type: string; sessions: number }[];

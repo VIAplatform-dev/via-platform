@@ -5,7 +5,12 @@ import { AdminPage, AdminHeader, TechCard, MetricCard, SegmentedControl, TH, TD 
 
 type ChannelRow = { channel: string; clicks: number; orders: number; sales: number; convPct: number; aov: number };
 type Trend = { days: string[]; series: { channel: string; counts: number[] }[] };
-type Attribution = { rows: ChannelRow[]; totals: { clicks: number; orders: number; sales: number; convPct: number; aov: number }; newCustomers: number; returningCustomers: number; trend?: Trend };
+type Traffic = { total: number; byType: { type: string; sessions: number }[]; topSources: { source: string; type: string; sessions: number }[] };
+type TopPages = { total: number; byType: { type: string; views: number }[]; pages: { path: string; type: string; title: string | null; views: number; visitors: number }[] };
+type Attribution = { rows: ChannelRow[]; totals: { clicks: number; orders: number; sales: number; convPct: number; aov: number }; newCustomers: number; returningCustomers: number; trend?: Trend; traffic?: Traffic; topPages?: TopPages };
+
+// Semantic colour per source type — search vs social vs marketplace read at a glance.
+const TYPE_COLOR: Record<string, string> = { Marketplace: "var(--accent,#0e9f76)", Search: "#0ea5e9", Social: "#8b5cf6", Direct: "#78716c", Referral: "#f59e0b", Email: "#10b981", Paid: "#ef4444" };
 
 const TREND_COLORS = ["var(--accent,#0e9f76)", "#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6"];
 function TrendChart({ days, series }: Trend) {
@@ -45,7 +50,7 @@ export default function AudiencePage() {
  <AdminHeader
  eyebrow="Store · Marketing · Audience"
  title="Audience"
- subtitle="Where your shoppers come from — attribution by channel."
+ subtitle="How shoppers find your store — search, social & referrals — plus what converts."
  actions={
  <SegmentedControl
  options={["30d", "All"]}
@@ -54,6 +59,43 @@ export default function AudiencePage() {
  />
  }
  />
+
+ {/* Where visitors come from — the headline answer, referrer-classified per store (no UTM needed). */}
+ {aud?.traffic && aud.traffic.total > 0 && (
+ <TechCard className="mb-5 overflow-hidden">
+ <div className="border-b border-stone-100 px-5 py-4">
+ <p className="text-[13.5px] font-medium text-stone-900">Where visitors come from</p>
+ <p className="mt-0.5 text-[12px] text-stone-400">{aud.traffic.total.toLocaleString()} storefront visit{aud.traffic.total === 1 ? "" : "s"} · classified by search, social &amp; referrals</p>
+ </div>
+ <div className="space-y-2.5 px-5 py-4">
+ {aud.traffic.byType.map((t) => {
+ const pct = Math.round((t.sessions / aud.traffic!.total) * 100);
+ return (
+ <div key={t.type} className="flex items-center gap-3">
+ <span className="w-16 shrink-0 text-[12px] font-medium text-stone-600">{t.type}</span>
+ <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
+ <div className="h-full rounded-full" style={{ width: `${Math.max(2, pct)}%`, background: TYPE_COLOR[t.type] || "#78716c" }} />
+ </div>
+ <span className="w-24 shrink-0 text-right text-[12px] tabular-nums text-stone-500">{t.sessions.toLocaleString()} · {pct}%</span>
+ </div>
+ );
+ })}
+ {aud.traffic.topSources.length > 0 && (
+ <div className="pt-2.5">
+ <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">Top sources</p>
+ <div className="flex flex-wrap gap-1.5">
+ {aud.traffic.topSources.map((s) => (
+ <span key={`${s.source}-${s.type}`} className="inline-flex items-center gap-1.5 rounded-full bg-stone-50 px-2.5 py-1 text-[12px] text-stone-700 ring-1 ring-stone-200">
+ <i className="h-1.5 w-1.5 rounded-full" style={{ background: TYPE_COLOR[s.type] || "#78716c" }} />
+ {s.source} <span className="tabular-nums text-stone-400">{s.sessions.toLocaleString()}</span>
+ </span>
+ ))}
+ </div>
+ </div>
+ )}
+ </div>
+ </TechCard>
+ )}
 
  {aud && aud.totals.clicks > 0 && (
  <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -109,6 +151,50 @@ export default function AudiencePage() {
  )}
  </div>
  </TechCard>
+
+ {/* Top pages — what shoppers actually browse, across the marketplace + the store's own storefront. */}
+ {aud?.topPages && aud.topPages.total > 0 && (
+ <TechCard className="mt-5 overflow-hidden">
+ <div className="border-b border-stone-100 px-5 py-4">
+ <p className="text-[13.5px] font-medium text-stone-900">Top pages</p>
+ <p className="mt-0.5 text-[12px] text-stone-400">{aud.topPages.total.toLocaleString()} page view{aud.topPages.total === 1 ? "" : "s"} · what shoppers browse</p>
+ </div>
+ <div className="px-5 py-4">
+ {aud.topPages.byType.length > 0 && (
+ <div className="mb-3 flex flex-wrap gap-1.5">
+ {aud.topPages.byType.map((t) => (
+ <span key={t.type} className="inline-flex items-center gap-1.5 rounded-full bg-stone-50 px-2.5 py-1 text-[12px] text-stone-600 ring-1 ring-stone-200">
+ <span className="capitalize">{t.type}</span> <span className="tabular-nums text-stone-400">{t.views.toLocaleString()}</span>
+ </span>
+ ))}
+ </div>
+ )}
+ <div className="overflow-x-auto">
+ <table className="w-full text-[13px]">
+ <thead>
+ <tr>
+ <TH className="pr-3">Page</TH>
+ <TH className="px-3">Type</TH>
+ <TH right className="px-3">Views</TH>
+ <TH right className="pl-3">Visitors</TH>
+ </tr>
+ </thead>
+ <tbody>
+ {aud.topPages.pages.map((p) => (
+ <tr key={`${p.path}-${p.type}`}>
+ <TD className="max-w-[240px] truncate pr-3 font-medium text-stone-800">{p.title || p.path}</TD>
+ <TD className="px-3 capitalize text-stone-500">{p.type}</TD>
+ <TD right className="px-3">{p.views.toLocaleString()}</TD>
+ <TD right className="pl-3">{p.visitors.toLocaleString()}</TD>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ <p className="pt-3 text-[11px] text-stone-400">Marketplace + storefront page views {range === "30" ? "in the last 30 days" : "all time"}.</p>
+ </div>
+ </TechCard>
+ )}
  </AdminPage>
  );
 }

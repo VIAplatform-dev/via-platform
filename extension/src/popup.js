@@ -87,5 +87,5 @@ function wireSync(id, plat) {
 
 wireTabs();
 wireSync("syncDepop", "depop");
-wireSync("syncPosh", "poshmark");
+wireSync("syncVestiaire", "vestiaire");
 load();

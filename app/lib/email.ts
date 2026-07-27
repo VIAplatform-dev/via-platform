@@ -417,8 +417,41 @@ function escapeHtml(s: string): string {
  * Links are UTM-tagged so the campaign shows up in the store's audience insights.
  */
 // A store's email brand — pulled from its storefront design so campaigns match the store automatically.
-export type EmailBrand = { accent: string; text: string; bg: string; headingFont?: string; bodyFont?: string; logo?: string | null };
+export type EmailBrand = {
+ accent: string; text: string; bg: string;
+ headingFont?: string; bodyFont?: string; logo?: string | null;
+ // Store-customizable extras (default to the classic look when unset):
+ buttonLabel?: string; // CTA button text — "Shop now" when unset
+ footerText?: string; // the small print under the email — a template with {store} when unset
+ showAccentBar?: boolean; // the thin colour bar across the top — on when unset
+ buttonStyle?: "rounded" | "pill" | "square"; // CTA corner style — "rounded" when unset
+ headerAlign?: "center" | "left"; // logo/heading + button alignment — "center" when unset
+};
 const DEFAULT_BRAND: EmailBrand = { accent: "#5D0F17", text: "#1c1917", bg: "#ffffff" };
+
+// Accept only known brand fields, coerced + clamped — never trust a raw client (or model) shape.
+// Shared by the design API, the live preview, and the Sidekick's update_email_design tool.
+const BRAND_HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+function brandColor(v: unknown, fallback: string): string { return typeof v === "string" && BRAND_HEX.test(v.trim()) ? v.trim() : fallback; }
+function brandStr(v: unknown, max: number): string | undefined { if (typeof v !== "string") return undefined; const s = v.trim().slice(0, max); return s || undefined; }
+export function sanitizeBrand(input: unknown): EmailBrand | null {
+ if (!input || typeof input !== "object") return null;
+ const b = input as Record<string, unknown>;
+ const logo = typeof b.logo === "string" && /^https?:\/\//i.test(b.logo.trim()) ? b.logo.trim().slice(0, 2000) : null;
+ return {
+ accent: brandColor(b.accent, "#5D0F17"),
+ text: brandColor(b.text, "#1c1917"),
+ bg: brandColor(b.bg, "#ffffff"),
+ headingFont: brandStr(b.headingFont, 60),
+ bodyFont: brandStr(b.bodyFont, 60),
+ logo,
+ buttonLabel: brandStr(b.buttonLabel, 40),
+ footerText: brandStr(b.footerText, 400),
+ showAccentBar: b.showAccentBar !== false,
+ buttonStyle: b.buttonStyle === "pill" || b.buttonStyle === "square" ? b.buttonStyle : "rounded",
+ headerAlign: b.headerAlign === "left" ? "left" : "center",
+ };
+}
 
 const EMAIL_SERIF = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Cormorant", "Newsreader", "Instrument Serif", "Fraunces", "EB Garamond", "Lora", "DM Serif Display", "Libre Baskerville", "Prata", "Spectral"]);
 function fontStack(name: string | undefined, kind: "heading" | "body"): string {
@@ -439,8 +472,8 @@ function fontsHref(brand: EmailBrand): string {
  return fams.length ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?${fams.join("&")}&display=swap" />` : "";
 }
 
-/** A store's email brand (accent, text, bg, fonts, logo), pulled from its storefront design. */
-export async function getStoreEmailBrand(slug: string): Promise<EmailBrand> {
+/** The brand a store's email inherits from its storefront design (colours, fonts, logo). */
+export async function getStorefrontEmailBrand(slug: string): Promise<EmailBrand> {
  const { getStorefrontBySlug } = await import("./storefront-db");
  const sf = await getStorefrontBySlug(slug).catch(() => null);
  const t = sf?.theme;
@@ -452,6 +485,18 @@ export async function getStoreEmailBrand(slug: string): Promise<EmailBrand> {
  bodyFont: t?.fonts?.body || undefined,
  logo: t?.logo || null,
  };
+}
+
+/**
+ * A store's effective email brand. By default it inherits the storefront design; once the store
+ * saves a custom email design (via the Email design editor) that takes over. `{...inherited,
+ * ...saved}` so any field the renderer later adds still falls back gracefully.
+ */
+export async function getStoreEmailBrand(slug: string): Promise<EmailBrand> {
+ const inherited = await getStorefrontEmailBrand(slug);
+ const { getEmailBrandOverrides } = await import("./email-settings-db");
+ const saved = await getEmailBrandOverrides(slug).catch(() => null);
+ return saved ? { ...inherited, ...saved } : inherited;
 }
 
 // Lightweight, email-safe formatting for store-written emails (campaigns + automations). Stores
@@ -499,14 +544,21 @@ export function campaignEmailHtml(opts: { storeName: string; body: string; link?
  const header = b.logo
  ? `<img src="${b.logo}" alt="${escapeHtml(cleanName)}" style="max-height:44px;width:auto;display:inline-block;" />`
  : `<div style="font-family:${headStack};font-size:27px;font-weight:700;letter-spacing:-0.015em;color:${b.text};">${escapeHtml(cleanName)}</div>`;
+ const btnLabel = escapeHtml((b.buttonLabel || "Shop now").slice(0, 40)) || "Shop now";
+ const footer = b.footerText != null && b.footerText.trim()
+ ? escapeHtml(b.footerText.trim().slice(0, 400)).replace(/\{store\}/g, escapeHtml(cleanName)).replace(/\n/g, "<br />")
+ : `You're receiving this because you shopped with ${escapeHtml(cleanName)}.<br />Reply to this email to reach us.`;
+ const accentBar = b.showAccentBar === false ? "" : `<div style="height:5px;background:${b.accent};"></div>`;
+ const align = b.headerAlign === "left" ? "left" : "center";
+ const btnRadius = b.buttonStyle === "pill" ? "999px" : b.buttonStyle === "square" ? "0" : "9px";
  return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />${fontsHref(b)}</head>
  <body style="margin:0;padding:0;background:#f1efeb;font-family:${bodyStack};color:${b.text};-webkit-font-smoothing:antialiased;">
  <div style="padding:30px 14px 40px;">
  <div style="max-width:600px;margin:0 auto;background:${surface};border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -8px rgba(0,0,0,0.12);">
- <div style="height:5px;background:${b.accent};"></div>
- <div style="padding:36px 44px 14px;text-align:center;">${header}</div>
- <div style="padding:12px 44px 34px;">${content}${cta ? `<div style="text-align:center;margin:32px 0 8px;"><a href="${cta}" style="display:inline-block;background:${b.accent};color:${btnText};text-decoration:none;padding:15px 38px;border-radius:9px;font-size:14px;font-weight:600;letter-spacing:0.02em;">Shop now</a></div>` : ""}</div>
- <div style="padding:22px 44px 34px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;line-height:1.6;color:#a29b93;text-align:center;">You're receiving this because you shopped with ${escapeHtml(cleanName)}.<br />Reply to this email to reach us.</div>
+ ${accentBar}
+ <div style="padding:36px 44px 14px;text-align:${align};">${header}</div>
+ <div style="padding:12px 44px 34px;">${content}${cta ? `<div style="text-align:${align};margin:32px 0 8px;"><a href="${cta}" style="display:inline-block;background:${b.accent};color:${btnText};text-decoration:none;padding:15px 38px;border-radius:${btnRadius};font-size:14px;font-weight:600;letter-spacing:0.02em;">${btnLabel}</a></div>` : ""}</div>
+ <div style="padding:22px 44px 34px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;line-height:1.6;color:#a29b93;text-align:center;">${footer}</div>
  </div>
  <div style="max-width:600px;margin:16px auto 0;text-align:center;font-size:11px;letter-spacing:0.04em;color:#c2bdb6;">Powered by VYA</div>
  </div></body></html>`;
@@ -1074,7 +1126,7 @@ export async function sendNewArrivalsEmail(
  // Hand-curated picks keep the exact order they were chosen; the automatic
  // selection gets grouped by brand for a nicer flow.
  const sortedProducts = preserveOrder ? products : sortByBrand(products).sorted;
- const subject = "Fresh drop alert, meet our new arrivals";
+ const subject = "Just in";
  // Cap at 25 pieces.
  const display = sortedProducts.slice(0, 25);
 

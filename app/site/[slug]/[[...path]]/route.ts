@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getCapturePage, getSiteCss } from "@/app/lib/site-capture-db";
 import { injectCart, injectCss, injectCollectionItems, prepareEditMode } from "@/app/lib/site-capture";
-import { captureStorefrontEntry } from "@/app/lib/store-visits-db";
+import { captureStorefrontEntry, recordStorePageview } from "@/app/lib/store-visits-db";
 import { recordSearch } from "@/app/lib/store-favorites-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getCollectionBySlug, listCollectionItems } from "@/app/lib/db/collections";
@@ -51,8 +51,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  }
 
  const css = await getSiteCss(slug).catch(() => "");
- // Record where this visitor came from (once per session, server-side).
+ // Record where this visitor came from (once per session, server-side) + this page view.
  const setCookie = await captureStorefrontEntry(req, slug);
+ const sid = req.cookies.get("via_sess")?.value || (setCookie ? /via_sess=([^;]+)/.exec(setCookie)?.[1] || null : null);
+ const pageType = pathname === "/" || pathname === "" ? "home" : /\/products?\//.test(pathname) ? "product" : /\/collections?\//.test(pathname) ? "collection" : "page";
+ await recordStorePageview({ storeSlug: slug, path: pathname || "/", pageType, sessionId: sid, surface: "storefront" }).catch(() => {});
  const headers: Record<string, string> = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" };
  if (setCookie) headers["Set-Cookie"] = setCookie;
  return new Response(injectCss(injectCart(html), css), { headers });

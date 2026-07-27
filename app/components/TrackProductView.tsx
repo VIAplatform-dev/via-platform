@@ -33,6 +33,26 @@ export default function TrackProductView({
  body: JSON.stringify({ productId }),
  }).catch(() => {});
 
+ // Per-store VYA-marketplace analytics: log this product-page view for the store, and (once per
+ // session per store) the acquisition source — so marketplace discovery counts as "Discovered via VYA".
+ try {
+ const key = `vs_${storeSlug}`;
+ const entry = !sessionStorage.getItem(key);
+ if (entry) sessionStorage.setItem(key, "1");
+ const params = new URLSearchParams(window.location.search);
+ const payload = JSON.stringify({
+ storeSlug,
+ path: window.location.pathname,
+ pageType: "product",
+ title,
+ entry,
+ referrer: document.referrer || null,
+ utmSource: params.get("utm_source"),
+ utmMedium: params.get("utm_medium"),
+ });
+ fetch("/api/track/store-visit", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload, keepalive: true }).catch(() => {});
+ } catch { /* ignore */ }
+
  trackViewItem(
  {
  itemId: productId,

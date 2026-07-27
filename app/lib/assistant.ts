@@ -3,7 +3,7 @@
 // where the "tools" are thin wrappers around operations we already have. Every tool
 // runs scoped to ONE store slug (resolved from the seller's session by the route), so
 // the Sidekick can only ever act on that seller's own store.
-import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront } from "./storefront-db";
+import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, revertStorefrontTheme } from "./storefront-db";
 import { getTemplate, STOREFRONT_TEMPLATES, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
 import { makeBlock, sanitizeBlocks, sanitizePages, pageSlugify, BLOCK_TYPE_IDS } from "./storefront-blocks";
 import { getListingsByStore, updateListing } from "./listings-db";
@@ -12,6 +12,12 @@ import { list } from "@vercel/blob";
 import type { StorefrontTheme } from "./store-import";
 import { AI_MODELS } from "./ai-models";
 import { getMemories, addMemory, forgetMemory } from "./assistant-memory-db";
+import { getStoreEmailBrand, getStorefrontEmailBrand, sanitizeBrand } from "./email";
+import { setEmailBrandOverrides, revertEmailBrand } from "./email-settings-db";
+import { getStoreAnalytics } from "./store-analytics-db";
+import { listSellerOrders } from "./db/orders";
+import { getSellerBySlug } from "./db/sellers";
+import { listCustomerProfiles } from "./store-customers-db";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = AI_MODELS.assistant;
@@ -38,6 +44,10 @@ async function anthropic(body: any): Promise<any> {
 
 const templateIds = STOREFRONT_TEMPLATES.map((t) => t.id);
 
+// Fonts the email renderer can load (serif display faces for headings, sans for body).
+const EMAIL_HEADING_FONTS = ["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces", "EB Garamond", "Lora", "DM Serif Display", "Libre Baskerville", "Prata", "Spectral"];
+const EMAIL_BODY_FONTS = ["Inter", "Work Sans", "DM Sans", "Nunito Sans", "Mulish", "Karla", "Lato"];
+
 const TOOLS = [
  { name: "get_storefront", description: "Read the store's current storefront: design (template, colors, fonts), handle, tagline, hero image, and whether it's live.", input_schema: { type: "object", properties: {} } },
  { name: "update_storefront_design", description: "Change the storefront look. Provide any of: a starter template id, colors (hex like #1a1a1a), fonts. Confirm with the seller before calling this.", input_schema: { type: "object", properties: { template: { type: "string", enum: templateIds }, colors: { type: "object", properties: { bg: { type: "string" }, text: { type: "string" }, accent: { type: "string" } } }, fonts: { type: "object", properties: { heading: { type: "string", enum: HEADING_FONTS }, body: { type: "string", enum: BODY_FONTS } } } } } },
@@ -56,6 +66,12 @@ const TOOLS = [
  { name: "create_page", description: "Create a new storefront page (e.g. About, FAQ, Shipping & Returns). Provide a title and optionally initial blocks (same types/props/style as set_layout). It's linked in the nav automatically. Write real copy. Confirm first.", input_schema: { type: "object", properties: { title: { type: "string" }, blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["title"] } },
  { name: "set_page_layout", description: "Replace all sections on a page (by slug) with a new set of blocks. Use slug 'shop' to edit the SHOP page's intro content — sections (heading, text, image, gallery, etc.) shown ABOVE the store's auto product grid; the products list themselves below automatically, so don't add a products/featured section there. For any other slug it's an extra page (About, FAQ…). Confirm first.", input_schema: { type: "object", properties: { slug: { type: "string" }, blocks: { type: "array", items: { type: "object", properties: { type: { type: "string", enum: BLOCK_TYPE_IDS }, props: { type: "object" }, style: { type: "object", properties: { bg: { type: "string" } } } }, required: ["type"] } } }, required: ["slug", "blocks"] } },
  { name: "delete_page", description: "Delete an extra page by slug. Confirm first.", input_schema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+ { name: "get_email_design", description: "Read the store's current marketing-email design — the look EVERY campaign and automation email sends with: colours (accent/background/text), heading & body fonts, logo, button label + shape, footer note, alignment, and whether the top colour bar shows. Also returns the storefront brand it can snap back to.", input_schema: { type: "object", properties: {} } },
+ { name: "get_business_snapshot", description: "Read a live snapshot of the store's performance so you can answer questions about sales, revenue, traffic, inventory, and top products/brands. Returns revenue, orders, AOV, views, favourites, inventory counts, top brands/categories, recent sales, customers/buyers — for the last N days (default 30). Use this for any 'how am I doing', 'what's my revenue', 'what's selling', 'how much traffic' question.", input_schema: { type: "object", properties: { days: { type: "number", description: "look-back window in days (default 30; omit for 30)" } } } },
+ { name: "get_orders", description: "List the store's recent orders (sales): order number, item, amount, status (paid/shipped/delivered/refunded), buyer email, and date. Use for order questions — 'what did I sell', 'any orders to ship', 'my last order', order lookups.", input_schema: { type: "object", properties: { limit: { type: "number", description: "how many recent orders (default 20, max 50)" } } } },
+ { name: "get_customers", description: "List the store's customers with their order count, total spent, subscription status, location and last-order date. Use for customer questions — 'who are my top customers', 'how many subscribers', 'has this person bought before', VIP/repeat-buyer analysis.", input_schema: { type: "object", properties: { limit: { type: "number", description: "how many customers (default 30, max 100), sorted by spend" } } } },
+ { name: "revert_last_change", description: "Undo the LAST change you made — to the storefront design OR the email design. Pass target 'storefront' or 'email'. Use it the moment a seller says 'undo', 'revert', 'go back', or 'I don't like that'. Do it immediately, no confirmation needed. One level of undo (calling it again redoes the change).", input_schema: { type: "object", properties: { target: { type: "string", enum: ["storefront", "email"] } }, required: ["target"] } },
+ { name: "update_email_design", description: "Change how the store's marketing emails look (applies to every campaign + automation at once). Pass ONLY the fields to change — everything else is kept. This is how you redesign the email or translate an inspiration email a seller likes into their own brand: pull the palette, type and mood from what they describe or upload, then set it here. Set reset:true to discard the custom design and go back to matching their storefront. State what you'll change in one line and confirm before calling.", input_schema: { type: "object", properties: { accent: { type: "string", description: "hex like #1a1a1a — button, links & top bar" }, background: { type: "string", description: "hex — the email card background (try a soft cream/off-white or a dark tone)" }, text: { type: "string", description: "hex — body text colour" }, headingFont: { type: "string", enum: EMAIL_HEADING_FONTS }, bodyFont: { type: "string", enum: EMAIL_BODY_FONTS }, logo: { type: "string", description: "logo image URL, or empty string to show the store name as a wordmark instead" }, buttonLabel: { type: "string", description: "CTA button text, e.g. 'Shop the drop'" }, footerText: { type: "string", description: "the small footer note; use {store} for the store name" }, buttonStyle: { type: "string", enum: ["rounded", "pill", "square"] }, headerAlign: { type: "string", enum: ["center", "left"] }, showAccentBar: { type: "boolean", description: "the thin colour bar across the very top" }, reset: { type: "boolean", description: "discard the custom design and revert to the storefront brand" } } } },
  { name: "list_captured_pages", description: "List the pages of the seller's CAPTURED site (their real existing site, hosted on VYA) by path. Only relevant if they brought their own site over rather than building from sections.", input_schema: { type: "object", properties: {} } },
  { name: "edit_captured_page", description: "Edit copy on one page of the captured site: replace every occurrence of `find` with `replace` in that page's HTML (path from list_captured_pages). Use for wording changes, fixing a typo, updating a banner/announcement. `find` must be exact visible text. Confirm first.", input_schema: { type: "object", properties: { path: { type: "string" }, find: { type: "string" }, replace: { type: "string" } }, required: ["path", "find", "replace"] } },
  { name: "style_captured_site", description: "Apply site-wide custom CSS to the captured site — injected over the original styles on every page, for color/font/spacing/button tweaks. Pass the full CSS to set (replaces any previous custom CSS); pass empty css to clear. Confirm first.", input_schema: { type: "object", properties: { css: { type: "string" } }, required: ["css"] } },
@@ -269,6 +285,80 @@ async function runTool(slug: string, name: string, input: any): Promise<any> {
  await setStorefrontTheme(slug, theme);
  return { ok: true, remaining: next.map((p) => p.slug) };
  }
+ case "get_business_snapshot": {
+ const days = Number.isFinite(input.days) && input.days > 0 ? Math.min(365, Math.round(input.days)) : 30;
+ const a = await getStoreAnalytics(slug, days);
+ const usd = (c: number) => Math.round((c || 0) / 100);
+ return {
+ periodDays: days,
+ revenueUsd: usd(a.revenueCents), orders: a.orders, aovUsd: usd(a.aovCents),
+ priorPeriod: { revenueUsd: usd(a.prior.revenueCents), orders: a.prior.orders },
+ traffic: { sessions: a.sessions, productViews: a.productViews, favorites: a.favorites },
+ customers: { total: a.customers, buyers: a.buyers, newBuyers: a.newBuyers, returningBuyers: a.returningBuyers },
+ inventory: { active: a.inventory.active, draft: a.inventory.draft, sold: a.inventory.sold, activeValueUsd: usd(a.inventory.activeValueCents) },
+ topBrands: a.topBrands.slice(0, 8).map((b) => ({ brand: b.brand, sold: b.sold, revenueUsd: usd(b.revenueCents) })),
+ topCategories: a.topCategories.slice(0, 8).map((c) => ({ category: c.category, sold: c.sold, revenueUsd: usd(c.revenueCents) })),
+ topSearches: a.topSearches.slice(0, 10),
+ recentSales: a.recentSales.slice(0, 8).map((s) => ({ title: s.title, amountUsd: usd(s.amountCents), at: s.at })),
+ };
+ }
+ case "get_orders": {
+ const seller = await getSellerBySlug(slug);
+ if (!seller) return { orders: [], note: "No seller record found." };
+ const limit = Number.isFinite(input.limit) && input.limit > 0 ? Math.min(50, Math.round(input.limit)) : 20;
+ const orders = await listSellerOrders(seller.id);
+ return {
+ count: orders.length,
+ orders: orders.slice(0, limit).map((o) => ({ orderNo: `#${1000 + o.orderNo}`, item: o.itemTitle, amountUsd: Math.round((o.amountCents || 0) / 100), status: o.status, buyer: o.buyerEmail, date: (o.paidAt || o.createdAt)?.toISOString?.() ?? null })),
+ };
+ }
+ case "get_customers": {
+ const limit = Number.isFinite(input.limit) && input.limit > 0 ? Math.min(100, Math.round(input.limit)) : 30;
+ const profiles = await listCustomerProfiles(slug);
+ const sorted = [...profiles].sort((a, b) => b.spentCents - a.spentCents);
+ return {
+ total: profiles.length,
+ subscribers: profiles.filter((p) => p.subscribed).length,
+ customers: sorted.slice(0, limit).map((p) => ({ name: p.name, email: p.email, orders: p.orders, spentUsd: Math.round((p.spentCents || 0) / 100), subscribed: p.subscribed, location: p.location, lastOrderAt: p.lastOrderAt })),
+ };
+ }
+ case "revert_last_change": {
+ if (input.target === "email") {
+ const r = await revertEmailBrand(slug);
+ return r.reverted ? { ok: true, target: "email", note: r.brand ? "Restored the previous email design." : "Email design is back to matching the storefront." } : { ok: true, note: "Nothing to revert on the email design yet." };
+ }
+ const ok = await revertStorefrontTheme(slug);
+ return { ok: true, target: "storefront", note: ok ? "Reverted the last storefront change." : "Nothing to revert on the storefront yet." };
+ }
+ case "get_email_design": {
+ const [brand, storefront] = await Promise.all([getStoreEmailBrand(slug), getStorefrontEmailBrand(slug)]);
+ return { brand, storefrontBrand: storefront, headingFonts: EMAIL_HEADING_FONTS, bodyFonts: EMAIL_BODY_FONTS };
+ }
+ case "update_email_design": {
+ if (input.reset) {
+ await setEmailBrandOverrides(slug, null);
+ return { ok: true, reset: true, brand: await getStorefrontEmailBrand(slug) };
+ }
+ const current = await getStoreEmailBrand(slug);
+ const merged = {
+ ...current,
+ ...(input.accent != null ? { accent: input.accent } : {}),
+ ...(input.background != null ? { bg: input.background } : {}),
+ ...(input.text != null ? { text: input.text } : {}),
+ ...(input.headingFont != null ? { headingFont: input.headingFont } : {}),
+ ...(input.bodyFont != null ? { bodyFont: input.bodyFont } : {}),
+ ...(input.buttonLabel != null ? { buttonLabel: input.buttonLabel } : {}),
+ ...(input.footerText != null ? { footerText: input.footerText } : {}),
+ ...(input.buttonStyle != null ? { buttonStyle: input.buttonStyle } : {}),
+ ...(input.headerAlign != null ? { headerAlign: input.headerAlign } : {}),
+ ...(input.showAccentBar != null ? { showAccentBar: !!input.showAccentBar } : {}),
+ ...(input.logo != null ? { logo: /^https?:\/\//i.test(String(input.logo)) ? String(input.logo) : null } : {}),
+ };
+ const clean = sanitizeBrand(merged);
+ if (!clean) return { error: "Couldn’t build that design." };
+ await setEmailBrandOverrides(slug, clean);
+ return { ok: true, applied: clean };
+ }
  case "remember_fact": {
  const fact = String(input.fact ?? "").trim();
  const saved = await addMemory(slug, fact);
@@ -294,7 +384,12 @@ You can:
 - Build the storefront page out of sections (blocks) — add, edit, reorder, and remove an announcement bar, hero banner, featured-products grid, text, image, gallery, or newsletter. This is how you "build" the page when a seller asks for things like "add a sale banner" or "put an about section at the bottom." Give a section a colored background with style.bg ('accent', 'dark', or a #hex).
 - Create and manage additional pages (About, FAQ, Shipping & Returns, etc.) with create_page / list_pages / set_page_layout / delete_page. Extra pages are built from the same sections and are linked in the nav automatically.
 - Help with listings — list inventory, write and improve product descriptions, and edit titles, prices, and descriptions.
+- Design their marketing emails — the look EVERY campaign and automation sends with: colours, heading & body fonts, logo, button label + shape, footer note, alignment, and the top accent bar (get_email_design / update_email_design). By default emails inherit the storefront brand; once you save a change it becomes their custom email design (update with reset:true snaps back to the storefront). This is how you redesign the email flow when a seller asks.
+- Answer anything about how the business is doing — pull a live snapshot (revenue, orders, AOV, traffic, top brands/categories, inventory, customers) with get_business_snapshot, list recent orders with get_orders, and list/rank customers with get_customers. Use these for any sales, revenue, traffic, order-lookup, or customer question instead of guessing.
+- Undo your last change to the storefront or the email design with revert_last_change — do it instantly when the seller says "undo" / "revert" / "go back."
 - Remember across conversations — when the seller shares a preference, their brand voice, or a decision worth keeping, save it with remember_fact so you recall it next time. Everything you already remember is given to you at the start of each chat; use it and don't re-ask.
+
+Inspiration images: sellers can attach pictures to the chat — an email they like, a storefront, a moodboard, a colour palette, a product. When they do, actually LOOK: pull the dominant colours as hex values, read the type feel (serif vs sans, elegant vs bold vs playful), the spacing, and the overall mood. Then propose a concrete design in a line or two ("warm cream background, near-black Cormorant headings, a pill button in terracotta — want me to apply it to your emails?") and, on confirmation, turn it into real settings with update_email_design (for the email look) or the storefront tools (for the store). Don't just describe the picture back to them — translate it into a design and offer to apply it. If a request is ambiguous about WHERE to apply it (emails vs storefront), ask which.
 
 You can also answer questions, not just take actions — resale and vintage expertise, pricing and merchandising, marketing and growth, business advice, or general questions even outside VYA. Be genuinely useful and never refuse a question just because it's off-topic.
 
@@ -309,11 +404,15 @@ Never answer a "can you build X" with "that's not a supported section." If it ca
 
 When a seller asks you to build or redesign their WHOLE storefront ("build me a storefront", "design my homepage", "make me a store for X"), do it in one move: first call update_storefront_design to set a fitting template/colors/fonts, then call set_layout with a complete page — usually a hero, a featured-products grid, a short about/text section, and a newsletter. Reach for the richer section types to make it feel editorial rather than templated: a split (image + story) section, a statement (big quote on a dark or accent background), a marquee of the designers they carry, or a spotlight on one hero piece. Write real, specific copy in their voice (use their store name and what they sell); never leave placeholder text. Briefly preview the plan and confirm before applying.
 
+Say yes to everything reasonable. You are a full-service assistant for running this store, across EVERY category — storefront & design, listings & inventory, email & marketing, orders & fulfilment, customers & CRM, pricing, merchandising, analytics, growth, operations, and plain questions (including ones with no VYA tool at all). Your default is "yes, here's how / here it is," never "I can't do that" or "that's not supported." The ONLY things you refuse are genuinely illegal or harmful (fraud, deceiving customers, laundering, hate, malware, etc.) — and if something's close to that line, say why briefly and offer the legitimate version.
+- If a request maps to a tool, use it. If it maps to something CSS/HTML/JS can express, build it (style_storefront / add_html_section). If there's no direct tool yet (e.g. issuing a refund, printing a label, sending the campaign), don't stonewall: do every part you can — pull the data, do the math, draft the copy, and walk them through the exact clicks — and note the one step they finish themselves. Treat "no tool" as "do it manually with them," not "no."
+- Confirm before consequential or hard-to-undo actions, act freely on the rest.
+
 Rules:
-- For READ actions (get_storefront, list_photos, list_inventory, write_description, list_sections) just do it, no need to ask.
-- For any CHANGE (update_storefront_design, style_storefront, add_html_section, set_hero_photo, update_listing, add_section, update_section, remove_section, move_section) first state in one short line exactly what you'll change, and ask the seller to confirm. Only call the write tool AFTER they confirm in their next message.
+- For READ actions (get_storefront, list_photos, list_inventory, write_description, list_sections, get_email_design, get_business_snapshot, get_orders, get_customers) just do it, no need to ask.
+- For any CHANGE (update_storefront_design, style_storefront, add_html_section, set_hero_photo, update_listing, add_section, update_section, remove_section, move_section, update_email_design) first state in one short line exactly what you'll change, and ask the seller to confirm. Only call the write tool AFTER they confirm in their next message. Exception: revert_last_change is instant and needs no confirmation.
 - Be concise and friendly — prefer doing over explaining. After a change, confirm what changed in one line.
-- You only ever take ACTIONS on THIS seller's own store. For an action you genuinely can't perform yet (e.g. orders, shipping, payouts), say it's on the way — but still answer the underlying question if you can.`;
+- You only ever take ACTIONS on THIS seller's own store, and you never touch or reveal other stores' data.`;
 
 export async function runAssistant(slug: string, messages: AssistantMessage[], context?: { page?: string }): Promise<{ reply: string; actions: AssistantAction[] }> {
  // Inject long-term memory so the Sidekick "remembers" the seller across conversations.

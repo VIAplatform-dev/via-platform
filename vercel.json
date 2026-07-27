@@ -82,7 +82,7 @@
     },
     {
       "path": "/api/cron/send-new-arrivals",
-      "schedule": "0 20 * * 2"
+      "schedule": "0 21 * * 2"
     },
     {
       "path": "/api/cron/monthly-report",

@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { Card, CardHeader, PageHeader, Button, Input, Field, cn } from "../ui";
 import { SHIPPING_TIERS } from "@/app/lib/shipping-tiers";
 
 type ShipFrom = { name?: string; street1?: string; street2?: string; city?: string; state?: string; zip?: string; country?: string; phone?: string };
 type ShipMode = "buyer_pays" | "store_pays" | "free_over";
+type DnsRecord = { name?: string; type?: string; value?: string };
+type SenderSettings = { fromName: string | null; replyTo: string | null; domain: string | null; sendingEmail: string | null; verified: boolean; dnsRecords: DnsRecord[] | null };
+type SenderInfo = { fromName: string; fromAddress: string; replyTo?: string | null; verified?: boolean } | null;
 
 type Brief = {
  pricing: { stance: string; targetPct: string; goal: string; notes: string };
@@ -29,7 +33,7 @@ const ACCENT = "#5D0F17";
 const ta = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-stone-400 focus:ring-2 focus:ring-stone-900/[0.06]";
 
 export default function SettingsPage() {
- const [tab, setTab] = useState<"brief" | "pricing" | "shipping">("brief");
+ const [tab, setTab] = useState<"brief" | "pricing" | "shipping" | "sender">("brief");
 
  // Pricing floor
  const [pct, setPct] = useState("");
@@ -49,7 +53,25 @@ export default function SettingsPage() {
  const [sSaved, setSSaved] = useState(false);
  const [sErr, setSErr] = useState<string | null>(null);
 
+ // Sender — email identity + (optional) own-domain authentication
+ const [snd, setSnd] = useState<SenderSettings | null>(null);
+ const [sender, setSender] = useState<SenderInfo>(null);
+ const [fromName, setFromName] = useState("");
+ const [replyTo, setReplyTo] = useState("");
+ const [domain, setDomain] = useState("");
+ const [eBusy, setEBusy] = useState<string | null>(null);
+ const [eMsg, setEMsg] = useState<string | null>(null);
+ const [copied, setCopied] = useState<string | null>(null);
+
+ function applySender(d: { settings: SenderSettings; sender: SenderInfo }) {
+ setSnd(d.settings); setSender(d.sender);
+ setFromName(d.settings?.fromName || d.sender?.fromName || "");
+ setReplyTo(d.settings?.replyTo || d.sender?.replyTo || "");
+ }
+
  useEffect(() => {
+ const t = new URLSearchParams(window.location.search).get("tab");
+ if (t === "brief" || t === "pricing" || t === "shipping" || t === "sender") { const id = setTimeout(() => setTab(t), 0); void id; }
  fetch("/api/store/pricing").then((r) => (r.ok ? r.json() : null)).then((d) => d && setPct(String(d.minMarkupPct))).catch(() => {});
  fetch("/api/store/brief").then((r) => (r.ok ? r.json() : null)).then((d) => {
   const x = d?.brief;
@@ -66,7 +88,40 @@ export default function SettingsPage() {
   setThreshold(d.freeThresholdUsd != null ? String(d.freeThresholdUsd) : "");
   setFrom(d.shipFrom || { country: "US" });
  }).catch(() => {});
+ fetch("/api/store/email-domain").then((r) => (r.ok ? r.json() : null)).then((d) => d && applySender(d)).catch(() => {});
  }, []);
+
+ async function saveIdentity() {
+ setEBusy("identity"); setEMsg(null);
+ try {
+  const r = await fetch("/api/store/email-domain", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fromName, replyTo }) });
+  const d = await r.json();
+  if (r.ok) { applySender(d); setEMsg("Saved."); } else setEMsg(d.error || "Couldn’t save.");
+ } catch { setEMsg("Couldn’t save."); }
+ setEBusy(null);
+ }
+ async function addDomain() {
+ setEBusy("domain"); setEMsg(null);
+ try {
+  const r = await fetch("/api/store/email-domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain }) });
+  const d = await r.json();
+  if (r.ok) { setSnd(d.settings); setDomain(""); } else setEMsg(d.error || "Couldn’t add domain.");
+ } catch { setEMsg("Couldn’t add domain."); }
+ setEBusy(null);
+ }
+ async function verifyDomain() {
+ setEBusy("verify"); setEMsg(null);
+ try {
+  const r = await fetch("/api/store/email-domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify" }) });
+  const d = await r.json();
+  if (r.ok) { setSnd(d.settings); setSender(d.sender); setEMsg(d.verified ? "Verified — emails now send from your domain." : "Not verified yet — DNS can take a bit to propagate."); }
+  else setEMsg(d.error || "Couldn’t verify.");
+ } catch { setEMsg("Couldn’t verify."); }
+ setEBusy(null);
+ }
+ async function copyDns(key: string, v: string) {
+ try { await navigator.clipboard.writeText(v); setCopied(key); setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500); } catch { /* ignore */ }
+ }
 
  async function savePricing() {
  setPBusy(true); setPSaved(false);
@@ -112,7 +167,7 @@ export default function SettingsPage() {
 
   {/* Tabs */}
   <div className="mb-6 flex gap-5 border-b border-stone-200">
-  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["shipping", "Shipping"]] as const).map(([k, lbl]) => (
+  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["shipping", "Shipping"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
    <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 pb-2.5 text-[13px] font-medium transition ${tab === k ? "border-[#5D0F17] text-[#5D0F17]" : "border-transparent text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
   ))}
   </div>
@@ -282,6 +337,64 @@ export default function SettingsPage() {
    </div>
   </div>
   </Card>
+  )}
+
+  {/* Email sender — the identity marketing emails send from (moved here from Marketing) */}
+  {tab === "sender" && (
+  <div className="space-y-5">
+   <Card>
+   <CardHeader title="Sender identity" subtitle="How your marketing emails send — the name customers see and where replies go. Used on every campaign & automation." />
+   <div className="space-y-4 px-5 py-4">
+    <Field label="From name"><Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your store name" /></Field>
+    <Field label="Reply-to email" hint="Where customer replies land."><Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="you@yourstore.com" /></Field>
+    <div className="flex flex-wrap items-center gap-3">
+    <Button onClick={saveIdentity} disabled={eBusy === "identity"}>{eBusy === "identity" ? "Saving…" : "Save"}</Button>
+    {sender && <span className="text-xs text-stone-500">Currently sends as <b className="text-stone-700">{sender.fromName}</b> &lt;{sender.fromAddress}&gt;</span>}
+    </div>
+   </div>
+   </Card>
+
+   <Card>
+   <CardHeader title="Send from your own domain" subtitle="Authenticate your domain so emails send FROM your address — better trust & deliverability. Optional." />
+   <div className="px-5 py-4">
+    {snd?.verified ? (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+     <p className="text-[13px] font-medium text-emerald-800">✓ {snd.domain} is verified</p>
+     <p className="mt-0.5 text-xs text-emerald-700">Emails now send from <b>{snd.sendingEmail}</b>.</p>
+    </div>
+    ) : snd?.domain ? (
+    <>
+     <p className="mb-3 text-[13px] text-stone-600">Add these records to <b>{snd.domain}</b>’s DNS (at your registrar), then verify.</p>
+     <div className="overflow-x-auto rounded-lg border border-stone-200">
+     <table className="w-full text-[12px]">
+      <thead><tr className="border-b border-stone-200 bg-stone-50/60 text-left text-stone-500"><th className="px-3 py-1.5 font-medium">Type</th><th className="px-3 py-1.5 font-medium">Name</th><th className="px-3 py-1.5 font-medium">Value</th></tr></thead>
+      <tbody>
+      {(snd.dnsRecords || []).map((rec, i) => (
+       <tr key={i} className="border-b border-stone-100 last:border-0">
+       <td className="whitespace-nowrap px-3 py-1.5 font-mono text-stone-700">{rec.type}</td>
+       <td className="px-3 py-1.5 font-mono text-stone-600"><span className="flex items-center gap-1"><span className="max-w-[130px] truncate">{rec.name}</span><button onClick={() => copyDns(`n${i}`, rec.name || "")} className="text-stone-300 hover:text-stone-600">{copied === `n${i}` ? <Check size={12} /> : <Copy size={12} />}</button></span></td>
+       <td className="px-3 py-1.5 font-mono text-stone-600"><span className="flex items-center gap-1"><span className="max-w-[190px] truncate">{rec.value}</span><button onClick={() => copyDns(`v${i}`, rec.value || "")} className="text-stone-300 hover:text-stone-600">{copied === `v${i}` ? <Check size={12} /> : <Copy size={12} />}</button></span></td>
+       </tr>
+      ))}
+      </tbody>
+     </table>
+     </div>
+     <div className="mt-3 flex items-center gap-3">
+     <Button onClick={verifyDomain} disabled={eBusy === "verify"}>{eBusy === "verify" ? "Checking…" : "Verify domain"}</Button>
+     <span className="text-[11px] text-stone-400">DNS changes can take minutes to a few hours.</span>
+     </div>
+    </>
+    ) : (
+    <div className="flex flex-wrap items-end gap-2">
+     <div className="flex-1"><Field label="Your domain"><Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="yourstore.com" /></Field></div>
+     <Button onClick={addDomain} disabled={eBusy === "domain" || !domain.trim()}>{eBusy === "domain" ? "Adding…" : "Authenticate"}</Button>
+    </div>
+    )}
+    {eMsg && <p className="mt-3 text-xs text-stone-600">{eMsg}</p>}
+    <p className="mt-3 text-[11px] text-stone-400">Until you authenticate a domain, emails send from your name via VYA’s shared sending domain — replies still route to you.</p>
+   </div>
+   </Card>
+  </div>
   )}
 
   <p className="mt-4 text-xs text-stone-400">You can also just tell the VYA agent — e.g. “price my archival pieces higher” or “free shipping over $150” — and it’ll set these for you.</p>

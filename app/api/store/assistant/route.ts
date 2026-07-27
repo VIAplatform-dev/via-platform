@@ -37,9 +37,20 @@ export async function POST(request: NextRequest) {
  try {
  const { reply, actions } = await runAssistant(slug, messages, { page: typeof body?.page === "string" ? body.page : undefined });
  // Persist the visible thread (plain text turns only — not the tool-call internals).
+ // Image turns become a short text trace ("[image] <caption>") so a reloaded chat reads sensibly.
+ const asText = (content: unknown): string => {
+ if (typeof content === "string") return content;
+ if (Array.isArray(content)) {
+ const blocks = content as Array<{ type?: string; text?: string }>;
+ const text = blocks.filter((b) => b?.type === "text").map((b) => b.text || "").join(" ").trim();
+ const imgs = blocks.filter((b) => b?.type === "image").length;
+ return (imgs ? `[${imgs} image${imgs > 1 ? "s" : ""}]${text ? " " : ""}` : "") + text;
+ }
+ return "";
+ };
  const thread: ThreadMessage[] = [...messages, { role: "assistant", content: reply }]
- .filter((m) => typeof m.content === "string")
- .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content) }));
+ .map((m) => ({ role: (m.role === "assistant" ? "assistant" : "user") as "assistant" | "user", content: asText(m.content) }))
+ .filter((m) => m.content);
  await saveThread(slug, thread);
  return NextResponse.json({ reply, actions });
  } catch (e) {
