@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, Sparkles } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, StatusPill } from "../ui";
+import { AdminPage, AdminHeader, TechCard, StatusPill, TechButton } from "../ui";
 
 type Heat = { brand: string; rank: number; momentumPct: number | null; isBreakout: boolean; heat: number };
 type Cat = { key: string; rank: number; momentumPct: number | null; isBreakout: boolean };
@@ -12,6 +12,19 @@ type Resale = { brand: string; soldCount: number; medianPriceCents: number | nul
 type IgBuzz = { brand: string; buzzScore: number; sampleCount: number; momentumPct: number | null };
 type Play = { brand: string; action: "source" | "price" | "watch" | "cool"; reason: string; suggestedPriceCents: number | null; carried: boolean };
 type Data = { rising: Heat[]; categories: Cat[]; yourBrands: YourBrand[]; googleTrends: GTrend[]; resaleMarket: Resale[]; igBuzz: IgBuzz[]; playbook: Play[]; webConfigured: boolean; socialConfigured: boolean; generatedAt: string };
+type SourcePick = { segmentType: string; segmentValue: string; score: number; confidence: "high" | "medium"; trend: "rising" | "falling" | "flat"; reason: string };
+type SourceNowData = { picks: SourcePick[]; asOfDate: string | null; empty?: boolean; locked?: boolean };
+type DemandResult = { segmentType: string; segmentValue: string; demandIndex: number; hasPriceData: boolean; priceP25: number | null; priceMedian: number | null; priceP75: number | null; verdict: { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string } };
+type BuyVerdict = { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string; basis?: string };
+type BuyEbay = { medianPrice: number | null; p25: number | null; p75: number | null; activeCount: number | null; soldPer30d: number | null; priceMomentumPct: number | null };
+type BuyGoogle = { momentumPct: number | null; avgInterest: number; breakout: boolean };
+type CultureTrend = { keyword: string; growthWow: number | null };
+type CultureData = { trends: CultureTrend[]; empty?: boolean; locked?: boolean };
+
+const VERDICT_TONE: Record<DemandResult["verdict"]["rating"], "live" | "info" | "pending" | "neutral"> = {
+ source: "live", "buy-sharp": "info", selective: "pending", pass: "neutral",
+};
+const vmoney = (n: number | null) => (n == null ? "—" : `$${Math.round(n).toLocaleString()}`);
 
 const PLAY_STYLE: Record<Play["action"], { label: string; tone: "live" | "info" | "pending" | "neutral"; rail: string }> = {
  source: { label: "Source", tone: "live", rail: "bg-[var(--accent-bright,#2fd39b)]" },
@@ -46,11 +59,31 @@ function Momentum({ pct, breakout }: { pct: number | null; breakout?: boolean })
 
 export default function TrendsPage() {
  const [data, setData] = useState<Data | null>(null);
+ const [sourceNow, setSourceNow] = useState<SourceNowData | null>(null);
+ const [culture, setCulture] = useState<CultureData | null>(null);
  const [loading, setLoading] = useState(true);
+ const [buyQ, setBuyQ] = useState("");
+ const [buyResults, setBuyResults] = useState<DemandResult[] | null>(null);
+ const [buyVerdict, setBuyVerdict] = useState<BuyVerdict | null>(null);
+ const [buyEbay, setBuyEbay] = useState<BuyEbay | null>(null);
+ const [buyGoogle, setBuyGoogle] = useState<BuyGoogle | null>(null);
+ const [buyLoading, setBuyLoading] = useState(false);
 
  useEffect(() => {
  fetch("/api/store/trends").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setData(d); setLoading(false); }).catch(() => setLoading(false));
+ // Source Now — from VYA's own marketplace data, so it works today (external signals are optional).
+ fetch("/api/store/source-now?window=30d").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setSourceNow(d); }).catch(() => {});
+ fetch("/api/store/culture-trends").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setCulture(d); }).catch(() => {});
  }, []);
+
+ async function runDemandSearch(q: string) {
+ if (q.trim().length < 2) { setBuyResults(null); setBuyVerdict(null); setBuyEbay(null); setBuyGoogle(null); return; }
+ setBuyLoading(true);
+ try {
+ const r = await fetch(`/api/store/demand-search?q=${encodeURIComponent(q.trim())}&window=30d`);
+ if (r.ok) { const d = await r.json(); setBuyResults(d.results ?? []); setBuyVerdict(d.verdict ?? null); setBuyEbay(d.ebay ?? null); setBuyGoogle(d.google ?? null); }
+ } finally { setBuyLoading(false); }
+ }
 
  return (
  <AdminPage>
@@ -59,6 +92,96 @@ export default function TrendsPage() {
  title="Trends"
  subtitle="Your sourcing & pricing playbook — VYA demand, Google Search, and real eBay resale prices read together into clear calls. The signals behind each call are below."
  />
+
+ {/* Source Now — the headline: what to buy right now, from VYA's own data (works before external signals are on). */}
+ {sourceNow && sourceNow.picks.length > 0 && (
+ <TechCard className="mb-6 p-5">
+ <div className="mb-1 flex items-center justify-between">
+ <p className="text-[13px] font-semibold text-stone-900">Source now</p>
+ <span className="text-[11px] uppercase tracking-wide text-stone-400">Rising demand · thin supply</span>
+ </div>
+ <p className="mb-3 text-[12px] text-stone-400">What to buy right now — where VYA buyers&apos; demand is rising and few stores carry it. The window to source before prices climb.</p>
+ <div className="space-y-2">
+ {sourceNow.picks.map((p) => (
+ <div key={`${p.segmentType}:${p.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
+ <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="Sourcing-opportunity score (0–100)">{Math.round(p.score)}</span>
+ <div className="min-w-0 flex-1">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[13px] font-semibold capitalize text-stone-900">{p.segmentValue}</span>
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">{p.segmentType}</span>
+ {p.trend === "rising" && <StatusPill tone="info">Rising</StatusPill>}
+ {p.confidence === "high" && <StatusPill tone="live">High confidence</StatusPill>}
+ </div>
+ <p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{p.reason}</p>
+ </div>
+ </div>
+ ))}
+ </div>
+ </TechCard>
+ )}
+
+ {/* Should I source this? — quick demand verdict on any brand / item type */}
+ <TechCard className="mb-6 p-5">
+ <p className="mb-1 text-[13px] font-semibold text-stone-900">Should I source this?</p>
+ <p className="mb-3 text-[12px] text-stone-400">Type a brand or item type — see if it&apos;s worth buying to resell.</p>
+ <form onSubmit={(e) => { e.preventDefault(); runDemandSearch(buyQ); }} className="flex items-center gap-2">
+ <input value={buyQ} onChange={(e) => setBuyQ(e.target.value)} placeholder="e.g. Cavalli, slip dress, Y2K, bags…" className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-[var(--accent)]" />
+ <TechButton type="submit">Check</TechButton>
+ </form>
+ {buyLoading && <p className="mt-3 text-[12px] text-stone-400">Checking…</p>}
+ {!buyLoading && buyVerdict && (
+ <div className="mt-3 space-y-2">
+ {/* Headline call — blends VYA demand with eBay comps; eBay leads when VYA's own signal is thin. */}
+ <div className="rounded-lg border border-stone-100 bg-white px-4 py-3">
+ <div className="flex flex-wrap items-center gap-2">
+ <StatusPill tone={VERDICT_TONE[buyVerdict.rating]}>{buyVerdict.headline}</StatusPill>
+ {buyGoogle && buyGoogle.momentumPct != null && <GChip pct={buyGoogle.momentumPct} breakout={buyGoogle.breakout} />}
+ </div>
+ <p className="mt-1 text-[12px] leading-relaxed text-stone-500">{buyVerdict.detail}</p>
+ {buyEbay && (buyEbay.medianPrice != null || buyEbay.activeCount != null || buyEbay.soldPer30d != null) && (
+ <p className="mt-1 text-[12px] text-stone-400">
+  eBay: {buyEbay.medianPrice != null ? `asks ~${vmoney(buyEbay.medianPrice)}` : "—"}
+  {buyEbay.p25 != null ? ` (${vmoney(buyEbay.p25)}–${vmoney(buyEbay.p75)})` : ""}
+  {buyEbay.activeCount != null ? ` · ${buyEbay.activeCount.toLocaleString()} listed` : ""}
+  {buyEbay.soldPer30d != null ? ` · ~${buyEbay.soldPer30d}/mo sold` : ""}
+  {buyEbay.priceMomentumPct != null ? ` · price ${buyEbay.priceMomentumPct >= 0 ? "+" : ""}${buyEbay.priceMomentumPct}%` : ""}
+ </p>
+ )}
+ </div>
+ {/* VYA's own demand matches (the local detail behind the call) */}
+ {buyResults && buyResults.map((r) => (
+ <div key={`${r.segmentType}:${r.segmentValue}`} className="rounded-lg border border-stone-100 bg-white px-4 py-3">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[13px] font-semibold capitalize text-stone-900">{r.segmentValue}</span>
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">{r.segmentType}</span>
+ <StatusPill tone={VERDICT_TONE[r.verdict.rating]}>{r.verdict.headline}</StatusPill>
+ </div>
+ <p className="mt-0.5 text-[12px] text-stone-500">{r.verdict.detail}</p>
+ <p className="mt-1 text-[12px] text-stone-400">Demand {Math.round(r.demandIndex)}/100 · Market asking {r.hasPriceData ? `${vmoney(r.priceMedian)} (${vmoney(r.priceP25)}–${vmoney(r.priceP75)})` : "—"}</p>
+ </div>
+ ))}
+ </div>
+ )}
+ </TechCard>
+
+ {/* Rising in culture — Pinterest fashion trends. Hidden until Pinterest is configured. */}
+ {culture && culture.trends.length > 0 && (
+ <TechCard className="mb-6 p-5">
+ <div className="mb-1 flex items-center justify-between">
+ <p className="text-[13px] font-semibold text-stone-900">Rising in culture</p>
+ <span className="text-[11px] uppercase tracking-wide text-stone-400">Pinterest · fashion</span>
+ </div>
+ <p className="mb-3 text-[12px] text-stone-400">Fastest-growing fashion searches on Pinterest — where taste forms before it hits resale.</p>
+ <div className="flex flex-wrap gap-2">
+ {culture.trends.map((t) => (
+ <span key={t.keyword} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[12px] capitalize text-stone-700">
+ {t.keyword}
+ {t.growthWow != null && t.growthWow > 0 && <span className="text-[11px] font-semibold not-italic text-[var(--accent-ink)]">+{t.growthWow}%</span>}
+ </span>
+ ))}
+ </div>
+ </TechCard>
+ )}
 
  {loading ? (
  <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>

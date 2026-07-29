@@ -65,7 +65,7 @@ export default function OfferPage() {
  <>
  <p className="text-[13px] font-medium text-emerald-700">✓ Accepted at {money(offer.amountCents)}</p>
  <p className="mt-1 text-[13px] text-black/60">{offer.binding ? "Complete your purchase at the agreed price." : "The seller will honor this price."}</p>
- {offer.itemId && <a href={`/products/${offer.itemId}`} className="mt-3 inline-block bg-[#5D0F17] text-[#FFFDF8] text-[11px] uppercase tracking-[0.15em] px-6 py-3 hover:bg-[#5D0F17]/85 transition">Buy now</a>}
+ {offer.itemId && <a href={offer.binding ? `/checkout?item=${offer.itemId}&offer=${token}` : `/products/${offer.itemId}`} className="mt-3 inline-block bg-[#5D0F17] text-[#FFFDF8] text-[11px] uppercase tracking-[0.15em] px-6 py-3 hover:bg-[#5D0F17]/85 transition">Buy now</a>}
  </>
  ) : offer.status === "declined" ? (
  <p className="text-[13px] text-black/60">The seller passed on this offer. The piece is still available at {money(offer.listPriceCents)}.</p>

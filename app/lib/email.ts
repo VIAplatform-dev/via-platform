@@ -32,6 +32,32 @@ function offerBtn(url: string, label: string): string {
  return `<a href="${url}" style="display:inline-block;background:#5D0F17;color:#FFFDF8;text-decoration:none;padding:10px 22px;border-radius:8px;font-size:14px">${label}</a>`;
 }
 
+/**
+ * Send a transactional email that reaches the store's OWN customer (offer updates, etc.) wearing the
+ * store's brand — its accent, logo, fonts, and sender name/reply-to — not VYA's. Reuses the campaign
+ * shell (with a custom CTA) so shoppers get a consistent look across marketing and transactional mail.
+ * A subtle "Powered by VYA" line stays in the footer. Best-effort; never throws.
+ */
+async function sendStoreBrandedTransactional(
+ storeSlug: string,
+ opts: { to: string; subject: string; body: string; cta?: { label: string; url: string } },
+): Promise<void> {
+ const { resolveStoreSender } = await import("./email-settings-db");
+ const [sender, brand] = await Promise.all([
+  resolveStoreSender(storeSlug),
+  getStoreEmailBrand(storeSlug),
+ ]);
+ const cleanName = (sender.fromName || "Your store").replace(/[<>"\n\r]/g, "").trim() || "Your store";
+ const html = campaignEmailHtml({ storeName: cleanName, body: opts.body, brand, cta: opts.cta });
+ await getResend().emails.send({
+  from: `${cleanName} <${sender.fromAddress}>`,
+  to: opts.to,
+  replyTo: sender.replyTo || undefined,
+  subject: opts.subject,
+  html,
+ });
+}
+
 /** Notify the store that a shopper made a fresh offer. Best-effort. */
 export async function sendNewOfferToStore(offer: Offer): Promise<void> {
  try {
@@ -64,26 +90,97 @@ export async function sendOfferUpdateToStore(offer: Offer): Promise<void> {
  } catch (e) { console.error("[offer] store update notify failed", e); }
 }
 
-/** Notify the buyer that the store responded to their offer. Best-effort. */
+/**
+ * Notify a store that consignments reached their agreed end date. Internal owner alert (goes to the
+ * store's contact inbox), so it stays VYA-branded/neutral like the other owner notifications — it's a
+ * to-do prompt, not a customer email. Best-effort.
+ */
+export async function sendConsignmentExpiryDigest(
+ storeSlug: string,
+ items: { consignor: string; title: string; expiresAt: string }[],
+): Promise<void> {
+ try {
+ if (!process.env.RESEND_API_KEY || !items.length) return;
+ const fmtDate = (d: string) => { const t = new Date(d); return isNaN(t.getTime()) ? "" : t.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+ const rows = items.map((it) =>
+ `<tr><td style="padding:8px 12px;border-bottom:1px solid #eee;">${escapeHtml(it.title)}</td><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#57534e;">${escapeHtml(it.consignor)}</td><td style="padding:8px 12px;border-bottom:1px solid #eee;color:#a29b93;white-space:nowrap;">${escapeHtml(fmtDate(it.expiresAt))}</td></tr>`,
+ ).join("");
+ const n = items.length;
+ await getResend().emails.send({
+ from: FROM_EMAIL,
+ to: storeContactEmails[storeSlug] || OPS_ALERT_EMAIL,
+ subject: `${n} consignment${n === 1 ? "" : "s"} reached ${n === 1 ? "its" : "their"} end date`,
+ html: `<p>${n === 1 ? "A consignment" : `${n} consignments`} hit the end date you agreed with the consignor. Return the piece${n === 1 ? "" : "s"}, or renew the terms to keep ${n === 1 ? "it" : "them"} listed.</p>
+ <table style="border-collapse:collapse;width:100%;max-width:520px;font-size:14px;margin:14px 0;"><thead><tr><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ddd;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#a29b93;">Item</th><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ddd;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#a29b93;">Consignor</th><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ddd;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#a29b93;">Ended</th></tr></thead><tbody>${rows}</tbody></table>
+ <p>${offerBtn(`${BASE_URL}/infrastructure/admin/consignment`, "Manage consignments")}</p>`,
+ });
+ } catch (e) { console.error("[consignment] expiry digest failed", e); }
+}
+
+/**
+ * Sourcing alert — email a store the sourcing opportunities that just entered the window: brands /
+ * categories / eras where VYA buyers' demand is rising and few stores carry them. Internal owner
+ * alert (VYA-branded/neutral), a nudge to open Market Insights. Best-effort; returns whether it sent.
+ */
+export async function sendSourcingAlert(
+ storeSlug: string,
+ picks: { segmentType: string; segmentValue: string; score: number; trend: string; reason: string }[],
+): Promise<boolean> {
+ try {
+ if (!process.env.RESEND_API_KEY || !picks.length) return false;
+ const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+ const top = picks[0];
+ const more = picks.length - 1;
+ const subject = `Source now: ${cap(top.segmentValue)} is ${top.trend === "rising" ? "spiking" : "in demand"}${more > 0 ? ` (+${more} more)` : ""}`;
+ const rows = picks.map((p) =>
+ `<tr>
+  <td style="padding:11px 12px;border-bottom:1px solid #eee;vertical-align:top;">
+   <div style="font-weight:600;color:#5D0F17;">${escapeHtml(cap(p.segmentValue))} <span style="font-weight:400;color:#a29b93;font-size:11px;text-transform:uppercase;letter-spacing:.05em;">${escapeHtml(p.segmentType)}</span></div>
+   <div style="color:#57534e;font-size:13px;line-height:1.5;margin-top:3px;">${escapeHtml(p.reason)}</div>
+  </td>
+  <td style="padding:11px 12px;border-bottom:1px solid #eee;text-align:right;vertical-align:top;">
+   <span style="display:inline-block;background:#5D0F17;color:#FFFDF8;border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;">${Math.round(p.score)}</span>
+  </td>
+ </tr>`,
+ ).join("");
+ await getResend().emails.send({
+ from: FROM_EMAIL,
+ to: storeContactEmails[storeSlug] || OPS_ALERT_EMAIL,
+ subject,
+ html: `<p>New sourcing opportunities on VYA — where buyers' demand is rising and few stores carry it. Worth sourcing while the window's still open.</p>
+  <table style="border-collapse:collapse;width:100%;max-width:560px;margin:14px 0;">${rows}</table>
+  <p style="color:#a29b93;font-size:12px;line-height:1.5;">The number is a 0–100 sourcing-opportunity score. Aggregated across VYA's stores — never any single store's private numbers.</p>
+  <p>${offerBtn(`${BASE_URL}/infrastructure/admin/trends`, "Open Trends")}</p>`,
+ });
+ return true;
+ } catch (e) { console.error("[sourcing-alert] send failed", e); return false; }
+}
+
+/**
+ * Notify the buyer that the store responded to their offer. This reaches the store's OWN customer, so
+ * it's sent wearing the STORE's brand (accent/logo/fonts) and from the store's sender — not VYA's.
+ * Best-effort.
+ */
 export async function sendOfferUpdateToBuyer(offer: Offer): Promise<void> {
  try {
  if (!process.env.RESEND_API_KEY || !offer.buyerEmail) return;
  const item = offer.itemTitle || "the piece";
  const link = `${BASE_URL}/offer/${offer.token}`;
- let subject: string, body: string;
+ let subject: string, body: string, cta: { label: string; url: string } | undefined;
  if (offer.status === "accepted") {
  subject = `Your offer on ${item} was accepted 🎉`;
- body = `<p>The seller accepted your offer of <b>${offerMoney(offer.amountCents)}</b> on <b>${item}</b>.</p>
- <p>${offer.binding ? "Complete your purchase at the agreed price:" : "You can buy it now:"} ${offerBtn(link, "Buy now")}</p>`;
+ body = `The seller **accepted your offer** of **${offerMoney(offer.amountCents)}** on ${item}.\n\n${offer.binding ? "Complete your purchase at the agreed price." : "It's yours to grab — buy it now before someone else does."}`;
+ cta = { label: offer.binding ? "Complete purchase" : "Buy now", url: link };
  } else if (offer.status === "pending") {
  subject = `The seller countered your offer on ${item}`;
- body = `<p>The seller countered at <b>${offerMoney(offer.amountCents)}</b> on <b>${item}</b> (you offered less).</p>
- <p>${offerBtn(link, "View & respond")}</p>`;
+ body = `The seller **countered at ${offerMoney(offer.amountCents)}** on ${item}. Take a look and decide whether to accept, counter back, or pass.`;
+ cta = { label: "View & respond", url: link };
  } else {
  subject = `Update on your offer for ${item}`;
- body = `<p>The seller passed on your offer for <b>${item}</b> this time — the piece is still available at ${offerMoney(offer.listPriceCents)}.</p>`;
+ body = `The seller passed on your offer for ${item} this time — but it's still available at **${offerMoney(offer.listPriceCents)}** if you'd like it.`;
+ cta = { label: "See the piece", url: link };
  }
- await getResend().emails.send({ from: FROM_EMAIL, to: offer.buyerEmail, subject, html: body });
+ await sendStoreBrandedTransactional(offer.storeSlug, { to: offer.buyerEmail, subject, body, cta });
  } catch (e) { console.error("[offer] buyer notify failed", e); }
 }
 
@@ -532,10 +629,12 @@ export function renderEmailBody(raw: string, brand: EmailBrand = DEFAULT_BRAND):
 
 // The full campaign/automation email — the shared renderer behind both what's sent and the
 // in-browser preview, so what a store sees is exactly what lands in the inbox.
-export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string; brand?: EmailBrand }): string {
+export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string; brand?: EmailBrand; cta?: { label: string; url: string } }): string {
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
  const b = opts.brand || DEFAULT_BRAND;
- const cta = opts.link ? withUtm(opts.link, "campaign") : null;
+ // A custom `cta` (used by transactional emails — offer updates, etc.) overrides both the button
+ // URL and its label; otherwise fall back to the campaign link + the brand's default button label.
+ const cta = opts.cta?.url || (opts.link ? withUtm(opts.link, "campaign") : null);
  const content = renderEmailBody(opts.body, b);
  const bodyStack = fontStack(b.bodyFont, "body");
  const headStack = fontStack(b.headingFont, "heading");
@@ -544,7 +643,7 @@ export function campaignEmailHtml(opts: { storeName: string; body: string; link?
  const header = b.logo
  ? `<img src="${b.logo}" alt="${escapeHtml(cleanName)}" style="max-height:44px;width:auto;display:inline-block;" />`
  : `<div style="font-family:${headStack};font-size:27px;font-weight:700;letter-spacing:-0.015em;color:${b.text};">${escapeHtml(cleanName)}</div>`;
- const btnLabel = escapeHtml((b.buttonLabel || "Shop now").slice(0, 40)) || "Shop now";
+ const btnLabel = escapeHtml((opts.cta?.label || b.buttonLabel || "Shop now").slice(0, 40)) || "Shop now";
  const footer = b.footerText != null && b.footerText.trim()
  ? escapeHtml(b.footerText.trim().slice(0, 400)).replace(/\{store\}/g, escapeHtml(cleanName)).replace(/\n/g, "<br />")
  : `You're receiving this because you shopped with ${escapeHtml(cleanName)}.<br />Reply to this email to reach us.`;

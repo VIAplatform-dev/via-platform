@@ -58,6 +58,7 @@ export default function ItemsPage() {
  const [channels, setChannels] = useState<Record<string, { key: string; status: string }[]>>({});
  const [platformNames, setPlatformNames] = useState<Record<string, string>>({});
  const [busyId, setBusyId] = useState<string | null>(null);
+ const [soldNotice, setSoldNotice] = useState<string | null>(null);
  const [isAdmin, setIsAdmin] = useState(false);
  const [selected, setSelected] = useState<Set<string>>(new Set());
  const [bulkBusy, setBulkBusy] = useState(false);
@@ -120,11 +121,17 @@ export default function ItemsPage() {
  async function act(id: string, action: "sold" | "remove" | "publish") {
  if (action === "remove" && !confirm("Remove this item?")) return;
  setBusyId(id);
- await fetch(`/api/store/items/${id}`, {
+ const r = await fetch(`/api/store/items/${id}`, {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action }),
- });
+ }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ // On a sale, tell the seller which no-API channels they must pull the item from by hand.
+ if (action === "sold") {
+ const manual = (r?.pull || []).filter((p: { hasApi: boolean }) => !p.hasApi).map((p: { name: string }) => p.name);
+ setSoldNotice(manual.length ? `Marked sold and pulled from your channels. Remove it on ${manual.join(" & ")} yourself — they have no API.` : "Marked sold and pulled from every connected channel.");
+ setTimeout(() => setSoldNotice(null), 9000);
+ }
  await load();
  setBusyId(null);
  }
@@ -270,6 +277,12 @@ export default function ItemsPage() {
  </>
  }
  />
+
+ {soldNotice && (
+ <div className="mb-4 flex items-start gap-2 rounded-xl border border-[var(--accent,#0e9f76)]/25 bg-[var(--accent-soft,#eafaf3)] px-4 py-3 text-[13px] text-[var(--accent-ink,#0b7a5c)]">
+ <span>✓ {soldNotice}</span>
+ </div>
+ )}
 
  {/* Real inventory snapshot — counts from the items list (no fabricated trend/delta). */}
  {items.length > 0 && (

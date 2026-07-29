@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { resolveStoreSlug } from "@/app/lib/storeAuth";
+import { isStorePro } from "@/app/lib/store-plans-db";
 import { gateSegments, type RawSegment } from "@/app/lib/data-layer/privacy";
 import { PRIVACY, SOURCING, BLEND } from "@/app/lib/data-layer/config";
 import { sourcingVerdict, blendedVerdict, type Trend } from "@/app/lib/data-layer/metrics";
-import { searchComps, isEbayConfigured } from "@/app/lib/data-layer/ebay";
+import { isEbayConfigured } from "@/app/lib/data-layer/ebay";
+import { getOrFetchEbayComps } from "@/app/lib/data-layer/ebay-history-db";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { inferCategoryFromTitle } from "@/app/lib/loadStoreProducts";
 import { inferEra } from "@/app/lib/data-layer/enrich";
@@ -29,7 +31,9 @@ function parseDataUrl(url: string): VisionImage | null {
 // Identifies the item by photo, then returns the same privacy-gated demand
 // verdict the text search gives — for the brand, category, and era it detects.
 export async function POST(request: NextRequest) {
- if (!(await resolveStoreSlug(request))) return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
+ const storeSlug = await resolveStoreSlug(request);
+ if (!storeSlug) return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
+ if (!(await isStorePro(storeSlug))) return NextResponse.json({ locked: true }); // Pro feature
 
  if (!isVisionConfigured()) {
  return NextResponse.json({ notConfigured: true, error: "Photo scanning isn't set up yet (no AI key configured)." }, { status: 503 });
@@ -66,7 +70,7 @@ export async function POST(request: NextRequest) {
     AND segment_value = ANY(${wanted})
   ` as Promise<Array<Record<string, unknown>>>)
   : Promise.resolve([] as Array<Record<string, unknown>>),
- isEbayConfigured() && ebayQuery.length >= 2 ? searchComps(ebayQuery) : Promise.resolve(null),
+ isEbayConfigured() && ebayQuery.length >= 2 ? getOrFetchEbayComps(ebayQuery) : Promise.resolve(null),
  ]);
 
  const raw: RawSegment[] = rows.map((r) => ({

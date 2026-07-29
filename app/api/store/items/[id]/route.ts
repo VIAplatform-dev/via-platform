@@ -3,6 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem, markSold, removeItem, publishItem, updateItem } from "@/app/lib/db/inventory";
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
+import { delistEverywhere } from "@/app/lib/cross-listing-db";
 
 export const dynamic = "force-dynamic";
 
@@ -25,12 +26,19 @@ export async function POST(request: NextRequest, { params }: Ctx) {
  if (!item || item.sellerId !== seller.id) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
  let result;
- if (action === "sold") result = await markSold(id);
- else if (action === "remove") result = await removeItem(id);
+ // When an item sells (anywhere), pull it from every cross-listed channel so it can't double-sell.
+ // `soldOn` attributes the sale to a channel (defaults to VYA); API channels (eBay) end automatically,
+ // and we return the no-API channels (Depop/Vestiaire) the seller still needs to remove by hand.
+ let pull: { platform: string; name: string; handle: string | null; hasApi: boolean }[] = [];
+ if (action === "sold") {
+ result = await markSold(id);
+ const soldOn = typeof body?.soldOn === "string" && body.soldOn ? body.soldOn : "vya";
+ pull = await delistEverywhere(id, soldOn).catch(() => []);
+ } else if (action === "remove") result = await removeItem(id);
  else if (action === "publish") result = await publishItem(id);
  else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 
- return NextResponse.json({ ok: true, item: result });
+ return NextResponse.json({ ok: true, item: result, pull });
 }
 
 // PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material,

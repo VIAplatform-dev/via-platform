@@ -9,6 +9,7 @@ import {
  median,
  sellThroughPct,
  supplyGapScore,
+ sourceNowScore,
  sourcingVerdict,
  blendedVerdict,
 } from "./metrics.ts";
@@ -62,6 +63,17 @@ test("sellThroughPct — null when no supply, else %", () => {
  assert.equal(sellThroughPct(1, 3), 33.3); // rounded 1 dp
  assert.equal(sellThroughPct(5, 0), null); // can't divide by zero supply
  assert.equal(sellThroughPct(0, 10), 0);
+});
+
+test("sourceNowScore — rising beats flat beats falling for the same signal", () => {
+ // Same demand + gap, different momentum: rising is boosted, falling is discounted.
+ const flat = sourceNowScore(80, "flat", 60); // (0.5*80 + 0.5*60) * 1 = 70
+ assert.equal(flat, 70);
+ assert.ok(sourceNowScore(80, "rising", 60) > flat); // 70 * 1.15 = 80.5 → 81
+ assert.ok(sourceNowScore(80, "falling", 60) < flat); // 70 * 0.7 = 49
+ // Clamped to 0–100 even when the boost overshoots.
+ assert.equal(sourceNowScore(100, "rising", 100), 100);
+ assert.equal(sourceNowScore(0, "falling", 0), 0);
 });
 
 test("supplyGapScore — clamped demand minus supply percentile", () => {
@@ -121,4 +133,15 @@ test("blendedVerdict — no VYA, browse-only → price anchor; nothing → not e
  const none = blendedVerdict(null, null, BT);
  assert.equal(none.headline, "Not enough data");
  assert.equal(none.basis, "none");
+});
+
+test("blendedVerdict — no VYA/eBay, Google carries a leading (soft) call", () => {
+ // Falling search → cooling; rising → worth a watch; flat → quiet. All basis "google".
+ const down = blendedVerdict(null, null, BT, { momentumPct: -29 });
+ assert.equal(down.headline, "Cooling");
+ assert.equal(down.basis, "google");
+ assert.equal(blendedVerdict(null, null, BT, { momentumPct: 45 }).headline, "Worth a watch");
+ assert.equal(blendedVerdict(null, null, BT, { momentumPct: 3 }).headline, "Quiet");
+ // eBay still wins over Google when present.
+ assert.equal(blendedVerdict(null, { medianPrice: 200, activeCount: 40, soldPer30d: 35 }, BT, { momentumPct: -29 }).basis, "ebay-sold");
 });

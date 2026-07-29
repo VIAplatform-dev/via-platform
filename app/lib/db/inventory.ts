@@ -131,6 +131,20 @@ export async function reserveItem(
  }
 }
 
+/** The owner tag (`buyerRef`) of the item's current live reservation, or null if none is held.
+ * Lets a caller tell WHO holds a 'reserved' piece — e.g. whether it's the buyer's own accepted
+ * binding offer (`offer-<token>`) vs. someone else mid-checkout. */
+export async function currentReservationRef(itemId: string): Promise<string | null> {
+ const db = getDb();
+ const [r] = await db
+ .select({ buyerRef: reservations.buyerRef })
+ .from(reservations)
+ .where(and(eq(reservations.itemId, itemId), isNull(reservations.releasedAt)))
+ .orderBy(desc(reservations.expiresAt))
+ .limit(1);
+ return r?.buyerRef ?? null;
+}
+
 /** Release any live reservation on an item and return it to active. */
 export async function releaseReservation(itemId: string): Promise<void> {
  const db = getDb();

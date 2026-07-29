@@ -3,7 +3,9 @@ import { neon } from "@neondatabase/serverless";
 import { gateSegments, type RawSegment } from "@/app/lib/data-layer/privacy";
 import { PRIVACY, DEMAND_WEIGHTS } from "@/app/lib/data-layer/config";
 import { rawDemand } from "@/app/lib/data-layer/metrics";
+import { askingPriceLookup } from "@/app/lib/data-layer/asking-price";
 import { resolveStoreSlug } from "@/app/lib/storeAuth";
+import { isStorePro } from "@/app/lib/store-plans-db";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,9 @@ function db() {
 export async function GET(request: NextRequest) {
  const storeSlug = await resolveStoreSlug(request);
  if (!storeSlug) return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
+
+ // Market Insights is a VYA Pro feature — free stores get a locked teaser, not the data.
+ if (!(await isStorePro(storeSlug))) return NextResponse.json({ locked: true });
 
  const windowKey = request.nextUrl.searchParams.get("window") === "30d" ? "30d" : "7d";
  const windowDays = windowKey === "30d" ? 30 : 7;
@@ -54,7 +59,15 @@ export async function GET(request: NextRequest) {
  }));
 
  // Privacy gate FIRST — nothing downstream ever sees a sub-threshold segment.
- const visible = gateSegments(raw, PRIVACY);
+ const gated = gateSegments(raw, PRIVACY);
+
+ // Fill price with the ASKING benchmark from the live catalog (large sample) — realized sale prices
+ // are still too thin to show. Asking prices are public, so no extra gate beyond segment visibility.
+ const ask = await askingPriceLookup();
+ const visible = gated.map((s) => {
+  const a = ask(s.segmentType, s.segmentValue);
+  return { ...s, priceP25: a.p25, priceMedian: a.median, priceP75: a.p75, hasPriceData: a.median != null };
+ });
 
  // 1. Trending — high demand AND low supply (supply gap), brands + categories.
  const trending = visible

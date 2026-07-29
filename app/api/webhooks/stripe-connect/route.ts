@@ -11,6 +11,7 @@ import { sendBuyerOrderConfirmation, sendSellerSaleNotification } from "@/app/li
 import { fireAutomationTrigger } from "@/app/lib/automation-engine";
 import { markCheckoutRecovered } from "@/app/lib/checkout-attempts-db";
 import { delistEverywhere } from "@/app/lib/cross-listing-db";
+import { markOfferConsumed } from "@/app/lib/offers-db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,23 +38,29 @@ type ShipAddr = { line1?: string | null; line2?: string | null; city?: string | 
 // flow (Buy-now / hosted) and the Payment Element flow (embedded card + wallets).
 // Idempotent on the PaymentIntent, so a session payment that also fires
 // payment_intent.succeeded never records twice.
-async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string }) {
+async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null }) {
  if (!o.pi || !(await orderExistsForPaymentIntent(o.pi))) {
  let idx = 0;
  for (const itemId of o.itemIds) {
  const sold = await markSold(itemId);
  if (!sold) { idx++; continue; }
- const fee = applicationFeeCents(sold.priceCents);
+ // On a binding-offer checkout the buyer paid the AGREED price, not the list price — record the
+ // order, seller payout, and consignor credit at what was actually charged. Offers are single-item,
+ // so the override applies to the first (only) item.
+ const salePriceCents = idx === 0 && o.salePriceCents != null ? o.salePriceCents : sold.priceCents;
+ const fee = applicationFeeCents(salePriceCents);
  const order = await createPaidOrder({
  itemId, sellerId: o.sellerId, buyerEmail: o.buyerEmail, buyerName: o.buyerName, buyerPhone: o.buyerPhone, ship: o.ship,
- amountCents: sold.priceCents, feeCents: fee,
+ amountCents: salePriceCents, feeCents: fee,
  shippingPaidCents: idx === 0 ? o.shippingPaidCents : 0,
  currency: (sold.currency || o.currency || "usd").toUpperCase(),
  stripePaymentIntent: o.pi,
  });
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
  // Consignment: if this piece was taken on consignment, credit the consignor their split.
- creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: sold.priceCents }).catch(() => {});
+ creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: salePriceCents }).catch(() => {});
+ // Binding offer redeemed → mark it used so the link can't buy the piece twice.
+ if (idx === 0 && o.offerToken) markOfferConsumed(o.offerToken, String(order.id)).catch(() => {});
  markCheckoutRecovered(itemId).catch(() => {}); // sold → stop any abandoned-cart nudge
  delistEverywhere(itemId, "vya").catch(() => {}); // sold on VYA → pull from other marketplaces
  // Buyer prepaid shipping → auto-generate the label now so the seller just prints it (VYA
@@ -152,7 +159,7 @@ export async function POST(request: NextRequest) {
  }
  const buyerEmail = cust?.email ?? null;
  const shippingPaidCents = md.shipping_paid_cents ? parseInt(md.shipping_paid_cents, 10) || 0 : 0;
- await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd" });
+ await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null });
 }
 } else if (event.type === "payment_intent.succeeded") {
 // Embedded Payment Element pays a PaymentIntent directly (no session). itemIds +
@@ -167,7 +174,7 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
  const ship2: ShipAddr = md2.ship_line1
   ? { line1: md2.ship_line1, line2: md2.ship_line2 || null, city: md2.ship_city || null, state: md2.ship_state || null, postal: md2.ship_zip || null, country: md2.ship_country || "US" }
   : addr2 ? { line1: addr2.line1, line2: addr2.line2, city: addr2.city, state: addr2.state, postal: addr2.postal_code, country: addr2.country } : null;
- await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd" });
+ await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null });
 }
  } else if (event.type === "checkout.session.expired") {
  const s = event.data.object as Stripe.Checkout.Session;

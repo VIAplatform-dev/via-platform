@@ -15,20 +15,30 @@ const SEL = {
   publishedUrlAnchor: 'a[href*="/products/"]',
 };
 
-// Map a VYA condition to a Depop condition search query + the option text to match.
+// Map a VYA condition (canonical OR freeform, e.g. "Great") to a Depop condition search query +
+// the option text to match. Returns null for anything unrecognizable — better blank than wrong.
 function depopConditionQuery(cond) {
   const c = String(cond || "").toLowerCase();
-  if (/new.*(tag|packag)|nwt|bnwt|brand ?new/.test(c)) return { q: "Brand new", match: "brand new" };
-  if (/like ?new|mint/.test(c)) return { q: "Like new", match: "like new" };
-  if (/excellent/.test(c)) return { q: "Excellent", match: "excellent" };
-  if (/very good|good/.test(c)) return { q: "Good", match: "good" };
-  if (/fair|worn|distress/.test(c)) return { q: "Fair", match: "fair" };
-  return { q: String(cond || ""), match: "" };
+  if (/nwt|bnwt|nib|deadstock|dead ?stock|new with tag|brand ?new|unworn|never worn/.test(c)) return { q: "Brand new", match: "brand new" };
+  if (/like ?new|mint|pristine/.test(c)) return { q: "Like new", match: "like new" };
+  if (/excellent|great|flawless|barely worn/.test(c)) return { q: "Excellent", match: "excellent" };
+  if (/very good|good|gently|light(ly)? worn|minor wear/.test(c)) return { q: "Good", match: "good" };
+  if (/fair|poor|worn|distress|as[- ]is|heavily|damaged/.test(c)) return { q: "Fair", match: "fair" };
+  return null;
 }
 
+// Common designer abbreviations → the brand name Depop actually indexes.
+const BRAND_ALIASES = {
+  "ysl": "Saint Laurent", "slp": "Saint Laurent", "lv": "Louis Vuitton", "cdg": "Comme des Garcons",
+  "apc": "A.P.C.", "mmm": "Maison Margiela", "margiela": "Maison Margiela", " goyard": "Goyard",
+  "bbr": "Burberry", "ax": "Armani", "dg": "Dolce & Gabbana",
+};
+function canonicalBrand(b) { const k = String(b || "").toLowerCase().trim(); return BRAND_ALIASES[k] || b; }
+
 // Fill a Depop Downshift autocomplete (#<field>-input + #<field>-menu): type the query, wait for
-// options to render, then click the best text match. Best-effort — returns false if nothing matched.
-async function fillAutocomplete(inputId, query, matchText) {
+// options, then click the best text match. `strict` = only click a real text match (never a wrong
+// fallback like "Other"). Best-effort — returns false if nothing suitable was found.
+async function fillAutocomplete(inputId, query, matchText, strict) {
   if (!query) return false;
   const input = document.querySelector(`#${inputId}`);
   if (!input) return false;
@@ -44,7 +54,9 @@ async function fillAutocomplete(inputId, query, matchText) {
   }
   if (!opts.length) return false;
   const want = (matchText || query).toLowerCase();
-  const pick = opts.find((o) => (o.textContent || "").toLowerCase().includes(want)) || opts[0];
+  const match = opts.find((o) => (o.textContent || "").toLowerCase().includes(want));
+  const pick = match || (strict ? null : opts[0]);
+  if (!pick) return false;
   pick.click();
   return true;
 }
@@ -100,7 +112,7 @@ function setNativeValue(el, value) {
 }
 
 async function fillListing(item) {
-  const filled = { photos: 0, description: false, price: false, condition: false, brand: false };
+  const filled = { photos: 0, description: false, price: false, condition: false, brand: false, color: false };
   console.log("[VYA] fillListing start", { images: (item.images || []).length, hasBody: !!item.body, price: item.priceDollars, brand: item.brand, condition: item.condition });
 
   // Wait for the sell form to actually render before touching it (SPA race).
@@ -119,11 +131,16 @@ async function fillListing(item) {
 
   // Best-effort pickers VYA reliably knows. Category/size stay for the seller to confirm.
   try {
-    if (item.condition) { const { q, match } = depopConditionQuery(item.condition); filled.condition = await fillAutocomplete("condition-input", q, match); console.log("[VYA] condition:", filled.condition, "→", q); }
+    const cq = item.condition ? depopConditionQuery(item.condition) : null;
+    if (cq) { filled.condition = await fillAutocomplete("condition-input", cq.q, cq.match); console.log("[VYA] condition:", filled.condition, item.condition, "→", cq.q); }
+    else console.log("[VYA] condition skipped (no mapping):", item.condition);
   } catch (e) { console.warn("[VYA] condition fill error", e && e.message); }
   try {
-    if (item.brand) { filled.brand = await fillAutocomplete("brand-input", item.brand, item.brand); console.log("[VYA] brand:", filled.brand, "→", item.brand); }
+    if (item.brand) { const b = canonicalBrand(item.brand); filled.brand = await fillAutocomplete("brand-input", b, b, true); console.log("[VYA] brand:", filled.brand, item.brand, "→", b); }
   } catch (e) { console.warn("[VYA] brand fill error", e && e.message); }
+  try {
+    if (item.color) { filled.color = await fillAutocomplete("colour-input", item.color, item.color, true); console.log("[VYA] color:", filled.color, "→", item.color); }
+  } catch (e) { console.warn("[VYA] color fill error", e && e.message); }
 
   console.log("[VYA] fill result:", filled);
 

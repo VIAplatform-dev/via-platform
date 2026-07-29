@@ -17,7 +17,7 @@
     "https://vyaplatform.com/*",
     "https://www.depop.com/*",
     "https://depop.com/*",
-    "https://www.vestiairecollective.com/*",
+    "https://*.vestiairecollective.com/*",
     "https://vestiairecollective.com/*"
   ],
   "background": {
@@ -46,7 +46,7 @@
     },
     {
       "matches": [
-        "https://www.vestiairecollective.com/*",
+        "https://*.vestiairecollective.com/*",
         "https://vestiairecollective.com/*"
       ],
       "js": [

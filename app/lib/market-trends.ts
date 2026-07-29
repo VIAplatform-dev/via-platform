@@ -161,6 +161,33 @@ export async function getGoogleTrends(brands: string[]): Promise<BrandSearchTren
  }).filter((x): x is BrandSearchTrend => !!x);
 }
 
+// On-demand Google trend for an ARBITRARY query (e.g. a store searching "Escada"), cache-through:
+// read a recent snapshot if we have one (free), else fetch live from SerpApi ONCE and SAVE it — so
+// the next lookup of that term is free and the DB accrues a proprietary search-trend history for
+// every term stores look up. Returns null when we have nothing cached and SerpApi is off.
+export async function getOrFetchGoogleTrend(query: string, maxAgeDays = 14): Promise<BrandSearchTrend | null> {
+ const q = query.trim();
+ if (q.length < 2) return null;
+ const sql = tdb();
+ await ensureTables(sql);
+ const cached = (await sql`
+  SELECT brand, momentum_pct, avg_interest, breakout FROM google_search_snapshots
+  WHERE lower(brand) = lower(${q}) AND captured_at >= now() - (${maxAgeDays} || ' days')::interval
+  ORDER BY captured_at DESC LIMIT 1
+ `.catch(() => [])) as { brand: string; momentum_pct: number | null; avg_interest: number | null; breakout: boolean | null }[];
+ if (cached.length) {
+  const c = cached[0];
+  return { brand: q, momentumPct: c.momentum_pct, avgInterest: c.avg_interest ?? 0, breakout: !!c.breakout };
+ }
+ if (!isMarketTrendsConfigured()) return null; // no cache + SerpApi off → nothing to show yet
+ const fresh = await fetchGoogleTrend(q).catch(() => null);
+ if (fresh && (fresh.avgInterest > 0 || fresh.momentumPct !== null)) {
+  await sql`INSERT INTO google_search_snapshots (brand, momentum_pct, avg_interest, breakout)
+   VALUES (${fresh.brand}, ${fresh.momentumPct}, ${fresh.avgInterest}, ${fresh.breakout})`.catch(() => {});
+ }
+ return fresh;
+}
+
 export async function getResaleMarket(brands: string[]): Promise<ResaleMarket[]> {
  const list = [...new Set(brands.map((b) => b.trim()).filter(Boolean))];
  if (!list.length) return [];

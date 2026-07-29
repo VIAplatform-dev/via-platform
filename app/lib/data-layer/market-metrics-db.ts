@@ -105,21 +105,42 @@ async function aggregate(curStart: string, priorStart: string): Promise<AggRow[]
  return rows;
 }
 
-// Tally current in-stock count per brand / category / era from the live catalog
-// (era enriched on the fly, since products carry no era column).
-async function supplyTallies(): Promise<Record<SegmentType, Map<string, number>>> {
+export type SegSupply = { count: number; prices: number[]; stores: Set<string> };
+
+// One catalog scan → per brand / category / era: in-stock COUNT, the ASKING-price list (dollars),
+// and the SET of stores that carry it. Shared by the metric job (which needs counts) and Source Now
+// (which needs asking prices + store spread), so both read the SAME brand/category/era enrichment
+// and reconcile exactly. Era is enriched on the fly, since products carry no era column.
+export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<string, SegSupply>>> {
  const buckets = await loadEraBuckets();
  const brandRef = await loadBrandRef();
  const products = await getAllProducts().catch(() => []);
- const out: Record<SegmentType, Map<string, number>> = { brand: new Map(), category: new Map(), era: new Map() };
- const bump = (m: Map<string, number>, k: string | null) => { if (k) m.set(k, (m.get(k) ?? 0) + 1); };
+ const out: Record<SegmentType, Map<string, SegSupply>> = { brand: new Map(), category: new Map(), era: new Map() };
+ const bump = (m: Map<string, SegSupply>, k: string | null, price: number, store: string | null) => {
+ if (!k) return;
+ const e = m.get(k) ?? { count: 0, prices: [], stores: new Set<string>() };
+ e.count += 1;
+ if (price > 0) e.prices.push(price);
+ if (store) e.stores.add(store);
+ m.set(k, e);
+ };
  for (const p of products) {
+ const price = Number(p.price) || 0;
+ const store = p.store_slug ?? null;
  // Resolve brand through the SAME canonical alias reference the demand side (events.brand)
  // uses, so supply and demand reconcile when joined by brand for sell-through / supply-gap.
- bump(out.brand, resolveBrand(p.title, brandRef, WHOLE_WORD_ALIASES));
- bump(out.category, inferCategoryFromTitle(p.title) as string);
- bump(out.era, inferEra(`${p.title} ${p.description ?? ""}`, buckets));
+ bump(out.brand, resolveBrand(p.title, brandRef, WHOLE_WORD_ALIASES), price, store);
+ bump(out.category, inferCategoryFromTitle(p.title) as string, price, store);
+ bump(out.era, inferEra(`${p.title} ${p.description ?? ""}`, buckets), price, store);
  }
+ return out;
+}
+
+// Just the in-stock counts per segment (what the metric job needs for supply / sell-through).
+async function supplyTallies(): Promise<Record<SegmentType, Map<string, number>>> {
+ const scan = await scanCatalogBySegment();
+ const out: Record<SegmentType, Map<string, number>> = { brand: new Map(), category: new Map(), era: new Map() };
+ for (const t of ["brand", "category", "era"] as SegmentType[]) for (const [k, v] of scan[t]) out[t].set(k, v.count);
  return out;
 }
 

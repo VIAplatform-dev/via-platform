@@ -7,7 +7,7 @@ const VYA = "https://vyaplatform.com";
 // Each marketplace's "create listing" page. Add a key here + a content-script adapter to support more.
 const CREATE_URL = {
   depop: "https://www.depop.com/products/create/",
-  vestiaire: "https://www.vestiairecollective.com/sell/",
+  vestiaire: "https://www.vestiairecollective.com/sell-clothes-online/",
   poshmark: "https://poshmark.com/create-listing",
 };
 

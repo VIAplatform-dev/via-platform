@@ -368,6 +368,39 @@ export async function reverseConsignedSale(opts: { productId: string; orderId: s
  return { reversed: true, consignorId, cutCents };
 }
 
+/**
+ * Expiry sweep — flip every still-'active' consigned item whose agreed end date (`expires_at`) has
+ * passed to 'expired' (surfaces as "Ended" in the consignor portal), and return the affected pieces
+ * (with title + consignor name) so the caller can email each store a "these consignments ended" digest.
+ * Does NOT pull the item from sale — the store decides whether to return the piece or renew the terms.
+ * Idempotent: the guarded UPDATE means an item is only ever swept once.
+ */
+export async function expireOverdueConsignments(): Promise<
+ { storeSlug: string; consignor: string; title: string; expiresAt: string }[]
+> {
+ await ensureConsignmentTables();
+ const sql = db();
+ const updated = (await sql`
+  UPDATE consignment_items SET status = 'expired'
+  WHERE status = 'active' AND expires_at IS NOT NULL AND expires_at < NOW()
+  RETURNING id`) as Array<Record<string, unknown>>;
+ if (!updated.length) return [];
+ const ids = updated.map((r) => Number(r.id));
+ const rows = (await sql`
+  SELECT ci.store_slug, ci.expires_at, COALESCE(i.title, 'an item') AS title, COALESCE(c.name, 'a consignor') AS consignor
+  FROM consignment_items ci
+  LEFT JOIN items i ON i.id::text = ci.product_id
+  LEFT JOIN consignors c ON c.id = ci.consignor_id
+  WHERE ci.id = ANY(${ids})
+  ORDER BY ci.store_slug, ci.expires_at`) as Array<Record<string, unknown>>;
+ return rows.map((r) => ({
+  storeSlug: String(r.store_slug),
+  consignor: String(r.consignor),
+  title: String(r.title),
+  expiresAt: String(r.expires_at),
+ }));
+}
+
 // ── Ledger / balance / payouts ────────────────────────────────────────────────
 export async function getConsignorBalanceCents(consignorId: number): Promise<number> {
  await ensureConsignmentTables();

@@ -14,9 +14,6 @@ import {
  ShoppingBag,
  Search,
  MessageSquareText,
- TrendingUp,
- TrendingDown,
- Minus,
  Sparkles,
  ClipboardCheck,
 } from "lucide-react";
@@ -82,45 +79,7 @@ type ActivityItem = { type: "favorite" | "cart" | "sale"; title: string; at: str
 type Extras = { listing: ListingQuality | null; activity: ActivityItem[] };
 
 type RangeOption = "7d" | "30d" | "all";
-type Tab = "overview" | "performance" | "audience" | "listing" | "messages" | "market";
-
-type MarketSegment = {
- segmentType: string;
- segmentValue: string;
- demandIndex: number;
- demandTrend: "rising" | "falling" | "flat";
- supplyGapScore: number;
- sellThroughPct: number | null;
- priceP25: number | null;
- priceMedian: number | null;
- priceP75: number | null;
- storeCount: number;
- hasPriceData: boolean;
-};
-type MarketInsights = {
- windowKey: "7d" | "30d";
- asOfDate: string | null;
- trending: MarketSegment[];
- priceBenchmarks: MarketSegment[];
- yourStoreVsMarket: { brand: string; yourViews: number; yourSaves: number; yourOrders: number; yourDemand: number; marketDemandIndex: number | null; marketTrend: string | null }[];
- privacyFloor: { minStores: number; minTransactions: number };
- empty?: boolean;
-};
-type DemandResult = MarketSegment & {
- verdict: { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string };
- activeSupply: number;
-};
-type ScanResult = {
- identification: {
- brand: string | null; brandConfidence: string; itemType: string | null; category: string | null;
- era: string | null; condition: string | null; color: string | null; summary: string;
- canonicalBrand: string | null; canonicalCategory: string | null; canonicalEra: string | null;
- };
- verdict?: { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string; basis: string };
- ebay?: { medianPrice: number | null; p25: number | null; p75: number | null; activeCount: number | null; sampleSize: number; currency: string } | null;
- segments: DemandResult[];
- notConfigured?: boolean;
-};
+type Tab = "overview" | "performance" | "audience" | "listing" | "messages";
 
 const DEFAULT_RATES: { upTo?: number; rate: number }[] = [
  { upTo: 1000, rate: 0.07 },
@@ -139,18 +98,12 @@ function commissionTiersLabel(rates?: { upTo?: number; rate: number }[]): string
  .join(" · ");
 }
 
-// Market Insights stays hidden until the cross-store data layer is live and has
-// enough data to show sellers. Flip to true (and ship the data-layer endpoints)
-// to surface the tab — the tab's code is all still here, just not navigable.
-const SHOW_MARKET_INSIGHTS = false;
-
 const NAV: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
  { id: "overview", label: "Overview", icon: LayoutDashboard },
  { id: "performance", label: "Performance", icon: BarChart3 },
  { id: "audience", label: "Audience", icon: Heart },
  { id: "listing", label: "Listing Health", icon: ClipboardCheck },
  { id: "messages", label: "Messages", icon: MessageSquareText },
- ...(SHOW_MARKET_INSIGHTS ? [{ id: "market" as Tab, label: "Market Insights", icon: TrendingUp }] : []),
 ];
 
 const TAB_META: Record<Tab, { title: string; subtitle: string }> = {
@@ -159,7 +112,6 @@ const TAB_META: Record<Tab, { title: string; subtitle: string }> = {
  audience: { title: "Audience", subtitle: "The community following and saving your work." },
  listing: { title: "Listing Health", subtitle: "Listings missing details that help pieces sell." },
  messages: { title: "Messages", subtitle: "Questions from shoppers about your pieces." },
- market: { title: "Market Insights", subtitle: "What's in demand across VYA — aggregated and anonymous." },
 };
 
 const FEEDBACK_URL = "https://form.typeform.com/to/L13186Wp";
@@ -235,83 +187,6 @@ function RangeToggle({ range, onChange }: { range: RangeOption; onChange: (r: Ra
  );
 }
 
-function TrendPill({ trend }: { trend: string | null }) {
- if (trend === "rising") return <span className="inline-flex items-center gap-1 text-[13px] text-green-700"><TrendingUp size={13} strokeWidth={2} /> Rising</span>;
- if (trend === "falling") return <span className="inline-flex items-center gap-1 text-[13px] text-red-700"><TrendingDown size={13} strokeWidth={2} /> Falling</span>;
- if (trend === "flat") return <span className="inline-flex items-center gap-1 text-[13px] text-[#5D0F17]/45"><Minus size={13} strokeWidth={2} /> Flat</span>;
- return <span className="text-[#5D0F17]/30">—</span>;
-}
-
-// A demand-index chip (0–100), shaded by heat.
-function DemandChip({ value }: { value: number | null }) {
- if (value == null) return <span className="text-[#5D0F17]/30">—</span>;
- const bg = value >= 75 ? "bg-[#5D0F17] text-[#FFFDF8]" : value >= 40 ? "bg-[#5D0F17]/15 text-[#5D0F17]" : "bg-[#5D0F17]/[0.06] text-[#5D0F17]/60";
- return <span className={`inline-block rounded-full px-2 py-0.5 text-[12px] font-medium ${bg}`}>{value}</span>;
-}
-
-const SEG_LABEL: Record<string, string> = { brand: "Brand", category: "Category", era: "Era" };
-const money = (n: number | null) => (n == null ? "—" : `$${Math.round(n).toLocaleString()}`);
-
-const VERDICT_STYLE: Record<string, { bg: string; label: string }> = {
- source: { bg: "bg-green-700 text-white", label: "Source it" },
- "buy-sharp": { bg: "bg-[#b8860b] text-white", label: "Buy at a sharp price" },
- selective: { bg: "bg-[#5D0F17]/15 text-[#5D0F17]", label: "Be selective" },
- pass: { bg: "bg-[#5D0F17]/[0.06] text-[#5D0F17]/60", label: "Pass" },
-};
-
-// Shared verdict card — used by both the text demand-search and the photo scan.
-function VerdictCard({ r }: { r: DemandResult }) {
- const vs = VERDICT_STYLE[r.verdict.rating];
- return (
- <div className="rounded-xl border border-[#5D0F17]/10 p-4">
- <div className="flex flex-wrap items-center justify-between gap-2">
- <div className="flex items-center gap-2.5">
- <span className="text-[10px] uppercase tracking-wide text-[#5D0F17]/35">{SEG_LABEL[r.segmentType] ?? r.segmentType}</span>
- <span className="font-serif text-lg text-[#5D0F17]">{r.segmentValue}</span>
- </div>
- <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${vs.bg}`}>{r.verdict.headline}</span>
- </div>
- <p className="mt-2 text-[13px] leading-relaxed text-[#5D0F17]/65">{r.verdict.detail}</p>
- <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-[#5D0F17]/70">
- <span className="inline-flex items-center gap-1.5">Demand <DemandChip value={r.demandIndex} /></span>
- <span className="inline-flex items-center gap-1.5">Trend <TrendPill trend={r.demandTrend} /></span>
- <span>Sells for <strong className="text-[#5D0F17]">{r.hasPriceData ? money(r.priceMedian) : "—"}</strong>{r.hasPriceData && r.priceP25 != null ? ` (${money(r.priceP25)}–${money(r.priceP75)})` : ""}</span>
- <span>Sell-through <strong className="text-[#5D0F17]">{r.sellThroughPct == null ? "—" : `${r.sellThroughPct}%`}</strong></span>
- <span>Already listed <strong className="text-[#5D0F17]">{r.activeSupply.toLocaleString()}</strong></span>
- <span>Supply gap <strong className="text-[#5D0F17]">{r.supplyGapScore}</strong></span>
- </div>
- </div>
- );
-}
-
-// Downscale a photo client-side (≤1568px, JPEG) before upload — cuts payload + AI cost.
-function resizeToDataUrl(file: File, max = 1568): Promise<string> {
- return new Promise((resolve, reject) => {
- const img = new window.Image();
- const url = URL.createObjectURL(file);
- img.onload = () => {
- URL.revokeObjectURL(url);
- let { width, height } = img;
- if (Math.max(width, height) > max) {
- const s = max / Math.max(width, height);
- width = Math.round(width * s);
- height = Math.round(height * s);
- }
- const canvas = document.createElement("canvas");
- canvas.width = width;
- canvas.height = height;
- const ctx = canvas.getContext("2d");
- if (!ctx) return reject(new Error("canvas unavailable"));
- ctx.drawImage(img, 0, 0, width, height);
- resolve(canvas.toDataURL("image/jpeg", 0.85));
- };
- img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
- img.src = url;
- });
-}
-
-// ── Page ────────────────────────────────────────────────────────────────────
-
 function StoreDashboardInner() {
  const router = useRouter();
  const searchParams = useSearchParams();
@@ -329,91 +204,11 @@ function StoreDashboardInner() {
  const [range, setRange] = useState<RangeOption>("all");
  const [loadingInitial, setLoadingInitial] = useState(true);
  const [tab, setTab] = useState<Tab>("overview");
- const [market, setMarket] = useState<MarketInsights | null>(null);
- const [marketLoading, setMarketLoading] = useState(false);
- const [marketQuery, setMarketQuery] = useState("");
- const [buyQ, setBuyQ] = useState("");
- const [buyResults, setBuyResults] = useState<DemandResult[] | null>(null);
- const [buyLoading, setBuyLoading] = useState(false);
- const [scanPreviews, setScanPreviews] = useState<string[]>([]);
- const [scanLoading, setScanLoading] = useState(false);
- const [scanResult, setScanResult] = useState<ScanResult | null>(null);
- const [scanError, setScanError] = useState<string | null>(null);
 
  const fetchAnalytics = useCallback(async (r: RangeOption) => {
  const res = await fetch(withStore(`/api/store/analytics?range=${r}`));
  if (res.ok) setAnalytics(await res.json());
  }, [withStore]);
-
- // Market Insights uses 7d/30d windows; map the "all" range to 30d.
- const fetchMarket = useCallback(async (r: RangeOption) => {
- const win = r === "7d" ? "7d" : "30d";
- setMarketLoading(true);
- try {
- const res = await fetch(withStore(`/api/store/market-insights?window=${win}`));
- if (res.ok) setMarket(await res.json());
- } finally {
- setMarketLoading(false);
- }
- }, [withStore]);
-
- // "Should I buy this?" demand search.
- const runDemandSearch = useCallback(async (q: string, r: RangeOption) => {
- if (q.trim().length < 2) { setBuyResults(null); return; }
- const win = r === "7d" ? "7d" : "30d";
- setBuyLoading(true);
- try {
- const res = await fetch(withStore(`/api/store/demand-search?q=${encodeURIComponent(q.trim())}&window=${win}`));
- if (res.ok) { const d = await res.json(); setBuyResults(d.results ?? []); }
- } finally {
- setBuyLoading(false);
- }
- }, [withStore]);
-
- const handleScanFiles = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
- const files = Array.from(e.target.files ?? []).slice(0, 4);
- if (files.length === 0) return;
- setScanError(null);
- setScanResult(null);
- try {
- const urls = await Promise.all(files.map((f) => resizeToDataUrl(f)));
- setScanPreviews(urls);
- } catch {
- setScanError("Couldn't read that image — try another.");
- }
- }, []);
-
- const runScan = useCallback(async () => {
- if (scanPreviews.length === 0 || scanLoading) return;
- setScanLoading(true);
- setScanError(null);
- try {
- const win = range === "7d" ? "7d" : "30d";
- const res = await fetch(withStore("/api/store/scan-item"), {
- method: "POST",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ images: scanPreviews, window: win }),
- });
- const data = await res.json();
- if (res.status === 503 || data.notConfigured) {
- setScanError("Photo scanning isn't switched on yet.");
- return;
- }
- if (!res.ok) { setScanError(data.error ?? "Scan failed."); return; }
- setScanResult(data);
- } catch {
- setScanError("Scan failed. Please try again.");
- } finally {
- setScanLoading(false);
- }
- }, [scanPreviews, scanLoading, range, withStore]);
-
- // Lazy-load market data the first time the tab is opened, and on range change.
- useEffect(() => {
- // eslint-disable-next-line react-hooks/set-state-in-effect
- if (tab === "market") fetchMarket(range);
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [tab, range]);
 
  useEffect(() => {
  async function init() {
@@ -618,7 +413,7 @@ function StoreDashboardInner() {
  <p className="mt-1 text-sm text-[#5D0F17]/50">{meta.subtitle}</p>
  </div>
  <div className="flex items-center gap-4">
- {(tab === "performance" || tab === "market") && <RangeToggle range={range} onChange={handleRangeChange} />}
+ {tab === "performance" && <RangeToggle range={range} onChange={handleRangeChange} />}
  <div className="hidden items-center gap-2.5 lg:flex">
  <StoreAvatar store={store} size={34} />
  <span className="text-sm text-[#5D0F17]/70">{store.location}</span>
@@ -933,231 +728,6 @@ function StoreDashboardInner() {
  </div>
  )}
 
- {/* ── MARKET INSIGHTS ── */}
- {tab === "market" && (
- <div className="space-y-8">
- {marketLoading && !market ? (
- <p className="text-sm text-[#5D0F17]/50">Loading market data…</p>
- ) : !market || market.empty ? (
- <div className="rounded-2xl border border-[#5D0F17]/10 bg-white p-8 text-center text-sm text-[#5D0F17]/50">
- Market insights are being prepared — check back soon.
- </div>
- ) : (
- <>
- <p className="text-[12px] leading-relaxed text-[#5D0F17]/45">
-  Aggregated across all VYA stores{market.asOfDate ? ` · as of ${market.asOfDate}` : ""}. Individual store numbers are
-  never shown — a figure appears only when it spans at least {market.privacyFloor.minStores} stores, and price &amp;
-  sell-through need {market.privacyFloor.minTransactions}+ sales (otherwise &ldquo;—&rdquo;).
- </p>
-
- {/* 0. Should I buy this? — demand search */}
- <div className="rounded-2xl border border-[#5D0F17]/10 bg-white p-6">
- <h3 className="font-serif text-lg text-[#5D0F17]">Should I source this?</h3>
- <p className="mt-1 text-[13px] text-[#5D0F17]/50">Type a brand or item type — see if it&apos;s worth buying to resell.</p>
- <form
-  onSubmit={(e) => { e.preventDefault(); runDemandSearch(buyQ, range); }}
-  className="mt-3 flex items-center gap-2 rounded-lg border border-[#5D0F17]/15 px-3 py-2.5"
- >
-  <Search size={16} className="text-[#5D0F17]/35" />
-  <input
-  value={buyQ}
-  onChange={(e) => setBuyQ(e.target.value)}
-  placeholder="e.g. Cavalli, slip dress, Y2K, bags…"
-  className="w-full bg-transparent text-sm text-[#5D0F17] outline-none placeholder:text-[#5D0F17]/35"
-  />
-  <button type="submit" className="shrink-0 rounded-full bg-[#5D0F17] px-4 py-1.5 text-[12px] uppercase tracking-[0.08em] text-[#FFFDF8] transition-opacity hover:opacity-90">
-  Check
-  </button>
- </form>
-
- {buyLoading && <p className="mt-4 text-sm text-[#5D0F17]/50">Checking…</p>}
- {!buyLoading && buyResults && buyResults.length === 0 && (
-  <p className="mt-4 text-sm text-[#5D0F17]/50">No market signal for that yet — either nothing matched, or it&apos;s below the {market.privacyFloor.minStores}-store threshold.</p>
- )}
- {!buyLoading && buyResults && buyResults.length > 0 && (
-  <div className="mt-4 space-y-3">
-  {buyResults.map((r) => <VerdictCard key={`${r.segmentType}:${r.segmentValue}`} r={r} />)}
-  </div>
- )}
- </div>
-
- {/* 0b. Scan an item — photo → AI identify → verdict */}
- <div className="rounded-2xl border border-[#5D0F17]/10 bg-white p-6">
- <h3 className="font-serif text-lg text-[#5D0F17]">Scan an item</h3>
- <p className="mt-1 text-[13px] text-[#5D0F17]/50">Snap or upload a photo — we identify it and tell you whether it&apos;s worth sourcing.</p>
-
- <div className="mt-3 flex flex-wrap items-center gap-3">
- <label className="cursor-pointer rounded-full border border-[#5D0F17]/20 px-4 py-2 text-[12px] uppercase tracking-[0.08em] text-[#5D0F17] transition-colors hover:border-[#5D0F17]">
-  Choose photo(s)
-  <input type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleScanFiles} />
- </label>
- {scanPreviews.length > 0 && (
-  <button onClick={runScan} disabled={scanLoading} className="rounded-full bg-[#5D0F17] px-5 py-2 text-[12px] uppercase tracking-[0.08em] text-[#FFFDF8] transition-opacity hover:opacity-90 disabled:opacity-50">
-  {scanLoading ? "Analyzing…" : "Analyze"}
-  </button>
- )}
- {scanPreviews.length > 0 && (
-  <div className="flex gap-2">
-  {scanPreviews.map((src, i) => (
-   // eslint-disable-next-line @next/next/no-img-element
-   <img key={i} src={src} alt="" className="h-14 w-14 rounded-md object-cover" />
-  ))}
-  </div>
- )}
- </div>
-
- {scanError && <p className="mt-3 text-[13px] text-red-700">{scanError}</p>}
-
- {scanResult && (
- <div className="mt-5 space-y-3">
-  <div className="rounded-xl bg-[#5D0F17]/[0.04] p-4">
-  <p className="text-[#5D0F17]"><span className="font-serif text-lg">{scanResult.identification.summary}</span></p>
-  <p className="mt-1 text-[12px] text-[#5D0F17]/50">
-   {scanResult.identification.canonicalBrand ?? "Brand not identified"}
-   {scanResult.identification.brand ? ` · ${scanResult.identification.brandConfidence} confidence` : ""}
-   {scanResult.identification.era ? ` · ${scanResult.identification.era}` : ""}
-   {scanResult.identification.condition ? ` · ${scanResult.identification.condition}` : ""}
-   {scanResult.identification.color ? ` · ${scanResult.identification.color}` : ""}
-  </p>
-  </div>
-  {scanResult.verdict && (
-  <div className="rounded-xl border border-[#5D0F17]/10 p-4">
-  <div className="flex flex-wrap items-center justify-between gap-2">
-   <span className="font-serif text-lg text-[#5D0F17]">Verdict</span>
-   <span className={`rounded-full px-3 py-1 text-[12px] font-medium ${VERDICT_STYLE[scanResult.verdict.rating]?.bg ?? "bg-[#5D0F17]/10 text-[#5D0F17]"}`}>{scanResult.verdict.headline}</span>
-  </div>
-  <p className="mt-2 text-[13px] leading-relaxed text-[#5D0F17]/65">{scanResult.verdict.detail}</p>
-  {scanResult.ebay && scanResult.ebay.medianPrice != null && (
-   <p className="mt-2 text-[12px] text-[#5D0F17]/55">
-   eBay: asks ~{money(scanResult.ebay.medianPrice)}{scanResult.ebay.p25 != null ? ` (${money(scanResult.ebay.p25)}–${money(scanResult.ebay.p75)})` : ""}{scanResult.ebay.activeCount != null ? ` · ${scanResult.ebay.activeCount.toLocaleString()} listed` : ""}
-   </p>
-  )}
-  </div>
-  )}
-  {scanResult.segments.length > 0 && (
-  <div className="space-y-3">
-  <p className="text-[11px] uppercase tracking-[0.1em] text-[#5D0F17]/40">VYA demand detail</p>
-  {scanResult.segments.map((r) => <VerdictCard key={`${r.segmentType}:${r.segmentValue}`} r={r} />)}
-  </div>
-  )}
-  <p className="text-[11px] text-[#5D0F17]/40">AI identification is a best guess — double-check the brand before sourcing. eBay figures are typical asking prices, not sold.</p>
- </div>
- )}
- </div>
-
- {/* 1. Trending — high demand, low supply */}
- <Panel title="Trending now — high demand, low supply">
- {market.trending.length > 0 ? (
-  <div className="overflow-x-auto">
-  <table className="w-full text-sm">
-   <thead>
-   <tr className="border-b border-[#5D0F17]/[0.07] text-left text-[11px] uppercase tracking-[0.08em] text-[#5D0F17]/45">
-    <th className="px-6 py-3 font-medium">What</th>
-    <th className="px-4 py-3 font-medium">Demand</th>
-    <th className="px-4 py-3 font-medium">Trend</th>
-    <th className="px-4 py-3 font-medium text-right">Supply gap</th>
-    <th className="px-6 py-3 font-medium text-right">Sell-through</th>
-   </tr>
-   </thead>
-   <tbody className="divide-y divide-[#5D0F17]/[0.06]">
-   {market.trending.map((s) => (
-    <tr key={`${s.segmentType}:${s.segmentValue}`}>
-    <td className="px-6 py-3.5"><span className="text-[10px] uppercase tracking-wide text-[#5D0F17]/35">{SEG_LABEL[s.segmentType] ?? s.segmentType}</span><div className="text-[#5D0F17]">{s.segmentValue}</div></td>
-    <td className="px-4 py-3.5"><DemandChip value={s.demandIndex} /></td>
-    <td className="px-4 py-3.5"><TrendPill trend={s.demandTrend} /></td>
-    <td className="px-4 py-3.5 text-right font-medium text-[#5D0F17]">{s.supplyGapScore}</td>
-    <td className="px-6 py-3.5 text-right text-[#5D0F17]/70">{s.sellThroughPct == null ? "—" : `${s.sellThroughPct}%`}</td>
-    </tr>
-   ))}
-   </tbody>
-  </table>
-  </div>
- ) : (
-  <p className="px-6 py-8 text-center text-sm text-[#5D0F17]/45">Not enough market data yet to show trends.</p>
- )}
- </Panel>
-
- {/* 2. Price benchmark lookup */}
- <Panel title="Price benchmark">
- <div className="px-6 pt-4">
-  <div className="flex items-center gap-2 rounded-lg border border-[#5D0F17]/15 px-3 py-2">
-  <Search size={15} className="text-[#5D0F17]/35" />
-  <input
-   value={marketQuery}
-   onChange={(e) => setMarketQuery(e.target.value)}
-   placeholder="Search a brand, category or era…"
-   className="w-full bg-transparent text-sm text-[#5D0F17] outline-none placeholder:text-[#5D0F17]/35"
-  />
-  </div>
- </div>
- {(() => {
-  const q = marketQuery.trim().toLowerCase();
-  const rows = market.priceBenchmarks.filter((s) => !q || s.segmentValue.toLowerCase().includes(q)).slice(0, 30);
-  return rows.length > 0 ? (
-  <div className="mt-3 overflow-x-auto">
-   <table className="w-full text-sm">
-   <thead>
-    <tr className="border-y border-[#5D0F17]/[0.07] text-left text-[11px] uppercase tracking-[0.08em] text-[#5D0F17]/45">
-    <th className="px-6 py-3 font-medium">What</th>
-    <th className="px-4 py-3 font-medium">Demand</th>
-    <th className="px-4 py-3 font-medium text-right">Sells for (25–med–75)</th>
-    <th className="px-6 py-3 font-medium text-right">Sell-through</th>
-    </tr>
-   </thead>
-   <tbody className="divide-y divide-[#5D0F17]/[0.06]">
-    {rows.map((s) => (
-    <tr key={`${s.segmentType}:${s.segmentValue}`}>
-     <td className="px-6 py-3.5"><span className="text-[10px] uppercase tracking-wide text-[#5D0F17]/35">{SEG_LABEL[s.segmentType] ?? s.segmentType}</span><div className="text-[#5D0F17]">{s.segmentValue}</div></td>
-     <td className="px-4 py-3.5"><DemandChip value={s.demandIndex} /></td>
-     <td className="px-4 py-3.5 text-right text-[#5D0F17]/80">{s.hasPriceData ? `${money(s.priceP25)} · ${money(s.priceMedian)} · ${money(s.priceP75)}` : "—"}</td>
-     <td className="px-6 py-3.5 text-right text-[#5D0F17]/70">{s.sellThroughPct == null ? "—" : `${s.sellThroughPct}%`}</td>
-    </tr>
-    ))}
-   </tbody>
-   </table>
-  </div>
-  ) : (
-  <p className="px-6 py-8 text-center text-sm text-[#5D0F17]/45">No matching market data.</p>
-  );
- })()}
- </Panel>
-
- {/* 3. Your store vs market */}
- <Panel title="Your store vs the market">
- {market.yourStoreVsMarket.length > 0 ? (
-  <div className="overflow-x-auto">
-  <table className="w-full text-sm">
-   <thead>
-   <tr className="border-b border-[#5D0F17]/[0.07] text-left text-[11px] uppercase tracking-[0.08em] text-[#5D0F17]/45">
-    <th className="px-6 py-3 font-medium">Brand (yours)</th>
-    <th className="px-4 py-3 font-medium text-right">Your views</th>
-    <th className="px-4 py-3 font-medium text-right">Your sold</th>
-    <th className="px-4 py-3 font-medium">Market demand</th>
-    <th className="px-6 py-3 font-medium">Market trend</th>
-   </tr>
-   </thead>
-   <tbody className="divide-y divide-[#5D0F17]/[0.06]">
-   {market.yourStoreVsMarket.map((r) => (
-    <tr key={r.brand}>
-    <td className="px-6 py-3.5 text-[#5D0F17]">{r.brand}</td>
-    <td className="px-4 py-3.5 text-right text-[#5D0F17]/70">{r.yourViews.toLocaleString()}</td>
-    <td className="px-4 py-3.5 text-right text-[#5D0F17]/70">{r.yourOrders.toLocaleString()}</td>
-    <td className="px-4 py-3.5">{r.marketDemandIndex == null ? <span className="text-[#5D0F17]/30">—</span> : <DemandChip value={r.marketDemandIndex} />}</td>
-    <td className="px-6 py-3.5"><TrendPill trend={r.marketTrend} /></td>
-    </tr>
-   ))}
-   </tbody>
-  </table>
-  <p className="px-6 py-3 text-[11px] text-[#5D0F17]/40">Market demand is blank where there isn&apos;t enough cross-store data to show it safely.</p>
-  </div>
- ) : (
-  <p className="px-6 py-8 text-center text-sm text-[#5D0F17]/45">Once your pieces start getting views and sales, you&apos;ll see how your brands stack up against market demand here.</p>
- )}
- </Panel>
- </>
- )}
- </div>
- )}
  </div>
  </main>
  </div>

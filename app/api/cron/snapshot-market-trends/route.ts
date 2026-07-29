@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getBrandHeatIndex } from "@/app/lib/brand-heat-db";
 import { captureMarketTrends, isMarketTrendsConfigured } from "@/app/lib/market-trends";
 import { captureInstagramBuzz, igConfigured } from "@/app/lib/instagram";
+import { capturePinterestTrends, isPinterestConfigured } from "@/app/lib/pinterest-trends";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -16,15 +17,21 @@ export async function GET(request: Request) {
  const authed = request.headers.get("authorization") === `Bearer ${cronSecret}` || (cronSecret && url.searchParams.get("key") === cronSecret);
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
- // SerpApi (Google + eBay) and Instagram are independent — run whichever is configured.
- if (!isMarketTrendsConfigured() && !igConfigured()) {
- return NextResponse.json({ ok: true, skipped: "No external sources enabled (set SERPAPI_ENABLED=true and/or IG_ACCESS_TOKEN).", google: 0, resale: 0, instagram: 0 });
+ // SerpApi (Google + eBay), Instagram, and Pinterest are independent — run whichever is configured.
+ if (!isMarketTrendsConfigured() && !igConfigured() && !isPinterestConfigured()) {
+ return NextResponse.json({ ok: true, skipped: "No external sources enabled (set SERPAPI_ENABLED=true, IG_ACCESS_TOKEN, and/or PINTEREST_ACCESS_TOKEN).", google: 0, resale: 0, instagram: 0, pinterest: 0 });
  }
+
+ // Pinterest needs no brand list — it returns the top growing fashion keywords globally, so capture
+ // it independently (it's the "what's rising in culture" signal, not a per-brand lookup).
+ const pinterest = isPinterestConfigured()
+ ? await capturePinterestTrends().catch((e) => { console.error("snapshot-market-trends (pinterest):", e); return 0; })
+ : 0;
 
  // The brands worth tracking externally: the top of VYA's own demand index.
  const heat = await getBrandHeatIndex(30, 24).catch(() => ({ brands: [] as { brand: string }[] }));
  const brands = (heat.brands as { brand: string }[]).map((b) => b.brand).filter(Boolean);
- if (!brands.length) return NextResponse.json({ ok: true, message: "No brands to snapshot yet.", google: 0, resale: 0, instagram: 0 });
+ if (!brands.length) return NextResponse.json({ ok: true, message: "No brands to snapshot yet.", google: 0, resale: 0, instagram: 0, pinterest });
 
  const [saved, instagram] = await Promise.all([
  isMarketTrendsConfigured()
@@ -34,5 +41,5 @@ export async function GET(request: Request) {
  ? captureInstagramBuzz(brands).catch((e) => { console.error("snapshot-market-trends (instagram):", e); return 0; })
  : Promise.resolve(0),
  ]);
- return NextResponse.json({ ok: true, brands: brands.length, ...saved, instagram });
+ return NextResponse.json({ ok: true, brands: brands.length, ...saved, instagram, pinterest });
 }

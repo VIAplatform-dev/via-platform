@@ -27,6 +27,8 @@ export type Offer = {
  status: OfferStatus;
  lastActor: OfferActor; // whose move it was — the other side responds
  binding: boolean;
+ consumedAt: string | null; // set once a binding offer has been redeemed at checkout (single-use)
+ consumedOrderId: string | null;
  createdAt: string;
  updatedAt: string;
  expiresAt: string;
@@ -49,10 +51,15 @@ async function ensure() {
  status TEXT NOT NULL DEFAULT 'pending',
  last_actor TEXT NOT NULL DEFAULT 'buyer',
  binding BOOLEAN NOT NULL DEFAULT false,
+ consumed_at TIMESTAMPTZ,
+ consumed_order_id TEXT,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '2 days')
  )`;
+ // Self-healing: existing tables predate the single-use redemption columns.
+ await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ`;
+ await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS consumed_order_id TEXT`;
  await sql`CREATE TABLE IF NOT EXISTS storefront_offer_events (
  id SERIAL PRIMARY KEY,
  offer_id INTEGER NOT NULL REFERENCES storefront_offers(id) ON DELETE CASCADE,
@@ -88,6 +95,8 @@ function mapOffer(r: any): Offer {
  status: effectiveStatus(r),
  lastActor: (r.last_actor as OfferActor) || "buyer",
  binding: !!r.binding,
+ consumedAt: r.consumed_at ?? null,
+ consumedOrderId: r.consumed_order_id ?? null,
  createdAt: r.created_at,
  updatedAt: r.updated_at,
  expiresAt: r.expires_at,
@@ -116,6 +125,28 @@ export async function getOfferByToken(token: string): Promise<Offer | null> {
  await ensure();
  const rows = (await db()`SELECT * FROM storefront_offers WHERE token = ${token} LIMIT 1`.catch(() => [])) as any[];
  return rows.length ? mapOffer(rows[0]) : null;
+}
+
+/**
+ * Return the offer ONLY if it can be redeemed at checkout for `itemId`: it was accepted, it's a
+ * binding offer (the store promised the agreed price), it's for this exact piece, and it hasn't
+ * already been used. Anything else (pending/declined, non-binding, wrong item, already purchased)
+ * returns null, so the checkout falls back to rejecting rather than charging the wrong price.
+ */
+export async function getRedeemableBindingOffer(token: string, itemId: string): Promise<Offer | null> {
+ const o = await getOfferByToken(token);
+ if (!o) return null;
+ if (o.status !== "accepted" || !o.binding) return null;
+ if (!o.itemId || o.itemId !== itemId) return null;
+ if (o.consumedAt) return null;
+ return o;
+}
+
+/** Mark a binding offer as redeemed (single-use). Idempotent — only the first order wins. */
+export async function markOfferConsumed(token: string, orderId: string): Promise<void> {
+ await ensure();
+ await db()`UPDATE storefront_offers SET consumed_at = now(), consumed_order_id = ${orderId}, updated_at = now()
+ WHERE token = ${token} AND consumed_at IS NULL`.catch(() => {});
 }
 
 export async function getOfferForStore(id: number, storeSlug: string): Promise<Offer | null> {

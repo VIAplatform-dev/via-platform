@@ -94,6 +94,15 @@ export function supplyGapScore(demandIndex: number, supplyPercentile: number): n
  return Math.max(0, Math.min(100, Math.round(demandIndex - supplyPercentile)));
 }
 
+// "Source Now" score (0–100): how strong a sourcing opportunity a segment is RIGHT NOW.
+// It rewards demand and a supply gap equally (buyers want it AND few stores carry it), then
+// scales by momentum — a rising segment is the window, a falling one is closing. Pure blend of
+// signals we measure with confidence (demand index, trend, supply gap); price is context, not score.
+export function sourceNowScore(demandIndex: number, trend: Trend, supplyGap: number): number {
+ const momentum = trend === "rising" ? 1.15 : trend === "falling" ? 0.7 : 1;
+ return Math.max(0, Math.min(100, Math.round((0.5 * demandIndex + 0.5 * supplyGap) * momentum)));
+}
+
 export type SourcingThresholds = { hotDemand: number; warmDemand: number; underSupplied: number; strongSellThrough: number };
 export type VerdictRating = "source" | "buy-sharp" | "selective" | "pass";
 export type SourcingVerdict = { rating: VerdictRating; headline: string; detail: string };
@@ -153,12 +162,21 @@ export function sourcingVerdict(
 // grows it takes over. Pure + tested so the blend logic is auditable.
 export type VyaSignal = { demandIndex: number; demandTrend: Trend; supplyGapScore: number; sellThroughPct: number | null } | null;
 export type EbaySignal = { medianPrice: number | null; activeCount: number | null; soldPer30d?: number | null } | null;
+export type GoogleSignal = { momentumPct: number | null; breakout?: boolean } | null;
 export type BlendThresholds = SourcingThresholds & { ebaySaturatedListings: number; ebaySellsWellPer30d: number };
-export type BlendedVerdict = SourcingVerdict & { basis: "vya" | "vya+ebay" | "ebay-sold" | "ebay-browse" | "none" };
+export type BlendedVerdict = SourcingVerdict & { basis: "vya" | "vya+ebay" | "ebay-sold" | "ebay-browse" | "google" | "none" };
 
-export function blendedVerdict(vya: VyaSignal, ebay: EbaySignal, t: BlendThresholds): BlendedVerdict {
+export function blendedVerdict(vya: VyaSignal, ebay: EbaySignal, t: BlendThresholds, google?: GoogleSignal): BlendedVerdict {
  const haveEbay = !!ebay && (ebay.medianPrice != null || ebay.activeCount != null || ebay.soldPer30d != null);
  if (!vya && !haveEbay) {
+ // No VYA and no eBay — but Google Search is a LEADING signal, so use it rather than shrug. It's
+ // unconfirmed (interest ≠ resale demand), so the calls stay soft.
+ const g = google && google.momentumPct != null ? google.momentumPct : null;
+ if (g != null) {
+ if (g >= 20 || google?.breakout) return { rating: "selective", headline: "Worth a watch", detail: `Google search is climbing (+${g}%) — a leading signal, but no VYA or eBay confirmation yet. Source cautiously.`, basis: "google" };
+ if (g <= -20) return { rating: "pass", headline: "Cooling", detail: `Google search is falling (${g}%) with no VYA or eBay signal — not a sourcing moment.`, basis: "google" };
+ return { rating: "pass", headline: "Quiet", detail: `Flat search interest (${g >= 0 ? "+" : ""}${g}%) and no VYA or eBay signal — little to act on.`, basis: "google" };
+ }
  return { rating: "pass", headline: "Not enough data", detail: "Not enough market signal on this yet to make a confident call.", basis: "none" };
  }
  const saturated = !!ebay && ebay.activeCount != null && ebay.activeCount >= t.ebaySaturatedListings;

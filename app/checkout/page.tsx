@@ -24,6 +24,7 @@ export default function CheckoutPage() {
 function CheckoutInner() {
  const sp = useSearchParams();
  const itemId = sp.get("item") || "";
+ const offerToken = sp.get("offer") || ""; // accepted binding offer → checkout at the agreed price
  const isCart = sp.get("cart") === "1";
  const [info, setInfo] = useState<Info | null>(null);
  const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -42,7 +43,7 @@ function CheckoutInner() {
  let cancelled = false;
  (async () => {
  try {
- const r = await fetch(isCart ? `/api/storefront/cart-checkout-info` : `/api/storefront/checkout-info?item=${itemId}`);
+ const r = await fetch(isCart ? `/api/storefront/cart-checkout-info` : `/api/storefront/checkout-info?item=${itemId}${offerToken ? `&offer=${offerToken}` : ""}`);
  const d = await r.json();
  if (cancelled) return;
  if (!r.ok) { setLoadErr(d.error || "Couldn’t load this checkout."); return; }
@@ -52,7 +53,7 @@ function CheckoutInner() {
  }
  })();
  return () => { cancelled = true; };
- }, [itemId, isCart]);
+ }, [itemId, isCart, offerToken]);
 
  const cur = info?.items[0]?.currency || "USD";
  const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format((c || 0) / 100);
@@ -102,7 +103,7 @@ function CheckoutInner() {
  async function redirectPay() {
  setBusy(true); setErr(null);
  try {
- const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, buyer: { email, name: a.name, phone: a.phone }, ship: { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country }, shippingCostCents: shipCents || 0 }) });
+ const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, offer: offerToken || undefined, buyer: { email, name: a.name, phone: a.phone }, ship: { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country }, shippingCostCents: shipCents || 0 }) });
  const d = await r.json();
  if (!r.ok || !d.url) { setErr(d.error || "Checkout failed."); setBusy(false); return; }
  window.location.href = d.url;

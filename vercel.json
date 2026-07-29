@@ -9,6 +9,14 @@
       "schedule": "0 10 * * *"
     },
     {
+      "path": "/api/cron/consignment-expiry",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/sourcing-alerts",
+      "schedule": "0 13 * * 1"
+    },
+    {
       "path": "/api/cron/store-automations",
       "schedule": "0 15 * * *"
     },
@@ -82,7 +90,7 @@
     },
     {
       "path": "/api/cron/send-new-arrivals",
-      "schedule": "0 21 * * 2"
+      "schedule": "0 20 * * 2"
     },
     {
       "path": "/api/cron/monthly-report",

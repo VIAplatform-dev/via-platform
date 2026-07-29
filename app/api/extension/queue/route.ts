@@ -4,6 +4,7 @@ import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { listAvailableItems } from "@/app/lib/db/inventory";
 import { crossPostContent, platformByKey, getCrossListingsByPlatform } from "@/app/lib/cross-listing-db";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
+import { normalizeColor } from "@/app/lib/colorNormalize";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
  category: it.category,
  brand, // for the marketplace brand picker
  condition: it.condition || null, // for the marketplace condition picker
+ material: it.material || null, // Vestiaire material autocomplete
+ color: normalizeColor(it.title), // dominant colour inferred from the title (e.g. "…Brown Suede" → brown)
  images: Array.isArray(it.images) ? it.images.slice(0, 8) : [],
  };
  });
