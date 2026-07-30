@@ -160,7 +160,10 @@ export async function POST(request: NextRequest) {
  );
  }
  const products = rawProducts
- .filter((p) => p.price !== null)
+ // Drop null AND $0 prices. A $0 item on a resale marketplace is never a real listing.
+ // It means a missing price, a rental (e.g. Venus Vintage rents most pieces, which sync as $0),
+ // or "contact for price". Skipping them keeps unbuyable items off the site for every store.
+ .filter((p) => p.price !== null && Number(p.price) > 0)
  .filter((p) => !excludedTitles.has(p.title.toLowerCase()))
  .filter((p) => !excludedKeywords.some((kw) => p.title.toLowerCase().includes(kw)))
  .filter((p) => !p.shopifyProductId || !excludedCollectionIds.has(p.shopifyProductId))
