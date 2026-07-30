@@ -1309,6 +1309,28 @@ export const stores = [
  "Returns accepted within 30 days of receipt. Items must be unworn, unused, with tags attached and in original packaging. Sale items, personalized items, and gift cards are final sale. Refunds are issued to the original payment method. Contact hello@vangie.co to initiate a return.",
  },
  {
+ slug: "venus-vintage",
+ dashboardToken: "vv-126bbe6301a1",
+ name: "Venus Vintage",
+ location: "Los Angeles, CA",
+ description:
+ "What started as a personal passion for collecting archival fashion has grown into Venus Vintage, a curated destination for authentic designer vintage. Inspired by fashion history and superior craftsmanship, Venus Vintage was built to preserve the golden eras of fashion design and ensure that true luxury endures. Each piece in our collection is thoughtfully hand-selected and chosen for its exceptional quality and unique narrative. From coveted runway selects to rare vintage gems, Venus Vintage offers a bridge between iconic history and a treasured place in your personal wardrobe.",
+ website: "https://venusvintage.co",
+ contactEmail: "venussvintagee@gmail.com",
+ dataSource: "venus-vintage",
+ image: "/stores/venus-vintage.jpg",
+ logo: "/stores/venus-vintage.jpg",
+ logoBg: "#ffffff",
+ currency: "USD",
+ commissionType: "shopify-collabs" as const,
+ collabsStoreId: "251852",
+ authenticityPolicy:
+ "Every piece at Venus Vintage is thoughtfully hand-selected, carefully inspected, and accurately described before listing.",
+ shippingPolicy: "Ships from Los Angeles, CA. Shipping rates are calculated at checkout.",
+ returnPolicy:
+ "All sales are final. As a vintage boutique specializing in one-of-a-kind pieces, please review all item details and photos carefully before purchasing.",
+ },
+ {
  slug: "vintage-archives-la",
  dashboardToken: "vala-4b8e1c9a7d2f",
  name: "Vintage Archives LA",
@@ -1518,6 +1540,8 @@ export const storeContactEmails: Record<string, string> = {
  "california-boho-studio": "hello@californiabohostudio.com",
  "shiranka-vintage": "info@shirankavintage.com",
  "reine-revival": "kaylendbusiness@gmail.com",
+ "venus-vintage": "venussvintagee@gmail.com",
+ "blummier": "blummier@gmail.com",
  // VYA admin test account — sees all requests
  "via-admin": "hana@theviaplatform.com",
 };

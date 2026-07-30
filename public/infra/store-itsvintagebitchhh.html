@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>ITSVINTAGEBITCHHH — live on VYA</title>
+<title>ITSVINTAGEBITCHHH, live on VYA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -152,16 +152,16 @@ function blogHTML(){
     ['04.30.26','Care notes for lace &amp; mesh','Keeping delicate vintage looking like the day it was made.',PRODUCTS[1].img]
   ];
   var cards=posts.map(function(b){return '<div class="post" onclick="toast(\'Post opening soon\')"><div class="pi"><img src="'+b[3]+'"></div><div class="d">'+b[0]+'</div><h3>'+b[1]+'</h3><p>'+b[2]+'</p></div>';}).join('');
-  return '<div class="page-w"><h1>The Blog</h1><p class="lead">Notes from the archive — sourcing stories, styling, and the pieces we are obsessed with.</p><div class="posts">'+cards+'</div></div>';
+  return '<div class="page-w"><h1>The Blog</h1><p class="lead">Notes from the archive, sourcing stories, styling, and the pieces we are obsessed with.</p><div class="posts">'+cards+'</div></div>';
 }
 function aboutHTML(){
   return '<div class="page-w"><h1>About us</h1><p class="lead">ITSVINTAGEBITCHHH is a one-of-one vintage archive. Every piece is hand-sourced, one of a kind, and chosen for the women who want to wear something no one else has.</p>'+
-    '<p>What started as a personal obsession with rare designer and 90s pieces turned into a curated shop of true one-offs — Comme des Garçons, Agnes B, Tibi, Dries, and the odd perfect find you did not know you needed.</p>'+
+    '<p>What started as a personal obsession with rare designer and 90s pieces turned into a curated shop of true one-offs, Comme des Garçons, Agnes B, Tibi, Dries, and the odd perfect find you did not know you needed.</p>'+
     '<p>Because everything is a single piece, when it is gone, it is gone. Book an appointment to shop the archive in person, or browse the drop online.</p>'+
     '<p><b>By appointment &amp; online.</b> New pieces added weekly.</p></div>';
 }
 function contactHTML(){
-  return '<div class="page-w"><h1>Contact us</h1><p class="lead">Questions about a piece, sizing, or a hold? Reach out — we answer everything ourselves.</p><div class="cwrap"><div class="cinfo"><a href="#" onclick="return false">hello@itsvintagebitchhh.com</a><a href="#" onclick="return false">@itsvintagebitchhh on Instagram</a><a onclick="go(\'book\')">Book an appointment &#8594;</a></div><div class="form"><input placeholder="Your name"><input placeholder="Email"><textarea placeholder="Your message"></textarea><button onclick="toast(\'Message sent ✓\')">Send message</button></div></div></div>';
+  return '<div class="page-w"><h1>Contact us</h1><p class="lead">Questions about a piece, sizing, or a hold? Reach out, we answer everything ourselves.</p><div class="cwrap"><div class="cinfo"><a href="#" onclick="return false">hello@itsvintagebitchhh.com</a><a href="#" onclick="return false">@itsvintagebitchhh on Instagram</a><a onclick="go(\'book\')">Book an appointment &#8594;</a></div><div class="form"><input placeholder="Your name"><input placeholder="Email"><textarea placeholder="Your message"></textarea><button onclick="toast(\'Message sent ✓\')">Send message</button></div></div></div>';
 }
 function bookHTML(){
   return '<div class="page-w"><div class="book"><h1>Book an appointment</h1><p class="lead" style="margin:0 auto">Come shop the archive in person. Pick a time and VYA will hold it for you.</p><div class="slots"><div class="slot" onclick="pickSlot(this)">Thu 2:00</div><div class="slot" onclick="pickSlot(this)">Fri 11:30</div><div class="slot" onclick="pickSlot(this)">Sat 1:00</div><div class="slot" onclick="pickSlot(this)">Sun 3:30</div></div><button onclick="toast(\'Appointment requested ✓\')">Request appointment</button></div></div>';

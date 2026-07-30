@@ -21,7 +21,7 @@
   },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
   document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
 
-  // Styled forms (ready to wire) — show a success state, no backend
+  // Styled forms (ready to wire), show a success state, no backend
   document.querySelectorAll('form[data-mock]').forEach(function(f){
     f.addEventListener('submit',function(ev){
       ev.preventDefault();
@@ -33,7 +33,7 @@
   });
 })();
 
-// Company thesis stats — scramble/flicker into their final value when in view
+// Company thesis stats, scramble/flicker into their final value when in view
 (function(){
   var stats=[].slice.call(document.querySelectorAll('.tstat-n'));
   if(!stats.length) return;
@@ -61,7 +61,7 @@
   stats.forEach(function(s){ io.observe(s); });
 })();
 
-// Rotating mission line — "VYA can help you ___" rolls through phrases
+// Rotating mission line, "VYA can help you ___" rolls through phrases
 (function(){
   var track=document.querySelector('.rotor-track'); if(!track) return;
   var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -79,7 +79,7 @@
   setInterval(step, 2400);
 })();
 
-// Who we build for — reveal each persona as it scrolls into view (special.co style)
+// Who we build for, reveal each persona as it scrolls into view (special.co style)
 (function(){
   var items=[].slice.call(document.querySelectorAll('.who-row'));
   if(!items.length) return;
@@ -89,7 +89,7 @@
   items.forEach(function(i){ io.observe(i); });
 })();
 
-// Mobile nav menu — the hamburger toggles the links dropdown (subpages had no handler at all).
+// Mobile nav menu, the hamburger toggles the links dropdown (subpages had no handler at all).
 (function(){
   var nav=document.getElementById('nav');
   var toggle=document.querySelector('.nav-toggle');

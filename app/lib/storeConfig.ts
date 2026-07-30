@@ -490,6 +490,13 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  storeDomain: "thevintagenewyorker.com",
  scrapeProductPage: true,
  },
+ {
+ type: "shopify",
+ name: "Venus Vintage",
+ slug: "venus-vintage",
+ storeDomain: "venusvintage.co",
+ scrapeProductPage: true,
+ },
 ];
 
 // Big Cartel stores (public JSON API — no token required)
