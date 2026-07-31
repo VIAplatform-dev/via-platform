@@ -5,6 +5,7 @@ import { stores, storeContactEmails } from "@/app/lib/stores";
 import { getOrCreateSeller } from "@/app/lib/db/sellers";
 import { createItem } from "@/app/lib/db/inventory";
 import { createCrossListingsForItem, syncItemToApiPlatforms } from "@/app/lib/cross-listing-db";
+import { maybeAutoPostStory } from "@/app/lib/instagram-publish";
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
 import { logCorrections, logPredictions, rememberItem } from "@/app/lib/intake-memory-db";
 import { recordIntakeExample } from "@/app/lib/training-data-db";
@@ -103,6 +104,9 @@ export async function POST(request: NextRequest) {
  if (item.status === "active") {
  createCrossListingsForItem(slug, item.id).catch(() => {});
  syncItemToApiPlatforms(slug, item.id).catch(() => {});
+ // If the store connected Instagram with auto-post on, post the new piece to their
+ // Story (a card that drives to their own storefront). Best-effort — never blocks publish.
+ maybeAutoPostStory(slug, item.id).catch(() => {});
  }
 
  // Correction memory: log any field the seller changed from the AI's draft, keyed

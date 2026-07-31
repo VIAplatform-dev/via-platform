@@ -45,6 +45,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { href: `${B}/marketing/campaigns`, label: "Campaigns" },
  { href: `${B}/marketing/design`, label: "Email design" },
  { href: `${B}/marketing/share-links`, label: "Share links" },
+ { href: `${B}/instagram`, label: "Instagram" },
  { href: `${B}/marketing/automations`, label: "Automations" },
  ],
  },
