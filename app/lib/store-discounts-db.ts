@@ -83,3 +83,82 @@ export async function getAutoApplyCode(storeSlug: string): Promise<string | null
  const v = rows[0] ? (rows[0] as { code: string }).code : null;
  return v && v.trim() ? v.trim() : null;
 }
+
+// ── Native checkout application ──────────────────────────────────────────────
+// Codes are strictly per-store: validation is always scoped by store_slug, so a
+// code created by store A can never match store B's items. Used by the native
+// VYA checkout (single-item + cart), NOT the click-through marketplace.
+
+export type ValidDiscount = { id: number; code: string; label: string | null; kind: string; value: number | null };
+
+/** Look up an ACTIVE code for THIS store only. Returns null if it isn't this store's code. */
+export async function validateDiscount(storeSlug: string, codeRaw: string): Promise<ValidDiscount | null> {
+ await ensureTable();
+ const code = (codeRaw || "").trim().toUpperCase();
+ if (!code) return null;
+ const rows = await db()`
+ SELECT id, code, label, kind, value FROM store_discounts
+ WHERE store_slug = ${storeSlug} AND active = true AND UPPER(code) = ${code}
+ LIMIT 1`;
+ if (!rows[0]) return null;
+ const r = rows[0] as { id: number; code: string; label: string | null; kind: string; value: number | null };
+ return { id: Number(r.id), code: r.code, label: r.label, kind: r.kind, value: r.value == null ? null : Number(r.value) };
+}
+
+/** How much a discount takes off a subtotal (cents), and whether it waives shipping.
+ *  percent → value% of subtotal · fixed → $value (value is dollars) · free_shipping → waive shipping · other → no native effect. */
+export function computeDiscount(d: { kind: string; value: number | null }, subtotalCents: number): { offCents: number; freeShipping: boolean } {
+ const v = d.value ?? 0;
+ if (d.kind === "percent") return { offCents: Math.min(subtotalCents, Math.max(0, Math.round((subtotalCents * v) / 100))), freeShipping: false };
+ if (d.kind === "fixed") return { offCents: Math.min(subtotalCents, Math.max(0, Math.round(v * 100))), freeShipping: false };
+ if (d.kind === "free_shipping") return { offCents: 0, freeShipping: true };
+ return { offCents: 0, freeShipping: false };
+}
+
+/** Spread `offCents` across line-item amounts proportionally, exactly (remainder lands on the last item). */
+export function distributeDiscount(amounts: number[], offCents: number): number[] {
+ const total = amounts.reduce((a, b) => a + b, 0);
+ if (offCents <= 0 || total <= 0) return amounts.slice();
+ const capped = Math.min(offCents, total);
+ let allocated = 0;
+ return amounts.map((a, i) => {
+  const share = i === amounts.length - 1 ? capped - allocated : Math.round((capped * a) / total);
+  allocated += share;
+  return Math.max(0, a - share);
+ });
+}
+
+let redemptionsReady = false;
+async function ensureRedemptions() {
+ if (redemptionsReady) return;
+ await db()`CREATE TABLE IF NOT EXISTS store_discount_redemptions (
+  id SERIAL PRIMARY KEY,
+  store_slug TEXT NOT NULL,
+  discount_id INTEGER,
+  code TEXT NOT NULL,
+  order_ref TEXT,
+  amount_off_cents INTEGER NOT NULL DEFAULT 0,
+  buyer_email TEXT,
+  redeemed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+ )`;
+ await db()`CREATE UNIQUE INDEX IF NOT EXISTS idx_discount_redemption_order ON store_discount_redemptions(store_slug, code, order_ref)`;
+ redemptionsReady = true;
+}
+
+/** Record a redemption at fulfillment (idempotent per store+code+order). */
+export async function recordDiscountRedemption(r: {
+ storeSlug: string; discountId?: number | null; code: string; orderRef: string; amountOffCents: number; buyerEmail?: string | null;
+}): Promise<void> {
+ await ensureRedemptions();
+ await db()`
+ INSERT INTO store_discount_redemptions (store_slug, discount_id, code, order_ref, amount_off_cents, buyer_email)
+ VALUES (${r.storeSlug}, ${r.discountId ?? null}, ${r.code.toUpperCase()}, ${r.orderRef}, ${Math.max(0, Math.round(r.amountOffCents))}, ${r.buyerEmail ?? null})
+ ON CONFLICT (store_slug, code, order_ref) DO NOTHING`.catch(() => {});
+}
+
+/** Times a code has been redeemed (for the seller's discounts UI). */
+export async function redemptionCount(storeSlug: string, code: string): Promise<number> {
+ await ensureRedemptions();
+ const rows = await db()`SELECT COUNT(*)::int AS n FROM store_discount_redemptions WHERE store_slug = ${storeSlug} AND UPPER(code) = ${code.toUpperCase()}`;
+ return Number((rows[0] as { n: number }).n) || 0;
+}

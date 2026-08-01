@@ -5,7 +5,7 @@ import { Tag, X } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, MetricCard, TH, TD, cn } from "../ui";
 import { Input } from "@/app/store/ui";
 
-type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean };
+type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean; used?: number };
 
 const selectCls = "h-9 rounded-lg border border-stone-200 bg-white px-2 text-[13px] text-stone-900 outline-none focus:border-stone-400";
 
@@ -79,6 +79,7 @@ export default function DiscountsPage() {
  <tr>
  <TH className="px-5">Code</TH>
  <TH className="px-5">Discount</TH>
+ <TH className="px-5">Used</TH>
  <TH className="px-5">Status</TH>
  <TH right className="px-5">Actions</TH>
  </tr>
@@ -88,6 +89,7 @@ export default function DiscountsPage() {
  <tr key={d.id} className="transition hover:bg-stone-50/70">
  <TD className="px-5 font-mono font-medium text-stone-900">{d.code}</TD>
  <TD className="px-5 text-stone-500">{kindLabel(d)}</TD>
+ <TD className="px-5 tabular-nums text-stone-500">{d.used ? `${d.used}×` : "—"}</TD>
  <TD className="px-5">
  <div className="flex flex-wrap items-center gap-1.5">
  <StatusPill tone={d.active ? "live" : "neutral"} dot={d.active}>{d.active ? "Active" : "Off"}</StatusPill>

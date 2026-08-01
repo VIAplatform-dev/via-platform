@@ -37,6 +37,10 @@ function CheckoutInner() {
  const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
  const [payTotal, setPayTotal] = useState(0);
  const preparedKey = useRef<string>("");
+ const [discountCode, setDiscountCode] = useState("");
+ const [discount, setDiscount] = useState<{ code: string; offCents: number; freeShipping: boolean } | null>(null);
+ const [dcErr, setDcErr] = useState<string | null>(null);
+ const [dcBusy, setDcBusy] = useState(false);
 
  useEffect(() => {
  if (!itemId && !isCart) return;
@@ -103,18 +107,34 @@ function CheckoutInner() {
  async function redirectPay() {
  setBusy(true); setErr(null);
  try {
- const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, offer: offerToken || undefined, buyer: { email, name: a.name, phone: a.phone }, ship: { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country }, shippingCostCents: shipCents || 0 }) });
+ const r = await fetch("/api/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, offer: offerToken || undefined, discountCode: discount ? discountCode.trim() : undefined, buyer: { email, name: a.name, phone: a.phone }, ship: { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country }, shippingCostCents: shipCents || 0 }) });
  const d = await r.json();
  if (!r.ok || !d.url) { setErr(d.error || "Checkout failed."); setBusy(false); return; }
  window.location.href = d.url;
  } catch { setErr("Checkout failed."); setBusy(false); }
  }
 
+ // Validate a discount code for THIS store (server scopes it to the item's seller).
+ async function applyDiscount() {
+ const code = discountCode.trim();
+ if (!code || !info) return;
+ setDcBusy(true); setDcErr(null);
+ try {
+ const r = await fetch("/api/storefront/discount", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, code, subtotalCents: info.subtotalCents }) });
+ const d = await r.json();
+ if (d.ok) { setDiscount({ code: d.code, offCents: d.offCents, freeShipping: d.freeShipping }); setDcErr(null); }
+ else { setDiscount(null); setDcErr(d.error || "That code isn’t valid."); }
+ } catch { setDcErr("Couldn’t apply code."); }
+ setDcBusy(false);
+ }
+
  if (loadErr) return <main className="min-h-screen bg-[#FFFDF8] text-[#5D0F17] flex items-center justify-center"><p className="text-sm text-[#5D0F17]/60">{loadErr}</p></main>;
  if (!info) return <main className="min-h-screen bg-[#FFFDF8] text-[#5D0F17] flex items-center justify-center"><p className="text-sm text-[#5D0F17]/50">Loading…</p></main>;
 
- const shownShip = info.freeShipping ? 0 : shipCents;
- const total = isCart && clientSecret ? payTotal : info.subtotalCents + (shownShip || 0);
+ const discountOff = !isCart && discount ? discount.offCents : 0;
+ const codeFreeShip = !isCart && !!discount?.freeShipping;
+ const shownShip = info.freeShipping || codeFreeShip ? 0 : shipCents;
+ const total = isCart && clientSecret ? payTotal : Math.max(0, info.subtotalCents - discountOff) + (shownShip || 0);
 
  return (
  <main className="min-h-screen bg-[#FFFDF8] text-[#5D0F17]">
@@ -187,8 +207,19 @@ function CheckoutInner() {
  ))}
  </div>
  <div className="border-t border-[#5D0F17]/10 p-4 space-y-1.5 text-sm">
+ {!isCart && (
+ <div className="mb-2.5 flex gap-2">
+ <input className={input + " flex-1"} value={discountCode} onChange={(e) => { setDiscountCode(e.target.value); setDiscount(null); setDcErr(null); }} placeholder="Discount code" />
+ <button onClick={applyDiscount} disabled={dcBusy || !discountCode.trim()} className="shrink-0 border border-[#5D0F17]/25 px-3 text-[11px] uppercase tracking-[0.14em] text-[#5D0F17] transition hover:bg-[#5D0F17]/5 disabled:opacity-40">{dcBusy ? "…" : "Apply"}</button>
+ </div>
+ )}
+ {dcErr && <p className="-mt-1 mb-2 text-[11px] text-red-700">{dcErr}</p>}
+ {discount && <p className="-mt-1 mb-2 text-[11px] text-green-700">Code {discount.code} applied.</p>}
  <div className="flex justify-between"><span className="text-[#5D0F17]/60">Subtotal</span><span>{money(info.subtotalCents)}</span></div>
- <div className="flex justify-between"><span className="text-[#5D0F17]/60">Shipping</span><span>{info.freeShipping ? "Free" : shownShip === null ? <span className="text-[#5D0F17]/40">Calculated at address</span> : money(shownShip)}</span></div>
+ {!isCart && discount && (discountOff > 0 || discount.freeShipping) && (
+ <div className="flex justify-between text-green-700"><span>Discount ({discount.code})</span><span>{discount.freeShipping && discountOff === 0 ? "Free shipping" : `−${money(discountOff)}`}</span></div>
+ )}
+ <div className="flex justify-between"><span className="text-[#5D0F17]/60">Shipping</span><span>{info.freeShipping || codeFreeShip ? "Free" : shownShip === null ? <span className="text-[#5D0F17]/40">Calculated at address</span> : money(shownShip)}</span></div>
  <div className="flex justify-between border-t border-[#5D0F17]/10 pt-2 mt-1 text-base font-semibold"><span>Total</span><span>{money(total)}</span></div>
  </div>
  </div>

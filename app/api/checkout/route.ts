@@ -8,6 +8,7 @@ import { recordCheckoutAttempt } from "@/app/lib/checkout-attempts-db";
 import { getRedeemableBindingOffer } from "@/app/lib/offers-db";
 import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
+import { validateDiscount, computeDiscount } from "@/app/lib/store-discounts-db";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ function baseUrl(request: NextRequest) {
  return `${proto}://${host}`;
 }
 
-// POST { itemId, buyer:{email,name,phone}, ship:{line1,line2,city,state,zip,country}, shippingCostCents }
+// POST { itemId, buyer:{email,name,phone}, ship:{line1,line2,city,state,zip,country}, shippingCostCents, discountCode }
 // Buyer-facing checkout. We collect the address ourselves (so we can quote a live
 // shipping rate first), then open a Stripe Checkout Session as a DIRECT charge on
 // the seller's account. VYA's application fee = 1% of the item PLUS any shipping the
@@ -61,6 +62,23 @@ export async function POST(request: NextRequest) {
  const pay = await getSellerPayments(seller.slug);
  if (!pay?.stripeAccountId || !pay.chargesEnabled) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
 
+ // Per-store discount code — applied to the native charge. validateDiscount is scoped by
+ // seller.slug, so ONLY this store's codes ever apply (a code from another store won't match).
+ // Skipped on binding offers, where the agreed price is already final.
+ let salePriceCents = effPriceCents;
+ let effShippingCents = shippingCostCents;
+ let appliedDiscount: { id: number; code: string; offCents: number } | null = null;
+ const discountCode = !offerToken && typeof body?.discountCode === "string" ? body.discountCode : "";
+ if (discountCode) {
+ const d = await validateDiscount(seller.slug, discountCode);
+ if (d) {
+ const c = computeDiscount(d, effPriceCents);
+ salePriceCents = Math.max(0, effPriceCents - c.offCents);
+ if (c.freeShipping) effShippingCents = 0;
+ appliedDiscount = { id: d.id, code: d.code, offCents: c.offCents + (c.freeShipping ? shippingCostCents : 0) };
+ }
+ }
+
  const reservation = await reserveItem(itemId, "checkout");
  if (!reservation) return NextResponse.json({ error: "This piece was just reserved by someone else." }, { status: 409 });
 
@@ -68,12 +86,11 @@ export async function POST(request: NextRequest) {
  const base = baseUrl(request);
  const currency = (item.currency || "usd").toLowerCase();
  // Consignment (Model A): fold the consignor's cut into VYA's application fee so it lands in
- // VYA's balance to fund the payout — the same routing the cart flow does. Uses the effective
- // price (agreed price on a binding offer, else list).
+ // VYA's balance to fund the payout. Computed on the SALE price (after discount), like the fee.
  let consignCents = 0;
  const ci = await getConsignmentItemByProduct(itemId).catch(() => null);
- if (ci && ci.status === "active") consignCents = consignorCutCents(effPriceCents, ci.splitPct);
- const appFee = applicationFeeCents(effPriceCents) + shippingCostCents + consignCents;
+ if (ci && ci.status === "active") consignCents = consignorCutCents(salePriceCents, ci.splitPct);
+ const appFee = applicationFeeCents(salePriceCents) + effShippingCents + consignCents;
  const meta: Record<string, string> = {
  itemId,
  sellerId: seller.id,
@@ -85,16 +102,22 @@ export async function POST(request: NextRequest) {
  ship_zip: String(ship.zip),
  ship_country: String(ship.country || "US"),
  buyer_phone: String(buyer.phone || ""),
- shipping_paid_cents: String(shippingCostCents),
+ shipping_paid_cents: String(effShippingCents),
+ // Record the price actually charged so the order/payout/consignor credit are all at the real amount.
+ sale_price_cents: String(salePriceCents),
  };
- // Carry the offer + agreed price to the fulfillment webhook so the order, payout, and consignor
- // credit are all recorded at the price actually charged (not the item's list price).
- if (offerToken) { meta.offer_token = offerToken; meta.sale_price_cents = String(effPriceCents); }
+ if (offerToken) meta.offer_token = offerToken;
+ if (appliedDiscount) {
+ meta.discount_code = appliedDiscount.code;
+ meta.discount_off_cents = String(appliedDiscount.offCents);
+ meta.discount_id = String(appliedDiscount.id);
+ meta.discount_store = seller.slug;
+ }
  const line_items: Record<number, unknown> = {
- 0: { quantity: 1, price_data: { currency, unit_amount: effPriceCents, product_data: { name: item.title, ...(item.images?.[0] ? { images: { 0: item.images[0] } } : {}) } } },
+ 0: { quantity: 1, price_data: { currency, unit_amount: salePriceCents, product_data: { name: item.title, ...(item.images?.[0] ? { images: { 0: item.images[0] } } : {}) } } },
  };
- if (shippingCostCents > 0) {
- line_items[1] = { quantity: 1, price_data: { currency, unit_amount: shippingCostCents, product_data: { name: "Shipping" } } };
+ if (effShippingCents > 0) {
+ line_items[1] = { quantity: 1, price_data: { currency, unit_amount: effShippingCents, product_data: { name: "Shipping" } } };
  }
  const session = await stripePost(
  "checkout/sessions",

@@ -4,6 +4,7 @@ import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
 import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus } from "@/app/lib/db/orders";
+import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { logError } from "@/app/lib/error-log";
 import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
 import { applicationFeeCents } from "@/app/lib/payments-config";
@@ -160,6 +161,17 @@ export async function POST(request: NextRequest) {
  const buyerEmail = cust?.email ?? null;
  const shippingPaidCents = md.shipping_paid_cents ? parseInt(md.shipping_paid_cents, 10) || 0 : 0;
  await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null });
+ // Per-store discount redemption (idempotent per store+code+order via the unique index).
+ if (md.discount_code && md.discount_store) {
+ recordDiscountRedemption({
+ storeSlug: md.discount_store,
+ code: md.discount_code,
+ discountId: md.discount_id ? parseInt(md.discount_id, 10) || null : null,
+ orderRef: pi || s.id,
+ amountOffCents: md.discount_off_cents ? parseInt(md.discount_off_cents, 10) || 0 : 0,
+ buyerEmail,
+ }).catch(() => {});
+ }
 }
 } else if (event.type === "payment_intent.succeeded") {
 // Embedded Payment Element pays a PaymentIntent directly (no session). itemIds +

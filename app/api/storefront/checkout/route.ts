@@ -9,6 +9,7 @@ import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { flatRateCents } from "@/app/lib/shipping-tiers";
+import { validateDiscount, computeDiscount, distributeDiscount } from "@/app/lib/store-discounts-db";
 import type { Item } from "@/app/lib/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -76,18 +77,30 @@ export async function POST(request: NextRequest) {
  }
  if (!reserved.length) continue;
 
+ const amounts = reserved.map((it) => it.priceCents);
+ const subtotal = amounts.reduce((s, a) => s + a, 0);
+ // Per-store discount code — ONLY this seller's own code applies. validateDiscount is scoped by
+ // seller.slug, so a code created by another store in the cart can never touch this store's items.
+ let off = 0; let freeShip = false; let applied: { id: number; code: string } | null = null;
+ const discountCode = typeof body?.discountCode === "string" ? body.discountCode : "";
+ if (discountCode) {
+ const d = await validateDiscount(seller.slug, discountCode);
+ if (d) { const c = computeDiscount(d, subtotal); off = c.offCents; freeShip = c.freeShipping; applied = { id: d.id, code: d.code }; }
+ }
+ const discounted = distributeDiscount(amounts, off); // per-item cents after discount
+ const discountedSubtotal = discounted.reduce((s, a) => s + a, 0);
+
  const lineItems: Record<number, unknown> = {};
  reserved.forEach((item, i) => {
  lineItems[i] = {
  quantity: 1,
  price_data: {
  currency: (item.currency || "usd").toLowerCase(),
- unit_amount: item.priceCents,
+ unit_amount: discounted[i],
  product_data: { name: item.title, ...(item.images?.[0] ? { images: { 0: item.images[0] } } : {}) },
  },
  };
  });
- const subtotal = reserved.reduce((s, it) => s + it.priceCents, 0);
  // Server-authoritative shipping, PER SELLER — each store ships its own parcel, so each session
  // charges that store's own flat tier. Never a client-supplied value, and not "only the first seller"
  // (which used to leave sellers 2..N charged for a label the buyer never paid for).
@@ -102,25 +115,33 @@ export async function POST(request: NextRequest) {
  widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
  heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
  });
+ const effShip = freeShip ? 0 : shipHere; // a free-shipping code waives the buyer's shipping charge
  const cur = (reserved[0].currency || "usd").toLowerCase();
- if (shipHere > 0) lineItems[reserved.length] = { quantity: 1, price_data: { currency: cur, unit_amount: shipHere, product_data: { name: "Shipping" } } };
+ if (effShip > 0) lineItems[reserved.length] = { quantity: 1, price_data: { currency: cur, unit_amount: effShip, product_data: { name: "Shipping" } } };
  // Consignment (Model A): route each consigned item's consignor cut into VYA's balance, on top
  // of the platform fee — so we hold it and pay the consignor out (Stripe won't let the store
- // transfer to them directly). The store nets the sale minus fee minus consignor cuts.
+ // transfer to them directly). Computed on the DISCOUNTED per-item price.
  let consignTotal = 0;
- for (const it of reserved) {
- const ci = await getConsignmentItemByProduct(it.id).catch(() => null);
- if (ci && ci.status === "active") consignTotal += consignorCutCents(it.priceCents, ci.splitPct);
+ for (let i = 0; i < reserved.length; i++) {
+ const ci = await getConsignmentItemByProduct(reserved[i].id).catch(() => null);
+ if (ci && ci.status === "active") consignTotal += consignorCutCents(discounted[i], ci.splitPct);
  }
- const feeAmount = applicationFeeCents(subtotal) + shipHere + consignTotal;
+ const feeAmount = applicationFeeCents(discountedSubtotal) + effShip + consignTotal;
  const itemIds = reserved.map((it) => it.id);
  const idCsv = itemIds.join(",");
  const meta: Record<string, string> = {
  itemIds: idCsv, sellerId,
  ship_name: String(buyer.name || ""), ship_line1: String(ship.line1), ship_line2: String(ship.line2 || ""),
  ship_city: String(ship.city), ship_state: String(ship.state), ship_zip: String(ship.zip), ship_country: String(ship.country || "US"),
- buyer_phone: String(buyer.phone || ""), shipping_paid_cents: String(shipHere),
+ buyer_phone: String(buyer.phone || ""), shipping_paid_cents: String(effShip),
+ sale_subtotal_cents: String(discountedSubtotal),
  };
+ if (applied && (off > 0 || freeShip)) {
+ meta.discount_code = applied.code;
+ meta.discount_off_cents = String(subtotal - discountedSubtotal + (freeShip ? shipHere : 0));
+ meta.discount_id = String(applied.id);
+ meta.discount_store = seller.slug;
+ }
 
  const session = await stripePost(
  "checkout/sessions",
