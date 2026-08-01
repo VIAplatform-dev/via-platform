@@ -4,6 +4,7 @@ import { markSourcingRequestPaid, getSourcingRequestBySession } from "@/app/lib/
 import { getAllStoreEmails } from "@/app/lib/stores";
 import { saveConversion } from "@/app/lib/analytics-db";
 import { setStorePlan } from "@/app/lib/store-plans-db";
+import { type TierId, type Interval, tierForPriceId } from "@/app/lib/plans";
 import { neon } from "@neondatabase/serverless";
 import { timingSafeEqualStr } from "@/app/lib/safe-compare";
 
@@ -87,6 +88,21 @@ export async function POST(request: NextRequest) {
  stripeCustomerId: (session.customer as string | null) ?? null,
  stripeSubscriptionId: (session.subscription as string | null) ?? null,
  }).catch((err) => console.error("[stripe-webhook] store_pro activate error:", err));
+ }
+ break;
+ }
+
+ // getvya.ai tiered subscription (starter/studio/atelier), 30-day trial
+ if (session.mode === "subscription" && (session.metadata as Record<string, string>)?.type === "store_subscription") {
+ const md = session.metadata as Record<string, string>;
+ if (md?.store_slug) {
+ await setStorePlan(md.store_slug, {
+ tier: (md.tier as TierId) || null,
+ interval: (md.interval as Interval) || null,
+ status: "trialing",
+ stripeCustomerId: (session.customer as string | null) ?? null,
+ stripeSubscriptionId: (session.subscription as string | null) ?? null,
+ }).catch((err) => console.error("[stripe-webhook] store_subscription activate error:", err));
  }
  break;
  }
@@ -188,6 +204,19 @@ export async function POST(request: NextRequest) {
  currentPeriodEnd: unixToIso(sub.current_period_end),
  }).catch((err) => console.error("[stripe-webhook] store_pro update error:", err));
  }
+ if ((sub.metadata as Record<string, string>)?.type === "store_subscription" && slug) {
+ const md = sub.metadata as Record<string, string>;
+ const priceId = (sub as { items?: { data?: { price?: { id?: string } }[] } }).items?.data?.[0]?.price?.id;
+ const fromPrice = priceId ? tierForPriceId(priceId) : null;
+ await setStorePlan(slug, {
+ tier: (md.tier as TierId) || fromPrice?.tierId || null,
+ interval: (md.interval as Interval) || fromPrice?.interval || null,
+ status: sub.status as string,
+ stripeSubscriptionId: sub.id as string,
+ stripeCustomerId: (sub.customer as string | null) ?? null,
+ currentPeriodEnd: unixToIso(sub.current_period_end),
+ }).catch((err) => console.error("[stripe-webhook] store_subscription update error:", err));
+ }
  break;
  }
 
@@ -197,6 +226,11 @@ export async function POST(request: NextRequest) {
  if ((sub.metadata as Record<string, string>)?.type === "store_pro" && slug) {
  await setStorePlan(slug, { plan: "free", status: "canceled" }).catch((err) =>
  console.error("[stripe-webhook] store_pro cancel error:", err),
+ );
+ }
+ if ((sub.metadata as Record<string, string>)?.type === "store_subscription" && slug) {
+ await setStorePlan(slug, { status: "canceled" }).catch((err) =>
+ console.error("[stripe-webhook] store_subscription cancel error:", err),
  );
  }
  break;

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { storeContactEmails } from "@/app/lib/stores";
+import { TIERS, TRIAL_DAYS, priceIdFor, priceEnvName, type TierId, type Interval } from "@/app/lib/plans";
+
+export const dynamic = "force-dynamic";
 
 function getStoreSlugFromEmail(email: string): string | null {
  for (const [slug, storeEmail] of Object.entries(storeContactEmails)) {
@@ -10,7 +13,7 @@ function getStoreSlugFromEmail(email: string): string | null {
 }
 
 function getBaseUrl(request: NextRequest) {
- const host = request.headers.get("host") || "vyaplatform.com";
+ const host = request.headers.get("host") || "getvya.ai";
  const proto = host.startsWith("localhost") ? "http" : "https";
  return `${proto}://${host}`;
 }
@@ -28,7 +31,8 @@ async function stripePost(path: string, params: Record<string, string>) {
  return json;
 }
 
-// POST /api/store/billing/checkout — start a VYA Pro (store data layer) subscription.
+// POST /api/store/billing/checkout — start a getvya.ai subscription (30-day trial).
+// Body: { tier: "starter"|"studio"|"atelier", interval: "month"|"year" }
 export async function POST(request: NextRequest) {
  const session = await auth();
  if (!session?.user?.email) {
@@ -39,10 +43,17 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
  }
 
- const priceId = process.env.STRIPE_STORE_PRO_PRICE_ID?.trim();
+ const body = (await request.json().catch(() => ({}))) as { tier?: string; interval?: string };
+ const tier = body.tier as TierId;
+ const interval: Interval = body.interval === "year" ? "year" : "month";
+ if (!TIERS.some((t) => t.id === tier)) {
+ return NextResponse.json({ error: "Unknown plan tier" }, { status: 400 });
+ }
+
+ const priceId = priceIdFor(tier, interval);
  if (!priceId) {
  return NextResponse.json(
- { error: "Pro plan is not configured yet. Set STRIPE_STORE_PRO_PRICE_ID." },
+ { error: `That plan isn't priced yet. Set ${priceEnvName(tier, interval)} in Stripe.` },
  { status: 503 },
  );
  }
@@ -54,13 +65,19 @@ export async function POST(request: NextRequest) {
  "line_items[0][price]": priceId,
  "line_items[0][quantity]": "1",
  customer_email: session.user.email,
- success_url: `${base}/store/dashboard?pro=success`,
- cancel_url: `${base}/store/dashboard?pro=cancelled`,
- "metadata[type]": "store_pro",
+ success_url: `${base}/admin/billing?sub=success`,
+ cancel_url: `${base}/admin/billing?sub=cancelled`,
+ allow_promotion_codes: "true",
+ "subscription_data[trial_period_days]": String(TRIAL_DAYS),
+ "metadata[type]": "store_subscription",
  "metadata[store_slug]": storeSlug,
- // Carry the slug onto the subscription so later subscription.* events can resolve the store.
- "subscription_data[metadata][type]": "store_pro",
+ "metadata[tier]": tier,
+ "metadata[interval]": interval,
+ // Carry onto the subscription so later subscription.* events can resolve store + tier.
+ "subscription_data[metadata][type]": "store_subscription",
  "subscription_data[metadata][store_slug]": storeSlug,
+ "subscription_data[metadata][tier]": tier,
+ "subscription_data[metadata][interval]": interval,
  });
  return NextResponse.json({ url: checkout.url });
  } catch (err) {

@@ -56,6 +56,7 @@ const PUBLIC_ROUTES = [
   "/api/store/listings",
   "/api/store/domain",
   "/api/store/payments",
+  "/api/store/billing",
   "/api/store/import",
   "/api/store/onboarding-status",
   "/api/store/intake",
