@@ -53,7 +53,15 @@ const nextConfig: NextConfig = {
     return {
       beforeFiles: osHosts.flatMap((h) => [
         { source: "/admin", has: [h], destination: "/infrastructure/admin" },
-        { source: "/admin/:path*", has: [h], destination: "/infrastructure/admin/:path*" },
+        // Exclude the auth pages: /admin/login and /admin/set-password must serve the LEGACY
+        // app/admin/* pages, which render unauthenticated. The workspace routes are wrapped by
+        // a layout that redirects to /admin/login when logged out — so a login page mapped into
+        // the workspace tree would redirect to itself forever.
+        {
+          source: "/admin/:path((?!login|set-password).*)",
+          has: [h],
+          destination: "/infrastructure/admin/:path",
+        },
       ]),
     };
   },
