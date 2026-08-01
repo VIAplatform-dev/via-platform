@@ -15,6 +15,8 @@ export type InboxSettings = {
  offersEnabled: boolean;
  offersBinding: boolean;
  minOfferPct: number; // auto-decline offers below this % of list price; 0 = no floor
+ notifyPhone: string | null; // seller's mobile — texted (via Linq) on a new buyer message
+ notifySms: boolean; // whether to send that text notification
 };
 
 export const DEFAULT_INBOX_SETTINGS: InboxSettings = {
@@ -22,6 +24,8 @@ export const DEFAULT_INBOX_SETTINGS: InboxSettings = {
  offersEnabled: true,
  offersBinding: false,
  minOfferPct: 0,
+ notifyPhone: null,
+ notifySms: false,
 };
 
 let ensured = false;
@@ -36,6 +40,8 @@ async function ensure() {
  min_offer_pct INTEGER NOT NULL DEFAULT 0,
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
+ await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS notify_phone TEXT`.catch(() => {});
+ await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS notify_sms BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
  ensured = true;
 }
 
@@ -50,6 +56,8 @@ export async function getInboxSettings(storeSlug: string): Promise<InboxSettings
  offersEnabled: r.offers_enabled !== false,
  offersBinding: !!r.offers_binding,
  minOfferPct: Math.max(0, Math.min(100, Number(r.min_offer_pct) || 0)),
+ notifyPhone: r.notify_phone ?? null,
+ notifySms: !!r.notify_sms,
  };
 }
 
@@ -57,10 +65,12 @@ export async function updateInboxSettings(storeSlug: string, patch: Partial<Inbo
  await ensure();
  const next = { ...(await getInboxSettings(storeSlug)), ...patch };
  next.minOfferPct = Math.max(0, Math.min(100, Math.round(next.minOfferPct)));
- await db()`INSERT INTO storefront_settings (store_slug, messaging_enabled, offers_enabled, offers_binding, min_offer_pct, updated_at)
- VALUES (${storeSlug}, ${next.messagingEnabled}, ${next.offersEnabled}, ${next.offersBinding}, ${next.minOfferPct}, now())
+ const phone = next.notifyPhone ? String(next.notifyPhone).trim().slice(0, 32) || null : null;
+ await db()`INSERT INTO storefront_settings (store_slug, messaging_enabled, offers_enabled, offers_binding, min_offer_pct, notify_phone, notify_sms, updated_at)
+ VALUES (${storeSlug}, ${next.messagingEnabled}, ${next.offersEnabled}, ${next.offersBinding}, ${next.minOfferPct}, ${phone}, ${next.notifySms}, now())
  ON CONFLICT (store_slug) DO UPDATE SET
  messaging_enabled = EXCLUDED.messaging_enabled, offers_enabled = EXCLUDED.offers_enabled,
- offers_binding = EXCLUDED.offers_binding, min_offer_pct = EXCLUDED.min_offer_pct, updated_at = now()`;
- return next;
+ offers_binding = EXCLUDED.offers_binding, min_offer_pct = EXCLUDED.min_offer_pct,
+ notify_phone = EXCLUDED.notify_phone, notify_sms = EXCLUDED.notify_sms, updated_at = now()`;
+ return { ...next, notifyPhone: phone };
 }

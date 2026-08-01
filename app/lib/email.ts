@@ -1367,6 +1367,36 @@ export async function sendStoreMessageNotification(params: {
  });
 }
 
+// Buyer-facing: the store replied to a conversation the buyer started. Sends them
+// the reply + a link back to their private thread (and reply-to = the store, so a
+// plain email reply reaches the seller too).
+export async function sendBuyerReplyNotification(params: {
+ buyerEmail: string;
+ storeName: string;
+ productTitle: string | null;
+ replyBody: string;
+ threadUrl: string;
+ replyTo?: string | null;
+}): Promise<void> {
+ const resend = getResend();
+ const esc = (s: string) =>
+ s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+ const about = params.productTitle ? ` about <strong>${esc(params.productTitle)}</strong>` : "";
+ await resend.emails.send({
+ from: FROM_EMAIL,
+ to: params.buyerEmail,
+ ...(params.replyTo ? { replyTo: params.replyTo } : {}),
+ subject: params.productTitle ? `${params.storeName} replied: ${params.productTitle}` : `${params.storeName} replied to your message`,
+ html: emailShell(`
+ <h2>${esc(params.storeName)} replied.</h2>
+ <p>You have a new reply${about}.</p>
+ <div class="link-box">${esc(params.replyBody)}</div>
+ <a href="${params.threadUrl}" class="btn">View &amp; reply</a>
+ <p class="muted">Or just reply to this email &mdash; it reaches the store.</p>
+ `),
+ });
+}
+
 export type EditLook = {
  /** Publicly-hosted image URL (e.g. https://vyaplatform.com/y2k-edit/look-1.jpg) */
  image: string;

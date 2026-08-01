@@ -20,7 +20,7 @@ type Offer = {
  status: "pending" | "accepted" | "declined" | "expired" | "withdrawn";
  lastActor: "buyer" | "store"; binding: boolean;
 };
-type Settings = { messagingEnabled: boolean; offersEnabled: boolean; offersBinding: boolean; minOfferPct: number };
+type Settings = { messagingEnabled: boolean; offersEnabled: boolean; offersBinding: boolean; minOfferPct: number; notifyPhone: string | null; notifySms: boolean };
 
 // Accent is theme-scoped: green inside /infrastructure/admin (via --accent), wine on the seller
 // /store portal (the fallback). --accent-soft is the matching tint for hover/active surfaces.
@@ -161,12 +161,26 @@ export default function InboxPage() {
  { key: "messagingEnabled", label: "Buyer messaging", hint: "Let shoppers ask questions about your pieces." },
  { key: "offersEnabled", label: "Offers", hint: "Let shoppers make price offers on your pieces." },
  { key: "offersBinding", label: "Accepted offers are binding", hint: "On: accepting reserves the piece and the buyer checks out at the agreed price. Off: it’s a soft agreement." },
+ { key: "notifySms", label: "Text me new messages", hint: "Get a text (iMessage where possible) the moment a shopper messages you, so you can reply fast." },
  ].map((row) => (
  <div key={row.key} className="flex items-start justify-between gap-6 py-3.5">
  <div><p className="text-[13px] font-medium text-stone-800">{row.label}</p><p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{row.hint}</p></div>
  <Toggle on={settings[row.key as keyof Settings] as boolean} onChange={(v) => saveSettings({ [row.key]: v } as Partial<Settings>)} />
  </div>
  ))}
+ {settings.notifySms && (
+ <div className="py-3.5">
+ <p className="text-[13px] font-medium text-stone-800">Notify this number</p>
+ <input
+ defaultValue={settings.notifyPhone || ""}
+ onBlur={(e) => saveSettings({ notifyPhone: e.target.value.trim() || null })}
+ placeholder="(555) 123-4567"
+ inputMode="tel"
+ className="mt-2 w-full max-w-xs rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400"
+ />
+ <p className="mt-1.5 text-[12px] text-stone-500">We text from VYA’s number; reply right from your inbox.</p>
+ </div>
+ )}
  </div>
  </div>
  )}

@@ -21,6 +21,8 @@ export async function PUT(request: NextRequest) {
  if (typeof b?.offersEnabled === "boolean") patch.offersEnabled = b.offersEnabled;
  if (typeof b?.offersBinding === "boolean") patch.offersBinding = b.offersBinding;
  if (typeof b?.minOfferPct === "number") patch.minOfferPct = b.minOfferPct;
+ if (typeof b?.notifyPhone === "string" || b?.notifyPhone === null) patch.notifyPhone = b.notifyPhone;
+ if (typeof b?.notifySms === "boolean") patch.notifySms = b.notifySms;
  const settings = await updateInboxSettings(slug, patch);
  return NextResponse.json({ ok: true, settings });
 }

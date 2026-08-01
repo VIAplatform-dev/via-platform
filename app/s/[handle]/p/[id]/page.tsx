@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem } from "@/app/lib/db/inventory";
+import { getInboxSettings } from "@/app/lib/storefront-settings-db";
 import { formatPrice } from "@/app/lib/formatPrice";
 import AskAboutItem from "@/app/s/AskAboutItem";
 import MakeOffer from "@/app/components/MakeOffer";
@@ -32,6 +33,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const sold = item.status === "sold" || item.status === "reserved";
  const price = formatPrice(item.priceCents / 100, item.currency);
  const link = (p: string) => (preview ? `${p}?preview=1` : p);
+ // Honor the store's Buyer-messaging toggle (defaults on if settings are unavailable).
+ const inbox = await getInboxSettings(sf.storeSlug).catch(() => null);
 
  return (
  <main style={{ background: c.bg, color: c.text, fontFamily: body }} className="min-h-screen">
@@ -76,7 +79,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  )}
  {!sold && (
  <div className="mt-3 flex flex-col gap-1">
- <AskAboutItem storeSlug={sf.storeSlug} itemTitle={item.title} accent={c.accent} />
+ {inbox?.messagingEnabled !== false && <AskAboutItem storeSlug={sf.storeSlug} itemTitle={item.title} accent={c.accent} />}
  <MakeOffer storeSlug={sf.storeSlug} itemId={item.id} itemTitle={item.title} listPriceCents={item.priceCents} accent={c.accent} />
  </div>
  )}

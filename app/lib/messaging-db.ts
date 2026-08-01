@@ -142,3 +142,26 @@ export async function markStoreRead(id: number, storeSlug: string): Promise<void
  const sql = neon(getDatabaseUrl());
  await sql`UPDATE storefront_conversations SET store_read_at = now() WHERE id = ${id} AND store_slug = ${storeSlug}`;
 }
+
+/** All of a buyer's conversations with ONE store (by email). Store-scoped — a buyer of Store A
+ *  is invisible to Store B; this only ever returns threads for (this store, this email). */
+export async function getConversationsForBuyer(storeSlug: string, email: string): Promise<ConversationSummary[]> {
+ await ensureTables();
+ const sql = neon(getDatabaseUrl());
+ const rows = await sql`
+ SELECT c.*,
+ (SELECT body FROM storefront_messages m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS last_message
+ FROM storefront_conversations c
+ WHERE c.store_slug = ${storeSlug} AND LOWER(c.buyer_email) = LOWER(${email})
+ ORDER BY c.last_message_at DESC
+ LIMIT 100`;
+ return rows.map((r: any) => ({ ...mapConv(r), lastMessage: r.last_message ?? null, storeUnread: 0 }));
+}
+
+/** A single conversation scoped to (store, buyer email) — authorizes a buyer's reply. */
+export async function getConversationForBuyer(id: number, storeSlug: string, email: string): Promise<Conversation | null> {
+ await ensureTables();
+ const sql = neon(getDatabaseUrl());
+ const rows = await sql`SELECT * FROM storefront_conversations WHERE id = ${id} AND store_slug = ${storeSlug} AND LOWER(buyer_email) = LOWER(${email})`;
+ return rows.length ? mapConv(rows[0]) : null;
+}
