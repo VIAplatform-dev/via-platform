@@ -52,6 +52,13 @@ export async function POST(request: NextRequest) {
  (perStoreEnvVar && process.env[perStoreEnvVar]) ||
  process.env.SQUARE_WEBHOOK_SIGNATURE_KEY;
 
+ // Fail CLOSED: without a signing key we cannot verify the payload, so reject rather than
+ // trust an unsigned webhook — an unsigned "COMPLETED payment" would let anyone fabricate a
+ // sale and manufacture commission. (Shopify already fails closed; Square must too.)
+ if (!signatureKey) {
+ console.error("[square-webhook] No signing key configured — rejecting unverifiable webhook");
+ return NextResponse.json({ error: "Webhook signature not configured" }, { status: 401 });
+ }
  // Reject if we have a key configured but no/bad signature
  if (signatureKey) {
  if (!signatureHeader) {

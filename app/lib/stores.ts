@@ -1542,6 +1542,8 @@ export const storeContactEmails: Record<string, string> = {
  "reine-revival": "kaylendbusiness@gmail.com",
  "venus-vintage": "venussvintagee@gmail.com",
  "blummier": "blummier@gmail.com",
+  "nunumia": "nunumiavintage@gmail.com",
+  "thread-and-bloom": "shopthreadandbloom@gmail.com",
  // VYA admin test account — sees all requests
  "via-admin": "hana@theviaplatform.com",
 };

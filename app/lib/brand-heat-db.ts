@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { inferBrandFromTitle, normalizeCategory } from "./market-data-db";
+import { PRIVACY } from "./data-layer/config";
 
 // Brand Heat Index — a cross-store brand-momentum ranking (the Lyst-Index / StockX
 // Current-Culture-Index model). Aggregates VYA's demand signals across ALL stores
@@ -84,8 +85,11 @@ export async function getBrandHeatIndex(periodDays = 30, limit = 50): Promise<Br
  };
 
  // 1. Views + favorites per product, split current vs prior period.
+ // Track distinct stores per brand so we can enforce the N≥5 privacy floor — a brand
+ // carried by fewer than PRIVACY.minStores stores would leak an individual store's numbers.
+ const brandStores = new Map<string, Set<string>>();
  const eng = (await sql`
- SELECT p.title,
+ SELECT p.title, p.store_slug,
   COALESCE(vc.c,0)::int AS v_cur, COALESCE(vp.c,0)::int AS v_prior,
   COALESCE(fc.c,0)::int AS f_cur, COALESCE(fp.c,0)::int AS f_prior
  FROM products p
@@ -98,10 +102,12 @@ export async function getBrandHeatIndex(periodDays = 30, limit = 50): Promise<Br
  LEFT JOIN (SELECT product_id, COUNT(*) c FROM product_favorites WHERE created_at >= NOW() - ${prior}::interval AND created_at < NOW() - ${cur}::interval GROUP BY product_id) fp
   ON fp.product_id = p.id
  WHERE COALESCE(vc.c,0)+COALESCE(vp.c,0)+COALESCE(fc.c,0)+COALESCE(fp.c,0) > 0
- `) as Array<{ title: string; v_cur: number; v_prior: number; f_cur: number; f_prior: number }>;
+ `) as Array<{ title: string; store_slug: string; v_cur: number; v_prior: number; f_cur: number; f_prior: number }>;
  for (const r of eng) {
  const b = inferBrandFromTitle(r.title);
  if (!b) continue;
+ let st = brandStores.get(b); if (!st) { st = new Set(); brandStores.set(b, st); }
+ st.add(r.store_slug);
  const a = get(b);
  a.vC += r.v_cur; a.vP += r.v_prior; a.fC += r.f_cur; a.fP += r.f_prior;
  }
@@ -147,8 +153,11 @@ export async function getBrandHeatIndex(periodDays = 30, limit = 50): Promise<Br
  else a.soldP += qty;
  }
 
- // Score + momentum.
- const scored = Array.from(acc.entries()).map(([brand, a]) => {
+ // Score + momentum. PRIVACY FLOOR: only surface a brand carried by ≥ minStores distinct
+ // stores, so aggregated heat/momentum can never be traced back to one store's numbers.
+ const scored = Array.from(acc.entries())
+ .filter(([brand]) => (brandStores.get(brand)?.size ?? 0) >= PRIVACY.minStores)
+ .map(([brand, a]) => {
  const heat = a.vC * W.view + a.fC * W.favorite + a.sC * W.search + a.soldC * W.sold;
  const heatPrior = a.vP * W.view + a.fP * W.favorite + a.sP * W.search + a.soldP * W.sold;
  const hasPrior = heatPrior >= MIN_PRIOR_HEAT_FOR_MOMENTUM;
@@ -244,12 +253,20 @@ async function groupEngagement(periodDays: number, field: "category" | "store"):
  WHERE COALESCE(vc.c,0)+COALESCE(vp.c,0)+COALESCE(fc.c,0)+COALESCE(fp.c,0) > 0
  `) as Array<{ store_slug: string; product_type: string | null; v_cur: number; v_prior: number; f_cur: number; f_prior: number }>;
  const map = new Map<string, G>();
+ const groupStores = new Map<string, Set<string>>(); // key → distinct stores, for the privacy floor
  const get = (k: string): G => { let g = map.get(k); if (!g) { g = { vC: 0, vP: 0, fC: 0, fP: 0, soldC: 0, soldP: 0, gmv: 0 }; map.set(k, g); } return g; };
  for (const r of rows) {
  const key = field === "store" ? r.store_slug : (r.product_type ? normalizeCategory(r.product_type) : null);
  if (!key) continue;
+ let st = groupStores.get(key); if (!st) { st = new Set(); groupStores.set(key, st); }
+ st.add(r.store_slug);
  const g = get(key);
  g.vC += r.v_cur; g.vP += r.v_prior; g.fC += r.f_cur; g.fP += r.f_prior;
+ }
+ // PRIVACY FLOOR on seller-facing CATEGORY buckets — drop any category carried by fewer than
+ // minStores stores so it can't expose one store. Store buckets are admin-only, so not gated.
+ if (field === "category") {
+ for (const [k] of map) if ((groupStores.get(k)?.size ?? 0) < PRIVACY.minStores) map.delete(k);
  }
  return map;
 }
