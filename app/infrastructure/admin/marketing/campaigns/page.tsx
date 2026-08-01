@@ -48,7 +48,7 @@ export default function CampaignsPage() {
  <p className="mt-0.5 text-[12px] text-stone-500">From <span className="font-medium text-stone-700">{camp?.storeName || "your store"}</span> · replies go to {camp?.storeEmail || "your contact email"}</p>
  </div>
  <div className="flex items-center gap-2">
- <Link href="/infrastructure/admin/marketing/design" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium text-stone-500 ring-1 ring-stone-200 transition hover:text-stone-800 hover:ring-stone-300">
+ <Link href="/admin/marketing/design" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium text-stone-500 ring-1 ring-stone-200 transition hover:text-stone-800 hover:ring-stone-300">
  <Palette size={13} className="text-stone-400" /> Design
  </Link>
  <span title={camp?.audience ? `${camp.audience.buyers} from orders · ${camp.audience.imported} imported${camp.audience.unsubscribed ? ` · ${camp.audience.unsubscribed} unsubscribed (skipped)` : ""}` : undefined} className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[12px] font-medium text-stone-600 ring-1 ring-stone-200">

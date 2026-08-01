@@ -39,6 +39,24 @@ const nextConfig: NextConfig = {
       })),
     ];
   },
+  async rewrites() {
+    // getvya.ai serves the Owner Workspace at a clean /admin, but the routes physically
+    // live at /infrastructure/admin (the /admin namespace is taken by the legacy internal
+    // panel on vyaplatform.com). This host-conditional rewrite maps them — and because it
+    // lives in next.config (not middleware), the client router honors it, so in-workspace
+    // navigation is proper SPA nav rather than full reloads. Scoped to the getvya.ai host,
+    // so vyaplatform.com/admin (the legacy panel) is untouched.
+    const osHosts = [
+      { type: "host" as const, value: "getvya.ai" },
+      { type: "host" as const, value: "www.getvya.ai" },
+    ];
+    return {
+      beforeFiles: osHosts.flatMap((h) => [
+        { source: "/admin", has: [h], destination: "/infrastructure/admin" },
+        { source: "/admin/:path*", has: [h], destination: "/infrastructure/admin/:path*" },
+      ]),
+    };
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

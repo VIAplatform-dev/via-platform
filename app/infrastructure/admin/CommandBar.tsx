@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, CornerDownLeft } from "lucide-react";
 import { cn } from "./ui";
 
-const B = "/infrastructure/admin";
+const B = "/admin";
 type Hit = { id: string; label: string; sub?: string; href: string };
 type Group = { group: string; hits: Hit[] };
 

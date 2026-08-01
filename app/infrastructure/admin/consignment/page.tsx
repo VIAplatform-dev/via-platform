@@ -27,8 +27,8 @@ export default function ConsignmentPage() {
 
  const actions = (
  <>
- <TechButtonLink variant="secondary" href="/infrastructure/admin/consignment/settings"><Settings2 size={14} /> Settings</TechButtonLink>
- <TechButtonLink href="/infrastructure/admin/consignment/consignors"><UserPlus size={14} /> Consignors</TechButtonLink>
+ <TechButtonLink variant="secondary" href="/admin/consignment/settings"><Settings2 size={14} /> Settings</TechButtonLink>
+ <TechButtonLink href="/admin/consignment/consignors"><UserPlus size={14} /> Consignors</TechButtonLink>
  </>
  );
 
@@ -51,7 +51,7 @@ export default function ConsignmentPage() {
  icon={<Users size={28} strokeWidth={1.5} />}
  title="No consignment activity yet"
  body="Add your consignors and mark their pieces sold — balances, payouts and sales volume all show up here."
- action={<TechButtonLink href="/infrastructure/admin/consignment/consignors">Add a consignor</TechButtonLink>}
+ action={<TechButtonLink href="/admin/consignment/consignors">Add a consignor</TechButtonLink>}
  />
  ) : (
  <>
@@ -120,7 +120,7 @@ export default function ConsignmentPage() {
  </div>
  )}
  <div className="flex items-center justify-end border-t border-stone-100 px-5 py-3">
- <TechButtonLink variant="secondary" href="/infrastructure/admin/consignment/payouts" className={cn("text-[12px]")}>Pay out consignors →</TechButtonLink>
+ <TechButtonLink variant="secondary" href="/admin/consignment/payouts" className={cn("text-[12px]")}>Pay out consignors →</TechButtonLink>
  </div>
  </TechCard>
  </>

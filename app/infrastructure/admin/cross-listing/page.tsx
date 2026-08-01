@@ -106,7 +106,7 @@ export default function CrossListingPage() {
  const mktRevenue = marketRows.reduce((s, r) => s + r.revenueCents, 0);
  const crossListedCount = board.filter((it) => Object.entries(it.listings).some(([k, st]) => k !== "vya" && (st === "listed" || st === "pending"))).length;
 
- const settingsBtn = <TechButtonLink variant="secondary" href="/infrastructure/admin/cross-listing/settings"><Settings2 size={14} /> Marketplace settings</TechButtonLink>;
+ const settingsBtn = <TechButtonLink variant="secondary" href="/admin/cross-listing/settings"><Settings2 size={14} /> Marketplace settings</TechButtonLink>;
  const installBtn = <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Get the extension</TechButtonLink>;
 
  return (
@@ -125,7 +125,7 @@ export default function CrossListingPage() {
  icon={<Tag size={28} strokeWidth={1.5} />}
  title="No marketplaces connected yet"
  body="Connect eBay, Depop, Poshmark and more — then publish once to VYA and list everywhere. Sales, offers and revenue per channel show up here."
- action={<TechButtonLink href="/infrastructure/admin/cross-listing/settings">Connect a marketplace</TechButtonLink>}
+ action={<TechButtonLink href="/admin/cross-listing/settings">Connect a marketplace</TechButtonLink>}
  />
  ) : (
  <>
@@ -146,7 +146,7 @@ export default function CrossListingPage() {
  {settingsBtn}
  </div>
  {marketRows.length === 0 ? (
- <div className="px-5 py-8 text-center text-[13px] text-stone-400">No marketplaces connected — <a href="/infrastructure/admin/cross-listing/settings" className="text-[var(--accent-ink,#0b7a5c)] hover:underline">connect one</a> to start.</div>
+ <div className="px-5 py-8 text-center text-[13px] text-stone-400">No marketplaces connected — <a href="/admin/cross-listing/settings" className="text-[var(--accent-ink,#0b7a5c)] hover:underline">connect one</a> to start.</div>
  ) : (
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">

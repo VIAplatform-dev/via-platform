@@ -53,7 +53,7 @@ export default function ConsignmentSettingsPage() {
  return (
  <AdminPage>
  <div className="mb-1">
- <Link href="/infrastructure/admin/consignment" className="text-[12px] text-stone-400 hover:text-stone-700">← Consignment</Link>
+ <Link href="/admin/consignment" className="text-[12px] text-stone-400 hover:text-stone-700">← Consignment</Link>
  </div>
  <AdminHeader
  eyebrow="Sell · Consignment · Settings"

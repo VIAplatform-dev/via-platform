@@ -42,7 +42,7 @@ export default function CustomerDetailPage() {
 
  return (
  <AdminPage>
- <Link href="/infrastructure/admin/customers" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Customers</Link>
+ <Link href="/admin/customers" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Customers</Link>
  <AdminHeader
  eyebrow="Store · Customers"
  title={
@@ -73,7 +73,7 @@ export default function CustomerDetailPage() {
  <thead><tr><TH className="px-5">Order</TH><TH className="px-4">Item</TH><TH right className="px-4">Amount</TH><TH className="px-4">Status</TH><TH right className="px-5">Date</TH></tr></thead>
  <tbody>
  {orders.map((o) => (
- <tr key={o.id} className="cursor-pointer transition hover:bg-stone-50/70" onClick={() => { window.location.href = `/infrastructure/admin/orders/${o.id}`; }}>
+ <tr key={o.id} className="cursor-pointer transition hover:bg-stone-50/70" onClick={() => { window.location.href = `/admin/orders/${o.id}`; }}>
  <TD className="px-5 font-mono text-[12px] tabular-nums text-stone-500">{fmtOrderNo(o.orderNo)}</TD>
  <TD className="px-4 font-medium text-stone-800">{o.itemTitle || "Item"}</TD>
  <TD right className="px-4 text-stone-700">{money(o.amountCents)}</TD>
@@ -91,7 +91,7 @@ export default function CustomerDetailPage() {
  <TechCard className="mb-5 overflow-hidden">
  <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
  <h3 className="text-[13px] font-semibold text-stone-900">Offers sent</h3>
- <TechButtonLink variant="secondary" href="/infrastructure/admin/inbox" className="px-3 py-1 text-[12px]"><Tag size={12} /> Inbox</TechButtonLink>
+ <TechButtonLink variant="secondary" href="/admin/inbox" className="px-3 py-1 text-[12px]"><Tag size={12} /> Inbox</TechButtonLink>
  </div>
  {offers.length === 0 ? (
  <div className="px-5 py-8 text-center text-[13px] text-stone-400">No offers from this customer.</div>
@@ -117,14 +117,14 @@ export default function CustomerDetailPage() {
  <TechCard className="overflow-hidden">
  <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
  <h3 className="text-[13px] font-semibold text-stone-900">Messages</h3>
- <TechButtonLink variant="secondary" href="/infrastructure/admin/inbox" className="px-3 py-1 text-[12px]"><MessageCircle size={12} /> Open inbox</TechButtonLink>
+ <TechButtonLink variant="secondary" href="/admin/inbox" className="px-3 py-1 text-[12px]"><MessageCircle size={12} /> Open inbox</TechButtonLink>
  </div>
  {conversations.length === 0 ? (
  <div className="px-5 py-8 text-center text-[13px] text-stone-400">No messages from this customer.</div>
  ) : (
  <div className="divide-y divide-stone-100">
  {conversations.map((c) => (
- <Link key={c.id} href="/infrastructure/admin/inbox" className="flex items-center gap-3 px-5 py-3 transition hover:bg-stone-50/70">
+ <Link key={c.id} href="/admin/inbox" className="flex items-center gap-3 px-5 py-3 transition hover:bg-stone-50/70">
  <div className="min-w-0 flex-1">
  {c.itemTitle && <p className="truncate text-[12px] text-stone-400">Re: {c.itemTitle}</p>}
  <p className="truncate text-[13px] text-stone-700">{c.lastMessage || "—"}</p>

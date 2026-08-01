@@ -177,6 +177,64 @@ export async function middleware(request: NextRequest) {
     host === "localhost" ||
     host.endsWith(".vercel.app");
 
+  // ── getvya.ai — the operating-system product ────────────────────────────────
+  // getvya.ai serves the seller OS on its own host: the marketing site at the root
+  // and the Owner Workspace at /admin. Runs BEFORE the storefront catch-all below so
+  // it isn't mistaken for a seller's connected domain. APIs, /_next, /infra assets and
+  // the raw /infrastructure routes pass through to the normal pipeline (which keeps
+  // their auth gating + static rewrites); only the OS's own clean paths are rewritten.
+  const isOsHost = host === "getvya.ai" || host === "www.getvya.ai";
+  if (isOsHost) {
+    const passthrough =
+      pathname.startsWith("/api") ||
+      pathname.startsWith("/_next") ||
+      pathname.startsWith("/infra/") ||
+      pathname === "/infrastructure" ||
+      pathname.startsWith("/infrastructure/") ||
+      // legacy admin auth routes must stay reachable so admin login works on this host
+      pathname === "/admin/login" ||
+      pathname === "/admin/set-password" ||
+      pathname.startsWith("/admin/auth");
+    if (!passthrough) {
+      if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+        // Owner Workspace. The path→route mapping (/admin/* → /infrastructure/admin/*) is a
+        // host-conditional rewrite in next.config (client-router aware, so SPA nav works).
+        // Middleware only enforces the admin gate here (auth pages are in `passthrough` above),
+        // then hands off — the rewrite serves the actual route.
+        if (!(await isAdminAuthenticated(request))) {
+          const loginUrl = new URL("/admin/login", request.url);
+          loginUrl.searchParams.set("redirect", fullPath);
+          return NextResponse.redirect(loginUrl);
+        }
+        return NextResponse.next();
+      }
+      // Everything else on getvya.ai is the marketing site: "/" → landing page,
+      // "/company" etc → the matching static page under public/infra.
+      const url = request.nextUrl.clone();
+      url.pathname = pathname === "/" ? "/infra/index.html" : `/infra${pathname.replace(/\/+$/, "")}.html`;
+      return NextResponse.rewrite(url);
+    }
+    // passthrough falls through to the normal pipeline; the storefront blocks skip isOsHost.
+  }
+
+  // ── Old /infrastructure/* URLs → getvya.ai ──────────────────────────────────
+  // The OS moved to its own domain. Permanently redirect the old paths on the
+  // marketplace host so links, bookmarks and search results follow:
+  //   vyaplatform.com/infrastructure            → getvya.ai/
+  //   vyaplatform.com/infrastructure/admin/…    → getvya.ai/admin/…
+  //   vyaplatform.com/infrastructure/company    → getvya.ai/company
+  // Gated to the real marketplace host so localhost / *.vercel.app previews and
+  // getvya.ai itself are unaffected.
+  const isMarketplaceHost = host === "vyaplatform.com" || host === "www.vyaplatform.com";
+  if (isMarketplaceHost && (pathname === "/infrastructure" || pathname.startsWith("/infrastructure/"))) {
+    const rest = pathname.slice("/infrastructure".length); // "" | "/admin/…" | "/company"
+    let target: string;
+    if (rest === "" || rest === "/") target = "/";
+    else if (rest === "/admin" || rest.startsWith("/admin/")) target = `/admin${rest.slice("/admin".length)}`;
+    else target = rest;
+    return NextResponse.redirect(new URL(`${target}${search}`, "https://getvya.ai"), 308);
+  }
+
   // Free branded subdomain: {handle}.vyaplatform.com → that store's storefront.
   // We rewrite to /s/{handle}, which itself redirects to the captured site if the
   // seller brought one over. (Needs a *.vyaplatform.com wildcard domain on Vercel.)
@@ -188,7 +246,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  if (host && !isVyaHost && !pathname.startsWith("/api") && !pathname.startsWith("/_next")) {
+  if (host && !isVyaHost && !isOsHost && !pathname.startsWith("/api") && !pathname.startsWith("/_next")) {
     // A captured site's internal links are /site/{slug}/… — let those through so
     // navigation within a brought-over site works on the seller's own domain.
     if (pathname.startsWith("/site/")) return NextResponse.next();

@@ -21,7 +21,7 @@ type Msg = { role: "user" | "assistant"; content: string };
 const PERIODS: Record<string, number> = { Today: 1, "7d": 7, "30d": 30, "90d": 90 };
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-const B = "/infrastructure/admin";
+const B = "/admin";
 
 const ACTIONS = [
  { href: `${B}/add-listing`, icon: PlusCircle, title: "Add a listing", body: "Snap a photo — AI drafts the title, price, and description." },

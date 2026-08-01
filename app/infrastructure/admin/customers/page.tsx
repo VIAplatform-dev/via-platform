@@ -204,7 +204,7 @@ export default function CustomersPage() {
  <tr key={c.email} className="transition hover:bg-stone-50/70">
  <TD className="px-4"><input type="checkbox" className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${c.email}`} /></TD>
  <TD className="px-3">
- <Link href={`/infrastructure/admin/customers/${encodeURIComponent(c.email)}`} className="group/name inline-block">
+ <Link href={`/admin/customers/${encodeURIComponent(c.email)}`} className="group/name inline-block">
  <div className="font-medium text-stone-900 group-hover/name:underline">{c.name || c.email}</div>
  {c.name && <div className="text-[12px] text-stone-400">{c.email}</div>}
  </Link>

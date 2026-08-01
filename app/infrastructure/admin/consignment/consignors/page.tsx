@@ -55,7 +55,7 @@ export default function ConsignorsPage() {
 
  return (
  <AdminPage>
- <Link href="/infrastructure/admin/consignment" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Consignment</Link>
+ <Link href="/admin/consignment" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Consignment</Link>
  <AdminHeader eyebrow="Sell · Consignment · Consignors" title="Consignors" subtitle="Your consignors, their splits, and what they’re owed." />
 
  <TechCard className="p-4">

@@ -391,7 +391,7 @@ export default function IntakePage() {
  <p className="mt-1 text-sm text-stone-500">{savedDraft ? "It’s in your inventory — publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
  <div className="mt-6 flex items-center justify-center gap-3">
  <TechButton onClick={reset}>List another</TechButton>
- <TechButton variant="secondary" onClick={() => { window.location.href = "/infrastructure/admin/inventory"; }}>View inventory</TechButton>
+ <TechButton variant="secondary" onClick={() => { window.location.href = "/admin/inventory"; }}>View inventory</TechButton>
  </div>
  </div>
  </div>

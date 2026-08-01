@@ -76,7 +76,7 @@ export default function CrossListingSettingsPage() {
 
  return (
  <AdminPage>
- <Link href="/infrastructure/admin/cross-listing" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Cross-listing</Link>
+ <Link href="/admin/cross-listing" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Cross-listing</Link>
  <AdminHeader eyebrow="Sell · Cross-listing · Settings" title="Connected marketplaces" subtitle="Connect the shops you also sell on. New VYA listings queue to every auto-list channel automatically, and a sale anywhere pulls the piece from everywhere so it never double-sells." />
 
  {/* Extension install — required for the Depop/Vestiaire (extension) channels to auto-fill. */}

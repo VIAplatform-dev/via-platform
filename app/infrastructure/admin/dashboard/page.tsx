@@ -38,7 +38,7 @@ const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { maximumFr
 const dollars = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const shortDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—");
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
-const B = "/infrastructure/admin";
+const B = "/admin";
 
 const TABS = [
  { key: "overview", label: "Overview" },

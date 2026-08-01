@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Infrastructure admin design system — the "techie white" look from the pitch deck.
 // Mint-green as the primary accent, uppercase mono micro-labels, metric cards with
-// sparklines, status pills, and hairline data tables. Scoped to /infrastructure/admin
+// sparklines, status pills, and hairline data tables. Scoped to /admin
 // only (the accent is set as --accent on the admin shell; the seller /store portal
 // keeps its wine accent via the maroon fallback in @/app/store/ui).
 // ─────────────────────────────────────────────────────────────────────────────

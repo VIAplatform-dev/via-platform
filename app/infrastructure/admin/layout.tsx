@@ -9,7 +9,7 @@ import CommandBar from "./CommandBar";
 
 type Sub = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: LucideIcon; children?: Sub[]; match?: string[] };
-const B = "/infrastructure/admin";
+const B = "/admin";
 const GROUPS: { label?: string; items: NavItem[] }[] = [
  { items: [{ href: `${B}/home`, label: "Home", icon: Home }] },
  {
@@ -79,7 +79,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
 
 
  useEffect(() => {
- if (ok === false) router.replace("/admin/login?redirect=/infrastructure/admin");
+ if (ok === false) router.replace("/admin/login?redirect=/admin");
  }, [ok, router]);
 
  if (ok !== true) {

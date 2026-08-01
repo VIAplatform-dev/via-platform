@@ -273,7 +273,7 @@ export default function ItemsPage() {
  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search items…" aria-label="Search items"
  className="h-9 w-full rounded-full border border-stone-200 bg-white pl-8 pr-3 text-[13px] text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[var(--accent,#0e9f76)] sm:w-52" />
  </div>
- <TechButtonLink href="/infrastructure/admin/add-listing">+ New listing</TechButtonLink>
+ <TechButtonLink href="/admin/add-listing">+ New listing</TechButtonLink>
  </>
  }
  />
@@ -312,7 +312,7 @@ export default function ItemsPage() {
  icon={<Package size={28} strokeWidth={1.5} />}
  title={term ? "No matches" : statusFilter ? `No ${statusFilter} items` : "No items yet"}
  body={term ? "Try a different search." : "Snap a photo and VYA drafts the listing for you — title, description, and a ghost-mannequin image."}
- action={term ? undefined : <TechButtonLink href="/infrastructure/admin/add-listing">Snap your first piece</TechButtonLink>}
+ action={term ? undefined : <TechButtonLink href="/admin/add-listing">Snap your first piece</TechButtonLink>}
  />
  ) : (
  <TechCard className="overflow-hidden">

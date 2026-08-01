@@ -12,12 +12,12 @@ const PAGE_LABEL: Record<string, string> = {
  "/store/home": "Home", "/store/intake": "Add listing", "/store/items": "Inventory", "/store/orders": "Orders",
  "/store/inbox": "Inbox", "/store/storefront": "Storefront", "/store/customers": "Customers", "/store/payments": "Payments",
  "/store/dashboard": "Analytics", "/store/settings": "Settings",
- "/infrastructure/admin/home": "Home", "/infrastructure/admin/add-listing": "Add listing", "/infrastructure/admin/inventory": "Inventory",
- "/infrastructure/admin/orders": "Orders", "/infrastructure/admin/inbox": "Inbox", "/infrastructure/admin/storefront": "Storefront",
- "/infrastructure/admin/customers": "Customers", "/infrastructure/admin/payments": "Payments", "/infrastructure/admin/dashboard": "Analytics",
- "/infrastructure/admin/settings": "Settings", "/infrastructure/admin/marketing": "Marketing", "/infrastructure/admin/performance": "Performance",
- "/infrastructure/admin/marketing/campaigns": "Marketing · Campaigns", "/infrastructure/admin/marketing/design": "Marketing · Email design",
- "/infrastructure/admin/connect": "Connect", "/infrastructure/admin/import": "Bring your site", "/infrastructure/admin/ai": "AI accuracy",
+ "/admin/home": "Home", "/admin/add-listing": "Add listing", "/admin/inventory": "Inventory",
+ "/admin/orders": "Orders", "/admin/inbox": "Inbox", "/admin/storefront": "Storefront",
+ "/admin/customers": "Customers", "/admin/payments": "Payments", "/admin/dashboard": "Analytics",
+ "/admin/settings": "Settings", "/admin/marketing": "Marketing", "/admin/performance": "Performance",
+ "/admin/marketing/campaigns": "Marketing · Campaigns", "/admin/marketing/design": "Marketing · Email design",
+ "/admin/connect": "Connect", "/admin/import": "Bring your site", "/admin/ai": "AI accuracy",
 };
 
 const WRITE_TOOLS = new Set(["update_storefront_design", "style_storefront", "add_html_section", "set_hero_photo", "update_listing", "add_section", "update_section", "remove_section", "move_section", "set_layout", "create_page", "set_page_layout", "delete_page", "edit_captured_page", "style_captured_site", "update_email_design", "revert_last_change"]);
