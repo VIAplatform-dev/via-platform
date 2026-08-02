@@ -33,7 +33,16 @@ const ACCENT = "#5D0F17";
 const ta = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-stone-400 focus:ring-2 focus:ring-stone-900/[0.06]";
 
 export default function SettingsPage() {
- const [tab, setTab] = useState<"brief" | "pricing" | "shipping" | "sender">("brief");
+ const [tab, setTab] = useState<"brief" | "pricing" | "shipping" | "sender" | "policy">("brief");
+
+ // Returns / refund policy
+ const [refundsEnabled, setRefundsEnabled] = useState(true);
+ const [returnWindowDays, setReturnWindowDays] = useState("14");
+ const [restockingFeePct, setRestockingFeePct] = useState("0");
+ const [returnShippingPaidBy, setReturnShippingPaidBy] = useState<"buyer" | "store">("buyer");
+ const [policyText, setPolicyText] = useState("");
+ const [polBusy, setPolBusy] = useState(false);
+ const [polSaved, setPolSaved] = useState(false);
 
  // Pricing floor
  const [pct, setPct] = useState("");
@@ -74,8 +83,9 @@ export default function SettingsPage() {
 
  useEffect(() => {
  const t = new URLSearchParams(window.location.search).get("tab");
- if (t === "brief" || t === "pricing" || t === "shipping" || t === "sender") { const id = setTimeout(() => setTab(t), 0); void id; }
+ if (t === "brief" || t === "pricing" || t === "shipping" || t === "sender" || t === "policy") { const id = setTimeout(() => setTab(t), 0); void id; }
  fetch("/api/store/pricing").then((r) => (r.ok ? r.json() : null)).then((d) => d && setPct(String(d.minMarkupPct))).catch(() => {});
+ fetch("/api/store/policy").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.policy) { setRefundsEnabled(d.policy.refundsEnabled !== false); setReturnWindowDays(String(d.policy.returnWindowDays ?? 14)); setRestockingFeePct(String(d.policy.restockingFeePct ?? 0)); setReturnShippingPaidBy(d.policy.returnShippingPaidBy === "store" ? "store" : "buyer"); setPolicyText(d.policy.policyText || ""); } }).catch(() => {});
  fetch("/api/store/brief").then((r) => (r.ok ? r.json() : null)).then((d) => {
   const x = d?.brief;
   if (!x) return;
@@ -162,6 +172,13 @@ export default function SettingsPage() {
  setSBusy(false);
  }
 
+ async function savePolicy() {
+ setPolBusy(true); setPolSaved(false);
+ const r = await fetch("/api/store/policy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refundsEnabled, returnWindowDays: Number(returnWindowDays) || 0, restockingFeePct: Number(restockingFeePct) || 0, returnShippingPaidBy, policyText: policyText.trim() || null }) }).catch(() => null);
+ if (r && r.ok) setPolSaved(true);
+ setPolBusy(false);
+ }
+
  const setF = (k: keyof ShipFrom, v: string) => { setFrom((f) => ({ ...f, [k]: v })); setSSaved(false); };
 
  return (
@@ -170,7 +187,7 @@ export default function SettingsPage() {
 
   {/* Tabs */}
   <div className="mb-6 flex gap-5 border-b border-stone-200">
-  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["shipping", "Shipping"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
+  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["shipping", "Shipping"], ["policy", "Returns"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
    <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 pb-2.5 text-[13px] font-medium transition ${tab === k ? "border-[#5D0F17] text-[#5D0F17]" : "border-transparent text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
   ))}
   </div>
@@ -337,6 +354,69 @@ export default function SettingsPage() {
    <Button onClick={saveShipping} disabled={sBusy}>{sBusy ? "Saving…" : "Save shipping"}</Button>
    {sSaved && <span className="text-xs text-emerald-600">Saved ✓</span>}
    {sErr && <span className="text-xs text-red-600">{sErr}</span>}
+   </div>
+  </div>
+  </Card>
+  )}
+
+  {/* Returns / refund policy — buyer-facing, per store */}
+  {tab === "policy" && (
+  <Card className="mb-5">
+  <CardHeader title="Returns & refunds" subtitle="What buyers see on your storefront before they buy. You can always issue a refund manually from an order, whatever this says." />
+  <div className="space-y-5">
+   <div className="flex items-center justify-between gap-4">
+   <div>
+    <p className="text-[13px] font-medium text-stone-800">Accept returns</p>
+    <p className="text-[12px] text-stone-500">Off shows “All sales final.” On lets buyers return within your window.</p>
+   </div>
+   <button
+    type="button" onClick={() => { setRefundsEnabled((v) => !v); setPolSaved(false); }} aria-pressed={refundsEnabled}
+    className={cn("relative h-6 w-11 shrink-0 rounded-full transition", refundsEnabled ? "bg-[#5D0F17]" : "bg-stone-300")}
+   >
+    <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all", refundsEnabled ? "left-[22px]" : "left-0.5")} />
+   </button>
+   </div>
+
+   {refundsEnabled && (
+   <div className="grid grid-cols-2 gap-4">
+    <Field label="Return window (days)">
+    <Input value={returnWindowDays} onChange={(e) => { setReturnWindowDays(e.target.value.replace(/[^0-9]/g, "")); setPolSaved(false); }} inputMode="numeric" placeholder="14" />
+    </Field>
+    <Field label="Restocking fee (%)" hint="Kept from the item price on a return. 0 = none.">
+    <Input value={restockingFeePct} onChange={(e) => { setRestockingFeePct(e.target.value.replace(/[^0-9]/g, "").slice(0, 2)); setPolSaved(false); }} inputMode="numeric" placeholder="0" />
+    </Field>
+   </div>
+   )}
+
+   {refundsEnabled && (
+   <Field label="Return shipping" hint="We generate a prepaid return label and email it to the buyer.">
+    <div className="flex gap-2">
+    {(["buyer", "store"] as const).map((who) => (
+     <button key={who} type="button" onClick={() => { setReturnShippingPaidBy(who); setPolSaved(false); }}
+     className={cn("flex-1 rounded-md border px-3 py-2 text-[13px] font-medium transition", returnShippingPaidBy === who ? "border-[#5D0F17] bg-[#5D0F17]/[0.04] text-[#5D0F17]" : "border-stone-300 text-stone-500 hover:border-stone-400")}>
+     {who === "buyer" ? "Buyer pays" : "Store pays"}
+     </button>
+    ))}
+    </div>
+    <span className="mt-1 block text-xs text-stone-400">{returnShippingPaidBy === "buyer" ? "Return-label cost is deducted from the buyer’s refund." : "You cover return shipping."}</span>
+   </Field>
+   )}
+
+   <Field label="Policy details (optional)" hint="Shown to buyers on your storefront.">
+    <textarea value={policyText} onChange={(e) => { setPolicyText(e.target.value); setPolSaved(false); }} rows={3} className={ta}
+    placeholder={refundsEnabled ? "e.g. Returns accepted on unworn items within 14 days; buyer pays return shipping." : "e.g. All sales are final — message us with any questions before you buy."} />
+   </Field>
+
+   <div className="rounded-md bg-stone-50 px-3 py-2.5 text-[12px] text-stone-500">
+   Buyers will see: <span className="font-medium text-stone-700">{
+    !refundsEnabled ? "All sales final."
+    : `${Number(returnWindowDays) > 0 ? `Returns accepted within ${returnWindowDays} days` : "Returns accepted — contact the store"}${Number(restockingFeePct) > 0 ? ` · ${restockingFeePct}% restocking fee.` : "."}`
+   }</span>
+   </div>
+
+   <div className="flex items-center gap-3">
+   <Button onClick={savePolicy} disabled={polBusy}>{polBusy ? "Saving…" : "Save returns policy"}</Button>
+   {polSaved && <span className="text-xs text-emerald-600">Saved ✓</span>}
    </div>
   </div>
   </Card>

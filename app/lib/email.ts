@@ -3190,3 +3190,60 @@ export async function sendBuyerTrackingEmail(p: {
  html,
  });
 }
+
+/** Buyer's prepaid RETURN label — emailed when the store starts a return. Store-branded. */
+export async function sendReturnLabelEmail(p: {
+ storeSlug: string; buyerEmail: string; storeName: string; itemTitle: string; returnLabelUrl: string; paidBy: "buyer" | "store";
+}): Promise<void> {
+ if (!p.buyerEmail) return;
+ const resend = getResend();
+ const { resolveStoreSender } = await import("./email-settings-db");
+ const [sender, brand] = await Promise.all([resolveStoreSender(p.storeSlug), getStoreEmailBrand(p.storeSlug)]);
+ const storeName = sender.fromName || p.storeName;
+ const t = txnTokens(brand);
+ const costLine = p.paidBy === "store"
+ ? "Return shipping is on us — just print the label and send it back."
+ : "The cost of return shipping will be deducted from your refund.";
+ const content = `
+ <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">Here's your prepaid return label for <b>${p.itemTitle}</b>. 📦</p>
+ <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:20px 24px;margin:0 0 24px;">
+ <p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">Print the label, attach it to the package, and drop it at any carrier location. ${costLine}</p>
+ </div>
+ <a href="${p.returnLabelUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Print return label →</a>
+ `;
+ const html = storeTransactionalShell(brand, storeName, "Return label", content);
+ await resend.emails.send({
+ from: `${fromDisplayName(storeName)} <${sender.fromAddress || orderSenderAddress()}>`,
+ to: p.buyerEmail,
+ replyTo: sender.replyTo || undefined,
+ subject: `Your return label from ${storeName}`,
+ html,
+ });
+}
+
+/** Buyer notice that a return was NOT accepted (with the store's reason). Store-branded. */
+export async function sendReturnRejectedEmail(p: {
+ storeSlug: string; buyerEmail: string; storeName: string; itemTitle: string; note: string | null; shipBack: boolean;
+}): Promise<void> {
+ if (!p.buyerEmail) return;
+ const resend = getResend();
+ const { resolveStoreSender } = await import("./email-settings-db");
+ const [sender, brand] = await Promise.all([resolveStoreSender(p.storeSlug), getStoreEmailBrand(p.storeSlug)]);
+ const storeName = sender.fromName || p.storeName;
+ const t = txnTokens(brand);
+ const reason = p.note ? `<div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:16px 20px;margin:0 0 20px;"><p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${escapeHtml(p.note)}</p></div>` : "";
+ const back = p.shipBack ? "We're sending it back to you — you'll get tracking separately." : "Please reach out with any questions.";
+ const content = `
+ <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 16px;">We received your return of <b>${p.itemTitle}</b>, but unfortunately we weren't able to accept it.</p>
+ ${reason}
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0;">${back}</p>
+ `;
+ const html = storeTransactionalShell(brand, storeName, "About your return", content);
+ await resend.emails.send({
+ from: `${fromDisplayName(storeName)} <${sender.fromAddress || orderSenderAddress()}>`,
+ to: p.buyerEmail,
+ replyTo: sender.replyTo || undefined,
+ subject: `About your return to ${storeName}`,
+ html,
+ });
+}

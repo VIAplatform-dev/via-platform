@@ -1,4 +1,4 @@
-import { getOrderDetail, setOrderLabel } from "./db/orders";
+import { getOrderDetail, setOrderLabel, setReturnLabel, getReturnLabelInfo, setShipBackLabel } from "./db/orders";
 import { getSellerById } from "./db/sellers";
 import { getShippingSettings, hasShipFrom } from "./store-shipping-db";
 import { getRates, buyLabel, voidLabel, isShippoConfigured } from "./shippo";
@@ -64,4 +64,65 @@ export async function voidOrderLabel(orderId: string): Promise<boolean> {
  const ok = await voidLabel(txId).catch(() => false);
  if (ok) await markLabelVoided(orderId);
  return ok;
+}
+
+/**
+ * Generate a prepaid RETURN label — the outbound label with from/to swapped: it ships FROM the buyer
+ * back TO the store's ship-from address. VYA buys it on Shippo (same as outbound); who ultimately
+ * pays is a policy decision handled at refund time (buyer-pays → deducted from the refund). Idempotent
+ * (returns the existing label) + best-effort (a reason instead of throwing).
+ */
+export async function generateReturnLabel(orderId: string): Promise<{ ok: boolean; reason?: string; labelUrl?: string; trackingNumber?: string; costCents?: number }> {
+ if (!isShippoConfigured()) return { ok: false, reason: "shippo-not-configured" };
+ const order = await getOrderDetail(orderId);
+ if (!order) return { ok: false, reason: "order-not-found" };
+
+ const existing = await getReturnLabelInfo(orderId).catch(() => ({ url: null, trackingNumber: null, costCents: null }));
+ if (existing.url) return { ok: true, reason: "already-labeled", labelUrl: existing.url, trackingNumber: existing.trackingNumber || undefined, costCents: existing.costCents ?? undefined };
+
+ if (!order.shipLine1 || !order.shipCity) return { ok: false, reason: "no-buyer-address" };
+ const seller = await getSellerById(order.sellerId);
+ if (!seller) return { ok: false, reason: "no-seller" };
+ const shipping = await getShippingSettings(seller.slug);
+ if (!hasShipFrom(shipping)) return { ok: false, reason: "no-store-address" };
+ const s = shipping.shipFrom!;
+
+ // FROM = the buyer (the return originates with them); TO = the store's ship-from.
+ const from = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
+ const to = { name: s.name || seller.name, street1: s.street1!, street2: s.street2, city: s.city!, state: s.state!, zip: s.zip!, country: s.country || "US", phone: s.phone, email: seller.email };
+ const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+
+ const rates = await getRates(from, to, parcel);
+ if (!rates.length) return { ok: false, reason: "no-rates" };
+ const label = await buyLabel(rates[0].rateId);
+ if (!label) return { ok: false, reason: "label-failed" };
+ await setReturnLabel(orderId, { url: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents });
+ return { ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents };
+}
+
+/**
+ * Ship a REJECTED return back to the buyer — a store → buyer label (same direction as the original
+ * outbound, bought fresh and stored separately so it doesn't clash with the original fulfillment label).
+ */
+export async function generateShipBackLabel(orderId: string): Promise<{ ok: boolean; reason?: string; labelUrl?: string; trackingNumber?: string; costCents?: number }> {
+ if (!isShippoConfigured()) return { ok: false, reason: "shippo-not-configured" };
+ const order = await getOrderDetail(orderId);
+ if (!order) return { ok: false, reason: "order-not-found" };
+ if (!order.shipLine1 || !order.shipCity) return { ok: false, reason: "no-buyer-address" };
+ const seller = await getSellerById(order.sellerId);
+ if (!seller) return { ok: false, reason: "no-seller" };
+ const shipping = await getShippingSettings(seller.slug);
+ if (!hasShipFrom(shipping)) return { ok: false, reason: "no-store-address" };
+ const f = shipping.shipFrom!;
+
+ const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: seller.email };
+ const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
+ const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+
+ const rates = await getRates(from, to, parcel);
+ if (!rates.length) return { ok: false, reason: "no-rates" };
+ const label = await buyLabel(rates[0].rateId);
+ if (!label) return { ok: false, reason: "label-failed" };
+ await setShipBackLabel(orderId, label.labelUrl);
+ return { ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents };
 }

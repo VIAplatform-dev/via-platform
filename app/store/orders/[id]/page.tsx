@@ -52,6 +52,14 @@ export default function OrderDetailPage() {
  const [quote, setQuote] = useState<{ costCents: number; provider: string; service: string; rateId: string; estDays: number | null; sellerPays: boolean } | null>(null);
  const [labelMsg, setLabelMsg] = useState<string | null>(null);
  const [labelBusy, setLabelBusy] = useState(false);
+ const [retBusy, setRetBusy] = useState(false);
+ const [retMsg, setRetMsg] = useState<string | null>(null);
+ const [rejecting, setRejecting] = useState(false);
+ const [rejNote, setRejNote] = useState("");
+ const [rejPhotos, setRejPhotos] = useState<string[]>([]);
+ const [rejShipBack, setRejShipBack] = useState(false);
+ const [rejBusy, setRejBusy] = useState(false);
+ const [rejMsg, setRejMsg] = useState<string | null>(null);
 
  useEffect(() => {
  let cancelled = false;
@@ -109,6 +117,35 @@ export default function OrderDetailPage() {
  else { setQuote(null); setReloadKey((k) => k + 1); }
  } catch { setLabelMsg("Couldn’t buy the label."); }
  setLabelBusy(false);
+ }
+
+ async function sendReturnLabel() {
+ if (retBusy) return;
+ setRetBusy(true); setRetMsg(null);
+ try {
+ const r = await fetch(`/api/store/orders/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "return_label" }) });
+ const d = await r.json();
+ if (!r.ok) setRetMsg(d.error || "Couldn’t create a return label.");
+ else setRetMsg(`Return label emailed to the buyer${d.paidBy === "buyer" ? " (cost comes off their refund)" : ""}.`);
+ } catch { setRetMsg("Couldn’t create a return label."); }
+ setRetBusy(false);
+ }
+
+ async function uploadRejPhoto(file: File) {
+ const fd = new FormData(); fd.append("file", file);
+ const d = await fetch("/api/store/assets", { method: "POST", body: fd }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+ if (d?.url) setRejPhotos((p) => [...p, d.url]);
+ }
+ async function rejectReturn() {
+ if (rejBusy) return;
+ setRejBusy(true); setRejMsg(null);
+ try {
+ const r = await fetch(`/api/store/orders/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reject_return", note: rejNote.trim() || null, evidence: rejPhotos, shipBack: rejShipBack }) });
+ const d = await r.json();
+ if (r.ok) { setRejMsg(`Return rejected — the buyer was notified${d.shipBackUrl ? " and the item is on its way back" : ""}.`); setRejecting(false); }
+ else setRejMsg(d.error || "Couldn’t reject the return.");
+ } catch { setRejMsg("Couldn’t reject the return."); }
+ setRejBusy(false);
  }
 
  const money = (c: number, cur: string) => new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD" }).format((c || 0) / 100);
@@ -177,8 +214,29 @@ export default function OrderDetailPage() {
  <div className="flex flex-wrap gap-2">
  {order.status === "paid" && <Button size="sm" variant="secondary" onClick={markShipped} disabled={busy}>Mark shipped</Button>}
  {order.status === "shipped" && <Button size="sm" variant="secondary" onClick={() => setStatus("delivered")} disabled={busy}>Mark delivered</Button>}
+ {(order.status === "shipped" || order.status === "delivered") && <Button size="sm" variant="secondary" onClick={sendReturnLabel} disabled={retBusy}>{retBusy ? "Creating…" : "Send return label"}</Button>}
+ {(order.status === "shipped" || order.status === "delivered") && !rejecting && <Button size="sm" variant="ghost" onClick={() => { setRejecting(true); setRejMsg(null); }}>Reject return</Button>}
  {order.status !== "refunded" && <Button size="sm" variant="danger" onClick={() => setStatus("refunded")} disabled={busy}>Refund order</Button>}
  </div>
+ {retMsg && <p className="mt-2 text-xs text-stone-500">{retMsg}</p>}
+ {rejecting && (
+ <div className="mt-3 space-y-2 rounded-lg border border-stone-200 p-3">
+ <p className="text-[13px] font-medium text-stone-700">Reject this return</p>
+ <textarea value={rejNote} onChange={(e) => setRejNote(e.target.value)} rows={2} placeholder="Reason (shown to the buyer) — e.g. came back worn, or not the item that was sent" className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] outline-none focus:border-stone-400" />
+ <div className="flex flex-wrap items-center gap-2">
+ {/* eslint-disable-next-line @next/next/no-img-element */}
+ {rejPhotos.map((u, i) => <img key={i} src={u} alt="" className="h-12 w-12 rounded border border-stone-200 object-cover" />)}
+ <label className="cursor-pointer text-[12px] text-stone-500 underline hover:text-stone-700">+ Add photo<input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRejPhoto(f); }} /></label>
+ <span className="text-[11px] text-stone-400">Photos are kept as proof if the buyer disputes the charge.</span>
+ </div>
+ <label className="flex items-center gap-2 text-[13px] text-stone-600"><input type="checkbox" checked={rejShipBack} onChange={(e) => setRejShipBack(e.target.checked)} /> Ship the item back to the buyer</label>
+ <div className="flex gap-2">
+ <Button size="sm" variant="danger" onClick={rejectReturn} disabled={rejBusy}>{rejBusy ? "Rejecting…" : "Reject & notify buyer"}</Button>
+ <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>Cancel</Button>
+ </div>
+ </div>
+ )}
+ {rejMsg && <p className="mt-2 text-xs text-stone-500">{rejMsg}</p>}
  </div>
  </Card>
  </div>

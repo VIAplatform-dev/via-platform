@@ -35,10 +35,11 @@ export async function GET(request: Request) {
  if (payable <= 0) continue;
  try {
  // Platform transfer from VYA's balance (holds the consignor's cut routed from the sale).
- // Idempotency key = consignor + exact payable: if the ledger write below fails, the next run
- // sees the same payable and re-sends the SAME key, so Stripe returns the existing transfer
- // (no second payout) and we just re-record it. Prevents the double-pay on a transient failure.
- const idem = `consignor-payout-${c.id}-${payable}`;
+ // Idempotency key = consignor + amount + the payable-balance-at-time. The balance term is what
+ // makes DISTINCT payouts distinct (a $50 payout of $100 vs a $50 payout of $50 differ), so they
+ // no longer collide and short-pay — while a retry of the SAME payout (ledger write failed → balance
+ // unchanged) still re-sends the SAME key, so Stripe returns the existing transfer, not a second one.
+ const idem = `consignor-payout-${c.id}-${payable}-of-${payable}`;
  const transfer = await stripePost("transfers", { amount: payable, currency: "usd", destination: c.stripeAccountId }, undefined, idem);
  await recordPayout({ storeSlug: c.storeSlug, consignorId: c.id, amountCents: payable, method: "stripe", status: "paid", stripeTransferId: transfer.id as string });
  paid++;

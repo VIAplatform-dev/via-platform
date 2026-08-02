@@ -5,6 +5,7 @@ import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem } from "@/app/lib/db/inventory";
 import { getInboxSettings } from "@/app/lib/storefront-settings-db";
+import { getRefundPolicy, policySummary } from "@/app/lib/store-policy-db";
 import { formatPrice } from "@/app/lib/formatPrice";
 import AskAboutItem from "@/app/s/AskAboutItem";
 import MakeOffer from "@/app/components/MakeOffer";
@@ -84,6 +85,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const link = (p: string) => (preview ? `${p}?preview=1` : p);
  // Honor the store's Buyer-messaging toggle (defaults on if settings are unavailable).
  const inbox = await getInboxSettings(sf.storeSlug).catch(() => null);
+ // The store's return/refund policy — shown so a buyer knows before they buy.
+ const policy = await getRefundPolicy(sf.storeSlug).catch(() => null);
 
  // Product structured data (schema.org) → Google rich results: price, availability, condition,
  // brand shown right in search. Only emitted for a live storefront (not a preview render).
@@ -161,6 +164,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  </div>
  )}
  <p className="mt-5 text-[11px] leading-relaxed opacity-45">One-of-one vintage — once it’s gone, it’s gone. Secure checkout by Stripe.</p>
+ {policy && <p className="mt-2 text-[11px] leading-relaxed opacity-55" title={policy.policyText || undefined}>{policySummary(policy)}</p>}
  </div>
  </div>
  </div>

@@ -1,6 +1,15 @@
 import { and, desc, eq, isNull, inArray, sql } from "drizzle-orm";
+import { neon } from "@neondatabase/serverless";
 import { getDb, orders, payouts, items, sellers } from "./index";
 import type { Order } from "./index";
+
+// Raw client for the additive refund/return columns that aren't in the drizzle schema yet
+// (tagged-template queries return a plain rows array, no execute-shape ambiguity).
+function rawSql() {
+ const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+ if (!url) throw new Error("DATABASE_URL or POSTGRES_URL is not set.");
+ return neon(url);
+}
 
 export type SellerOrderRow = {
  id: string;
@@ -226,6 +235,70 @@ export async function markTrackingEmailSent(orderId: string): Promise<void> {
 export type OrderStatus = "paid" | "shipped" | "delivered" | "refunded";
 export async function updateOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
  await getDb().update(orders).set({ status }).where(eq(orders.id, orderId));
+}
+
+// Refund + return-label columns are added additively (raw SQL, not the drizzle schema) so existing
+// selects keep working before `db:push` runs. Self-healing + memoized.
+let refundColsEnsured = false;
+async function ensureRefundCols(): Promise<void> {
+ if (refundColsEnsured) return;
+ try {
+ const s = rawSql();
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at timestamptz`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_amount_cents integer`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_label_url text`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_tracking_number text`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_label_cost_cents integer`;
+ // Rejected-return bookkeeping: the store received the item back but wouldn't accept it.
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_status text`; // null | rejected
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_rejection_note text`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_evidence jsonb`; // photo URLs (chargeback proof)
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS return_shipback_label_url text`;
+ await s`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS reversed_at timestamptz`;
+ refundColsEnsured = true;
+ } catch { /* db:push covers it */ }
+}
+
+/** Record that the store rejected a returned item: reason + evidence photos (kept for a possible
+ *  chargeback). Deliberately does NOT refund — the money stays with the store. */
+export async function setReturnRejected(orderId: string, note: string | null, evidence: string[]): Promise<void> {
+ await ensureRefundCols();
+ await rawSql()`UPDATE orders SET return_status = 'rejected', return_rejection_note = ${note}, return_evidence = ${JSON.stringify(evidence.slice(0, 12))} WHERE id = ${orderId}`;
+}
+
+/** Store a ship-back label (store → buyer) when a rejected item is sent back to the buyer. */
+export async function setShipBackLabel(orderId: string, url: string): Promise<void> {
+ await ensureRefundCols();
+ await rawSql()`UPDATE orders SET return_shipback_label_url = ${url} WHERE id = ${orderId}`;
+}
+
+/** Store a bought RETURN label (buyer → store) on the order. */
+export async function setReturnLabel(orderId: string, l: { url: string; trackingNumber: string; costCents: number }): Promise<void> {
+ await ensureRefundCols();
+ await rawSql()`UPDATE orders SET return_label_url = ${l.url}, return_tracking_number = ${l.trackingNumber}, return_label_cost_cents = ${l.costCents} WHERE id = ${orderId}`;
+}
+
+/** The order's return-label info (null fields if none bought yet). Used for idempotency + to deduct
+ *  the buyer-paid return-shipping cost from a refund. */
+export async function getReturnLabelInfo(orderId: string): Promise<{ url: string | null; trackingNumber: string | null; costCents: number | null }> {
+ await ensureRefundCols();
+ const rows = await rawSql()`SELECT return_label_url, return_tracking_number, return_label_cost_cents FROM orders WHERE id = ${orderId} LIMIT 1` as Array<Record<string, unknown>>;
+ const r = rows[0];
+ return { url: (r?.return_label_url as string) ?? null, trackingNumber: (r?.return_tracking_number as string) ?? null, costCents: r?.return_label_cost_cents != null ? Number(r.return_label_cost_cents) : null };
+}
+
+/** Mark an order refunded and record WHEN + HOW MUCH — so a refunded sale is a real record, not just
+ *  a mutated status. */
+export async function markOrderRefunded(orderId: string, refundAmountCents: number): Promise<void> {
+ await ensureRefundCols();
+ await rawSql()`UPDATE orders SET status = 'refunded', refunded_at = now(), refund_amount_cents = ${refundAmountCents} WHERE id = ${orderId}`;
+}
+
+/** Reverse the seller-payout ledger row(s) for a refunded order, so seller-net reporting stops
+ *  counting a sale that was given back. Idempotent (only reverses rows not already reversed). */
+export async function reversePayoutForOrder(orderId: string): Promise<void> {
+ await ensureRefundCols();
+ await rawSql()`UPDATE payouts SET reversed_at = now() WHERE order_id = ${orderId} AND reversed_at IS NULL`;
 }
 
 export async function recordPayout(o: { orderId: string; sellerId: string; amountCents: number; currency: string }): Promise<void> {

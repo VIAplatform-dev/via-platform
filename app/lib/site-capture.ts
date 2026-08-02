@@ -5,7 +5,7 @@
 // the VYA-hosted copy — so the whole site can be navigated on VYA, pixel-faithful.
 // (JS is stripped for v1: looks identical; interactivity + cart + AI editing next.)
 import * as cheerio from "cheerio";
-import { safeUrl } from "@/app/lib/safe-url";
+import { assertPublicUrl, safeFetch } from "@/app/lib/safe-url";
 // The DB helpers are imported lazily inside crawlAndStore (the only consumer) so that
 // the pure HTML functions here — applyEdits/prepareEditMode/captureSite — can be used
 // (and unit-tested) without pulling in the database layer.
@@ -34,25 +34,29 @@ export type Capture = { html: string; origin: string; sourceUrl: string; bytes: 
 export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<Capture> {
  // SSRF guard: this fetches a user-supplied URL server-side, so reject anything that isn't a plain
  // public web host (localhost, internal TLDs, bare IPs incl. cloud metadata, IPv6) before touching it.
- const safe = safeUrl(url);
+ const safe = await assertPublicUrl(url); // DNS-resolves + rejects internal IPs (SSRF)
  if (!safe) throw new Error("That URL isn’t a valid public website.");
  const sourceUrl = safe.href;
  const origin = safe.origin;
- const res = await fetch(sourceUrl, { headers: UA, signal: AbortSignal.timeout(20000) });
+ const res = await safeFetch(sourceUrl, { headers: UA, signal: AbortSignal.timeout(20000) });
  if (!res.ok) throw new Error(`Couldn't load ${sourceUrl} (${res.status})`);
  const $ = cheerio.load(await res.text());
 
  // Drop the source CSP — it blocks the cart/interactivity scripts VYA injects.
  $("meta[http-equiv]").each((_: number, el: any) => { if (/content-security-policy/i.test($(el).attr("http-equiv") || "")) $(el).remove(); });
 
- // Keep the theme's own interactivity JS (accordions, dropdowns, slideshows);
- // strip tracking/analytics + Shopify's checkout/cart pings (we replace those).
- const TRACKERS = /google-analytics|googletagmanager|gtag\/js|connect\.facebook|facebook\.net|fbevents|tiktok|snap\.licdn|pinterest|klaviyo|hotjar|clarity\.ms|doubleclick|criteo|\bbat\.bing|cdn\.shopify\.com\/shopifycloud\/(trekkie|consent)|monorail|web-pixel/i;
- $("script").each((_: number, el: any) => {
- const src = $(el).attr("src") || "";
- const inline = $(el).html() || "";
- if ((src && TRACKERS.test(src)) || /gtag\(|fbq\(|dataLayer|trekkie|window\.Shopify\s*=\s*window\.Shopify.*analytics|web-pixel/i.test(inline)) { $(el).remove(); return; }
- if (src) $(el).attr("src", abs(src, sourceUrl));
+ // SECURITY: strip ALL scripts. Re-hosting a third party's JS on the vyaplatform.com origin would
+ // let it act as any logged-in buyer/admin who opens the page (stored XSS with the victim's cookies).
+ // VYA re-adds its own cart/editor JS at SERVE time, so nothing of ours is lost — captured sites are
+ // served static (which is the v1 intent anyway). Also drop inline event handlers + javascript: URLs,
+ // the other ways captured markup can execute in our origin.
+ $("script").remove();
+ $("*").each((_: number, el: any) => {
+ const attribs = el.attribs || {};
+ for (const name of Object.keys(attribs)) {
+ if (/^on/i.test(name)) { $(el).removeAttr(name); continue; }
+ if ((name === "href" || name === "src" || name === "xlink:href") && /^\s*javascript:/i.test(attribs[name] || "")) $(el).removeAttr(name);
+ }
  });
 
  // Inline stylesheets, absolutizing their url()/imports to the source CDN. Retry once
@@ -64,9 +68,9 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  const cssUrl = abs(href, sourceUrl);
  let css = "";
  for (let attempt = 0; attempt < 2 && !css; attempt++) {
- try { const r = await fetch(cssUrl, { headers: UA, signal: AbortSignal.timeout(12000) }); if (r.ok) css = await r.text(); } catch { /* retry / fall through */ }
+ try { const r = await safeFetch(cssUrl, { headers: UA, signal: AbortSignal.timeout(12000) }); if (r.ok) css = await r.text(); } catch { /* retry / fall through */ }
  }
- if (css) { $(el).replaceWith(`<style data-vya-src="${cssUrl}">${absCssUrls(css, cssUrl)}</style>`); inlinedSheets++; }
+ if (css) { $(el).replaceWith(`<style data-vya-src="${cssUrl}">${absCssUrls(css, cssUrl).replace(/<\//g, "<\\/")}</style>`); inlinedSheets++; }
  else $(el).attr("href", cssUrl);
  }
  // Absolutize any inline <style> url()s too.
@@ -124,7 +128,7 @@ function includePath(p: string): boolean {
 }
 
 export async function crawlAndStore(slug: string, startUrl: string, maxPages = 80): Promise<{ pages: number; paths: string[] }> {
- const safe = safeUrl(startUrl); // SSRF guard on the crawl entry (same as captureSite)
+ const safe = await assertPublicUrl(startUrl); // DNS-resolves + rejects internal IPs (SSRF)
  if (!safe) throw new Error("That URL isn’t a valid public website.");
  const { saveCapturePage, deleteCaptures, getSiteCss, setSiteCss } = await import("./site-capture-db");
  const start = safe.href;
@@ -139,10 +143,10 @@ export async function crawlAndStore(slug: string, startUrl: string, maxPages = 8
  // Seed from the sitemap (authoritative page list) + the homepage.
  const seed = new Set<string>(["/"]);
  try {
- const root = await fetch(origin + "/sitemap.xml", { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
+ const root = await safeFetch(origin + "/sitemap.xml", { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
  const subs = [...root.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1].replace(/&amp;/g, "&")).filter((u) => /sitemap_(pages|collections|blogs)/.test(u));
  for (const s of subs) {
- const xml = await fetch(s, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
+ const xml = await safeFetch(s, { headers: UA, signal: AbortSignal.timeout(12000) }).then((r) => r.text());
  for (const m of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) { const p = new URL(m[1].replace(/&amp;/g, "&")).pathname; if (includePath(p)) seed.add(p); }
  }
  } catch { /* no sitemap — link crawl still covers it */ }
@@ -294,7 +298,8 @@ export function injectCollectionItems(html: string, items: CollectionCardItem[])
  * wins over the captured theme. No-op when there's no custom CSS. */
 export function injectCss(html: string, css: string): string {
  if (!css || !css.trim()) return html;
- const tag = `<style data-vya-custom="1">${css}</style>`;
+ // Neutralize any "</style><script>" breakout in store-authored CSS (CSS never needs "</").
+ const tag = `<style data-vya-custom="1">${css.replace(/<\//g, "<\\/")}</style>`;
  return html.indexOf("</body>") !== -1 ? html.replace("</body>", tag + "</body>") : html + tag;
 }
 

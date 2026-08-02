@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getOrderDetail, updateOrderStatus, setOrderLabel, markOrderShipped, markTrackingEmailSent, type OrderStatus } from "@/app/lib/db/orders";
+import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, type OrderStatus } from "@/app/lib/db/orders";
 import { relistItem } from "@/app/lib/db/inventory";
 import { reverseConsignedSale } from "@/app/lib/consignment-db";
-import { voidOrderLabel } from "@/app/lib/order-label";
+import { voidOrderLabel, generateReturnLabel, generateShipBackLabel } from "@/app/lib/order-label";
+import { getReturnLabelInfo, setReturnRejected } from "@/app/lib/db/orders";
+import { getRefundPolicy } from "@/app/lib/store-policy-db";
+import { sendReturnLabelEmail, sendReturnRejectedEmail } from "@/app/lib/email";
 import { recordLabelTransaction } from "@/app/lib/shippo-labels-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
@@ -62,10 +65,56 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  if (!STATUSES.includes(status)) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
 
  if (status === "refunded") {
+ // Idempotency: a double-click / retry must not re-refund, re-relist, or double-reverse.
+ if (r.order.status === "refunded") return NextResponse.json({ ok: true, status: "refunded", alreadyRefunded: true });
+
+ // Restocking fee: a % of the ITEM price the store keeps. The buyer is refunded the full charge
+ // (item + shipping they paid) MINUS that fee. `?fee=0` overrides the store default (e.g. to waive
+ // it as a goodwill exception); otherwise the store's returns policy applies.
+ const feeOverride = new URL(request.url).searchParams.get("fee");
+ const policy = await getRefundPolicy(r.slug).catch(() => null);
+ const feePct = feeOverride != null ? Math.max(0, Math.min(50, Number(feeOverride) || 0)) : (policy?.restockingFeePct ?? 0);
+ const fullCharge = r.order.amountCents + (r.order.shippingPaidCents || 0);
+ const restockingFeeCents = Math.round((r.order.amountCents * feePct) / 100);
+ // If the store's policy is buyer-pays-return-shipping AND a return label was bought, the buyer
+ // covers it — deduct that label cost from their refund too.
+ const rlabel = await getReturnLabelInfo(id).catch(() => ({ costCents: null }));
+ const returnShipDeduction = policy?.returnShippingPaidBy !== "store" && rlabel.costCents ? rlabel.costCents : 0;
+ const totalDeduction = restockingFeeCents + returnShipDeduction;
+ const refundAmountCents = Math.max(0, fullCharge - totalDeduction);
+
  const pay = await getSellerPayments(r.slug);
  if (r.order.stripePaymentIntent && pay?.stripeAccountId) {
+ const acct = pay.stripeAccountId;
+ const pi = r.order.stripePaymentIntent;
+ const feeCents = r.order.feeCents || 0;
+ // RECOUP: when the buyer paid return shipping, VYA keeps that label cost out of the fee it hands
+ // back to the seller — so the money for the label VYA bought lands with VYA, not the seller. This
+ // needs the platform application-fee id; if we can't get it, fall back to the standard refund
+ // (buyer still refunded correctly, VYA just doesn't recoup — no worse than before).
+ let feeId: string | null = null;
+ if (returnShipDeduction > 0 && feeCents > 0) {
  try {
- await stripePost("refunds", { payment_intent: r.order.stripePaymentIntent, refund_application_fee: "true" }, pay.stripeAccountId);
+ const piData = await stripeGet(`payment_intents/${pi}?expand[]=latest_charge`, undefined, acct) as { latest_charge?: { application_fee?: string | { id: string } } };
+ const af = piData?.latest_charge?.application_fee;
+ feeId = typeof af === "string" ? af : (af?.id ?? null);
+ } catch { feeId = null; }
+ }
+ try {
+ if (feeId) {
+ // 1) Refund the buyer the net amount. 2) Return the seller's share of VYA's fee — the whole fee
+ // MINUS the return-label cost VYA keeps. (Fee refunds are a platform op → no connected-account.)
+ await stripePost("refunds", { payment_intent: pi, amount: String(refundAmountCents) }, acct);
+ const feeRefund = Math.max(0, feeCents - returnShipDeduction);
+ if (feeRefund > 0) await stripePost(`application_fees/${feeId}/refunds`, { amount: String(feeRefund) }, undefined);
+ } else {
+ // Standard: partial refund when a deduction applies, else full; fee returned proportionally.
+ await stripePost("refunds", {
+ payment_intent: pi,
+ refund_application_fee: "true",
+ ...(totalDeduction > 0 ? { amount: String(refundAmountCents) } : {}),
+ }, acct);
+ }
  } catch (e) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "Refund failed at Stripe." }, { status: 502 });
  }
@@ -74,10 +123,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  // If this was a consigned piece, undo the consignor's credit too — otherwise a refunded sale
  // still gets paid out at the next payout run. Reverts the item to available + debits the ledger.
  await reverseConsignedSale({ productId: r.order.itemId, orderId: id }).catch(() => {});
+ // Reverse the seller-payout ledger row too, so seller-net reporting doesn't count a returned sale.
+ await reversePayoutForOrder(id).catch(() => {});
  // Void the shipping label if it hasn't shipped — recover the label cost VYA fronted.
  await voidOrderLabel(id).catch(() => {});
- await updateOrderStatus(id, "refunded");
- return NextResponse.json({ ok: true, status: "refunded", relisted: true });
+ // Record the refund (status + when + how much was actually returned to the buyer).
+ await markOrderRefunded(id, refundAmountCents);
+ return NextResponse.json({ ok: true, status: "refunded", relisted: true, refundAmountCents, restockingFeeCents, returnShipDeduction });
  }
 
  await updateOrderStatus(id, status);
@@ -92,6 +144,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  if ("err" in r) return NextResponse.json({ error: r.err }, { status: r.code });
  const { order, slug, seller } = r;
  const body = await request.json().catch(() => null);
+
+ // Return label — buy a prepaid label (buyer → store) and email it to the buyer. Who ultimately
+ // pays is the store's returns policy: buyer-pays → the cost is deducted from their eventual refund.
+ if (body?.action === "return_label") {
+ const res = await generateReturnLabel(id);
+ if (!res.ok) return NextResponse.json({ error: `Couldn’t create a return label (${res.reason}).` }, { status: 400 });
+ const policy = await getRefundPolicy(slug).catch(() => null);
+ const paidBy = policy?.returnShippingPaidBy === "store" ? "store" : "buyer";
+ if (order.buyerEmail && res.labelUrl) {
+ await sendReturnLabelEmail({ storeSlug: slug, buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", returnLabelUrl: res.labelUrl, paidBy }).catch((e) => logError("return-label-email", e, { context: { orderId: id } }));
+ }
+ return NextResponse.json({ ok: true, returnLabelUrl: res.labelUrl, trackingNumber: res.trackingNumber, costCents: res.costCents, paidBy });
+ }
+
+ // Reject a return — the item came back but the store won't accept it. Records the reason + evidence
+ // photos (kept for a possible chargeback), does NOT refund, and optionally ships the item back.
+ if (body?.action === "reject_return") {
+ const note = typeof body?.note === "string" ? body.note.trim().slice(0, 1000) : null;
+ const evidence = Array.isArray(body?.evidence) ? body.evidence.filter((u: unknown) => typeof u === "string").slice(0, 12) : [];
+ await setReturnRejected(id, note, evidence);
+ let shipBackUrl: string | undefined;
+ if (body?.shipBack) {
+ const sb = await generateShipBackLabel(id).catch(() => null);
+ if (sb?.ok) shipBackUrl = sb.labelUrl;
+ }
+ if (order.buyerEmail) {
+ await sendReturnRejectedEmail({ storeSlug: slug, buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", note, shipBack: !!shipBackUrl }).catch((e) => logError("return-rejected-email", e, { context: { orderId: id } }));
+ }
+ return NextResponse.json({ ok: true, returnStatus: "rejected", shipBackUrl: shipBackUrl ?? null });
+ }
 
  // Mark shipped — the label is already generated (auto or manual); this confirms drop-off and emails
  // the buyer their tracking. Handled before the Shippo/rate checks since it needs neither.

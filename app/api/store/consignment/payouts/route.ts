@@ -50,9 +50,11 @@ export async function POST(request: NextRequest) {
  try {
  // Platform transfer — VYA pays the consignor from its own balance (which holds the cut routed
  // from the sale). Stripe won't let the store transfer directly to another connected account.
- // Idempotency key = consignor + exact amount: a double-click / retry returns the SAME transfer
- // instead of paying twice, and if the ledger write fails we can safely re-send it.
- const idem = `consignor-payout-${consignorId}-${amountCents}`;
+ // Idempotency key = consignor + amount + the payable-balance-at-time. The balance term keeps
+ // DISTINCT payouts distinct (a $50-of-$100 partial won't collide with a later $50-of-$50 payout →
+ // no silent short-pay), while a genuine double-click / retry (balance unchanged) still returns the
+ // SAME transfer instead of paying twice.
+ const idem = `consignor-payout-${consignorId}-${amountCents}-of-${payable}`;
  const transfer = await stripePost("transfers", { amount: amountCents, currency: "usd", destination: consignor.stripeAccountId }, undefined, idem);
  const payoutId = await recordPayout({ storeSlug: slug, consignorId, amountCents, method, status: "paid", stripeTransferId: transfer.id as string });
  return NextResponse.json({ ok: true, payoutId, amountCents, method, status: "paid" });

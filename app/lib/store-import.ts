@@ -1,6 +1,6 @@
 import { fetchShopifyProductsPublic } from "@/app/lib/shopifyClient";
 import { formatPrice } from "@/app/lib/formatPrice";
-import { safeUrl } from "@/app/lib/safe-url";
+import { assertPublicUrl, safeFetch } from "@/app/lib/safe-url";
 import type { StoreProfile } from "@/app/lib/store-profile";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ export function extractTheme(head: string, origin: string, themeColor: string | 
 async function readHomepage(origin: string) {
  const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string };
  try {
- const res = await fetch(origin, {
+ const res = await safeFetch(origin, {
  headers: { "User-Agent": "Mozilla/5.0 (compatible; VYA-Importer/1.0)" },
  signal: AbortSignal.timeout(8000),
  });
@@ -233,7 +233,7 @@ async function pickSquarespaceCollection(origin: string, startUrl: string): Prom
  }
  // nav links from the homepage
  try {
- const html = await fetch(origin, { headers: UA, signal: AbortSignal.timeout(8000) }).then((r) => r.text());
+ const html = await safeFetch(origin, { headers: UA, signal: AbortSignal.timeout(8000) }).then((r) => r.text());
  for (const m of html.matchAll(/href=["'](\/[a-zA-Z0-9\-/]+)["']/g)) {
  const p = m[1].split("?")[0].replace(/\/$/, "");
  if (p && /shop|store|product|collection|catalog|browse|all/i.test(p) && p.split("/").length <= 3) candidates.add(p);
@@ -243,7 +243,7 @@ async function pickSquarespaceCollection(origin: string, startUrl: string): Prom
  }
  // collection URLs from the sitemap
  try {
- const sm = await fetch(origin + "/sitemap.xml", { headers: UA, signal: AbortSignal.timeout(8000) }).then((r) => r.text());
+ const sm = await safeFetch(origin + "/sitemap.xml", { headers: UA, signal: AbortSignal.timeout(8000) }).then((r) => r.text());
  for (const m of sm.matchAll(/<loc>([^<]+)<\/loc>/g)) {
  try {
  const p = new URL(m[1]).pathname.replace(/\/$/, "");
@@ -259,7 +259,7 @@ async function pickSquarespaceCollection(origin: string, startUrl: string): Prom
  const scored = await Promise.all(
  [...candidates].slice(0, 16).map(async (p) => {
  try {
- const d: any = await fetch(origin + p + "?format=json", { headers: { ...UA, Accept: "application/json" }, signal: AbortSignal.timeout(7000) }).then((r) => (r.ok ? r.json() : null));
+ const d: any = await safeFetch(origin + p + "?format=json", { headers: { ...UA, Accept: "application/json" }, signal: AbortSignal.timeout(7000) }).then((r) => (r.ok ? r.json() : null));
  const items = (d?.items || []).filter((it: any) => it.variants?.length);
  return { path: p, count: items.length, more: Boolean(d?.pagination?.nextPage) };
  } catch {
@@ -288,7 +288,7 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  let offset: number | undefined;
  for (let page = 0; page < 40 && out.length < max; page++) {
  const url = base + "?format=json" + (offset ? "&offset=" + offset : "");
- const res = await fetch(url, {
+ const res = await safeFetch(url, {
  headers: { "User-Agent": "Mozilla/5.0 (compatible; VYA-Importer/1.0)", Accept: "application/json" },
  signal: AbortSignal.timeout(8000),
  });
@@ -333,7 +333,7 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
  for (const slug of slugs.slice(0, 25)) {
  try {
  for (let page = 1; page <= 6; page++) {
- const r = await fetch(`https://${host}/collections/${slug}/products.json?limit=250&page=${page}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
+ const r = await safeFetch(`https://${host}/collections/${slug}/products.json?limit=250&page=${page}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
  if (!r.ok) break;
  const d = await r.json();
  const prods: any[] = Array.isArray(d.products) ? d.products : [];
@@ -357,7 +357,7 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
 
 /** Pull a store from a URL: Shopify public products.json, then Squarespace JSON. */
 export async function importStoreFromUrl(raw: string, max = 1500): Promise<ImportResult> {
- const u = safeUrl(raw);
+ const u = await assertPublicUrl(raw); // DNS-resolves + rejects internal IPs (SSRF)
  if (!u) {
  return { ok: false, storeName: "", platform: "unknown", brandColor: null, hero: null, theme: null, products: [], error: "Enter a valid store URL." };
  }

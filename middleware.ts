@@ -60,6 +60,7 @@ const PUBLIC_ROUTES = [
   "/api/store/import",
   "/api/store/onboarding-status",
   "/api/store/onboarding",
+  "/api/store/policy",
   "/api/store/intake",
   "/api/store/items",
   "/api/store/instagram",
