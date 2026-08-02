@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
  const link = (String(body.link || "").trim() || website) || undefined;
  const brand = await getStoreEmailBrand(slug);
- const common = { storeName: fromName, storeEmail: replyTo, fromAddress, subject: String(body.subject).slice(0, 200), body: String(body.body).slice(0, 10000), link, brand };
+ const common = { storeSlug: slug, storeName: fromName, storeEmail: replyTo, fromAddress, subject: String(body.subject).slice(0, 200), body: String(body.body).slice(0, 10000), link, brand };
 
  if (body.test) {
  const r = await sendStoreCampaign({ ...common, recipients: [replyTo] });

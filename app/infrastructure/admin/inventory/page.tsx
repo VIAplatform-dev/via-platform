@@ -23,6 +23,7 @@ type Item = {
  category: string | null;
  description: string | null;
  status: ItemStatus;
+ publishAt?: string | null; // set on a scheduled draft — auto-publishes at this time
  weightOz: number | null;
  lengthIn: number | null;
  widthIn: number | null;
@@ -360,7 +361,16 @@ export default function ItemsPage() {
  })()}
  </TD>
  <TD className="px-4 text-stone-500">{it.size || "—"}</TD>
- <TD className="px-5"><StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{it.status}</StatusPill></TD>
+ <TD className="px-5">
+ {it.status === "draft" && it.publishAt ? (
+ <div className="flex flex-col gap-0.5">
+ <StatusPill tone="info">scheduled</StatusPill>
+ <span className="text-[10px] text-stone-400" title={new Date(it.publishAt).toLocaleString()}>{new Date(it.publishAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+ </div>
+ ) : (
+ <StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{it.status}</StatusPill>
+ )}
+ </TD>
  <TD className="px-5">{postedCell(it)}</TD>
  <TD right className="px-5">
  <div className="flex items-center justify-end gap-1">

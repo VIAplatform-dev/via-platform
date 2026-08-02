@@ -4,6 +4,7 @@ import { neon } from "@neondatabase/serverless";
 import type { ReminderCategory } from "@/app/lib/giveaway-db";
 import type { DBProduct } from "@/app/lib/db";
 import { makeRecipientToken } from "@/app/lib/recipientToken";
+import { signUnsubToken } from "@/app/lib/buyer-auth";
 import { storeContactEmails } from "@/app/lib/stores";
 import type { Offer } from "@/app/lib/offers-db";
 
@@ -629,7 +630,7 @@ export function renderEmailBody(raw: string, brand: EmailBrand = DEFAULT_BRAND):
 
 // The full campaign/automation email — the shared renderer behind both what's sent and the
 // in-browser preview, so what a store sees is exactly what lands in the inbox.
-export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string; brand?: EmailBrand; cta?: { label: string; url: string } }): string {
+export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string; brand?: EmailBrand; cta?: { label: string; url: string }; unsubscribeUrl?: string }): string {
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
  const b = opts.brand || DEFAULT_BRAND;
  // A custom `cta` (used by transactional emails — offer updates, etc.) overrides both the button
@@ -657,13 +658,79 @@ export function campaignEmailHtml(opts: { storeName: string; body: string; link?
  ${accentBar}
  <div style="padding:36px 44px 14px;text-align:${align};">${header}</div>
  <div style="padding:12px 44px 34px;">${content}${cta ? `<div style="text-align:${align};margin:32px 0 8px;"><a href="${cta}" style="display:inline-block;background:${b.accent};color:${btnText};text-decoration:none;padding:15px 38px;border-radius:${btnRadius};font-size:14px;font-weight:600;letter-spacing:0.02em;">${btnLabel}</a></div>` : ""}</div>
- <div style="padding:22px 44px 34px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;line-height:1.6;color:#a29b93;text-align:center;">${footer}</div>
+ <div style="padding:22px 44px 34px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;line-height:1.6;color:#a29b93;text-align:center;">${footer}${opts.unsubscribeUrl ? `<br /><br /><a href="${opts.unsubscribeUrl}" style="color:#a29b93;text-decoration:underline;">Unsubscribe</a>` : ""}</div>
  </div>
  <div style="max-width:600px;margin:16px auto 0;text-align:center;font-size:11px;letter-spacing:0.04em;color:#c2bdb6;">Powered by VYA</div>
  </div></body></html>`;
 }
 
+// A store-branded shell for TRANSACTIONAL emails (order confirmation, shipping, sale alerts).
+// Mirrors the campaign chrome — the store's OWN logo/name + brand colours, a neutral "Powered by
+// VYA" footnote — but carries rich HTML (order tables, addresses, tracking) instead of markdown.
+// No VYA nav, no VYA logo, no competitor links, no unsubscribe (transactional mail isn't marketing).
+// This is what the buyer sees, so it must read as the store's email, never VYA's.
+function storeTransactionalShell(brand: EmailBrand, storeName: string, eyebrow: string, content: string): string {
+ const b = brand;
+ const cleanName = storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
+ const bodyStack = fontStack(b.bodyFont, "body");
+ const headStack = fontStack(b.headingFont, "heading");
+ const surface = b.bg || "#ffffff";
+ const header = b.logo
+  ? `<img src="${b.logo}" alt="${escapeHtml(cleanName)}" style="max-height:44px;width:auto;display:inline-block;" />`
+  : `<div style="font-family:${headStack};font-size:27px;font-weight:700;letter-spacing:-0.015em;color:${b.text};">${escapeHtml(cleanName)}</div>`;
+ const accentBar = b.showAccentBar === false ? "" : `<div style="height:5px;background:${b.accent};"></div>`;
+ const align = b.headerAlign === "left" ? "left" : "center";
+ const eyebrowHtml = eyebrow
+  ? `<div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:${b.accent};margin:0 0 16px;">${escapeHtml(eyebrow)}</div>`
+  : "";
+ return minifyHtml(`<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />${fontsHref(b)}</head>
+ <body style="margin:0;padding:0;background:#f1efeb;font-family:${bodyStack};color:${b.text};-webkit-font-smoothing:antialiased;">
+ <div style="padding:30px 14px 40px;">
+ <div style="max-width:600px;margin:0 auto;background:${surface};border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -8px rgba(0,0,0,0.12);">
+ ${accentBar}
+ <div style="padding:36px 44px 18px;text-align:${align};">${header}</div>
+ <div style="padding:8px 44px 38px;">${eyebrowHtml}${content}</div>
+ </div>
+ <div style="max-width:600px;margin:16px auto 0;text-align:center;font-size:11px;letter-spacing:0.04em;color:#c2bdb6;">Powered by VYA</div>
+ </div></body></html>`);
+}
+
+// Brand-derived palette for transactional content panels — neutral surfaces that sit under any
+// store's accent, so the order table reads the same whether the brand is burgundy or forest green.
+function txnTokens(b: EmailBrand) {
+ return { text: b.text, accent: b.accent, btnText: readableOn(b.accent), muted: "#8a8178", panelBg: "#faf8f4", panelBorder: "rgba(0,0,0,0.09)" };
+}
+
+// Trial lifecycle nudge (VYA → the store OWNER): "connect payouts + pick a plan to go live."
+// Fired by the weekly cron at day 7/14/21/27 of the 30-day trial, until they subscribe. This is a
+// getvya.ai OS email (the OS green), NOT a customer-facing store email — so it doesn't wear the
+// store's brand or the marketplace shell.
+export async function sendTrialNudge(p: { to: string; storeName: string; daysLeft: number }): Promise<void> {
+ if (!p.to) return;
+ const resend = getResend();
+ const ACCENT = "#0e9f76";
+ const left = Math.max(0, p.daysLeft);
+ const urgency = left <= 3 ? `Only ${left} day${left === 1 ? "" : "s"} left in your free trial.` : `${left} days left in your free trial.`;
+ const html = minifyHtml(`<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
+ <body style="margin:0;background:#f4f4f2;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1c1917;">
+ <div style="max-width:520px;margin:0 auto;padding:32px 16px;">
+  <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -8px rgba(0,0,0,0.1);">
+   <div style="height:5px;background:${ACCENT};"></div>
+   <div style="padding:34px 36px 30px;">
+    <p style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:${ACCENT};margin:0 0 14px;">VYA · ${escapeHtml(p.storeName)}</p>
+    <h1 style="font-size:23px;font-weight:700;margin:0 0 12px;letter-spacing:-0.01em;">You're set up — now get paid.</h1>
+    <p style="font-size:15px;line-height:1.65;color:#44403c;margin:0 0 8px;">${urgency}</p>
+    <p style="font-size:15px;line-height:1.65;color:#44403c;margin:0 0 22px;">Connect your payouts and choose a plan to take your storefront live and start selling. Keep building until then — nothing goes public until you're ready.</p>
+    <a href="https://getvya.ai/admin/billing" style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:14px;font-weight:600;">Choose your plan →</a>
+   </div>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#a8a29e;margin:16px 0 0;">getvya.ai · the operating system for resale</p>
+ </div></body></html>`);
+ await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.to, subject: `${left <= 3 ? `${left} days left — ` : ""}Take ${p.storeName} live`, html });
+}
+
 export async function sendStoreCampaign(opts: {
+ storeSlug: string; // to sign each recipient's unsubscribe token
  storeName: string;
  storeEmail: string; // reply-to
  fromAddress?: string; // the verified sending address, else VYA's shared domain
@@ -677,13 +744,21 @@ export async function sendStoreCampaign(opts: {
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
  const sender = (opts.fromAddress && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(opts.fromAddress)) ? opts.fromAddress : "campaigns@vyaplatform.com";
  const from = `${cleanName} <${sender}>`;
- const html = campaignEmailHtml({ storeName: cleanName, body: opts.body, link: opts.link, brand: opts.brand });
 
  let sent = 0, failed = 0;
  for (let i = 0; i < opts.recipients.length; i += 100) {
  const chunk = opts.recipients.slice(i, i + 100);
  try {
- await resend.batch.send(chunk.map((to) => ({ from, to, replyTo: opts.storeEmail, subject: opts.subject, html })));
+ // Per-recipient: a one-click unsubscribe link in the footer + List-Unsubscribe headers
+ // (RFC 8058) — required by Gmail/Yahoo bulk-sender rules and to stay out of spam.
+ await resend.batch.send(chunk.map((to) => {
+ const unsubscribeUrl = `${BASE_URL}/api/storefront/unsubscribe?t=${signUnsubToken(opts.storeSlug, to)}`;
+ return {
+ from, to, replyTo: opts.storeEmail, subject: opts.subject,
+ html: campaignEmailHtml({ storeName: cleanName, body: opts.body, link: opts.link, brand: opts.brand, unsubscribeUrl }),
+ headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+ };
+ }));
  sent += chunk.length;
  } catch {
  failed += chunk.length;
@@ -2983,6 +3058,7 @@ function fmtMoney(cents: number, currency: string): string {
 
 /** Buyer's order confirmation — what they bought + that the seller will ship. */
 export async function sendBuyerOrderConfirmation(p: {
+ storeSlug: string; // resolves the store's verified sender + brand — the email must read as theirs
  buyerEmail: string;
  orderId: string;
  itemTitle: string;
@@ -2996,47 +3072,54 @@ export async function sendBuyerOrderConfirmation(p: {
 }): Promise<void> {
  if (!p.buyerEmail) return;
  const resend = getResend();
+ const { resolveStoreSender } = await import("./email-settings-db");
+ const [sender, brand] = await Promise.all([resolveStoreSender(p.storeSlug), getStoreEmailBrand(p.storeSlug)]);
+ const storeName = sender.fromName || p.storeName;
+ const t = txnTokens(brand);
  const totalCents = p.subtotalCents + p.shippingCents;
  const orderNo = p.orderId.replace(/-/g, "").slice(-6).toUpperCase();
  const addr = p.ship ? [p.ship.line1, p.ship.line2, [p.ship.city, p.ship.state, p.ship.postal].filter(Boolean).join(", "), p.ship.country].filter(Boolean).join("<br>") : "";
- const row = (label: string, val: string, bold = false) => `<tr><td style="padding:5px 0;font-size:14px;color:rgba(93,15,23,0.7);font-family:Georgia,serif;">${label}</td><td align="right" style="padding:5px 0;font-size:14px;color:#5D0F17;font-family:Georgia,serif;${bold ? "font-weight:700;font-size:15px;" : ""}">${val}</td></tr>`;
+ const row = (label: string, val: string, bold = false) => `<tr><td style="padding:5px 0;font-size:14px;color:${t.muted};">${label}</td><td align="right" style="padding:5px 0;font-size:14px;color:${t.text};${bold ? "font-weight:700;font-size:15px;" : ""}">${val}</td></tr>`;
  const content = `
- <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:rgba(93,15,23,0.5);margin:0 0 6px;font-family:Georgia,serif;">Order #${orderNo}</p>
- <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 24px;font-family:Georgia,serif;">Your order is confirmed — thank you. 🖤</p>
- <div style="background:#FFFDF8;border:1px solid rgba(93,15,23,0.15);padding:22px 24px;margin:0 0 20px;">
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:${t.muted};margin:0 0 6px;">Order #${orderNo}</p>
+ <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 24px;">Your order is confirmed — thank you.</p>
+ <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:22px 24px;margin:0 0 20px;">
  <table width="100%" cellpadding="0" cellspacing="0"><tr>
- ${p.imageUrl ? `<td width="78" valign="top"><img src="${p.imageUrl}" alt="" width="66" style="display:block;border:1px solid rgba(93,15,23,0.1);" /></td>` : ""}
+ ${p.imageUrl ? `<td width="78" valign="top"><img src="${p.imageUrl}" alt="" width="66" style="display:block;border-radius:6px;border:1px solid ${t.panelBorder};" /></td>` : ""}
  <td valign="top">
- <p style="font-size:15px;font-weight:700;color:#5D0F17;margin:0 0 4px;font-family:Georgia,serif;">${p.itemTitle}</p>
- <p style="font-size:13px;color:rgba(93,15,23,0.6);margin:0;font-family:Georgia,serif;">from ${p.storeName}</p>
+ <p style="font-size:15px;font-weight:700;color:${t.text};margin:0 0 4px;">${p.itemTitle}</p>
+ <p style="font-size:13px;color:${t.muted};margin:0;">from ${escapeHtml(storeName)}</p>
  </td>
- <td align="right" valign="top" style="white-space:nowrap;"><span style="font-size:15px;color:#5D0F17;font-family:Georgia,serif;">${fmtMoney(p.subtotalCents, p.currency)}</span></td>
+ <td align="right" valign="top" style="white-space:nowrap;"><span style="font-size:15px;color:${t.text};">${fmtMoney(p.subtotalCents, p.currency)}</span></td>
  </tr></table>
- <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border-top:1px solid rgba(93,15,23,0.12);padding-top:10px;">
+ <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border-top:1px solid ${t.panelBorder};padding-top:10px;">
  ${row("Subtotal", fmtMoney(p.subtotalCents, p.currency))}
  ${row("Shipping", p.shippingCents > 0 ? fmtMoney(p.shippingCents, p.currency) : "Free")}
  ${row("Total", fmtMoney(totalCents, p.currency), true)}
  </table>
  </div>
  ${addr ? `<div style="margin:0 0 22px;">
- <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(93,15,23,0.5);margin:0 0 6px;font-family:Georgia,serif;">Shipping to</p>
- <p style="font-size:14px;color:#5D0F17;line-height:1.6;margin:0;font-family:Georgia,serif;">${addr}</p>
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 6px;">Shipping to</p>
+ <p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${addr}</p>
  </div>` : ""}
- <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0;font-family:Georgia,serif;">${p.storeName} will ship your piece soon — you'll get tracking by email once it's on the way.</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0;">${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.</p>
  `;
- const html = viaShell("Order confirmed", content);
- // From the STORE the buyer ordered from (not VYA); replies go to the seller.
+ const html = storeTransactionalShell(brand, storeName, "Order confirmed", content);
+ // From the STORE the buyer ordered from (their verified domain when set, else VYA's shared
+ // domain); replies go to the seller. Never VYA-branded — this lands in the buyer's inbox.
  await resend.emails.send({
- from: `${fromDisplayName(p.storeName)} <${orderSenderAddress()}>`,
+ from: `${fromDisplayName(storeName)} <${sender.fromAddress || orderSenderAddress()}>`,
  to: p.buyerEmail,
- ...(p.replyTo ? { replyTo: p.replyTo } : {}),
- subject: `Your order from ${p.storeName} — #${orderNo}`,
+ replyTo: sender.replyTo || p.replyTo || undefined,
+ subject: `Your order from ${storeName} — #${orderNo}`,
  html,
  });
 }
 
-/** Seller's sale notification — what sold, where to ship, link to buy the label. */
+/** Seller's sale notification — what sold, where to ship, link to buy the label. Goes to the
+ *  store's own inbox (an ops alert), so it's rendered in their brand and links to their workspace. */
 export async function sendSellerSaleNotification(p: {
+ storeSlug: string;
  sellerEmail: string;
  storeName: string;
  itemTitle: string;
@@ -3048,6 +3131,8 @@ export async function sendSellerSaleNotification(p: {
 }): Promise<void> {
  if (!p.sellerEmail) return;
  const resend = getResend();
+ const brand = await getStoreEmailBrand(p.storeSlug);
+ const t = txnTokens(brand);
  const addr = [
  p.buyerName,
  p.ship.line1,
@@ -3055,22 +3140,23 @@ export async function sendSellerSaleNotification(p: {
  [p.ship.city, p.ship.state, p.ship.postal].filter(Boolean).join(", "),
  p.ship.country,
  ].filter(Boolean).join("<br>");
- const url = `${BASE_URL}/store/orders/${p.orderId}`;
+ const url = `${BASE_URL}/infrastructure/admin/orders/${p.orderId}`;
  const content = `
- <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 18px;font-family:Georgia,serif;">You sold <b>${p.itemTitle}</b> for ${fmtMoney(p.amountCents, p.currency)}. 🎉</p>
- <div style="background:#FFFDF8;border:1px solid rgba(93,15,23,0.15);padding:20px 24px;margin:0 0 24px;">
- <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(93,15,23,0.5);margin:0 0 8px;font-family:Georgia,serif;">Ship to</p>
- <p style="font-size:15px;color:#5D0F17;line-height:1.6;margin:0;font-family:Georgia,serif;">${addr || "(address on the order)"}</p>
+ <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">You sold <b>${p.itemTitle}</b> for ${fmtMoney(p.amountCents, p.currency)}. 🎉</p>
+ <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:20px 24px;margin:0 0 24px;">
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 8px;">Ship to</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.6;margin:0;">${addr || "(address on the order)"}</p>
  </div>
- <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 20px;font-family:Georgia,serif;">Shipping's already paid — just generate your prepaid label, print it, and mark it shipped from your dashboard.</p>
- <a href="${url}" style="display:inline-block;background:#5D0F17;color:#FFFDF8 !important;padding:14px 32px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-family:Georgia,serif;">Get your label →</a>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 20px;">Shipping's already paid — just generate your prepaid label, print it, and mark it shipped from your dashboard.</p>
+ <a href="${url}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Get your label →</a>
  `;
- const html = viaShell("You made a sale", content);
+ const html = storeTransactionalShell(brand, p.storeName, "You made a sale", content);
  await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: `You sold ${p.itemTitle} — ship it`, html });
 }
 
-/** Buyer's shipping/tracking email — sent when the order ships. From the store. */
+/** Buyer's shipping/tracking email — sent when the order ships. Store-branded, from the store. */
 export async function sendBuyerTrackingEmail(p: {
+ storeSlug: string;
  buyerEmail: string;
  storeName: string;
  itemTitle: string;
@@ -3080,23 +3166,27 @@ export async function sendBuyerTrackingEmail(p: {
 }): Promise<void> {
  if (!p.buyerEmail) return;
  const resend = getResend();
+ const { resolveStoreSender } = await import("./email-settings-db");
+ const [sender, brand] = await Promise.all([resolveStoreSender(p.storeSlug), getStoreEmailBrand(p.storeSlug)]);
+ const storeName = sender.fromName || p.storeName;
+ const t = txnTokens(brand);
  const track = p.trackingUrl
- ? `<a href="${p.trackingUrl}" style="display:inline-block;background:#5D0F17;color:#FFFDF8 !important;padding:14px 32px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-family:Georgia,serif;">Track your package →</a>`
+ ? `<a href="${p.trackingUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Track your package →</a>`
  : "";
  const content = `
- <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 18px;font-family:Georgia,serif;">Your order from ${p.storeName} is on its way. 📦</p>
- <div style="background:#FFFDF8;border:1px solid rgba(93,15,23,0.15);padding:20px 24px;margin:0 0 24px;">
- <p style="font-size:15px;font-weight:700;color:#5D0F17;margin:0 0 8px;font-family:Georgia,serif;">${p.itemTitle}</p>
- <p style="font-size:13px;color:rgba(93,15,23,0.6);margin:0;font-family:Georgia,serif;">Tracking: ${p.trackingNumber}</p>
+ <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">Your order from ${escapeHtml(storeName)} is on its way. 📦</p>
+ <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:20px 24px;margin:0 0 24px;">
+ <p style="font-size:15px;font-weight:700;color:${t.text};margin:0 0 8px;">${p.itemTitle}</p>
+ <p style="font-size:13px;color:${t.muted};margin:0;">Tracking: ${p.trackingNumber}</p>
  </div>
  ${track}
  `;
- const html = viaShell("Your order shipped", content);
+ const html = storeTransactionalShell(brand, storeName, "Your order shipped", content);
  await resend.emails.send({
- from: `${fromDisplayName(p.storeName)} <${orderSenderAddress()}>`,
+ from: `${fromDisplayName(storeName)} <${sender.fromAddress || orderSenderAddress()}>`,
  to: p.buyerEmail,
- ...(p.replyTo ? { replyTo: p.replyTo } : {}),
- subject: `Your ${p.storeName} order has shipped`,
+ replyTo: sender.replyTo || p.replyTo || undefined,
+ subject: `Your ${storeName} order has shipped`,
  html,
  });
 }

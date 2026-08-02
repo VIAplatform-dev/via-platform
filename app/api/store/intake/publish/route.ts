@@ -3,7 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { createConsignmentItem, resolveSplitForIntake } from "@/app/lib/consignment-db";
 import { stores, storeContactEmails } from "@/app/lib/stores";
 import { getOrCreateSeller } from "@/app/lib/db/sellers";
-import { createItem } from "@/app/lib/db/inventory";
+import { createItem, ensurePublishAtColumn } from "@/app/lib/db/inventory";
 import { createCrossListingsForItem, syncItemToApiPlatforms } from "@/app/lib/cross-listing-db";
 import { maybeAutoPostStory } from "@/app/lib/instagram-publish";
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
@@ -24,16 +24,27 @@ export async function POST(request: NextRequest) {
  const title = String(body.title || "").trim().slice(0, 200);
  if (!title) return NextResponse.json({ error: "Title is required." }, { status: 400 });
 
- // A LIVE listing must be shippable: without a ship-from we can't quote a live rate to floor the
- // buyer's shipping (so VYA could lose money) or buy the label. Drafts are fine — the store can stage
- // pieces and add the address before publishing the batch.
- if (body.status !== "draft") {
+ // Scheduled publish: a valid future time means "save as a draft now, auto-publish then". Require
+ // it at least a minute out so it never races the cron.
+ let publishAt: Date | null = null;
+ if (typeof body.publishAt === "string" && body.publishAt) {
+ const d = new Date(body.publishAt);
+ if (!isNaN(d.getTime()) && d.getTime() > Date.now() + 60_000) publishAt = d;
+ }
+ const scheduled = !!publishAt;
+ const goLiveNow = body.status !== "draft" && !scheduled;
+
+ // Anything that will be publicly live — now OR on a schedule — must be shippable: without a
+ // ship-from we can't floor the buyer's shipping (VYA could lose money) or buy the label. A plain
+ // draft is fine (stage now, add the address before it goes live).
+ if (goLiveNow || scheduled) {
  const shipping = await getShippingSettings(slug);
- if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping before publishing a live listing." }, { status: 400 });
+ if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping before publishing or scheduling a live listing." }, { status: 400 });
  }
 
  const store = stores.find((s) => s.slug === slug);
  const seller = await getOrCreateSeller(slug, store?.name || slug, storeContactEmails[slug] || "");
+ await ensurePublishAtColumn(); // createItem writes publish_at — make sure the column exists
 
  const str = (v: unknown, n: number) => {
  const s = (typeof v === "string" ? v : "").trim();
@@ -65,8 +76,10 @@ export async function POST(request: NextRequest) {
  widthIn: dimUp(body.widthIn, 9),
  heightIn: dimUp(body.heightIn, 3),
  source: "ai",
- // Stores doing a drop stage pieces as drafts, then publish the batch at once.
- status: body.status === "draft" ? "draft" : "active",
+ // Stores doing a drop stage pieces as drafts, then publish the batch at once. A scheduled
+ // listing stays a draft (invisible) with publish_at set — the cron flips it live at that time.
+ status: goLiveNow ? "active" : "draft",
+ publishAt,
  });
 
  // Consignment: if this piece belongs to a consignor, record its terms and FREEZE the split
@@ -170,5 +183,5 @@ export async function POST(request: NextRequest) {
  trust: !usedAi ? "high" : body.reviewed ? "high" : "medium",
  }).catch(() => {});
 
- return NextResponse.json({ ok: true, itemId: item.id });
+ return NextResponse.json({ ok: true, itemId: item.id, status: item.status, scheduled, publishAt: publishAt?.toISOString() ?? null });
 }

@@ -24,6 +24,33 @@ export function signBuyerToken(storeSlug: string, email: string): string {
  return `${data}.${sig}`;
 }
 
+// ── Unsubscribe token ────────────────────────────────────────────────────────
+// Store-scoped, NON-EXPIRING (an unsubscribe link in a months-old email must still
+// work). Carries (store, email); the /unsubscribe route flips this store's subscription
+// for that email only — never touches any other store.
+export function signUnsubToken(storeSlug: string, email: string): string {
+ if (!SECRET) throw new Error("Auth secret not configured");
+ const payload = b64url(JSON.stringify({ s: storeSlug, e: email.toLowerCase(), u: 1 }));
+ const sig = b64url(createHmac("sha256", SECRET).update(payload).digest());
+ return `${payload}.${sig}`;
+}
+
+export function verifyUnsubToken(token: string | null | undefined): { storeSlug: string; email: string } | null {
+ if (!SECRET || !token) return null;
+ const parts = token.split(".");
+ if (parts.length !== 2) return null;
+ const [p, s] = parts;
+ const expected = b64url(createHmac("sha256", SECRET).update(p).digest());
+ try {
+ if (s.length !== expected.length || !timingSafeEqual(Buffer.from(s), Buffer.from(expected))) return null;
+ const payload = JSON.parse(Buffer.from(p.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString());
+ if (typeof payload.s !== "string" || typeof payload.e !== "string") return null;
+ return { storeSlug: payload.s, email: payload.e };
+ } catch {
+ return null;
+ }
+}
+
 /** Verify a buyer token → { storeSlug, email } or null. */
 export function verifyBuyerToken(token: string | null | undefined): { storeSlug: string; email: string } | null {
  if (!SECRET || !token) return null;

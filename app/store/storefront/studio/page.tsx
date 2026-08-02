@@ -41,6 +41,7 @@ export default function StorefrontStudio() {
  const [device, setDevice] = useState<Device>("desktop");
  const [loading, setLoading] = useState(true);
  const [publishing, setPublishing] = useState(false);
+ const [gateMsg, setGateMsg] = useState<string | null>(null); // "pick a plan to go live" prompt
  const [save, setSave] = useState<"idle" | "saving" | "saved">("idle");
  const [ddOpen, setDdOpen] = useState(false);
  const [showTemplates, setShowTemplates] = useState(false);
@@ -169,11 +170,13 @@ export default function StorefrontStudio() {
 
  async function togglePublish() {
  if (!settings) return;
- setPublishing(true);
+ setPublishing(true); setGateMsg(null);
  try {
  const r = await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, enabled: !settings.enabled }) });
  const d = await r.json().catch(() => null);
  if (r.ok && d?.settings) setSettings(d.settings as Settings);
+ // "Set up but held": going live needs an active plan — surface the prompt instead of failing silently.
+ else if (r.status === 402 || d?.code === "subscription_required") setGateMsg(d?.error || "Pick a plan to take your store live.");
  } catch { /* ignore */ }
  setPublishing(false);
  }
@@ -208,6 +211,13 @@ export default function StorefrontStudio() {
  <button type="button" onClick={togglePublish} disabled={publishing || !settings} className="rounded-lg bg-[#5D0F17] px-4 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{publishing ? "Saving…" : enabled ? "Published ✓" : "Publish"}</button>
  </div>
  </div>
+
+ {gateMsg && (
+ <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900">
+ <span>{gateMsg}</span>
+ <a href="/admin/billing" className="shrink-0 rounded-lg bg-[#5D0F17] px-3 py-1 text-[12px] font-semibold text-white transition hover:bg-[#4a0c12]">Choose a plan →</a>
+ </div>
+ )}
 
  {/* Body: chat (primary) + editable live preview */}
  <div className="flex min-h-0 flex-1">

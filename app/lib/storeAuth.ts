@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { auth } from "./auth";
 import { storeContactEmails } from "./stores";
 import { getMobilePayload } from "./mobileAuth";
+import { storeSlugForEmail } from "./store-users-db";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Store-portal auth resolution. Normally the store is the logged-in partner
@@ -44,8 +45,12 @@ export async function resolveStoreSlug(request: NextRequest): Promise<string | n
  if (preview && isAdminRequest(request)) return preview;
  const session = await auth();
  if (session?.user?.email) {
+ // Curated marketplace stores resolve from the static map; self-onboarded stores
+ // (getvya.ai signups) resolve from the store_users table — no code change to add one.
  const slug = storeSlugFromEmail(session.user.email);
  if (slug) return slug;
+ const dbSlug = await storeSlugForEmail(session.user.email);
+ if (dbSlug) return dbSlug;
  }
  // The infrastructure/admin area (owner's build workspace) drives the store portal
  // endpoints as the synthetic via-admin store. An admin with no explicit ?store and
@@ -64,6 +69,6 @@ export async function resolveStoreSlugAny(request: NextRequest): Promise<string 
  const web = await resolveStoreSlug(request);
  if (web) return web;
  const payload = getMobilePayload(request);
- if (payload?.email) return storeSlugFromEmail(payload.email);
+ if (payload?.email) return storeSlugFromEmail(payload.email) ?? (await storeSlugForEmail(payload.email));
  return null;
 }

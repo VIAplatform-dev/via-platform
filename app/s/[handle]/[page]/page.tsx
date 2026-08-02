@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { getStorefrontByHandle, getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import ContactForm from "../../ContactForm";
 import StorefrontView from "../../StorefrontView";
+import StorefrontTracker from "../../StorefrontTracker";
 import { sanitizePages } from "@/app/lib/storefront-blocks";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function StorefrontContentPage({ params, searchParams }: Pr
  <div className="bg-[#5D0F17] py-1.5 text-center text-[11px] uppercase tracking-[0.2em] text-[#FFFDF8]">Preview · not live yet</div>
  )}
  <StorefrontView settings={sf} preview={!!preview} pageSlug={page} />
+ {sf.enabled && !preview && <StorefrontTracker slug={sf.storeSlug} pageType="page" />}
  </>
  );
  }

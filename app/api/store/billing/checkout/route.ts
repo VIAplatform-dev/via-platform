@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { storeContactEmails } from "@/app/lib/stores";
+import { storeSlugForEmail } from "@/app/lib/store-users-db";
 import { TIERS, TRIAL_DAYS, priceIdFor, priceEnvName, type TierId, type Interval } from "@/app/lib/plans";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,8 @@ export async function POST(request: NextRequest) {
  if (!session?.user?.email) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
- const storeSlug = getStoreSlugFromEmail(session.user.email);
+ // Curated marketplace stores resolve from the static map; self-onboarded stores from store_users.
+ const storeSlug = getStoreSlugFromEmail(session.user.email) ?? (await storeSlugForEmail(session.user.email));
  if (!storeSlug) {
  return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
  }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory";
+import { getSellerById } from "@/app/lib/db/sellers";
+import { recordEvent } from "@/app/lib/analytics-events-db";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
 import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus } from "@/app/lib/db/orders";
@@ -41,6 +43,8 @@ type ShipAddr = { line1?: string | null; line2?: string | null; city?: string | 
 // payment_intent.succeeded never records twice.
 async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null }) {
  if (!o.pi || !(await orderExistsForPaymentIntent(o.pi))) {
+ // Resolve the store slug once (all items share the seller) for the clean event stream.
+ const sellerSlug = (await getSellerById(o.sellerId).catch(() => null))?.slug || null;
  let idx = 0;
  for (const itemId of o.itemIds) {
  const sold = await markSold(itemId);
@@ -58,6 +62,8 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  stripePaymentIntent: o.pi,
  });
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
+ // Clean event stream: the purchase, canonical items.id, at the price actually charged.
+ if (sellerSlug) recordEvent({ type: "purchase", storeSlug: sellerSlug, itemId, priceCents: salePriceCents, surface: "storefront" }).catch(() => {});
  // Consignment: if this piece was taken on consignment, credit the consignor their split.
  creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: salePriceCents }).catch(() => {});
  // Binding offer redeemed → mark it used so the link can't buy the piece twice.
@@ -82,8 +88,8 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  const img = Array.isArray(ord.itemImages) ? (ord.itemImages[0] as string) : null;
  const ship = { line1: ord.shipLine1, line2: ord.shipLine2, city: ord.shipCity, state: ord.shipState, postal: ord.shipPostal, country: ord.shipCountry };
  try {
- if (ord.buyerEmail) await sendBuyerOrderConfirmation({ buyerEmail: ord.buyerEmail, orderId: ord.id, itemTitle: ord.itemTitle || "your item", imageUrl: img, subtotalCents: ord.amountCents, shippingCents: ord.shippingPaidCents || 0, currency: ord.currency, storeName: ord.sellerName || "the store", ship, replyTo: ord.sellerEmail });
- if (ord.sellerEmail) await sendSellerSaleNotification({ sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship, orderId: ord.id });
+ if (ord.buyerEmail) await sendBuyerOrderConfirmation({ storeSlug: ord.sellerSlug || "", buyerEmail: ord.buyerEmail, orderId: ord.id, itemTitle: ord.itemTitle || "your item", imageUrl: img, subtotalCents: ord.amountCents, shippingCents: ord.shippingPaidCents || 0, currency: ord.currency, storeName: ord.sellerName || "the store", ship, replyTo: ord.sellerEmail });
+ if (ord.sellerEmail) await sendSellerSaleNotification({ storeSlug: ord.sellerSlug || "", sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship, orderId: ord.id });
  } catch (e) {
  // Email failed — un-claim so a later event retries it (no duplicate, no silent miss).
  await resetConfirmationSent(ord.id).catch(() => {});

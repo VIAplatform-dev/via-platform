@@ -43,7 +43,7 @@ export function needsReview(field: DraftField): boolean {
 
 // Bump when the intake prompts/logic change materially — stamped on every training
 // example so we never blend guesses from different "brain eras" when training.
-export const PROMPT_VERSION = "2026-07-21";
+export const PROMPT_VERSION = "2026-08-02";
 
 const SYSTEM =
  "You are a vintage & secondhand fashion expert drafting a resale listing from product photos. Identify the piece precisely and read any visible care/composition tag for fabric content. You also write the SEO-optimized description and benchmark price the way the best resale sellers do — drawing on how comparable pieces are titled, described, and sold on Grailed, eBay (sold listings), Vestiaire Collective, and Depop. Authentication, era, and material are high-stakes — only give high confidence when the visual evidence is genuinely clear; otherwise lower the confidence or return null. Never invent facts (measurements, flaws, provenance) you can't see. RUNWAY PROVENANCE: when a recognizable designer piece clearly matches a documented runway collection, COMMIT to the specific season/year (these are well-documented — e.g. the brown ruched Tom Ford for Gucci pieces are S/S 2004; Cavalli poppy-print gowns are S/S 2003) and weave that provenance in. Do NOT hedge to era-level (e.g. just 'Tom Ford era') or leave it blank out of over-caution when you clearly recognize the collection — if the description names a designer/era/collection, the runway field MUST name the exact season+year. Only avoid a runway for a generic piece not tied to a specific documented show; never fabricate one for a no-name piece.\n\nCRITICAL — BRANDING: Do NOT name a specific brand or designer from silhouette, fabric, color, or overall 'vibe' alone. A designer-LOOKING dress is not evidence of any particular house. Assign a brand ONLY when there is (a) a visible label/logo/hardware/monogram in the photo, (b) reverse-image-search matches provided to you that point to it, or (c) an unmistakable, documented archival design. Absent that, return brand = null with low confidence — an honest 'unbranded' beats a confident wrong label. Never default to a 'house style' guess (e.g. assuming every slinky Y2K piece is one particular Italian house).\n\nCRITICAL — MATERIAL: fabrics that look alike in a photo (neoprene, satin, microfiber, nylon, jersey, wool, canvas) CANNOT be told apart by sight. Only name a SPECIFIC fiber when the care/composition tag is legible, or the material is truly unmistakable (obvious leather, denim, shearling, sequins). Otherwise LEAVE THE MATERIAL BLANK — return the material value as null. Do NOT fill a vague descriptor ('black fabric', 'smooth textile') and do NOT guess a specific fiber ('neoprene'): a blank field the seller fills in is cleaner and more honest than a wrong or wishy-washy material. Only fill material when you can genuinely verify it — a legible composition tag, or an unmistakable material (leather, denim, shearling, sequins, knit).\n\nPINPOINT THE PIECE: you are usually GIVEN the brand — use it, and go past 'a Prada bag' to the SPECIFIC model / line / collection and era (e.g. 'Prada Re-Nylon shoulder bag', 'the Cavalli S/S 2003 poppy-print gown', 'Levi's 501 big E'). Pricing accuracy depends on comps for the EXACT piece, not the brand in general — so put that specificity into both the title AND the searchQuery.";
@@ -73,6 +73,7 @@ STRICT DESCRIPTION RULES (the "description" field is customer-facing storefront 
 - NEVER hedge. Write with the assured voice of an expert seller. If you're unsure of a fact, OMIT it — do not write "appears to be", "likely", "seems", or "no care tag is legible".
 - Keep it TIGHT: 2-3 sentences. No purple prose, no cataloguing every panel/seam/strap, no hype, no invented facts (measurements, flaws, provenance you aren't sure of).
 - Material/care uncertainty belongs ONLY in the structured fields, never in the description.
+- SEO, the natural way: work in the plain-language item type a shopper actually types — "shoulder bag", "slip dress", "leather moto jacket", "pleated midi skirt" — plus the brand and era, each mentioned ONCE, woven into real sentences. Do NOT stuff, repeat, or list keywords; a description that reads like a keyword pile ranks worse AND reads robotic. One natural mention of each search term beats five forced ones.
 - It must read as finished retail copy a boutique would publish as-is.`;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -176,6 +177,56 @@ export async function draftListing(
  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
  const text = data.content?.find((c) => c.type === "text")?.text ?? "";
  return parseDraft(text);
+}
+
+/**
+ * Polish a description the SELLER typed so it's optimized for search — without changing their facts,
+ * inventing details, or losing their voice. Text-only (no photo). Returns the rewritten description.
+ * Used by the "Improve for search" button so store-written copy gets the same SEO-natural treatment
+ * the AI-drafted copy already gets. Never adds a fact the seller didn't give.
+ */
+export async function polishDescriptionForSeo(
+ input: { description: string; title?: string; brand?: string; era?: string; material?: string; condition?: string; size?: string; category?: string },
+ voice?: { guide: string; examples: string[] } | null,
+): Promise<string> {
+ const apiKey = process.env.ANTHROPIC_API_KEY;
+ if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+ const facts = Object.entries({ title: input.title, brand: input.brand, era: input.era, material: input.material, condition: input.condition, size: input.size, category: input.category })
+  .filter(([, v]) => v && String(v).trim())
+  .map(([k, v]) => `- ${k}: ${v}`).join("\n");
+ const voiceBlock = voice?.guide
+  ? `\n\nKeep it in THIS store's voice (don't make it sound like generic AI): ${voice.guide}` +
+    (voice.examples?.length ? `\nExamples of how they write:\n${voice.examples.slice(0, 3).map((e, i) => `${i + 1}. "${e.slice(0, 300)}"`).join("\n")}` : "")
+  : "";
+
+ const prompt = `Rewrite this resale listing description so it's optimized for search while still reading like a person wrote it.
+
+CURRENT DESCRIPTION:
+"${input.description.slice(0, 2000)}"
+${facts ? `\nTHE PIECE (ground truth — never contradict these, and NEVER add a fact beyond them):\n${facts}\n` : ""}${voiceBlock}
+
+RULES:
+- Work in the plain-language item type a shopper actually types (e.g. "shoulder bag", "slip dress", "leather moto jacket") plus the brand and era, each ONCE, woven into real sentences. Never stuff, repeat, or list keywords.
+- Keep EVERY fact the seller stated. Do NOT invent measurements, flaws, materials, or provenance not given above. If something isn't provided, don't add it.
+- Keep the seller's voice and any structure/template they used. Tight: 2–3 sentences.
+- No hedging ("appears to be"), no mention of SEO/AI/keywords, no hype.
+Return ONLY the rewritten description text — no quotes, no preamble, no JSON.`;
+
+ const res = await fetch(ANTHROPIC_URL, {
+  method: "POST",
+  headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+  body: JSON.stringify({
+   model: INTAKE_MODEL,
+   max_tokens: 400,
+   system: "You are an expert resale copywriter. You optimize listing descriptions for search while keeping them natural, accurate, and in the seller's own voice. You never invent facts the seller didn't provide.",
+   messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
+  }),
+ });
+ if (!res.ok) throw new Error(`Anthropic error ${res.status}`);
+ const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+ const text = (data.content?.find((c) => c.type === "text")?.text ?? "").trim();
+ return text.replace(/^["']+|["']+$/g, "").trim().slice(0, 2000);
 }
 
 // Proactive runway-provenance check. Runs whenever a listing has no runway yet (even when the

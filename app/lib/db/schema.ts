@@ -51,6 +51,9 @@ export const items = pgTable(
  heightIn: integer("height_in"),
  source: text("source").notNull().default("manual"), // manual | imported | ai
  externalUrl: text("external_url"),
+ // Scheduled publish: a draft with publish_at in the future is "scheduled" — the cron flips it to
+ // active at that time. NULL = not scheduled (a normal draft or an already-live item).
+ publishAt: timestamp("publish_at", { withTimezone: true }),
  soldAt: timestamp("sold_at", { withTimezone: true }),
  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

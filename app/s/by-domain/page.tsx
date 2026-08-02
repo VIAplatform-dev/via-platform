@@ -20,10 +20,14 @@ export async function generateMetadata(): Promise<Metadata> {
  const sf = await resolveFromHost();
  if (!sf) return { title: "Storefront" };
  const store = stores.find((s) => s.slug === sf.storeSlug);
+ const name = store?.name ?? "Storefront";
+ const description = sf.tagline || (store ? `Shop ${store.name} — vintage and one-of-a-kind.` : undefined);
+ // The seller's own domain IS the canonical public site — index it when live.
  return {
- title: store?.name ?? "Storefront",
- description: sf.tagline || (store ? `Shop ${store.name} — vintage and one-of-a-kind.` : undefined),
- robots: { index: false },
+ title: name,
+ description,
+ robots: { index: sf.enabled, follow: true },
+ openGraph: { title: name, description, type: "website" },
  };
 }
 

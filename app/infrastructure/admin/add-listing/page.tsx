@@ -115,6 +115,9 @@ export default function IntakePage() {
  const [specificPiece, setSpecificPiece] = useState<{ model: string; similarity: number; era: string | null; source: string; refPriceCents: number | null } | null>(null);
  const [flaws, setFlaws] = useState<string[]>([]);
  const [promptVersion, setPromptVersion] = useState<string | null>(null);
+ const [seoBusy, setSeoBusy] = useState(false);
+ const [schedule, setSchedule] = useState(""); // datetime-local value for scheduled publish
+ const [scheduledAt, setScheduledAt] = useState<string | null>(null); // set on the done screen
  const [cols, setCols] = useState<Collection[]>([]);
  const [selectedCols, setSelectedCols] = useState<string[]>([]);
  const [newCol, setNewCol] = useState("");
@@ -149,6 +152,24 @@ export default function IntakePage() {
  function reorderPhoto(from: number, to: number) {
  if (from === to) return;
  setPhotos((ps) => { const a = [...ps]; const [m] = a.splice(from, 1); a.splice(to, 0, m); return a; });
+ }
+
+ // "Improve for search": rewrite the seller's own description to be SEO-natural, in their voice,
+ // without inventing facts. Sends the current attributes so keywords are woven in truthfully.
+ async function polishForSeo() {
+ if (seoBusy) return;
+ if (form.description.trim().length < 10) { setErr("Write a description first, then I’ll polish it for search."); return; }
+ setSeoBusy(true); setErr(null);
+ try {
+ const res = await fetch("/api/store/intake/seo", {
+ method: "POST", headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ description: form.description, title: form.title, brand: form.brand, era: form.era, material: form.material, condition: form.condition, size: form.size, category: form.category }),
+ });
+ const d = await res.json().catch(() => null);
+ if (res.ok && d?.description) set("description", d.description);
+ else setErr(d?.error || "Couldn’t polish that — try again.");
+ } catch { setErr("Couldn’t polish that — try again."); }
+ setSeoBusy(false);
  }
 
  // Typing cost auto-fills price at the store's markup: price = cost × (1 + markup%).
@@ -351,23 +372,26 @@ export default function IntakePage() {
  }
  }
 
- async function publish(status: "active" | "draft" = "active") {
+ // publishAt (ISO) = schedule it: the server saves it as a draft now and the cron publishes it then.
+ async function publish(status: "active" | "draft" = "active", publishAt?: string) {
  if (!form.title.trim()) { setErr("Add a title first."); return; }
  if (!photos.length) { setErr("Add at least one photo."); return; }
- if (status === "active" && !allConfirmed) { setErr("Confirm the flagged fields first."); return; }
+ if ((status === "active" || publishAt) && !allConfirmed) { setErr("Confirm the flagged fields first."); return; }
+ if (publishAt && new Date(publishAt).getTime() <= Date.now()) { setErr("Pick a time in the future to schedule."); return; }
  setBusy(true);
- setBusyMsg(status === "draft" ? "Saving draft…" : "Publishing…");
+ setBusyMsg(publishAt ? "Scheduling…" : status === "draft" ? "Saving draft…" : "Publishing…");
  setErr(null);
  try {
  const images = [ghost, ...photos].filter(Boolean);
  const r = await fetch("/api/store/intake/publish", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ ...form, status, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
+ body: JSON.stringify({ ...form, status, publishAt: publishAt || null, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
- setSavedDraft(status === "draft");
+ setScheduledAt(d.scheduled ? d.publishAt : null);
+ setSavedDraft(status === "draft" && !d.scheduled);
  setPhase("done");
  } catch (e) {
  setErr(e instanceof Error ? e.message : "Publish failed");
@@ -378,7 +402,7 @@ export default function IntakePage() {
  function reset() {
  setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null);
+ setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null);
  }
 
  // ── Done ──
@@ -387,8 +411,8 @@ export default function IntakePage() {
  <div className="flex min-h-screen items-center justify-center px-6 text-center">
  <div>
  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">✓</div>
- <p className="text-xl font-semibold text-stone-900">{savedDraft ? "Saved as draft" : "Listed"}</p>
- <p className="mt-1 text-sm text-stone-500">{savedDraft ? "It’s in your inventory — publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
+ <p className="text-xl font-semibold text-stone-900">{scheduledAt ? "Scheduled" : savedDraft ? "Saved as draft" : "Listed"}</p>
+ <p className="mt-1 text-sm text-stone-500">{scheduledAt ? `It’ll go live automatically on ${new Date(scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.` : savedDraft ? "It’s in your inventory — publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
  <div className="mt-6 flex items-center justify-center gap-3">
  <TechButton onClick={reset}>List another</TechButton>
  <TechButton variant="secondary" onClick={() => { window.location.href = "/admin/inventory"; }}>View inventory</TechButton>
@@ -573,7 +597,16 @@ export default function IntakePage() {
  </div>
  </div>
  <div>
+ <div className="flex items-center justify-between">
  <label className={label}>Description</label>
+ <button
+ type="button" onClick={polishForSeo} disabled={seoBusy || form.description.trim().length < 10}
+ className="text-[11px] font-medium text-[var(--accent,#0e9f76)] transition hover:opacity-70 disabled:opacity-40"
+ title="Rewrite your description for search — keeps your words and facts, just makes it more findable"
+ >
+ {seoBusy ? "Polishing…" : "✨ Improve for search"}
+ </button>
+ </div>
  <textarea className={cn(input, "min-h-[80px] resize-y")} value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="Write it yourself, or leave blank and AI drafts it" />
  </div>
 
@@ -599,11 +632,26 @@ export default function IntakePage() {
  placeholder="New collection — type &amp; Enter (Y2K, Designer bags…)" />
  </div>
 
- <div className="flex items-center gap-4 border-t border-stone-100 pt-4">
+ <div className="flex flex-wrap items-center gap-4 border-t border-stone-100 pt-4">
  <TechButton onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>
  <TechButton variant="secondary" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</TechButton>
  {!allConfirmed && <span className="text-[11px] text-amber-600">Confirm the flagged fields to publish — or save as a draft for now</span>}
  {err && <span className="text-xs text-red-600">{err}</span>}
+ {/* Schedule publish: pick a future time → saved as a draft now, auto-published then. */}
+ <div className="flex w-full items-center gap-2 sm:w-auto sm:ml-auto">
+ <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">Schedule</span>
+ <input
+ type="datetime-local" value={schedule} onChange={(e) => setSchedule(e.target.value)}
+ className={cn(input, "w-auto py-1.5 text-[13px]")}
+ />
+ <TechButton
+ variant="secondary"
+ onClick={() => publish("active", schedule ? new Date(schedule).toISOString() : undefined)}
+ disabled={busy || !schedule || !allConfirmed}
+ >
+ Schedule
+ </TechButton>
+ </div>
  </div>
  </TechCard>
  </div>

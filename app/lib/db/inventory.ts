@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, ne, sql, getTableColumns } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, isNotNull, lt, lte, ne, sql, getTableColumns } from "drizzle-orm";
 import { getDb, items, reservations, orders, payouts } from "./index";
 import type { Item, NewItem, Reservation } from "./index";
 import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-core";
@@ -15,6 +15,29 @@ export async function createItem(item: NewItem): Promise<Item> {
  const db = getDb();
  const [row] = await db.insert(items).values(item).returning();
  return row;
+}
+
+// Self-heal the scheduled-publish column so a deploy works even before `db:push` runs. Idempotent
+// + memoized, so it's a no-op after the first call (or once the migration has been applied).
+let publishAtEnsured = false;
+export async function ensurePublishAtColumn(): Promise<void> {
+ if (publishAtEnsured) return;
+ try {
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS publish_at timestamptz`);
+ publishAtEnsured = true;
+ } catch { /* db:push covers it; ignore if we lack DDL rights */ }
+}
+
+/** Publish every scheduled draft whose time has arrived (status 'draft' + publish_at <= now). The
+ *  status guard makes it atomic, so overlapping cron runs can't double-publish. Returns the items
+ *  that flipped live, so the caller can fan out to other channels + send the new-arrivals digest. */
+export async function publishDueScheduledItems(now: Date): Promise<Item[]> {
+ await ensurePublishAtColumn();
+ const db = getDb();
+ return db.update(items)
+ .set({ status: "active", publishAt: null, updatedAt: new Date() })
+ .where(and(eq(items.status, "draft"), isNotNull(items.publishAt), lte(items.publishAt, now)))
+ .returning();
 }
 
 /** Patch an item's display/sale fields (title, price, images, etc.). Does not

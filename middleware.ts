@@ -59,6 +59,7 @@ const PUBLIC_ROUTES = [
   "/api/store/billing",
   "/api/store/import",
   "/api/store/onboarding-status",
+  "/api/store/onboarding",
   "/api/store/intake",
   "/api/store/items",
   "/api/store/instagram",
@@ -195,14 +196,19 @@ export async function middleware(request: NextRequest) {
       // legacy admin auth routes must stay reachable so admin login works on this host
       pathname === "/admin/login" ||
       pathname === "/admin/set-password" ||
-      pathname.startsWith("/admin/auth");
+      pathname.startsWith("/admin/auth") ||
+      // store owners sign in via magic link here (callbackUrl=/admin → onboarding/workspace)
+      pathname === "/login" ||
+      pathname === "/register";
     if (!passthrough) {
       if (pathname === "/admin" || pathname.startsWith("/admin/")) {
         // Owner Workspace. The path→route mapping (/admin/* → /infrastructure/admin/*) is a
         // host-conditional rewrite in next.config (client-router aware, so SPA nav works).
-        // Middleware only enforces the admin gate here (auth pages are in `passthrough` above),
-        // then hands off — the rewrite serves the actual route.
-        if (!(await isAdminAuthenticated(request))) {
+        // The workspace admits the owner (ADMIN_PASSWORD) OR any signed-in store partner (their
+        // session). Per-store data scoping happens server-side (resolveStoreSlugAny returns only
+        // their store's data); owner-only destructive actions stay behind ADMIN_PASSWORD (isOwner).
+        // A signed-in user with no store yet is routed to onboarding by the layout (via whoami).
+        if (!(await isAdminAuthenticated(request)) && !hasUserSession(request)) {
           const loginUrl = new URL("/admin/login", request.url);
           loginUrl.searchParams.set("redirect", fullPath);
           return NextResponse.redirect(loginUrl);
@@ -316,7 +322,9 @@ export async function middleware(request: NextRequest) {
   // (the public landing page) is a public route and would otherwise let /infrastructure/admin/*
   // through too.
   if (pathname === "/infrastructure/admin" || pathname.startsWith("/infrastructure/admin/")) {
-    if (!(await isAdminAuthenticated(request))) {
+    // Owner (ADMIN_PASSWORD) OR a signed-in store partner. Data is scoped per-request
+    // server-side (resolveStoreSlugAny); owner-only actions stay behind ADMIN_PASSWORD.
+    if (!(await isAdminAuthenticated(request)) && !hasUserSession(request)) {
       const loginUrl = new URL("/admin/login", request.url);
       loginUrl.searchParams.set("redirect", fullPath);
       return attachEid(NextResponse.redirect(loginUrl));

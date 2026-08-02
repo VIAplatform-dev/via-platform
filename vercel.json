@@ -5,6 +5,14 @@
       "schedule": "0 6 * * 1"
     },
     {
+      "path": "/api/cron/trial-nudges",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/publish-scheduled",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/consignment-payouts",
       "schedule": "0 10 * * *"
     },

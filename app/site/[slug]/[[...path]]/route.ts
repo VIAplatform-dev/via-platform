@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getCapturePage, getSiteCss } from "@/app/lib/site-capture-db";
-import { injectCart, injectCss, injectCollectionItems, prepareEditMode } from "@/app/lib/site-capture";
+import { injectCart, injectCss, injectCollectionItems, injectSeo, prepareEditMode } from "@/app/lib/site-capture";
 import { captureStorefrontEntry, recordStorePageview } from "@/app/lib/store-visits-db";
 import { recordSearch } from "@/app/lib/store-favorites-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
@@ -58,5 +58,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  await recordStorePageview({ storeSlug: slug, path: pathname || "/", pageType, sessionId: sid, surface: "storefront" }).catch(() => {});
  const headers: Record<string, string> = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" };
  if (setCookie) headers["Set-Cookie"] = setCookie;
- return new Response(injectCss(injectCart(html), css), { headers });
+
+ // Canonical + indexable, so the re-hosted site ranks as itself. Served on the seller's own domain
+ // → self-canonical to that domain (the real public address); served on a VYA host → the /site path.
+ const host = (req.headers.get("host") || "").toLowerCase().split(":")[0];
+ const isVyaHost = !host || host === "vyaplatform.com" || host === "www.vyaplatform.com" || host.endsWith(".vercel.app") || host === "localhost";
+ const cleanPath = pathname === "/" || pathname === "" ? "" : pathname;
+ const canonicalUrl = isVyaHost ? `https://vyaplatform.com/site/${slug}${cleanPath}` : `https://${host}${cleanPath}`;
+ return new Response(injectSeo(injectCss(injectCart(html), css), { canonicalUrl }), { headers });
 }

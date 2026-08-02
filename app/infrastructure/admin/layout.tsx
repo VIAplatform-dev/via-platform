@@ -73,15 +73,51 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  const router = useRouter();
  const [ok, setOk] = useState<boolean | null>(null);
  const [navOpen, setNavOpen] = useState(false); // mobile drawer
+ // "Bring your site" (import/connect) is a ONE-TIME setup step for a store — they do it at
+ // onboarding and shouldn't be nagged to reconnect. So we hide it once a store is set up, but
+ // keep it for the owner/internal admin (who re-syncs any store). isOwner = the workspace owner
+ // (ADMIN_PASSWORD, i.e. via-admin), NOT a signed-in store partner.
+ const [isOwner, setIsOwner] = useState(false);
+ const [storeSetUp, setStoreSetUp] = useState(false);
+
+ // The onboarding wizard lives at /admin/onboarding but is self-contained — it renders
+ // WITHOUT the workspace shell and does its own auth, so we skip the gate below for it
+ // (otherwise a store with no store-record yet would be stuck on the loading screen).
+ const isOnboarding = pathname.endsWith("/admin/onboarding") || pathname.includes("/admin/onboarding/");
 
  useEffect(() => {
- fetch("/api/infrastructure/whoami").then((r) => setOk(r.ok)).catch(() => setOk(false));
- }, []);
+ if (isOnboarding) { setOk(true); return; }
+ fetch("/api/infrastructure/whoami")
+ .then(async (r) => {
+ if (!r.ok) { setOk(false); return; }
+ const data = await r.json().catch(() => ({}));
+ // Signed in but not attached to a store yet → send them through the signup wizard.
+ if (data?.needsOnboarding) { router.replace("/admin/onboarding"); return; }
+ setIsOwner(data?.admin === true);
+ setOk(true);
+ // For a store partner, check whether they've already set up (storefront live or listings)
+ // so we can retire the one-time "Bring your site" step from their nav.
+ if (data?.admin !== true) {
+ fetch("/api/store/onboarding-status")
+ .then((s) => (s.ok ? s.json() : null))
+ .then((st) => setStoreSetUp(Boolean(st?.onboarded)))
+ .catch(() => {});
+ }
+ })
+ .catch(() => setOk(false));
+ }, [isOnboarding, router]);
+
+ // Hide the one-time import step for a set-up store; the owner always keeps it.
+ const hideImport = !isOwner && storeSetUp;
+ const visibleGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => !(hideImport && n.href === `${B}/import`)) })).filter((g) => g.items.length > 0);
 
 
  useEffect(() => {
  if (ok === false) router.replace("/admin/login?redirect=/admin");
  }, [ok, router]);
+
+ // Render the wizard bare (no nav shell) when on the onboarding route.
+ if (isOnboarding) return <>{children}</>;
 
  if (ok !== true) {
  return <div className="flex min-h-screen items-center justify-center text-sm text-stone-400">{ok === false ? "Redirecting…" : "Loading…"}</div>;
@@ -140,7 +176,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  <kbd className="rounded border border-stone-200 px-1 font-mono text-[9.5px] leading-4">⌘K</kbd>
  </button>
  <nav className="flex-1" onClick={() => setNavOpen(false)}>
- {GROUPS.map((g, gi) => (
+ {visibleGroups.map((g, gi) => (
  <div key={gi} className={gi === 0 ? "" : "mt-5"}>
  {g.label && <p className="px-3 pb-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.15em] text-stone-400">{g.label}</p>}
  <div className="space-y-0.5">

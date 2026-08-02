@@ -34,7 +34,7 @@ export async function fireAutomationTrigger(
  const v = { name: recipient.name || "there", ...vars };
  let sent = 0;
  for (const a of autos) {
- const r = await sendStoreCampaign({ storeName: fromName, storeEmail: replyTo, fromAddress, subject: fill(a.subject, v), body: fill(a.body, v), link: website, recipients: [recipient.email], brand }).catch(() => null);
+ const r = await sendStoreCampaign({ storeSlug, storeName: fromName, storeEmail: replyTo, fromAddress, subject: fill(a.subject, v), body: fill(a.body, v), link: website, recipients: [recipient.email], brand }).catch(() => null);
  if (r) sent += r.sent;
  }
  return sent;
@@ -95,6 +95,6 @@ export async function sendAbandonedCartEmail(cart: AbandonedCart): Promise<boole
  const piece = cart.itemTitle || "your piece";
  const subject = `Still thinking about ${piece}?`;
  const body = `Hi ${cart.name || "there"},\n\nYou were checking out ${piece} — and since it's one-of-one, once it's gone, it's gone. Come finish up whenever you're ready:`;
- const r = await sendStoreCampaign({ storeName: fromName, storeEmail: replyTo, fromAddress, subject, body, link: `${CHECKOUT_BASE}/checkout?item=${cart.itemId}`, recipients: [cart.email], brand }).catch(() => null);
+ const r = await sendStoreCampaign({ storeSlug: cart.storeSlug, storeName: fromName, storeEmail: replyTo, fromAddress, subject, body, link: `${CHECKOUT_BASE}/checkout?item=${cart.itemId}`, recipients: [cart.email], brand }).catch(() => null);
  return !!r && r.sent > 0;
 }

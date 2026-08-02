@@ -10,6 +10,7 @@ import { consignorCutCents } from "@/app/lib/consignment-logic";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { flatRateCents } from "@/app/lib/shipping-tiers";
 import { validateDiscount, computeDiscount, distributeDiscount } from "@/app/lib/store-discounts-db";
+import { recordEvent } from "@/app/lib/analytics-events-db";
 import type { Item } from "@/app/lib/db/schema";
 
 export const dynamic = "force-dynamic";
@@ -160,6 +161,10 @@ export async function POST(request: NextRequest) {
  pay.stripeAccountId, // direct charge on the seller's connected account
  );
  sessions.push({ sellerSlug: seller.slug, url: session.url as string, itemIds });
+ // Clean event stream: each item entering checkout, at the price actually charged.
+ for (let i = 0; i < itemIds.length; i++) {
+ await recordEvent({ type: "checkout_start", storeSlug: seller.slug, itemId: itemIds[i], priceCents: discounted[i], surface: "storefront" });
+ }
  }
 
  if (!sessions.length) {

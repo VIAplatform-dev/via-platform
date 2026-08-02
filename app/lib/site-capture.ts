@@ -306,6 +306,25 @@ export function injectCart(html: string): string {
  return html.indexOf("</body>") !== -1 ? html.replace("</body>", CART_UI + "</body>") : html + CART_UI;
 }
 
+/** Give a captured page the two SEO tags it usually lacks when re-hosted on VYA: a canonical URL
+ * (so the page has one authoritative address) and an indexable robots directive. Both are ADDED
+ * ONLY when the captured HTML doesn't already declare them — we never override the seller's own
+ * canonical/robots. Injected right after <head> so crawlers read it early. */
+export function injectSeo(html: string, opts: { canonicalUrl: string }): string {
+ const tags: string[] = [];
+ if (!/<link[^>]+rel=["']?canonical/i.test(html)) {
+  tags.push(`<link rel="canonical" href="${opts.canonicalUrl.replace(/"/g, "%22")}">`);
+ }
+ if (!/<meta[^>]+name=["']?robots/i.test(html)) {
+  tags.push(`<meta name="robots" content="index, follow">`);
+ }
+ if (!tags.length) return html;
+ const block = tags.join("");
+ if (/<head[^>]*>/i.test(html)) return html.replace(/(<head[^>]*>)/i, `$1${block}`);
+ if (html.indexOf("</head>") !== -1) return html.replace("</head>", `${block}</head>`);
+ return block + html;
+}
+
 // ── Visual page editor: edit captured pages yourself (Shopify-style) ──────────
 // "Editable" things are numbered in document order so the same id maps the same
 // element on the client (in-iframe editing) and the server (save): text leaves,

@@ -199,3 +199,15 @@ export async function getAudienceBreakdown(storeSlug: string): Promise<{ subscri
 export async function addCustomer(storeSlug: string, email: string, name: string | null): Promise<void> {
  await importCustomers(storeSlug, [{ email, name, phone: null }], "manual");
 }
+
+/** Flip a customer's marketing-email consent for THIS store only (used by /unsubscribe).
+ *  Upserts so an unsubscribe still records even if the recipient isn't a stored customer yet. */
+export async function setEmailSubscribed(storeSlug: string, email: string, subscribed: boolean): Promise<void> {
+ await ensureTable();
+ const sql = db();
+ await sql`
+ INSERT INTO store_customers (store_slug, email, email_subscribed, source)
+ VALUES (${storeSlug}, ${email.toLowerCase().trim()}, ${subscribed}, 'unsubscribe')
+ ON CONFLICT (store_slug, email) DO UPDATE SET email_subscribed = ${subscribed}
+ `.catch(() => {});
+}

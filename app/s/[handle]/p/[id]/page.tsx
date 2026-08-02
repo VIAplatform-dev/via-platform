@@ -1,4 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
@@ -7,13 +8,61 @@ import { getInboxSettings } from "@/app/lib/storefront-settings-db";
 import { formatPrice } from "@/app/lib/formatPrice";
 import AskAboutItem from "@/app/s/AskAboutItem";
 import MakeOffer from "@/app/components/MakeOffer";
+import StorefrontTracker from "@/app/s/StorefrontTracker";
 
 export const dynamic = "force-dynamic";
 
 const SERIFS = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces"]);
 const ff = (n?: string) => (n ? `'${n}', ${SERIFS.has(n) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 
+// Storefronts are served on the stable public host; product URLs there are the canonical ones.
+const STOREFRONT_BASE = "https://vyaplatform.com";
+
+// Collapse whitespace + cap length for meta tags (Google shows ~155–160 chars of description).
+function clean(s: string, max = 160): string {
+ const t = (s || "").replace(/\s+/g, " ").trim();
+ return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+// Map a resale condition note/grade to a schema.org itemCondition (drives the rich result).
+function conditionUrl(cond?: string | null): string {
+ const g = (cond || "").toLowerCase();
+ return /deadstock|nwt|new with tag|brand new|unworn/.test(g) ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition";
+}
+
 type Props = { params: Promise<{ handle: string; id: string }>; searchParams: Promise<{ preview?: string }> };
+
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+ const { handle, id } = await params;
+ const { preview } = await searchParams;
+ const sf = await getStorefrontByHandleAny(handle).catch(() => null);
+ if (!sf) return { title: "Product" };
+ const seller = await getSellerBySlug(sf.storeSlug).catch(() => null);
+ const item = await getItem(id).catch(() => null);
+ if (!item || !seller || item.sellerId !== seller.id || item.status === "removed") {
+  return { title: "Product", robots: { index: false, follow: false } };
+ }
+ const storeName = sf.theme?.storeName || seller.name || handle.replace(/-/g, " ");
+ const price = formatPrice(item.priceCents / 100, item.currency);
+ // Prefer the store's own words (organic, unique). Fall back to a keyword-rich but natural
+ // sentence built from the real attributes — never stuffed, just descriptive.
+ const desc = item.description
+  ? clean(item.description)
+  : clean(`${[item.brand, item.era, item.title].filter(Boolean).join(" ")}${item.size ? `, size ${item.size}` : ""}${item.condition ? ` — ${item.condition}` : ""}. ${price} at ${storeName}. One-of-one vintage, secure checkout.`);
+ const title = `${item.title} | ${storeName}`;
+ const url = `${STOREFRONT_BASE}/s/${handle}/p/${id}`;
+ const image = (item.images || []).filter(Boolean)[0];
+ const hasDomain = !!sf.customDomain;
+ // Index live product pages so they rank; skip previews + the mirror of a custom-domain store.
+ const index = sf.enabled && !preview && !hasDomain;
+ return {
+  title,
+  description: desc,
+  alternates: { canonical: hasDomain ? `https://${sf.customDomain}` : url },
+  robots: { index, follow: true },
+  openGraph: { title, description: desc, type: "website", url, siteName: storeName, ...(image ? { images: [{ url: image }] } : {}) },
+  twitter: { card: image ? "summary_large_image" : "summary", title, description: desc, ...(image ? { images: [image] } : {}) },
+ };
+}
 
 export default async function ProductPage({ params, searchParams }: Props) {
  const { handle, id } = await params;
@@ -36,8 +85,36 @@ export default async function ProductPage({ params, searchParams }: Props) {
  // Honor the store's Buyer-messaging toggle (defaults on if settings are unavailable).
  const inbox = await getInboxSettings(sf.storeSlug).catch(() => null);
 
+ // Product structured data (schema.org) → Google rich results: price, availability, condition,
+ // brand shown right in search. Only emitted for a live storefront (not a preview render).
+ const url = `${STOREFRONT_BASE}/s/${handle}/p/${id}`;
+ const productLd = {
+ "@context": "https://schema.org",
+ "@type": "Product",
+ name: item.title,
+ ...(images.length ? { image: images } : {}),
+ ...(item.description ? { description: clean(item.description, 5000) } : {}),
+ ...(item.brand ? { brand: { "@type": "Brand", name: item.brand } } : {}),
+ ...(item.category ? { category: item.category } : {}),
+ ...(item.material ? { material: item.material } : {}),
+ ...(item.size ? { size: item.size } : {}),
+ offers: {
+ "@type": "Offer",
+ price: (item.priceCents / 100).toFixed(2),
+ priceCurrency: item.currency || "USD",
+ availability: sold ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
+ itemCondition: conditionUrl(item.condition),
+ url,
+ seller: { "@type": "Organization", name: storeName },
+ },
+ };
+
  return (
  <main style={{ background: c.bg, color: c.text, fontFamily: body }} className="min-h-screen">
+ {sf.enabled && !preview && (
+ <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productLd) }} />
+ )}
+ {sf.enabled && !preview && <StorefrontTracker slug={sf.storeSlug} pageType="product" itemId={String(item.id)} priceCents={item.priceCents} />}
  {fams && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?${fams}&display=swap`} />}
 
  <nav className="sticky top-0 z-40 flex items-center justify-between border-b border-black/[0.07] px-6 sm:px-8 py-5" style={{ background: c.bg }}>

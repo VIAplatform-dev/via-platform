@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { toggleFavorite, isFavorited, favoriteCount } from "@/app/lib/store-favorites-db";
+import { recordEvent } from "@/app/lib/analytics-events-db";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,8 @@ export async function POST(req: NextRequest) {
  if (!slug || !item) return withCors(req, NextResponse.json({ error: "slug + item required" }, { status: 400 }));
  const { id, fresh } = shopper(req);
  const r = await toggleFavorite(slug, item, id);
+ // Clean event stream — only the add counts as a favorite signal, not the un-favorite.
+ if (r?.favorited) await recordEvent({ type: "favorite", storeSlug: slug, itemId: item, actorId: id, surface: "storefront" });
  const res = NextResponse.json({ ok: true, ...r });
  if (fresh) setShopper(res, id);
  return withCors(req, res);

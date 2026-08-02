@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
 import { stores } from "@/app/lib/stores";
+import { getStoreAccount } from "@/app/lib/store-accounts-db";
+import { isStorePro } from "@/app/lib/store-plans-db";
 import {
  getStorefrontBySlug,
  isHandleTaken,
@@ -74,9 +76,24 @@ export async function POST(request: NextRequest) {
  return s ? s.slice(0, max) : null;
  };
 
+ // "Set up but held": a self-onboarded store can build + preview during its trial, but the
+ // storefront can't go publicly LIVE until a paid tier is active. Gated to trial-model stores
+ // (a store_accounts row) — the owner (admin) and curated marketplace stores are exempt, so
+ // nothing existing breaks. Payouts follow the same lever: no live storefront ⇒ no public sales.
+ const wantsLive = Boolean(body.enabled);
+ if (wantsLive && !isAdminRequest(request)) {
+ const account = await getStoreAccount(slug);
+ if (account && !(await isStorePro(slug))) {
+ return NextResponse.json(
+ { error: "Pick a plan to take your store live — you can keep building and previewing until then.", code: "subscription_required" },
+ { status: 402 },
+ );
+ }
+ }
+
  const saved = await upsertStorefront(slug, {
  handle,
- enabled: Boolean(body.enabled),
+ enabled: wantsLive,
  tagline: str(body.tagline, 120),
  accentColor,
  heroImage: str(body.heroImage, 600),

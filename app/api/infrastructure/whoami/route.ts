@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/app/lib/storeAuth";
+import { isAdminRequest, resolveStoreSlug } from "@/app/lib/storeAuth";
+import { auth } from "@/app/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-// Gate for the /infrastructure/admin workspace — 200 if the caller is an admin,
-// 401 otherwise, so the layout can redirect non-admins to the admin login.
+// Gate for the /infrastructure/admin workspace. Outcomes so the layout can route:
+//  - owner/break-glass admin (ADMIN_PASSWORD)  → { admin: true, slug: "via-admin" }
+//  - a store partner signed in with a store    → { admin: false, slug }
+//  - signed in but no store yet (fresh signup) → { admin: false, needsOnboarding: true }
+//  - not signed in                             → 401 (layout sends them to login)
 export async function GET(request: NextRequest) {
- if (!isAdminRequest(request)) return NextResponse.json({ admin: false }, { status: 401 });
- return NextResponse.json({ admin: true });
+ // Owner / break-glass admin: full workspace as the synthetic via-admin store.
+ if (isAdminRequest(request)) return NextResponse.json({ admin: true, slug: "via-admin" });
+
+ const session = await auth();
+ if (!session?.user?.email) return NextResponse.json({ admin: false }, { status: 401 });
+
+ // Signed-in partner: resolve their store (session email → store_users / static map).
+ const slug = await resolveStoreSlug(request);
+ if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug });
+
+ // Authenticated but not attached to any store → send them through onboarding.
+ return NextResponse.json({ admin: false, needsOnboarding: true, email: session.user.email });
 }

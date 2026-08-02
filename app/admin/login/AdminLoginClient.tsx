@@ -157,7 +157,14 @@ export default function AdminLoginClient() {
             )}
           </form>
 
-          <div className="mt-8 text-center">
+          <div className="mt-8 flex flex-col items-center gap-3 text-center">
+            <Link
+              href="/login?callbackUrl=/admin"
+              className="text-sm underline transition-colors"
+              style={{ color: "#5D0F17" }}
+            >
+              Sign in to your store →
+            </Link>
             <Link
               href="/"
               className="text-sm transition-colors"

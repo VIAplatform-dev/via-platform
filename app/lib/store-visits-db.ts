@@ -80,6 +80,29 @@ export async function captureStorefrontEntry(req: NextRequest, slug: string): Pr
  }
 }
 
+/**
+ * Client-beacon variant of the above. The block-builder storefront is server-rendered, so a small
+ * client tracker POSTs the REAL external referrer (document.referrer) — a client beacon's own Referer
+ * would just be the storefront page. Records the entry source once per session; returns a fresh
+ * sessionId for the caller to set as `via_sess`, or null if the session already exists.
+ */
+export async function captureStorefrontEntryClient(input: {
+ slug: string; hasSession: boolean; referrer: string | null; utmSource: string | null; utmMedium: string | null; path: string; selfHost: string;
+}): Promise<string | null> {
+ try {
+ if (input.hasSession) return null;
+ const c = classifySource({ referrer: input.referrer, utmSource: input.utmSource, utmMedium: input.utmMedium, selfHost: input.selfHost });
+ const sessionId = crypto.randomUUID();
+ await recordStoreVisit({
+ storeSlug: input.slug, sessionId, sourceType: c.type, source: c.source,
+ referrerHost: c.referrerHost || null, utmSource: input.utmSource, utmMedium: input.utmMedium, path: input.path,
+ });
+ return sessionId;
+ } catch {
+ return null;
+ }
+}
+
 // ── Page-level analytics: every page view per store (NOT session-gated), so a store can see what
 // pages/products shoppers actually browse — clean, per-store data across marketplace + storefront.
 let pvEnsured = false;
