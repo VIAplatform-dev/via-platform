@@ -174,13 +174,6 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  },
  {
  type: "shopify",
- name: "Solxury Vintage",
- slug: "so-lxury",
- storeDomain: "solxuryvintage.com",
- scrapeProductPage: true,
- },
- {
- type: "shopify",
  name: "Source 24",
  slug: "source-twenty-four",
  storeDomain: "sourcetwentyfour.com",
@@ -492,9 +485,9 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  },
  {
  type: "shopify",
- name: "Venus Vintage",
- slug: "venus-vintage",
- storeDomain: "venusvintage.co",
+ name: "Loved, Again",
+ slug: "loved-again",
+ storeDomain: "www.lovedagainvintage.com.au",
  scrapeProductPage: true,
  },
 ];

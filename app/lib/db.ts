@@ -5,9 +5,7 @@ import { SHOPIFY_STORES } from "./storeConfig";
 import { logError } from "./error-log";
 
 // Products from these slugs are hidden site-wide: manually disabled + stores without Collabs ID.
-// "venus-vintage" hidden while we sort her pricing — she rents most pieces, so the Shopify buy-price
-// syncs as $0. Remove from this list once prices import correctly.
-export const DISABLED_STORE_SLUGS: string[] = ["velvet-archive", "venus-vintage", ...HIDDEN_STORE_SLUGS];
+export const DISABLED_STORE_SLUGS: string[] = ["velvet-archive", ...HIDDEN_STORE_SLUGS];
 
 // Slugs of Shopify-powered stores. Used to gate collabs_link requirement — only Shopify
 // products need a collabs_link to be visible; non-Shopify products are always shown.
