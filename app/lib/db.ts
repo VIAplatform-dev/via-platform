@@ -5,7 +5,9 @@ import { SHOPIFY_STORES } from "./storeConfig";
 import { logError } from "./error-log";
 
 // Products from these slugs are hidden site-wide: manually disabled + stores without Collabs ID.
-export const DISABLED_STORE_SLUGS: string[] = ["velvet-archive", ...HIDDEN_STORE_SLUGS];
+// "venus-vintage" — removed as a store, but her product rows remain in the DB and sync as $0
+// (she rents most pieces). Keep her disabled so nothing surfaces until the rows are purged.
+export const DISABLED_STORE_SLUGS: string[] = ["velvet-archive", "venus-vintage", ...HIDDEN_STORE_SLUGS];
 
 // Slugs of Shopify-powered stores. Used to gate collabs_link requirement — only Shopify
 // products need a collabs_link to be visible; non-Shopify products are always shown.
