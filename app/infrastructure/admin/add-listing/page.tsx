@@ -240,9 +240,8 @@ export default function IntakePage() {
  // runs now (cheaply, off our own data), so a typed price still gets an over/under-market flag.
  async function fillWithAI() {
  if (!photos.length) { setErr("Add at least one photo first."); return; }
- // Brand-first: the seller knows the brand better than a photo does, and it anchors the comps,
- // price, and description. Require it before the AI fills the rest (most sellers type it anyway).
- if (!form.brand.trim()) { setErr("Add the brand first — it anchors the price and description. (Type “Unbranded” if it has no label.)"); return; }
+ // Brand sharpens the comps/price/description, but it's no longer required — the intake's
+ // reverse-image search + vision infer it from the photo when the seller leaves it blank.
  setBusy(true);
  setBusyMsg("Filling the blanks…");
  setErr(null);
@@ -520,10 +519,10 @@ export default function IntakePage() {
  <p className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-[11px] text-stone-600">🎯 Looks like <span className="font-medium text-stone-800">{specificPiece.model}</span> <span className="text-stone-400">· {Math.round(specificPiece.similarity * 100)}% match{specificPiece.refPriceCents ? ` · refs ~$${Math.round(specificPiece.refPriceCents / 100)}` : ""}</span></p>
  )}
 
- <TechButton className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length || !form.brand.trim()}>
+ <TechButton className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length}>
  <Sparkles size={14} className="mr-1.5 inline" />{busy ? busyMsg : "Fill the rest with AI"}
  </TechButton>
- <p className="mt-1.5 text-[11px] text-stone-400">{!form.brand.trim() ? "Enter the brand first — it anchors the price & description. (“Unbranded” is fine.)" : "Only fills blanks. Your price is always checked against live market comps."}</p>
+ <p className="mt-1.5 text-[11px] text-stone-400">{!form.brand.trim() ? "Tip: adding the brand sharpens the price & description — but AI will infer it from the photo if you leave it blank." : "Only fills blanks. Your price is always checked against live market comps."}</p>
 
  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
  </div>

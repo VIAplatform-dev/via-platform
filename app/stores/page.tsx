@@ -35,7 +35,7 @@ export default function StoresPage() {
  surface="stores_index"
  className="block mb-3 sm:mb-6"
  >
- <div className="relative aspect-[3/4] overflow-hidden" style={{ backgroundColor: store.image?.includes("placeholder") ? "#FFFDF8" : undefined }}>
+ <div className="relative aspect-[3/4] overflow-hidden rounded-xl" style={{ backgroundColor: store.image?.includes("placeholder") ? "#FFFDF8" : undefined }}>
  {store.image && !store.image.includes("placeholder") ? (
  <Image
  src={store.image}

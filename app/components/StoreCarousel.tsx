@@ -18,7 +18,7 @@ function StoreCard({ store }: { store: (typeof stores)[number] }) {
  className="group block flex-shrink-0 w-44 sm:w-64"
  >
  <div
- className="aspect-[3/4] relative overflow-hidden w-full"
+ className="aspect-[3/4] relative overflow-hidden rounded-xl w-full"
  style={{ backgroundColor: "#FFFDF8" }}
  >
  {store.image.includes("placeholder") ? (

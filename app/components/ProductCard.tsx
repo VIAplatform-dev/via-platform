@@ -152,25 +152,25 @@ export default function ProductCard({
  <ImageCarousel images={carouselImages} alt={name} variant="card" isEditorsPick={isEditorsPick} onAllImagesFailed={onImageFail} priority={priority} />
 
  {/* Product info */}
- <div className="pt-3 pb-1 sm:pb-2 flex flex-col gap-0.5">
- <h3 className="font-semibold text-xs sm:text-sm text-[#5D0F17] leading-snug line-clamp-2">
- {stripSizeFromTitle(name, size)}
- </h3>
-
- <p className="text-[9px] sm:text-[10px] uppercase tracking-wide text-[#5D0F17]/60">
+ <div className="pt-3 pb-1 sm:pb-2 px-2 sm:px-3 flex flex-col gap-1">
+ <p className="font-sans text-[9px] sm:text-[10px] uppercase tracking-[0.16em] text-[#5D0F17]/45">
  {storeName}
  </p>
 
- <div className="flex items-baseline gap-2">
- <p className="text-xs sm:text-sm font-medium text-[#5D0F17]">{price}</p>
+ <h3 className="font-sans font-medium text-[13px] sm:text-sm text-[#5D0F17] leading-snug line-clamp-2">
+ {stripSizeFromTitle(name, size)}
+ </h3>
+
+ <div className="flex items-baseline gap-2 mt-0.5">
+ <p className="font-sans text-[13px] sm:text-sm text-[#5D0F17]">{price}</p>
  {compareAtPrice && (
- <p className="text-xs sm:text-sm text-[#5D0F17]/40 line-through">{compareAtPrice}</p>
+ <p className="font-sans text-[12px] sm:text-[13px] text-[#5D0F17]/40 line-through">{compareAtPrice}</p>
  )}
  </div>
 
  {size && (
- <p className="text-[11px] sm:text-xs text-[#5D0F17]/50">
- Size: {expandSize(size, String(category), name)}
+ <p className="font-sans text-[11px] text-[#5D0F17]/45 tracking-wide">
+ Size {expandSize(size, String(category), name)}
  </p>
  )}
  </div>

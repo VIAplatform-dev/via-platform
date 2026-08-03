@@ -592,11 +592,12 @@ export default function FilteredProductGrid({
 
  return (
  <>
- <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+ <div className="w-screen relative left-1/2 -translate-x-1/2">
+ <div className="grid grid-cols-2 md:grid-cols-4 gap-0">
  {pageProducts.map((product, i) => (
  <div
  key={product.id}
- className={`group ${i % 5 === 0 ? "col-span-2 md:col-span-1" : "col-span-1"}`}
+ className="group"
  style={{ contentVisibility: i >= 12 ? "auto" : undefined, containIntrinsicSize: i >= 12 ? "0 420px" : undefined }}
  >
  <ProductCard
@@ -629,6 +630,7 @@ export default function FilteredProductGrid({
  />
  </div>
  ))}
+ </div>
  </div>
 
  {totalPages > 1 && (

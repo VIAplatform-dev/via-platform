@@ -318,42 +318,49 @@ export default function ProductFilter({
   return (
     <>
     <div className="bg-[#FFFDF8] py-3 mb-4">
-      <div className="inline-flex flex-col gap-2">
-        {/* Search — same width as the buttons row below */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5D0F17]/40" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+        {/* Search */}
+        <div className="relative w-full sm:max-w-xs">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5D0F17]/40" />
           <input
             type="text"
             value={filters.search}
             onChange={(e) => updateFilters({ search: e.target.value })}
             placeholder="Search products..."
-            className="w-full pl-9 pr-8 py-2.5 border border-[#5D0F17]/20 text-sm focus:border-[#5D0F17] focus:outline-none bg-transparent transition"
+            className="w-full pl-11 pr-9 py-2.5 rounded-full border border-[#5D0F17]/15 bg-[#5D0F17]/[0.03] text-sm text-[#5D0F17] placeholder:text-[#5D0F17]/40 focus:border-[#5D0F17]/40 focus:bg-[#FFFDF8] focus:outline-none transition"
           />
           {filters.search && (
-            <button onClick={() => updateFilters({ search: "" })} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5D0F17]/40 hover:text-[#5D0F17]">
+            <button onClick={() => updateFilters({ search: "" })} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#5D0F17]/40 hover:text-[#5D0F17]">
               <X size={14} />
             </button>
           )}
         </div>
 
         {/* Filters + Sort row */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:ml-auto">
+        {productCount !== undefined && (
+          <span className="text-sm text-[#5D0F17]/45 mr-1 whitespace-nowrap tabular-nums">
+            {productCount} product{productCount !== 1 ? "s" : ""}
+          </span>
+        )}
         {/* Filters dropdown */}
         <div className="relative">
           <button
             onClick={() => setMobileFiltersOpen(!mobileFiltersOpen)}
-            className={`flex items-center gap-1.5 text-sm transition-all duration-200 ${
-              activeFilterCount > 0 ? "text-[#5D0F17] font-medium" : "text-[#5D0F17]/60 hover:text-[#5D0F17]"
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm transition-all duration-200 ${
+              activeFilterCount > 0
+                ? "border-[#5D0F17] text-[#5D0F17] font-medium"
+                : "border-[#5D0F17]/15 text-[#5D0F17]/70 hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"
             }`}
           >
-            <SlidersHorizontal size={15} />
+            <SlidersHorizontal size={14} />
             Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
           </button>
 
           {mobileFiltersOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setMobileFiltersOpen(false)} />
-              <div className="absolute top-full left-0 mt-1 z-50 w-72 bg-[#FFFDF8] border border-[#5D0F17]/20 shadow-lg max-h-[70vh] overflow-y-auto">
+              <div className="absolute top-full left-0 mt-2 z-50 w-72 bg-[#FFFDF8] border border-[#5D0F17]/15 rounded-2xl shadow-lg max-h-[70vh] overflow-y-auto">
                 <div className="px-4">
               {/* Price Range */}
               <MobileSection
@@ -577,17 +584,16 @@ export default function ProductFilter({
         <div className="relative">
           <button
             onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
-            className="flex items-center gap-1 text-sm text-[#5D0F17]/60 hover:text-[#5D0F17] transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-[#5D0F17]/15 text-sm text-[#5D0F17]/70 hover:border-[#5D0F17]/40 hover:text-[#5D0F17] transition"
           >
-            Sort By
-            <span className="mx-1 text-[#5D0F17]/30">•</span>
-            <span className="text-[#5D0F17]">{sortLabels[filters.sort]}</span>
+            <span className="text-[#5D0F17]/50">Sort</span>
+            <span className="text-[#5D0F17] font-medium">{sortLabels[filters.sort]}</span>
             <ChevronDown size={13} className={`ml-0.5 transition-transform duration-200 ${sortDropdownOpen ? "rotate-180" : ""}`} />
           </button>
           {sortDropdownOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setSortDropdownOpen(false)} />
-              <div className="absolute top-full left-0 mt-1 z-50 bg-[#FFFDF8] border border-[#5D0F17]/20 shadow-lg min-w-[170px]">
+              <div className="absolute top-full right-0 mt-2 z-50 bg-[#FFFDF8] border border-[#5D0F17]/15 rounded-2xl shadow-lg overflow-hidden min-w-[170px]">
                 {(Object.keys(sortLabels) as SortOption[]).map((option) => (
                   <button
                     key={option}
@@ -608,12 +614,6 @@ export default function ProductFilter({
       </div>{/* end inline-flex col */}
     </div>
 
-    {/* Results count — shown when no active filters (otherwise shown in the active filters bar) */}
-    {!hasActiveFilters && productCount !== undefined && (
-      <p className="mb-4 text-sm text-[#5D0F17]/60">
-        {productCount} product{productCount !== 1 ? "s" : ""}
-      </p>
-    )}
 
     {/* ── Pick Your Sizes Modal ─────────────────────────────────── */}
     {showSizePicker && (

@@ -69,59 +69,6 @@ export default function StoreClientSection({
 
  return (
  <div>
- {/* Pills row */}
- <div className="bg-[#FFFDF8]">
- <div className="max-w-7xl mx-auto px-6">
- {/* Category pills */}
- {categoryCounts.length > 0 && (
- <div className="overflow-x-auto scrollbar-hide -mx-6 px-6">
- <div className="flex gap-2 py-3">
- {categoryCounts.map((cat) => (
- <button
- key={cat.label}
- onClick={() => toggleCategory(cat.label)}
- className={`inline-flex items-center gap-1.5 px-4 py-1.5 border text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-150 ${
- activeCategory === cat.label
- ? "border-[#5D0F17] text-[#5D0F17]"
- : "border-[#5D0F17]/20 text-[#5D0F17]/50 hover:border-[#5D0F17]/40 hover:text-[#5D0F17]/70"
- }`}
- >
- {cat.label}
- <span className={activeCategory === cat.label ? "text-[#5D0F17]/40" : "text-[#5D0F17]/25"}>
- {cat.count}
- </span>
- </button>
- ))}
- </div>
- </div>
- )}
-
- {/* Brand pills */}
- {visibleBrandCounts.length > 0 && (
- <div className="overflow-x-auto scrollbar-hide -mx-6 px-6">
- <div className="flex gap-2 pb-3">
- {visibleBrandCounts.map((brand) => (
- <button
- key={brand.label}
- onClick={() => toggleBrand(brand.label)}
- className={`inline-flex items-center gap-1.5 px-4 py-1.5 border text-[11px] uppercase tracking-widest whitespace-nowrap transition-all duration-150 ${
- activeBrand === brand.label
- ? "border-[#5D0F17] text-[#5D0F17]"
- : "border-[#5D0F17]/20 text-[#5D0F17]/50 hover:border-[#5D0F17]/40 hover:text-[#5D0F17]/70"
- }`}
- >
- {brand.label}
- <span className={activeBrand === brand.label ? "text-[#5D0F17]/40" : "text-[#5D0F17]/25"}>
- {brand.count}
- </span>
- </button>
- ))}
- </div>
- </div>
- )}
- </div>
- </div>
-
  {/* Product grid */}
  <section className="py-6 sm:py-8">
  <div className="max-w-7xl mx-auto px-6">

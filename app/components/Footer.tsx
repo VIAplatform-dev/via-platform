@@ -4,17 +4,28 @@ export default function Footer() {
  const currentYear = new Date().getFullYear();
 
  return (
- <footer className="bg-[#FFFDF8] text-[#5D0F17]">
+ <footer className="bg-[#FFFDF8]">
+ <div className="relative overflow-hidden rounded-t-[1.75rem] sm:rounded-t-[2.5rem]">
+ {/* Background — same croc image as the hero */}
+ <div
+ className="absolute inset-0"
+ style={{ backgroundImage: "url(/hero-v10.jpg)", backgroundSize: "cover", backgroundPosition: "center" }}
+ aria-hidden="true"
+ />
+ <div className="absolute inset-0 bg-black/45" aria-hidden="true" />
+
+ {/* Content */}
+ <div className="relative text-[#FFFDF8]">
  {/* Main Footer Content */}
- <div className="max-w-7xl mx-auto px-6 py-16">
+ <div className="max-w-7xl mx-auto px-6 sm:px-10 py-16">
  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
  {/* Brand Column */}
  <div className="lg:col-span-1">
  <Link href="/" className="inline-flex items-start gap-1.5 mb-5">
- <img src="/vya-logo.png" alt="VYA" className="h-7 sm:h-8 w-auto" />
- <span className="text-[9px] uppercase tracking-[0.2em] text-[#5D0F17]/50 mt-0.5">pilot</span>
+ <img src="/vya-logo.png" alt="VYA" className="h-7 sm:h-8 w-auto" style={{ filter: "brightness(0) invert(1)" }} />
+ <span className="text-[9px] uppercase tracking-[0.2em] text-[#FFFDF8]/60 mt-0.5">pilot</span>
  </Link>
- <p className="text-[#5D0F17]/70 text-sm leading-relaxed mb-6 max-w-xs">
+ <p className="text-[#FFFDF8]/75 text-sm leading-relaxed mb-6 max-w-xs">
  Shop the best vintage stores in the world, all in one place.
  </p>
  {/* Social Links */}
@@ -23,11 +34,11 @@ export default function Footer() {
  href="https://www.instagram.com/vyaplatform"
  target="_blank"
  rel="noopener noreferrer"
- className="group flex items-center justify-center w-10 h-10 border border-[#5D0F17]/30 hover:border-[#5D0F17] hover:bg-[#5D0F17] transition-all duration-300"
+ className="group flex items-center justify-center w-10 h-10 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
  aria-label="Follow us on Instagram"
  >
  <svg
- className="w-5 h-5 text-[#5D0F17] group-hover:text-[#D8CABD] transition-colors duration-300"
+ className="w-5 h-5 text-[#FFFDF8] group-hover:text-[#5D0F17] transition-colors duration-300"
  fill="currentColor"
  viewBox="0 0 24 24"
  aria-hidden="true"
@@ -43,11 +54,11 @@ export default function Footer() {
  href="https://www.tiktok.com/@vyaplatform"
  target="_blank"
  rel="noopener noreferrer"
- className="group flex items-center justify-center w-10 h-10 border border-[#5D0F17]/30 hover:border-[#5D0F17] hover:bg-[#5D0F17] transition-all duration-300"
+ className="group flex items-center justify-center w-10 h-10 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
  aria-label="Follow us on TikTok"
  >
  <svg
- className="w-5 h-5 text-[#5D0F17] group-hover:text-[#D8CABD] transition-colors duration-300"
+ className="w-5 h-5 text-[#FFFDF8] group-hover:text-[#5D0F17] transition-colors duration-300"
  fill="currentColor"
  viewBox="0 0 24 24"
  aria-hidden="true"
@@ -59,11 +70,11 @@ export default function Footer() {
  href="https://vyaplatform.substack.com/"
  target="_blank"
  rel="noopener noreferrer"
- className="group flex items-center justify-center w-10 h-10 border border-[#5D0F17]/30 hover:border-[#5D0F17] hover:bg-[#5D0F17] transition-all duration-300"
+ className="group flex items-center justify-center w-10 h-10 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
  aria-label="Read our Substack"
  >
  <svg
- className="w-5 h-5 text-[#5D0F17] group-hover:text-[#D8CABD] transition-colors duration-300"
+ className="w-5 h-5 text-[#FFFDF8] group-hover:text-[#5D0F17] transition-colors duration-300"
  fill="currentColor"
  viewBox="0 0 24 24"
  aria-hidden="true"
@@ -76,7 +87,7 @@ export default function Footer() {
 
  {/* Shop Column */}
  <div>
- <h4 className="text-xs uppercase tracking-[0.2em] text-[#5D0F17]/50 mb-6">
+ <h4 className="text-xs uppercase tracking-[0.2em] text-[#FFFDF8]/55 mb-6">
  Shop
  </h4>
  <ul className="space-y-4">
@@ -90,7 +101,7 @@ export default function Footer() {
  <li key={href}>
  <Link
  href={href}
- className="text-[#5D0F17]/75 hover:text-[#5D0F17] transition-colors duration-200 text-sm link-underline"
+ className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
  >
  {label}
  </Link>
@@ -101,7 +112,7 @@ export default function Footer() {
 
  {/* Company Column */}
  <div>
- <h4 className="text-xs uppercase tracking-[0.2em] text-[#5D0F17]/50 mb-6">
+ <h4 className="text-xs uppercase tracking-[0.2em] text-[#FFFDF8]/55 mb-6">
  Company
  </h4>
  <ul className="space-y-4">
@@ -115,7 +126,7 @@ export default function Footer() {
  <li key={href}>
  <Link
  href={href}
- className="text-[#5D0F17]/75 hover:text-[#5D0F17] transition-colors duration-200 text-sm link-underline"
+ className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
  >
  {label}
  </Link>
@@ -126,7 +137,7 @@ export default function Footer() {
  href="https://form.typeform.com/to/ssrEgHZ1"
  target="_blank"
  rel="noopener noreferrer"
- className="text-[#5D0F17]/75 hover:text-[#5D0F17] transition-colors duration-200 text-sm link-underline"
+ className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
  >
  Give Feedback
  </a>
@@ -136,7 +147,7 @@ export default function Footer() {
 
  {/* Press Column */}
  <div>
- <h4 className="text-xs uppercase tracking-[0.2em] text-[#5D0F17]/50 mb-6">
+ <h4 className="text-xs uppercase tracking-[0.2em] text-[#FFFDF8]/55 mb-6">
  As Seen In
  </h4>
  <ul className="space-y-5">
@@ -147,8 +158,8 @@ export default function Footer() {
   rel="noopener noreferrer"
   className="group"
  >
-  <p className="text-sm font-semibold text-[#5D0F17]/75 group-hover:text-[#5D0F17] transition-colors duration-200">Glossy</p>
-  <p className="text-[11px] text-[#5D0F17]/45 group-hover:text-[#5D0F17]/60 transition-colors duration-200 leading-snug mt-0.5">Why it&apos;s thrift stores&apos; time to shine</p>
+  <p className="text-sm font-semibold text-[#FFFDF8]/80 group-hover:text-[#FFFDF8] transition-colors duration-200">Glossy</p>
+  <p className="text-[11px] text-[#FFFDF8]/55 group-hover:text-[#FFFDF8]/70 transition-colors duration-200 leading-snug mt-0.5">Why it&apos;s thrift stores&apos; time to shine</p>
  </a>
  </li>
  <li>
@@ -158,8 +169,8 @@ export default function Footer() {
   rel="noopener noreferrer"
   className="group"
  >
-  <p className="text-sm font-semibold text-[#5D0F17]/75 group-hover:text-[#5D0F17] transition-colors duration-200">Business Insider</p>
-  <p className="text-[11px] text-[#5D0F17]/45 group-hover:text-[#5D0F17]/60 transition-colors duration-200 leading-snug mt-0.5">A college senior built a vintage marketplace with Claude</p>
+  <p className="text-sm font-semibold text-[#FFFDF8]/80 group-hover:text-[#FFFDF8] transition-colors duration-200">Business Insider</p>
+  <p className="text-[11px] text-[#FFFDF8]/55 group-hover:text-[#FFFDF8]/70 transition-colors duration-200 leading-snug mt-0.5">A college senior built a vintage marketplace with Claude</p>
  </a>
  </li>
  </ul>
@@ -169,12 +180,14 @@ export default function Footer() {
  </div>
 
  {/* Bottom Bar */}
- <div className="border-t border-[#5D0F17]/15">
- <div className="max-w-7xl mx-auto px-6 py-6">
+ <div className="border-t border-[#FFFDF8]/15">
+ <div className="max-w-7xl mx-auto px-6 sm:px-10 py-6">
  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
- <p className="text-[#5D0F17]/50 text-xs tracking-wide">
+ <p className="text-[#FFFDF8]/55 text-xs tracking-wide">
  {currentYear} VYA. All rights reserved.
  </p>
+ </div>
+ </div>
  </div>
  </div>
  </div>

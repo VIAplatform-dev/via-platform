@@ -12,24 +12,25 @@ export default async function NewArrivalsSection() {
   if (products.length === 0) return null;
 
   return (
-    <section id="new-arrivals" className="bg-[#FFFDF8] pt-16 pb-10 sm:pt-24 sm:pb-14 border-t border-[#5D0F17]/10">
+    <section id="new-arrivals" className="bg-[#FFFDF8] pt-16 pb-10 sm:pt-24 sm:pb-14 border-t border-[#5D0F17]/10 overflow-hidden">
       <div className="max-w-7xl mx-auto">
-        <div className="px-6 mb-8 sm:mb-12">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="px-6 mb-8 sm:mb-10">
+          <div className="flex items-end justify-between gap-4 border-b border-[#5D0F17]/10 pb-4 sm:pb-5">
             <div>
-              <p className="text-xs uppercase tracking-[0.15em] text-[#5D0F17]/50 mb-1 font-sans">Just Added</p>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[#5D0F17]">New Arrivals</h2>
+              <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-[#5D0F17]/45 mb-1.5 sm:mb-2 font-sans">Just Added</p>
+              <h2 className="text-[26px] sm:text-[34px] md:text-[40px] font-serif text-[#5D0F17] leading-none tracking-[-0.01em]">New Arrivals</h2>
             </div>
             <Link
               href="/new-arrivals"
-              className="text-sm uppercase tracking-[0.15em] text-[#5D0F17] hover:text-[#5D0F17]/60 transition-colors min-h-[44px] flex items-center"
+              className="group inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-[#5D0F17]/55 hover:text-[#5D0F17] transition-colors font-sans whitespace-nowrap flex-shrink-0 pb-1"
             >
-              Shop New Arrivals
+              Shop All <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
             </Link>
           </div>
         </div>
+      </div>
 
-        <div className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x [&_img]:select-none [&_img]:pointer-events-none">
+      <div className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x [&_img]:select-none [&_img]:pointer-events-none">
           <div className="flex gap-3 sm:gap-4 pl-6 pr-6">
             {products.map((product, i) => {
               const categorySlug = inferCategoryFromTitle(product.title);
@@ -59,7 +60,6 @@ export default async function NewArrivalsSection() {
             })}
           </div>
         </div>
-      </div>
     </section>
   );
 }

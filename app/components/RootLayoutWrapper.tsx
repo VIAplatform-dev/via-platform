@@ -16,5 +16,7 @@ export function AdminHide({ children }: { children: React.ReactNode }) {
 // Conditionally applies the header offset padding
 export function MainWrapper({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
- return <main className={isStandalone(pathname) ? "" : "pt-[56px]"}>{children}</main>;
+ // Homepage hero is full-bleed under the transparent header; no top offset there.
+ const noOffset = isStandalone(pathname) || pathname === "/";
+ return <main className={noOffset ? "" : "pt-[56px]"}>{children}</main>;
 }

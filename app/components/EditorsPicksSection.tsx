@@ -27,25 +27,25 @@ export default async function EditorsPicksSection() {
  }));
 
  return (
- <section className="bg-[#FFFDF8] pt-16 pb-20 sm:pt-24 sm:pb-28">
+ <section className="bg-[#FFFDF8] pt-16 pb-20 sm:pt-24 sm:pb-28 overflow-hidden">
  <div className="max-w-7xl mx-auto">
- <div className="px-6 mb-8 sm:mb-12">
- <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+ <div className="px-6 mb-8 sm:mb-10">
+ <div className="flex items-end justify-between gap-4 border-b border-[#5D0F17]/10 pb-4 sm:pb-5">
  <div>
- <p className="text-xs uppercase tracking-[0.18em] text-[#5D0F17]/50 mb-2 font-sans">Curated by the Community</p>
- <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif text-[#5D0F17]">Everyone&apos;s Favorites</h2>
+ <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.22em] text-[#5D0F17]/45 mb-1.5 sm:mb-2 font-sans">Curated by the Community</p>
+ <h2 className="text-[26px] sm:text-[34px] md:text-[40px] font-serif text-[#5D0F17] leading-none tracking-[-0.01em]">Everyone&apos;s Favorites</h2>
  </div>
  <Link
  href="/editors-picks"
- className="text-sm uppercase tracking-[0.15em] text-[#5D0F17] hover:text-[#5D0F17]/60 transition-colors min-h-[44px] flex items-center font-sans"
+ className="group inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-[#5D0F17]/55 hover:text-[#5D0F17] transition-colors font-sans whitespace-nowrap flex-shrink-0 pb-1"
  >
- View All
+ View All <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
  </Link>
+ </div>
  </div>
  </div>
 
  <EditorsPicksScroller picks={scrollerPicks} />
- </div>
  </section>
  );
 }

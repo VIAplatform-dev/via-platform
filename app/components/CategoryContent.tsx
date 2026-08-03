@@ -68,62 +68,9 @@ export default function CategoryContent({
  </Link>
  <h1 className="text-2xl sm:text-3xl font-serif mb-2">{label}</h1>
  <p className="text-sm sm:text-base text-[#5D0F17]/60 max-w-2xl">
- {label} from independent vintage and secondhand stores.
+ {label} sourced by our partner stores.
  </p>
 
- {/* Store pills */}
- {storeCounts.length > 0 && (
- <div className="mt-6 overflow-x-auto scrollbar-hide -mx-6 px-6">
- <div className="flex gap-2">
- {storeCounts.map((s) => {
- const active = activeStore === s.slug;
- return (
- <button
- key={s.slug}
- onClick={() => toggleStore(s.slug)}
- className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-[0.1em] whitespace-nowrap transition-colors cursor-pointer ${
- active
- ? "bg-[#5D0F17] text-[#FFFDF8]"
- : "bg-[#D8CABD]/30 text-[#5D0F17]/70 hover:bg-[#D8CABD]/60"
- }`}
- >
- {s.name}
- <span className={active ? "text-[#FFFDF8]/60" : "text-[#5D0F17]/40"}>
- {s.count}
- </span>
- </button>
- );
- })}
- </div>
- </div>
- )}
-
- {/* Brand pills */}
- {brandCounts.length > 0 && (
- <div className="mt-3 overflow-x-auto scrollbar-hide -mx-6 px-6">
- <div className="flex gap-2">
- {brandCounts.map((brand) => {
- const active = activeBrand === brand.slug;
- return (
- <button
- key={brand.slug}
- onClick={() => toggleBrand(brand.slug)}
- className={`inline-flex items-center gap-1.5 px-4 py-2 border text-xs uppercase tracking-[0.1em] whitespace-nowrap transition-colors cursor-pointer ${
- active
- ? "border-[#5D0F17] bg-[#5D0F17] text-[#FFFDF8]"
- : "border-[#5D0F17]/15 text-[#5D0F17]/70 hover:border-[#5D0F17]/40"
- }`}
- >
- {brand.label}
- <span className={active ? "text-[#FFFDF8]/60" : "text-[#5D0F17]/40"}>
- {brand.count}
- </span>
- </button>
- );
- })}
- </div>
- </div>
- )}
  </div>
  </section>
 

@@ -1,7 +1,6 @@
 export const revalidate = 1800; // re-render homepage in background every 30 minutes
 
 import Link from "next/link";
-import FAQAccordion from "./components/FAQAccordion";
 import Image from "next/image";
 import StoreCarousel from "./components/StoreCarousel";
 import NewArrivalsSection from "./components/NewArrivalsSection";
@@ -9,6 +8,7 @@ import StylingGuideSection from "./components/StylingGuideSection";
 import EditorsPicksSection from "./components/EditorsPicksSection";
 import { Suspense } from "react";
 import HomepageScrollTracker from "./components/HomepageScrollTracker";
+import HeroTypeIn from "./components/HeroTypeIn";
 
 export default function HomePage() {
  return (
@@ -19,7 +19,7 @@ export default function HomePage() {
  <div data-section="hero" className="md:hidden">
  <section className="relative overflow-hidden" style={{ height: "85vh" }}>
  <Image
- src="/hero-v7.jpg"
+ src="/hero-v10.jpg"
  alt=""
  fill
  priority
@@ -28,20 +28,26 @@ export default function HomePage() {
  sizes="100vw"
  />
  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0) 70%)" }} />
+ <div className="absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)" }} />
  <div className="absolute bottom-48 left-6 right-6 z-10">
- <h1 className="text-3xl font-serif text-[#FFFDF8] mb-6 leading-tight">
- Access the world&apos;s <span className="whitespace-nowrap">best vintage.</span>
- </h1>
+ <HeroTypeIn
+ phrases={[
+ "Access the world's best vintage.",
+ "Discover your new favorite pieces.",
+ "Meet stores from around the world.",
+ ]}
+ className="text-3xl font-serif text-[#FFFDF8] mb-6 leading-tight"
+ />
  <div className="flex gap-3">
  <Link
  href="/stores"
- className="bg-[#5D0F17] text-[#FFFDF8] px-6 py-3 text-xs uppercase tracking-[0.12em] text-center font-sans flex-1"
+ className="bg-[#FFFDF8] text-[#5D0F17] px-6 py-3 text-xs uppercase tracking-[0.12em] text-center font-sans flex-1 rounded-lg"
  >
  Explore Stores
  </Link>
  <Link
  href="/categories"
- className="border border-[#FFFDF8]/60 text-[#FFFDF8] px-6 py-3 text-xs uppercase tracking-[0.12em] text-center font-sans flex-1"
+ className="border border-[#FFFDF8] text-[#FFFDF8] px-6 py-3 text-xs uppercase tracking-[0.12em] text-center font-sans flex-1 rounded-lg"
  >
  Shop Now
  </Link>
@@ -56,7 +62,7 @@ export default function HomePage() {
  style={{ backgroundColor: "#D8C8BC", minHeight: "100vh" }}
  >
  <Image
- src="/hero-v7.jpg"
+ src="/hero-v10.jpg"
  alt=""
  fill
  priority
@@ -65,37 +71,29 @@ export default function HomePage() {
  sizes="100vw"
  />
  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0) 70%)" }} />
+ <div className="absolute inset-x-0 top-0 h-44" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0) 100%)" }} />
  <div className="absolute bottom-[28%] left-10 z-10 animate-hero">
- <h1 className="text-6xl font-serif mb-8 text-[#FFFDF8] leading-tight max-w-xl">
- Access the world&apos;s <span className="whitespace-nowrap">best vintage.</span>
- </h1>
+ <HeroTypeIn
+ phrases={[
+ "Access the world's best vintage.",
+ "Discover your new favorite pieces.",
+ "Meet stores from around the world.",
+ ]}
+ className="text-6xl font-serif mb-8 text-[#FFFDF8] leading-tight max-w-xl"
+ />
  <div className="flex gap-4">
  <Link
  href="/stores"
- className="bg-[#5D0F17] text-[#FFFDF8] px-10 py-4 text-sm uppercase tracking-[0.12em] hover:bg-[#5D0F17]/85 transition-colors duration-300 text-center font-sans"
+ className="bg-[#FFFDF8] text-[#5D0F17] px-10 py-4 text-sm uppercase tracking-[0.12em] hover:bg-white transition-colors duration-300 text-center font-sans rounded-lg"
  >
  Explore Stores
  </Link>
  <Link
  href="/categories"
- className="border border-[#FFFDF8]/60 text-[#FFFDF8] px-10 py-4 text-sm uppercase tracking-[0.12em] hover:bg-white/10 transition-colors duration-300 text-center font-sans"
+ className="border border-[#FFFDF8] text-[#FFFDF8] px-10 py-4 text-sm uppercase tracking-[0.12em] hover:bg-white/10 transition-colors duration-300 text-center font-sans rounded-lg"
  >
  Shop Now
  </Link>
- </div>
- </div>
- </section>
-
- {/* ================= HOW IT WORKS ================= */}
- <section data-section="how-it-works" className="bg-[#FFFDF8] py-8 sm:py-12">
- <div className="max-w-7xl mx-auto px-6 sm:px-10">
- <div className="max-w-xl">
- <p className="text-lg sm:text-xl md:text-2xl font-serif text-[#5D0F17] leading-snug">
- The best pieces, within reach. Shop from different vintage stores all over the world, in one place.
- </p>
- <p className="text-xs text-[#5D0F17]/60 font-sans leading-relaxed mt-4">
- Every store represented on VYA has been carefully vetted, ensuring authenticity, quality, and care. Every purchase from VYA supports real people — not mass production.
- </p>
  </div>
  </div>
  </section>
@@ -116,7 +114,7 @@ export default function HomePage() {
  style={{ height: "60vw", minHeight: "320px", maxHeight: "100vh" }}
  >
  <Image
- src="/edit-summer.jpg"
+ src="/edit-summer-v2.jpg"
  alt="Summer Edit"
  fill
  sizes="(min-width: 640px) 50vw, 100vw"
@@ -134,22 +132,22 @@ export default function HomePage() {
  </Link>
 
  <Link
- href="/collections/bridal-era"
+ href="/collections/y2k-girls"
  className="relative group overflow-hidden w-full sm:w-1/2"
  style={{ height: "60vw", minHeight: "320px", maxHeight: "100vh" }}
  >
  <Image
- src="/edit-4.jpg"
- alt="Bridal Edit"
+ src="/edit-y2k.jpg"
+ alt="Y2K Girls"
  fill
  sizes="(min-width: 640px) 50vw, 100vw"
- className="object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
+ className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
  loading="lazy"
  />
  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
  <div className="absolute bottom-8 left-8 text-[#FFFDF8]">
- <p className="text-[10px] uppercase tracking-[0.2em] mb-1 font-sans opacity-60">Curated by TheElleCollective</p>
- <h3 className="text-3xl sm:text-4xl font-serif mb-4 leading-none">Bridal Edit</h3>
+ <p className="text-[10px] uppercase tracking-[0.2em] mb-1 font-sans opacity-60">Pure 2000s energy</p>
+ <h3 className="text-3xl sm:text-4xl font-serif mb-4 leading-none">Y2K Girls</h3>
  <span className="text-xs uppercase tracking-[0.15em] border-b border-[#FFFDF8]/60 pb-0.5 font-sans">
  Discover
  </span>
@@ -184,9 +182,6 @@ export default function HomePage() {
  </Suspense>
  </div>
 
- {/* ================= STYLING GUIDE ================= */}
- <StylingGuideSection />
-
  {/* ================= CATEGORY ================= */}
  <section data-section="categories" className="bg-[#FFFDF8] py-16 sm:py-24">
  <div className="max-w-7xl mx-auto">
@@ -217,7 +212,7 @@ export default function HomePage() {
  href={`/categories/${category.slug}`}
  className="group block w-[72vw] flex-shrink-0 sm:w-auto"
  >
- <div className="aspect-[3/4] relative overflow-hidden bg-[#D8CABD]/30">
+ <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-[#D8CABD]/30">
  <Image
  src={category.image}
  alt={category.label}
@@ -239,91 +234,8 @@ export default function HomePage() {
  </div>
  </section>
 
- {/* ================= VYA EXPERIENCE ================= */}
- <section className="bg-[#FFFDF8] py-16 sm:py-24">
- <div className="max-w-7xl mx-auto px-6 text-center">
- <p className="text-lg sm:text-xl font-serif italic text-[#5D0F17]/70 mb-4">
- The VYA Experience
- </p>
-
- <h2 className="text-3xl sm:text-4xl font-serif mb-4 sm:mb-6 text-[#5D0F17]">
- A better way to shop vintage
- </h2>
-
- <p className="max-w-2xl mx-auto mb-12 sm:mb-16 text-[#5D0F17]/60 text-sm sm:text-base font-sans">
- VYA brings together the best independent vintage and secondhand stores
- into one seamless browsing experience, while keeping checkout
- with the store you love.
- </p>
-
- <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
- <div>
- <h3 className="text-lg sm:text-xl font-serif mb-2 sm:mb-3 text-[#5D0F17]">Browse across stores</h3>
- <p className="text-[#5D0F17]/60 text-sm sm:text-base font-sans">
- Explore curated inventory from multiple stores at once.
- </p>
- </div>
-
- <div>
- <h3 className="text-lg sm:text-xl font-serif mb-2 sm:mb-3 text-[#5D0F17]">Discover rare pieces</h3>
- <p className="text-[#5D0F17]/60 text-sm sm:text-base font-sans">
- Find one-of-a-kind items you won&apos;t see everywhere else.
- </p>
- </div>
-
- <div>
- <h3 className="text-lg sm:text-xl font-serif mb-2 sm:mb-3 text-[#5D0F17]">Checkout with confidence</h3>
- <p className="text-[#5D0F17]/60 text-sm sm:text-base font-sans">
- Purchase directly from the original store, no middlemen.
- </p>
- </div>
- </div>
- </div>
- </section>
-
- {/* ================= FAQ ================= */}
- <section className="bg-[#FFFDF8] py-16 sm:py-24">
- <div className="max-w-6xl mx-auto px-6">
- <div className="max-w-xl mb-12 sm:mb-16">
- <h2 className="text-3xl sm:text-4xl font-serif mb-4 text-[#5D0F17]">
- Frequently Asked Questions
- </h2>
- <p className="text-[#5D0F17]/60 text-sm sm:text-base font-sans">
- Everything you need to know about shopping, shipping, and how VYA works.
- </p>
- </div>
-
- <FAQAccordion
- faqs={[
- {
- q: "Is everything authentic?",
- a: "Yes — we partner only with vetted stores known for authenticity and quality.",
- },
- {
- q: "Who handles shipping?",
- a: "Each store fulfills orders directly using their own shipping policies.",
- },
- {
- q: "What about returns?",
- a: "Return policies are set by each individual store and listed on their product pages.",
- },
- {
- q: "Where do you ship?",
- a: "Stores decide where they ship, but most stores ship worldwide.",
- },
- ]}
- />
-
- <div className="mt-10 text-center">
- <Link
- href="/faqs"
- className="inline-block bg-[#5D0F17] text-[#FFFDF8] px-10 py-3.5 text-sm uppercase tracking-[0.15em] hover:bg-[#5D0F17]/85 transition font-sans"
- >
- Explore FAQs
- </Link>
- </div>
- </div>
- </section>
+ {/* ================= STYLING GUIDE ================= */}
+ <StylingGuideSection />
 
  </main>
  );

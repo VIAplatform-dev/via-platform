@@ -1,11 +1,13 @@
 // Homepage "Styling Guide" — shoppable looks. Each look is an editorial photo
-// (in /public/y2k-edit/) plus the pieces in it, linked to their product pages.
-// Add more looks here and they'll render on the homepage automatically.
+// (in /public/styling-guide/ or /public/y2k-edit/) plus the pieces in it, linked
+// to their product pages. Add more looks here and they'll render automatically.
+// Product links are validated against the live catalog; dead (sold/removed) items
+// are pruned so nothing on the homepage points to a 404.
 
 export type StylingLookItem = { label: string; url: string };
 
 export type StylingLook = {
- /** Image under /public (e.g. /y2k-edit/look-1.jpg). */
+ /** Image under /public (e.g. /styling-guide/post-121.jpg). */
  image: string;
  /** Optional caption shown under the look. */
  caption?: string;
@@ -15,35 +17,54 @@ export type StylingLook = {
 
 export const STYLING_LOOKS: StylingLook[] = [
  {
- image: "/y2k-edit/look-1.jpg",
+ image: "/styling-guide/post-121.jpg",
  items: [
- { label: "Dress", url: "/products/mookie-studios-1895088" },
- { label: "Sunglasses", url: "/products/petria-vintage-132836" },
+ { label: "Blouse", url: "/products/mookie-studios-3780080" },
+ { label: "Skirt", url: "/products/sheer-vintage-1659282" },
+ { label: "Bag", url: "/products/hachi-archive-3415148" },
+ { label: "Heels", url: "/products/hachi-archive-1683463" },
  ],
  },
  {
- image: "/y2k-edit/look-2.jpg",
+ image: "/styling-guide/post-122.jpg",
  items: [
- { label: "Jacket", url: "/products/sourced-by-scottie-1745827" },
- { label: "Shorts", url: "/products/lover-girl-vintage-1176959" },
- { label: "Boots", url: "/products/rareality-archive-1988266" },
- { label: "Bag", url: "/products/to-us-vintage-1948579" },
+ { label: "Dress", url: "/products/mookie-studios-3708419" },
+ { label: "Sunglasses", url: "/products/lamash-2777995" },
+ { label: "Bag", url: "/products/hachi-archive-2559661" },
+ { label: "Heels", url: "/products/sassy-so-what-3705371" },
  ],
  },
  {
- image: "/y2k-edit/look-3.jpg",
+ image: "/styling-guide/post-123.jpg",
  items: [
- { label: "Bag", url: "/products/hachi-archive-1252723" },
- { label: "Shoes", url: "/products/club-fleur-1495396" },
- { label: "Skirt", url: "/products/lover-girl-vintage-1393591" },
+ { label: "Top", url: "/products/mookie-studios-3708416" },
+ { label: "Skirt", url: "/products/mookie-studios-3708421" },
+ { label: "Bag", url: "/products/capsule-edit-3304433" },
  ],
  },
  {
- image: "/y2k-edit/look-4.jpg",
+ image: "/styling-guide/post-124.jpg",
  items: [
- { label: "Top", url: "/products/sourced-by-scottie-1506092" },
- { label: "Shorts", url: "/products/mookie-studios-1895081" },
- { label: "Shoes", url: "/products/chill-boutique-2256064" },
+ { label: "Dress", url: "/products/edited-archive-1397713" },
+ { label: "Bag", url: "/products/petria-vintage-3709656" },
+ { label: "Heels", url: "/products/hachi-archive-3415132" },
+ ],
+ },
+ {
+ image: "/styling-guide/post-125.jpg",
+ items: [
+ { label: "Top", url: "/products/reine-revival-3382490" },
+ { label: "Jeans", url: "/products/lover-girl-vintage-145702" },
+ { label: "Bag", url: "/products/california-boho-studio-2002740" },
+ { label: "Heels", url: "/products/scarz-vintage-260" },
+ ],
+ },
+ {
+ image: "/styling-guide/post-126.jpg",
+ items: [
+ { label: "Cami", url: "/products/lover-girl-vintage-3400940" },
+ { label: "Skirt", url: "/products/sourced-by-scottie-2622158" },
+ { label: "Heels", url: "/products/hachi-archive-1683476" },
  ],
  },
  {
@@ -52,16 +73,13 @@ export const STYLING_LOOKS: StylingLook[] = [
  { label: "Top", url: "/products/mookie-studios-1895099" },
  { label: "Jeans", url: "/products/sourced-by-scottie-1987435" },
  { label: "Bag", url: "/products/promised-vintage-91691" },
- { label: "Shoes", url: "/products/capsule-edit-2028118" },
  ],
  },
  {
  image: "/styling-guide/post-56.jpg",
  items: [
- { label: "Earrings", url: "/products/sheer-vintage-38608" },
  { label: "Dress", url: "/products/blodas-choice-1858323" },
  { label: "Purse", url: "/products/tess-elizabeth-vintage-695266" },
- { label: "Shoes", url: "/products/club-fleur-2178595" },
  ],
  },
  {
@@ -69,14 +87,11 @@ export const STYLING_LOOKS: StylingLook[] = [
  items: [
  { label: "Top", url: "/products/maison-optimism-vintage-1763189" },
  { label: "Skirt", url: "/products/edited-archive-1655057" },
- { label: "Shoes", url: "/products/vintage-archives-la-234" },
- { label: "Bag", url: "/products/hachi-archive-1252644" },
  ],
  },
  {
  image: "/styling-guide/post-58.jpg",
  items: [
- { label: "Tank", url: "/products/west-village-vintage-1170443" },
  { label: "Bag", url: "/products/montrose-edit-1700647" },
  { label: "Pants", url: "/products/sourced-by-scottie-2494559" },
  { label: "Shoes", url: "/products/sheer-vintage-1858608" },
