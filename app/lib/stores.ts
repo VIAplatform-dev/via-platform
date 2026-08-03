@@ -569,7 +569,10 @@ export const stores = [
  image: "/stores/loved-again.jpg",
  logo: "/stores/loved-again.jpg",
  logoBg: "#ffffff",
- currency: "AUD",
+ // Based in Melbourne (native AUD), but their products.json is served
+ // USD-localized via Shopify Markets when fetched from our US servers — so
+ // the sync must NOT convert (setting "AUD" here double-converts, ~0.72x too low).
+ currency: "USD",
  commissionType: "shopify-collabs" as const,
  collabsStoreId: "252378",
  authenticityPolicy:
