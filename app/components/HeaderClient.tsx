@@ -204,7 +204,7 @@ export default function HeaderClient({
  <>
  {/* ── Header ───────────────────────────────────────────── */}
  <div
- className={`fixed top-0 z-[60] w-full transition-colors duration-300 ${transparent ? "bg-transparent border-b border-transparent" : "bg-[#FFFDF8] border-b border-[#5D0F17]/10"}`}
+ className={`fixed top-0 z-[60] w-full transition-colors duration-300 ${transparent ? "bg-gradient-to-b from-black/25 to-transparent border-b border-transparent" : "bg-[#FFFDF8] border-b border-[#5D0F17]/10"}`}
  style={{ height: HEADER_H }}
  >
  <div className="max-w-7xl mx-auto px-6 h-full flex items-center gap-6 relative">

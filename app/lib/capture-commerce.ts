@@ -5,7 +5,6 @@
 import { getSellerBySlug } from "./db/sellers";
 import { createItem, listAvailableItems, deleteItemsBySource } from "./db/inventory";
 import type { ImportedProduct } from "./store-import";
-import { rehostImages } from "./rehost-images";
 
 const parseCents = (price?: string) => Math.round((parseFloat((price || "").replace(/[^0-9.]/g, "")) || 0) * 100);
 const detectCur = (price?: string) => (/£/.test(price || "") ? "GBP" : /€/.test(price || "") ? "EUR" : "USD");
@@ -26,10 +25,10 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  const title = (p.name || "").trim();
  const cents = parseCents(p.price);
  if (!title || !cents || have.has(title.toLowerCase())) continue;
- // Copy the images onto OUR storage so the listing survives the seller leaving their
- // old platform (their CDN images 404 otherwise). Soft-fails to the source URL.
- const rawImages = p.images?.length ? p.images : p.image ? [p.image] : [];
- const images = await rehostImages(rawImages, slug);
+ // Store the source URLs now (fast import); the rehost-images cron copies them onto
+ // OUR storage in the background so the interactive import doesn't wait on hundreds of
+ // image uploads. Durability without the slow import.
+ const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, 8);
  await createItem({
  sellerId: seller.id,
  title,
@@ -70,7 +69,7 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  let raw: string[] = [];
  if (p.images) { try { const a = JSON.parse(p.images); if (Array.isArray(a)) raw = a; } catch {} }
  if (!raw.length && p.image) raw = [p.image];
- const images = await rehostImages(raw, slug);
+ const images = raw.slice(0, 8); // rehost-images cron copies these to our storage in the background
  await createItem({
  sellerId: seller.id,
  title,
