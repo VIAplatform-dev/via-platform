@@ -490,6 +490,13 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  storeDomain: "www.lovedagainvintage.com.au",
  scrapeProductPage: true,
  },
+ {
+ type: "shopify",
+ name: "Of Substance",
+ slug: "of-substance",
+ storeDomain: "shopofsubstance.com",
+ scrapeProductPage: true,
+ },
 ];
 
 // Big Cartel stores (public JSON API — no token required)

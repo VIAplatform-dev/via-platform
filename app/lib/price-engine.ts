@@ -231,6 +231,14 @@ export async function estimatePrice(opts: {
  }
  }
 
+ // Guarantee a low–high band whenever we have a price. Some single-point paths (model-knowledge
+ // only, or a thin comp set with no live comps when SerpApi is off) leave low/high null, which
+ // hides the price scale entirely. Derive a ±band from the market value so the scale always shows.
+ if (marketCents != null) {
+ if (low == null) low = Math.round(marketCents * 0.85);
+ if (high == null) high = Math.round(marketCents * 1.2);
+ }
+
  const floorCents = opts.costCents && opts.costCents > 0 ? Math.round(opts.costCents * (1 + opts.minMarkupBps / 10000)) : null;
  const suggestedCents = Math.max(marketCents ?? 0, floorCents ?? 0);
 

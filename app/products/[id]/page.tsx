@@ -264,6 +264,10 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
 
  const BASE_URL = getBaseUrl();
  const brandName = inferBrandFromTitle(product.title);
+ // Point structured-data images at our own domain (the /i proxy) rather than the seller's
+ // cdn.shopify.com, so Google attributes the photos to THIS page and can surface it in
+ // reverse-image search. Same images are also declared in the image sitemap.
+ const seoImages = productImages.map((_, i) => `${BASE_URL}/i/${compositeId}/${i}.jpg`);
  const jsonLd = {
  "@context": "https://schema.org",
  "@type": "Product",
@@ -271,9 +275,10 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  "description": product.description
   ? product.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 500)
   : `${product.title} — vintage & secondhand at VYA`,
- "image": productImages,
+ "image": seoImages.length ? seoImages : productImages,
  "url": `${BASE_URL}/products/${compositeId}`,
  ...(brandName ? { "brand": { "@type": "Brand", "name": brandName } } : {}),
+ ...(product.materials ? { "material": product.materials } : {}),
  "offers": {
   "@type": "Offer",
   "price": Number(product.price).toFixed(2),
@@ -412,6 +417,16 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
                     <div className="space-y-3">
                       {displaySize && (
                         <p><span className="font-medium">Size:</span> {displaySize}</p>
+                      )}
+                      {/* Structured specs the seller stated on their own listing (captured at sync). */}
+                      {product.condition && (
+                        <p><span className="font-medium">Condition:</span> {product.condition}</p>
+                      )}
+                      {product.materials && (
+                        <p><span className="font-medium">Materials:</span> {product.materials}</p>
+                      )}
+                      {product.measurements && (
+                        <p><span className="font-medium">Measurements:</span> {product.measurements}</p>
                       )}
                       {descriptionHtml ? (
                         <div

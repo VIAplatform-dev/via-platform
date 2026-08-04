@@ -40,6 +40,15 @@ function flagFor(priceUsd: number, marketUsd: number | null, lowUsd: number | nu
 }
 
 const RISKY = ["brand", "era", "material"] as const;
+
+// A field only has something worth confirming if it's non-empty AND not an AI
+// placeholder like "N/A"/"Unknown". Those mean the AI couldn't determine it — there's
+// nothing for the seller to confirm, so such fields shouldn't be filled or gate publishing.
+const NO_VALUE_RE = /^(n\/?a|none|unknown|unsure|not sure|not applicable|n\.a\.)$/i;
+function hasRealValue(v: string | null | undefined): boolean {
+ const s = (v ?? "").trim();
+ return s.length > 0 && !NO_VALUE_RE.test(s);
+}
 const THRESHOLD = 0.75;
 
 const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-stone-400 focus:ring-2 focus:ring-stone-900/[0.06]";
@@ -273,7 +282,9 @@ export default function IntakePage() {
  const flags = RISKY.filter((k) => {
  if (String(form[k]).trim()) return false; // seller already filled it → trusted
  const fld = dr[k];
- return !!fld && (!fld.value || fld.confidence < THRESHOLD);
+ // Only flag when the AI actually produced a real value it's unsure about. If the AI
+ // left it blank or returned "N/A", there's nothing to confirm — don't gate on it.
+ return !!fld && hasRealValue(fld.value) && fld.confidence < THRESHOLD;
  });
  setFlagged(flags);
  setConfirmed({});
@@ -288,7 +299,9 @@ export default function IntakePage() {
  // Merge — only ever fill EMPTY fields; never overwrite what the seller typed.
  setForm((f) => {
  const next = { ...f };
- const fill = (k: keyof Form, v: string | null | undefined) => { if (!String(next[k]).trim() && v) next[k] = String(v); };
+ // Fill only EMPTY fields, and only with a real value — never write "N/A"/"Unknown"
+ // placeholders (leave the field genuinely blank so it doesn't look filled-but-unknown).
+ const fill = (k: keyof Form, v: string | null | undefined) => { if (!String(next[k]).trim() && hasRealValue(v)) next[k] = String(v); };
  if (dr) {
  fill("title", dr.title);
  fill("brand", dr.brand?.value);

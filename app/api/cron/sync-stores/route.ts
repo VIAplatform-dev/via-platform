@@ -17,6 +17,7 @@ import { fetchStripeProducts } from "@/app/lib/stripeClient";
 import { fetchWixProducts } from "@/app/lib/wixClient";
 import { stores, convertCurrencyToUSD, refreshExchangeRates } from "@/app/lib/stores";
 import { syncProducts, initDatabase } from "@/app/lib/db";
+import { backfillFromProducts } from "@/app/lib/training-data-db";
 
 export async function GET(request: Request) {
  console.log("[Sync Stores] Cron job triggered");
@@ -104,8 +105,11 @@ export async function GET(request: Request) {
  await Promise.all(
  batch.map(async (p) => {
  const descriptionIsEmpty = !(p.description || "").replace(/<[^>]+>/g, "").trim();
- const extra = await scrapeProductPageSections(p.externalUrl, descriptionIsEmpty);
- if (extra) p.description = (p.description || "") + extra;
+ const scraped = await scrapeProductPageSections(p.externalUrl, descriptionIsEmpty);
+ if (scraped.html) p.description = (p.description || "") + scraped.html;
+ if (scraped.condition) p.condition = scraped.condition;
+ if (scraped.materials) p.materials = scraped.materials;
+ if (scraped.measurements) p.measurements = scraped.measurements;
  })
  );
  }
@@ -135,6 +139,10 @@ export async function GET(request: Request) {
  size: p.size ?? undefined,
  productType: p.productType ?? undefined,
  brand: (p as any).vendor ?? undefined,
+ condition: p.condition ?? undefined,
+ materials: p.materials ?? undefined,
+ measurements: p.measurements ?? undefined,
+ tags: p.tags ?? undefined,
  available: p.available, // sold-out items (only fetched when skipSoldOutFilter) → preserved in sold_items, not the catalog
  compareAtPrice: p.compareAtPrice != null
  ? convertCurrencyToUSD(p.compareAtPrice as number, storeCurrency)
@@ -312,6 +320,18 @@ export async function GET(request: Request) {
  const failed = results.filter((r) => !r.success).length;
 
  console.log(`[Sync Stores] Done — ${succeeded} succeeded, ${failed} failed`);
+
+ // Learn from the sync: every newly-synced listing becomes a labeled training example
+ // (idempotent), then trigger the reference-index embedder so the pieces are visually
+ // searchable right away — coupling "pull Shopify over" to "learn + cache" in one pass.
+ try {
+ const added = await backfillFromProducts();
+ const baseUrl = getBaseUrl();
+ await fetch(`${baseUrl}/api/cron/embed-reference-index`, { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } }).catch(() => {});
+ console.log(`[Sync Stores] Training capture: +${added} new examples, embedder triggered`);
+ } catch (err) {
+ console.error("[Sync Stores] Training capture failed:", err);
+ }
 
  // Run favorite notifications after sync
  let notificationResult = null;

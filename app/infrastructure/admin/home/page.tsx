@@ -411,15 +411,15 @@ export default function WorkspaceHome() {
  <Link href={`${B}/inventory`} className="text-[12px] text-[var(--accent-ink)] hover:underline">View inventory</Link>
  </div>
  {recentItems.length ? (
- <table className="w-full">
- <thead><tr><TH>Item</TH><TH right>Price</TH><TH right>Status</TH></tr></thead>
+ <table className="w-full table-fixed">
+ <thead><tr><TH>Item</TH><TH right className="w-[76px]">Price</TH><TH right className="w-[92px]">Status</TH></tr></thead>
  <tbody>
  {recentItems.map((it) => (
  <tr key={it.id}>
  <TD>
- <div className="flex items-center gap-3">
- {it.images?.[0] ? <img src={it.images[0]} alt="" className="h-9 w-9 rounded-lg object-cover" /> : <span className="h-9 w-9 rounded-lg bg-stone-100" />}
- <span className="truncate font-medium text-stone-800">{it.title}</span>
+ <div className="flex min-w-0 items-center gap-3">
+ {it.images?.[0] ? <img src={it.images[0]} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" /> : <span className="h-9 w-9 shrink-0 rounded-lg bg-stone-100" />}
+ <span className="min-w-0 truncate font-medium text-stone-800">{it.title}</span>
  </div>
  </TD>
  <TD right className="font-semibold text-stone-900">{money(it.priceCents)}</TD>

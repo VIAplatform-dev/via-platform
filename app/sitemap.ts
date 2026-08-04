@@ -12,7 +12,7 @@ async function getProductUrls(): Promise<MetadataRoute.Sitemap> {
  if (!dbUrl) return [];
  const sql = neon(dbUrl);
  const rows = await sql`
-  SELECT p.store_slug, p.id, p.synced_at
+  SELECT p.store_slug, p.id, p.synced_at, p.images, p.image
   FROM products p
   WHERE p.image IS NOT NULL AND p.image != ''
   AND p.title NOT ILIKE '%gift card%'
@@ -23,12 +23,23 @@ async function getProductUrls(): Promise<MetadataRoute.Sitemap> {
   ORDER BY p.id DESC
   LIMIT 10000
  `;
- return (rows as { store_slug: string; id: number; synced_at: Date }[]).map((r) => ({
-  url: `${BASE_URL}/products/${r.store_slug}-${r.id}`,
-  lastModified: r.synced_at ?? new Date(),
-  changeFrequency: "daily" as const,
-  priority: 0.7,
- }));
+ return (rows as { store_slug: string; id: number; synced_at: Date; images: string | null; image: string | null }[]).map((r) => {
+  // Count the photos, then declare each as an image-sitemap entry pointing at OUR /i proxy
+  // (clean vyaplatform.com URLs) — the signal that tells Google to crawl + index the images
+  // under this VYA page, which is what makes reverse-image search surface us. Cap at 4/page.
+  let count = 0;
+  try { const parsed = JSON.parse(r.images ?? "[]"); if (Array.isArray(parsed)) count = parsed.length; } catch {}
+  if (count === 0 && r.image) count = 1;
+  const composite = `${r.store_slug}-${r.id}`;
+  const images = Array.from({ length: Math.min(count, 4) }, (_, i) => `${BASE_URL}/i/${composite}/${i}.jpg`);
+  return {
+   url: `${BASE_URL}/products/${composite}`,
+   lastModified: r.synced_at ?? new Date(),
+   changeFrequency: "daily" as const,
+   priority: 0.7,
+   ...(images.length ? { images } : {}),
+  };
+ });
  } catch {
  return [];
  }

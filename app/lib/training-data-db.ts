@@ -125,9 +125,9 @@ export async function backfillFromProducts(): Promise<number> {
  await ensureTable();
  const rows = (await db()`
   WITH ins AS (
-   INSERT INTO training_examples (source, store_slug, item_ref, image_urls, brand, title, description, size, price_cents, trust)
+   INSERT INTO training_examples (source, store_slug, item_ref, image_urls, brand, era, title, description, size, material, condition, price_cents, trust)
    SELECT 'marketplace', p.store_slug, p.id::text,
-    jsonb_build_array(p.image), p.brand, p.title, p.description, p.size,
+    jsonb_build_array(p.image), p.brand, p.era, p.title, p.description, p.size, p.materials, p.condition,
     CASE WHEN p.price IS NOT NULL THEN round(p.price * 100)::int ELSE NULL END, 'medium'
    FROM products p
    WHERE p.image IS NOT NULL AND p.image <> '' AND p.title IS NOT NULL

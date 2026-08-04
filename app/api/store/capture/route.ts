@@ -9,6 +9,17 @@ import { getPlatform } from "@/app/lib/platforms";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { deleteAllItems } from "@/app/lib/db/inventory";
 import { ensureCollection } from "@/app/lib/db/collections";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
+
+// The captured site is served by the MARKETPLACE app (vyaplatform.com/site/{slug}) or the
+// store's own connected domain — NOT the getvya.ai OS host the seller is viewing this from.
+// Returning a relative "/site/{slug}" made "View your site" 404 (it opened on getvya.ai, which
+// doesn't serve /site). Always return an absolute URL to where the site actually lives.
+async function siteViewUrl(slug: string): Promise<string> {
+ const sf = await getStorefrontBySlug(slug).catch(() => null);
+ if (sf?.customDomain) return `https://${sf.customDomain.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+ return `https://vyaplatform.com/site/${slug}`;
+}
 
 // Shopify's "store is password-protected" lock screen looks like a real page, so a
 // naive crawl would capture it. Detect it so we don't host the lock screen.
@@ -40,7 +51,7 @@ export async function GET(request: NextRequest) {
  const paths = await listCapturePaths(slug).catch(() => []);
  const origin = paths.length ? await getCaptureOrigin(slug).catch(() => null) : null;
  // isAdmin gates the owner-only "reset to simple design + wipe inventory" action.
- return NextResponse.json({ captured: paths.length, url: paths.length ? `/site/${slug}` : null, origin, pages: paths, isAdmin: isOwner(request, slug) });
+ return NextResponse.json({ captured: paths.length, url: paths.length ? await siteViewUrl(slug) : null, origin, pages: paths, isAdmin: isOwner(request, slug) });
 }
 
 // POST { url } — capture the seller's entire existing site and host every page on VYA.
@@ -76,10 +87,10 @@ export async function POST(request: NextRequest) {
  const locked = !r.pages || (r.pages <= 2 && !!home && looksPasswordProtected(home));
  if (locked) {
  const base = "Your storefront looks password-protected, so we couldn’t capture its design. Remove the password (Shopify: Online Store → Preferences) and re-run to bring your exact site over.";
- if (items > 0) return NextResponse.json({ ok: true, pages: 0, items, url: `/site/${slug}`, note: `${base} (We did import your ${items} products.)` });
+ if (items > 0) return NextResponse.json({ ok: true, pages: 0, items, url: await siteViewUrl(slug), note: `${base} (We did import your ${items} products.)` });
  return NextResponse.json({ error: `${base} Or connect your store above to import just your products.` }, { status: 400 });
  }
- return NextResponse.json({ ok: true, pages: r.pages, items, url: `/site/${slug}` });
+ return NextResponse.json({ ok: true, pages: r.pages, items, url: await siteViewUrl(slug) });
  } catch (e) {
  console.error("site capture error:", e);
  return NextResponse.json({ error: e instanceof Error ? e.message : "Capture failed." }, { status: 502 });

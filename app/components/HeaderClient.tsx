@@ -76,7 +76,10 @@ export default function HeaderClient({
  window.addEventListener("scroll", onScroll, { passive: true });
  return () => window.removeEventListener("scroll", onScroll);
  }, [isHome]);
- const transparent = isHome && !scrolled;
+ // Transparent (white text) only over the hero. When a nav drawer is open, the white drawer
+ // slides over the header — so drop to the solid state (maroon text) or the white nav labels
+ // would sit on the white panel and vanish.
+ const transparent = isHome && !scrolled && activeNavDrawer === null;
  const navItemClass = `text-[14px] tracking-[0.02em] transition-colors duration-200 whitespace-nowrap ${transparent ? "text-[#FFFDF8] hover:text-[#FFFDF8]/60" : "text-[#5D0F17] hover:text-[#5D0F17]/50"}`;
  const icon = transparent ? "text-[#FFFDF8]" : "text-[#5D0F17]";
 
@@ -431,7 +434,7 @@ export default function HeaderClient({
  onClick={closeNavDrawer}
  />
  <div
- className={`hidden md:flex fixed left-0 top-0 bottom-0 z-[70] w-full max-w-sm bg-white flex-col transition-transform duration-300 ease-out ${navOpen ? "translate-x-0 shadow-2xl" : "-translate-x-[102%] shadow-none"}`}
+ className={`hidden md:flex fixed left-0 top-0 bottom-0 z-[70] w-full ${lastNav === "stores" ? "max-w-2xl" : "max-w-sm"} bg-white flex-col transition-transform duration-300 ease-out ${navOpen ? "translate-x-0 shadow-2xl" : "-translate-x-[102%] shadow-none"}`}
  style={{ ...FONT }}
  onMouseEnter={keepNav}
  onMouseLeave={scheduleCloseNav}
@@ -447,12 +450,14 @@ export default function HeaderClient({
  <div className="overflow-y-auto flex-1">
  {lastNav === "stores" && (
  <div className="py-2">
+ <div className="grid grid-cols-2 gap-x-2">
  {stores.map((s) => (
  <Link key={s.slug} href={`/stores/${s.slug}`} onClick={closeNavDrawer} className={DROP_LINK}>
  <span className="font-medium">{s.name}</span>
  <span className="block text-[12px] text-[#5D0F17]/40 mt-0.5">{s.location}</span>
  </Link>
  ))}
+ </div>
  <Link href="/stores" onClick={closeNavDrawer} className={DROP_FOOT}>View All Stores</Link>
  </div>
  )}

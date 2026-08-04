@@ -9,6 +9,7 @@ import {
  scrapeProductPageSections,
 } from "@/app/lib/shopifyClient";
 import { syncProducts, initDatabase } from "@/app/lib/db";
+import { backfillFromProducts } from "@/app/lib/training-data-db";
 import { convertCurrencyToUSD, refreshExchangeRates, stores } from "@/app/lib/stores";
 import { ALL_STORES } from "@/app/lib/storeConfig";
 import { getPriceDropCandidates, recordPriceDropNotificationsSent } from "@/app/lib/notification-db";
@@ -152,10 +153,12 @@ export async function POST(request: NextRequest) {
  await Promise.all(
  rawProducts.map(async (p) => {
  const descriptionIsEmpty = !(p.description || "").replace(/<[^>]+>/g, "").trim();
- const extra = await scrapeProductPageSections(p.externalUrl, descriptionIsEmpty);
- if (extra) {
- p.description = (p.description || "") + extra;
- }
+ const scraped = await scrapeProductPageSections(p.externalUrl, descriptionIsEmpty);
+ if (scraped.html) p.description = (p.description || "") + scraped.html;
+ // Keep the seller's own condition/materials/measurements structured (not just in the blurb).
+ if (scraped.condition) p.condition = scraped.condition;
+ if (scraped.materials) p.materials = scraped.materials;
+ if (scraped.measurements) p.measurements = scraped.measurements;
  })
  );
  }
@@ -181,6 +184,10 @@ export async function POST(request: NextRequest) {
  variantId: p.variantId ?? undefined,
  shopifyProductId: p.shopifyProductId ?? undefined,
  size: p.size ?? undefined,
+ condition: p.condition ?? undefined,
+ materials: p.materials ?? undefined,
+ measurements: p.measurements ?? undefined,
+ tags: p.tags ?? undefined,
  compareAtPrice: p.compareAtPrice != null
  ? convertCurrencyToUSD(p.compareAtPrice as number, storeCurrency)
  : undefined,
@@ -190,6 +197,13 @@ export async function POST(request: NextRequest) {
 
  // Sync products to database
  const { count: productCount, inserted, updated, priceDrops } = await syncProducts(storeSlug, storeName, products);
+
+ // Learn from the import: every synced listing becomes a labeled training example
+ // immediately (idempotent — ON CONFLICT DO NOTHING), so a store pulling their Shopify
+ // over feeds the reference dataset right away. They're also usable as VYA comps at once
+ // (getVyaComps reads the products table live); photo embedding follows via the
+ // embed-reference-index cron. Never let a training-capture hiccup break the sync.
+ await backfillFromProducts().catch(() => {});
 
  // Price drop emails disabled
 

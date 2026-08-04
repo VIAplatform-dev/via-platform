@@ -26,6 +26,7 @@ const PUBLIC_ROUTES = [
   "/infrastructure",
   "/s",
   "/site",
+  "/i", // product-image proxy — must be crawlable by Googlebot (reverse-image SEO), like OG images
   "/api/auth",
   "/api/newsletter",
   "/api/contact",
@@ -63,6 +64,7 @@ const PUBLIC_ROUTES = [
   "/api/store/policy",
   "/api/store/intake",
   "/api/store/items",
+  "/api/store/inventory",
   "/api/store/instagram",
   "/api/store/orders",
   "/api/store/inbox",

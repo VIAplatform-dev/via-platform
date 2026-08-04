@@ -5,6 +5,7 @@
 import { getSellerBySlug } from "./db/sellers";
 import { createItem, listAvailableItems, deleteItemsBySource } from "./db/inventory";
 import type { ImportedProduct } from "./store-import";
+import { rehostImages } from "./rehost-images";
 
 const parseCents = (price?: string) => Math.round((parseFloat((price || "").replace(/[^0-9.]/g, "")) || 0) * 100);
 const detectCur = (price?: string) => (/£/.test(price || "") ? "GBP" : /€/.test(price || "") ? "EUR" : "USD");
@@ -25,12 +26,18 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  const title = (p.name || "").trim();
  const cents = parseCents(p.price);
  if (!title || !cents || have.has(title.toLowerCase())) continue;
+ // Copy the images onto OUR storage so the listing survives the seller leaving their
+ // old platform (their CDN images 404 otherwise). Soft-fails to the source URL.
+ const rawImages = p.images?.length ? p.images : p.image ? [p.image] : [];
+ const images = await rehostImages(rawImages, slug);
  await createItem({
  sellerId: seller.id,
  title,
  priceCents: cents,
  currency: detectCur(p.price),
- images: p.images?.length ? p.images.slice(0, 8) : p.image ? [p.image] : [],
+ images,
+ description: p.description ?? null,
+ size: p.size ?? null,
  status: p.available === false ? "sold" : "active",
  source: "captured",
  });
@@ -38,6 +45,52 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  n++;
  }
  return n;
+}
+
+/**
+ * Convert a store's SYNCED marketplace catalog (the read-only `products` rows from a
+ * Shopify/Squarespace/etc. connection) into managed, sellable OS `items` — the self-serve
+ * fix for the two-table trap, so a connected store can actually edit/reprice/manage its
+ * inventory instead of only browsing it. Re-hosts images (survives leaving the old platform),
+ * carries over everything we captured (brand/era/material/condition/measurements/size), and
+ * is idempotent by title so re-running only adds what's new.
+ */
+export async function convertCatalogToItems(slug: string): Promise<{ added: number; total: number }> {
+ const { getProductsByStore } = await import("./db");
+ const seller = await getSellerBySlug(slug);
+ if (!seller) return { added: 0, total: 0 };
+ const products = await getProductsByStore(slug).catch(() => []);
+ const existing = await listAvailableItems(seller.id);
+ const have = new Set(existing.map((i) => i.title.toLowerCase().trim()));
+ let added = 0;
+ for (const p of products) {
+ const title = (p.title || "").trim();
+ const cents = Math.round(Number(p.price) * 100);
+ if (!title || !cents || have.has(title.toLowerCase())) continue;
+ let raw: string[] = [];
+ if (p.images) { try { const a = JSON.parse(p.images); if (Array.isArray(a)) raw = a; } catch {} }
+ if (!raw.length && p.image) raw = [p.image];
+ const images = await rehostImages(raw, slug);
+ await createItem({
+ sellerId: seller.id,
+ title,
+ priceCents: cents,
+ currency: p.currency || "USD",
+ images,
+ description: p.description ?? null,
+ brand: p.brand ?? null,
+ era: p.era ?? null,
+ material: p.materials ?? null,
+ condition: p.condition ?? null,
+ size: p.size ?? null,
+ category: p.product_type ?? null,
+ status: "active",
+ source: "imported",
+ });
+ have.add(title.toLowerCase());
+ added++;
+ }
+ return { added, total: products.length };
 }
 
 /** Find the db/item id for a captured product (by title) — for its Buy button. */

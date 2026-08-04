@@ -766,6 +766,29 @@ export const stores = [
  "All sales are final. As a vintage boutique specializing in one-of-a-kind pieces, please review all item details and photos carefully before purchasing.",
  },
  {
+ slug: "of-substance",
+ dashboardToken: "ofs-4d9a2f7c1e8b",
+ name: "Of Substance",
+ location: "New York, NY",
+ description:
+ "Of Substance curates one-of-one vintage pieces chosen for their craftsmanship, character, and lasting relevance. Each garment is selected to bring individuality and substance to a modern wardrobe.",
+ website: "https://shopofsubstance.com",
+ contactEmail: "shradhakumar99@gmail.com",
+ dataSource: "of-substance",
+ image: "/stores/of-substance.jpg",
+ logo: "/stores/of-substance.jpg",
+ logoBg: "#ffffff",
+ currency: "USD",
+ commissionType: "shopify-collabs" as const,
+ collabsStoreId: "252525",
+ authenticityPolicy:
+ "Every piece at Of Substance is personally sourced and inspected before listing — chosen for craftsmanship, character, and lasting relevance, and accurately described so you can shop with confidence.",
+ shippingPolicy:
+ "Ships from New York, NY. Shipping rates are calculated at checkout.",
+ returnPolicy:
+ "All sales are final. As a vintage boutique specializing in one-of-a-kind pieces, please review all item details and photos carefully before purchasing.",
+ },
+ {
  slug: "other-matters-atelier",
  dashboardToken: "oma-7f3b9e2c1a4d",
  name: "Other Matters Atelier",
@@ -1509,6 +1532,7 @@ export const storeContactEmails: Record<string, string> = {
  "sarah-does": "sarah@sarahdoes.shop",
  "sassy-so-what": "hello@sassysowhat.com",
  "other-matters-atelier": "othermattersatelier@gmail.com",
+ "of-substance": "shradhakumar99@gmail.com",
  "tess-elizabeth-vintage": "hello@tesselizabeth.com",
  "west-village-vintage": "info@westvillagevintage.com",
  "ange-archive": "info@angearchive.com",

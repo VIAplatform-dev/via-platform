@@ -47,6 +47,13 @@ export type DBProduct = {
  size: string | null;
  compare_at_price: number | null;
  product_type: string | null;
+ brand: string | null;
+ condition: string | null;
+ materials: string | null;
+ measurements: string | null;
+ tags: string[] | null;
+ collections: string[] | null;
+ era: string | null;
  insider_notified: boolean;
  synced_at: Date;
  created_at: Date;
@@ -105,6 +112,20 @@ export async function initDatabase() {
  await sql`
  ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_id TEXT
  `;
+ // Captured from the seller's own product page (scrapeProductPage stores): the condition,
+ // fibre/materials, and measurements they already wrote — stored structured so intake,
+ // pricing, and training use the truth instead of re-guessing it from the photo.
+ await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS condition TEXT`;
+ await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS materials TEXT`;
+ await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS measurements TEXT`;
+ // The seller's own Shopify tags — they encode era/style/collection (e.g. "y2k", "1990s",
+ // "archive"). Kept so we stop discarding a strong era/style signal at import.
+ await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT[]`;
+ // The store's own collections this piece belongs to (e.g. "1990s", "Chanel", "Bags") — the
+ // richest seller-labeled signal for era/brand/category. `era` is derived from them (see
+ // collections-sync.ts) so the intake accuracy loop learns from real labels, not guesses.
+ await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS collections TEXT[]`;
+ await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS era TEXT`;
 
  // Add created_at column (set explicitly during sync, NULL for existing products)
  await sql`
@@ -327,6 +348,10 @@ export async function syncProducts(
  compareAtPrice?: number | null;
  brand?: string;
  productType?: string;
+ condition?: string | null;
+ materials?: string | null;
+ measurements?: string | null;
+ tags?: string[];
  available?: boolean; // false = sold out at the source. Preserved in sold_items, kept out of the live catalog.
  }>,
  options?: { excludeKeywords?: string[]; excludeTitles?: string[] }
@@ -448,7 +473,7 @@ export async function syncProducts(
  const imagesJson = product.images ? JSON.stringify(product.images) : null;
  const wasSeenOnInsider = prevSeenTitles.has(product.title);
  await sql`
- INSERT INTO products (store_slug, store_name, title, price, currency, image, images, video_url, external_url, description, variant_id, shopify_product_id, size, compare_at_price, product_type, brand, insider_notified, synced_at, created_at)
+ INSERT INTO products (store_slug, store_name, title, price, currency, image, images, video_url, external_url, description, variant_id, shopify_product_id, size, compare_at_price, product_type, brand, condition, materials, measurements, tags, insider_notified, synced_at, created_at)
  VALUES (
  ${storeSlug},
  ${storeName},
@@ -466,6 +491,10 @@ export async function syncProducts(
  ${product.compareAtPrice ?? null},
  ${product.productType || null},
  ${product.brand || null},
+ ${product.condition || null},
+ ${product.materials || null},
+ ${product.measurements || null},
+ ${product.tags && product.tags.length ? product.tags : null},
  ${wasSeenOnInsider},
  NOW(),
  NOW()
@@ -492,6 +521,10 @@ export async function syncProducts(
  compare_at_price = EXCLUDED.compare_at_price,
  product_type = COALESCE(EXCLUDED.product_type, products.product_type),
  brand = COALESCE(EXCLUDED.brand, products.brand),
+ condition = COALESCE(EXCLUDED.condition, products.condition),
+ materials = COALESCE(EXCLUDED.materials, products.materials),
+ measurements = COALESCE(EXCLUDED.measurements, products.measurements),
+ tags = COALESCE(EXCLUDED.tags, products.tags),
  synced_at = NOW()
  `;
  }

@@ -45,7 +45,11 @@ const norm = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
  * a meaningful final value.
  */
 export async function logCorrections(storeSlug: string, corrections: Correction[]): Promise<void> {
- const real = corrections.filter((c) => c.finalValue && c.finalValue.trim() && norm(c.aiValue) !== norm(c.finalValue));
+ // A real correction requires the AI to have actually guessed (non-empty aiValue) AND the seller
+ // to have changed it. A field the seller typed themselves (aiValue null/empty) is data entry, not
+ // an AI miss — logging it inflates the correction count and desyncs it from the prediction log
+ // (where it correctly counts as no prediction). Require a real AI guess so corrections == misses.
+ const real = corrections.filter((c) => c.aiValue && c.aiValue.trim() && c.finalValue && c.finalValue.trim() && norm(c.aiValue) !== norm(c.finalValue));
  if (real.length === 0) return;
  await ensureTable();
  const sql = db();

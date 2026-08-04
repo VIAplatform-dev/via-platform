@@ -54,6 +54,7 @@ export default function ItemsPage() {
  const [loading, setLoading] = useState(true);
  const [authErr, setAuthErr] = useState<string | null>(null);
  const [items, setItems] = useState<Item[]>([]);
+ const [importOpen, setImportOpen] = useState(false);
  const [q, setQ] = useState(""); // client-side search over title/category
  // Where each item is posted — real cross-listing status per platform, keyed by itemId.
  const [channels, setChannels] = useState<Record<string, { key: string; status: string }[]>>({});
@@ -274,10 +275,17 @@ export default function ItemsPage() {
  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search items…" aria-label="Search items"
  className="h-9 w-full rounded-full border border-stone-200 bg-white pl-8 pr-3 text-[13px] text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[var(--accent,#0e9f76)] sm:w-52" />
  </div>
+ <TechButton variant="secondary" onClick={() => setImportOpen(true)}>Import</TechButton>
  <TechButtonLink href="/admin/add-listing">+ New listing</TechButtonLink>
  </>
  }
  />
+
+ {importOpen && (
+ <ImportModal
+ onClose={() => { setImportOpen(false); load(); }}
+ />
+ )}
 
  {soldNotice && (
  <div className="mb-4 flex items-start gap-2 rounded-xl border border-[var(--accent,#0e9f76)]/25 bg-[var(--accent-soft,#eafaf3)] px-4 py-3 text-[13px] text-[var(--accent-ink,#0b7a5c)]">
@@ -492,5 +500,79 @@ export default function ItemsPage() {
  </div>
  )}
  </AdminPage>
+ );
+}
+
+// ── Import inventory ─────────────────────────────────────────────────────────
+// Two on-ramps for getting stock in fast: (1) import the store's already-synced
+// marketplace catalog as managed items (fixes the read-only-catalog trap), and
+// (2) bulk-upload a CSV/spreadsheet (the path for stores with no Shopify to connect).
+// Both re-host images onto our storage so listings survive leaving the old platform.
+function ImportModal({ onClose }: { onClose: () => void }) {
+ const [tab, setTab] = useState<"catalog" | "csv">("catalog");
+ const [csv, setCsv] = useState("");
+ const [goLive, setGoLive] = useState(false);
+ const [busy, setBusy] = useState(false);
+ const [msg, setMsg] = useState<string | null>(null);
+ const fileRef = useRef<HTMLInputElement>(null);
+
+ async function importCatalog() {
+ setBusy(true); setMsg(null);
+ try {
+ const r = await fetch("/api/store/inventory/convert", { method: "POST" });
+ const d = await r.json();
+ if (!r.ok) { setMsg(d.error || "Couldn’t import your catalog."); return; }
+ setMsg(d.added > 0 ? `✓ Imported ${d.added} item${d.added === 1 ? "" : "s"} from your synced catalog — they’re now editable inventory.` : "Nothing new to import — your catalog is already in your inventory.");
+ } catch { setMsg("Something went wrong."); } finally { setBusy(false); }
+ }
+
+ async function importCsv() {
+ if (!csv.trim()) { setMsg("Paste or upload your inventory file first."); return; }
+ setBusy(true); setMsg(null);
+ try {
+ const r = await fetch("/api/store/items/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv, status: goLive ? "active" : "draft" }) });
+ const d = await r.json();
+ if (!r.ok) { setMsg(d.error || "Couldn’t read that file."); return; }
+ setMsg(`✓ Added ${d.added} of ${d.found} item${d.found === 1 ? "" : "s"}${goLive ? " — live now." : " as drafts — review and publish when ready."}`);
+ setCsv("");
+ } catch { setMsg("Something went wrong."); } finally { setBusy(false); }
+ }
+
+ return (
+ <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+ <div className="fixed inset-0 bg-black/40" onClick={onClose} />
+ <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+ <div className="mb-4 flex items-start justify-between">
+ <div>
+ <h2 className="text-base font-semibold text-stone-900">Import inventory</h2>
+ <p className="mt-0.5 text-[12px] text-stone-500">Get your whole catalog in at once. Images are copied onto VYA, so nothing breaks if you leave your old platform.</p>
+ </div>
+ <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
+ </div>
+
+ <div className="mb-4 flex gap-1 rounded-lg bg-stone-100 p-1 text-[13px]">
+ <button onClick={() => { setTab("catalog"); setMsg(null); }} className={cn("flex-1 rounded-md px-3 py-1.5 transition", tab === "catalog" ? "bg-white font-medium text-stone-900 shadow-sm" : "text-stone-500")}>My synced catalog</button>
+ <button onClick={() => { setTab("csv"); setMsg(null); }} className={cn("flex-1 rounded-md px-3 py-1.5 transition", tab === "csv" ? "bg-white font-medium text-stone-900 shadow-sm" : "text-stone-500")}>Upload a file</button>
+ </div>
+
+ {tab === "catalog" ? (
+ <div className="space-y-3">
+ <p className="text-[13px] leading-relaxed text-stone-600">If you connected Shopify (or another store), your products are already browsable on VYA but read-only. Import them here to turn them into managed inventory you can edit, reprice, and relist.</p>
+ <TechButton className="w-full" disabled={busy} onClick={importCatalog}>{busy ? "Importing…" : "Import my synced catalog"}</TechButton>
+ </div>
+ ) : (
+ <div className="space-y-3">
+ <p className="text-[13px] leading-relaxed text-stone-600">Paste or upload a CSV. We’ll map the columns automatically — a title and price are all that’s required (brand, size, condition, image URL, etc. come over too if present).</p>
+ <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} />
+ <button type="button" onClick={() => fileRef.current?.click()} className="w-full rounded-lg border border-dashed border-stone-300 py-2.5 text-[13px] text-stone-500 hover:border-stone-400 hover:text-stone-700">Choose a CSV file…</button>
+ <textarea value={csv} onChange={(e) => setCsv(e.target.value)} rows={5} placeholder="…or paste your rows here (title, price, brand, size, condition, image URL)" className="w-full resize-none rounded-lg border border-stone-200 p-3 text-[12px] text-stone-800 outline-none focus:border-[var(--accent,#0e9f76)]" />
+ <label className="flex items-center gap-2 text-[13px] text-stone-600"><input type="checkbox" checked={goLive} onChange={(e) => setGoLive(e.target.checked)} className="accent-[var(--accent,#0e9f76)]" />Publish immediately (otherwise saved as drafts)</label>
+ <TechButton className="w-full" disabled={busy || !csv.trim()} onClick={importCsv}>{busy ? "Importing…" : "Import items"}</TechButton>
+ </div>
+ )}
+
+ {msg && <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-[13px] text-stone-700">{msg}</p>}
+ </div>
+ </div>
  );
 }

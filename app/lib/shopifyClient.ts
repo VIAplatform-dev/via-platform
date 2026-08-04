@@ -25,6 +25,10 @@ export type ShopifyProduct = {
  shopifyProductId: string | null;
  size: string | null;
  tags?: string[];
+ // Captured from the product page (scrapeProductPage stores) — the seller's own words.
+ condition?: string | null;
+ materials?: string | null;
+ measurements?: string | null;
 };
 
 export type ShopifyFetchResult = {
@@ -1058,13 +1062,25 @@ export async function fetchShopifyProductsByCollections(
  * description from a "Details" or "Description" section on the page — useful
  * for stores where body_html is empty but the description renders in a page tab.
  */
-export async function scrapeProductPageSections(url: string, extractFallbackDescription = false): Promise<string> {
+export type ScrapedPageSections = {
+ /** Combined HTML of the extracted sections, appended to the product description. */
+ html: string;
+ /** Structured values the seller already wrote — captured so intake/pricing/training
+  * don't have to re-guess them. Null when the page doesn't state them. */
+ condition: string | null;
+ measurements: string | null;
+ materials: string | null;
+};
+
+const EMPTY_SECTIONS: ScrapedPageSections = { html: "", condition: null, measurements: null, materials: null };
+
+export async function scrapeProductPageSections(url: string, extractFallbackDescription = false): Promise<ScrapedPageSections> {
  try {
  const res = await fetch(url, {
  headers: { Accept: "text/html" },
  signal: AbortSignal.timeout(8000),
  });
- if (!res.ok) return "";
+ if (!res.ok) return EMPTY_SECTIONS;
  const html = await res.text();
 
  const text = html
@@ -1075,6 +1091,11 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  .trim();
 
  const sections: string[] = [];
+ // Structured captures — the seller's own words, kept alongside the HTML so downstream
+ // (product display, training labels, pricing condition multiplier) uses truth, not a guess.
+ let condition: string | null = null;
+ let measurements: string | null = null;
+ let materials: string | null = null;
 
  // Regex to strip Shopify storefront UI text that leaks into scraped content.
  // These strings appear in the raw page text when themes render price/cart UI
@@ -1085,7 +1106,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  // we don't accidentally capture footer HTML that appears after product content.
  // Also stops at e-commerce UI keywords (price, cart, stock) that some themes
  // render between product content sections.
- const nextSection = "\\s+(?:Condition|Dimensions?|Measurements?|Authenticity(?:\\s+Guarantee)?|Model\\s+Number|Serial\\s+Number|Add\\s+to\\s+(?:cart|bag|wishlist)|Subscribe|Order\\s+Polic|Details|Shipping|Returns?|You\\s+may\\s+also|Powered\\s+by|Sign\\s+up|Newsletter|Privacy\\s+(?:Policy|Choices)|Customer\\s+(?:care|service)|Follow\\s+(?:us|me)|Social\\s+Media|Regular\\s+price|Sale\\s+price|Sold\\s+out|In\\s+stock|Unit\\s+price|Product\\s+variant|Decrease\\s+quantity|Increase\\s+quantity|THIS\\s+ITEM\\s+IS|Pick\\s+up\\s+available|Tax\\s+included|\\$\\s*\\d)";
+ const nextSection = "\\s+(?:Condition|Dimensions?|Measurements?|Materials?|Fabric|Composition|Made\\s+of|Care|Authenticity(?:\\s+Guarantee)?|Model\\s+Number|Serial\\s+Number|Add\\s+to\\s+(?:cart|bag|wishlist)|Subscribe|Order\\s+Polic|Details|Shipping|Returns?|You\\s+may\\s+also|Powered\\s+by|Sign\\s+up|Newsletter|Privacy\\s+(?:Policy|Choices)|Customer\\s+(?:care|service)|Follow\\s+(?:us|me)|Social\\s+Media|Regular\\s+price|Sale\\s+price|Sold\\s+out|In\\s+stock|Unit\\s+price|Product\\s+variant|Decrease\\s+quantity|Increase\\s+quantity|THIS\\s+ITEM\\s+IS|Pick\\s+up\\s+available|Tax\\s+included|\\$\\s*\\d)";
 
  const dimResult = new RegExp(`\\b(?:Dimensions?|Measurements?)\\b\\s*:?\\s*(.+?)(?=${nextSection})`, "i").exec(text);
  if (dimResult) {
@@ -1098,6 +1119,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  if (val.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))) val = firstHalf.trim();
  if (val.length >= 3 && val.length <= 300) {
  sections.push(`<p>Measurements: ${val}</p>`);
+ measurements = val;
  }
  }
 
@@ -1112,6 +1134,22 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  if (val.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))) val = firstHalf.trim();
  if (val.length >= 3 && val.length <= 400) {
  sections.push(`<p>Condition: ${val}</p>`);
+ condition = val;
+ }
+ }
+
+ // Materials / fabric / composition — sellers state this explicitly; capture it structured
+ // so intake/training use the real fibre content instead of guessing from the photo.
+ const matResult = new RegExp(`\\b(?:Materials?|Fabric|Composition|Made\\s+of)\\b\\s*:?\\s*(.+?)(?=${nextSection})`, "i").exec(text);
+ if (matResult) {
+ let val = matResult[1].trim();
+ val = val.replace(ECOM_JUNK_RE, "").trim();
+ const half = Math.ceil(val.length / 2);
+ const firstHalf = val.slice(0, half);
+ if (val.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))) val = firstHalf.trim();
+ if (val.length >= 2 && val.length <= 200) {
+ sections.push(`<p>Materials: ${val}</p>`);
+ materials = val;
  }
  }
 
@@ -1158,9 +1196,9 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  }
  }
 
- return sections.join("");
+ return { html: sections.join(""), condition, measurements, materials };
  } catch {
- return "";
+ return EMPTY_SECTIONS;
  }
 }
 
@@ -1185,6 +1223,10 @@ export function toRSSProductFormat(product: ShopifyProduct): {
  productType: string | null;
  vendor: string | null;
  available: boolean;
+ condition?: string | null;
+ materials?: string | null;
+ measurements?: string | null;
+ tags?: string[];
 } {
  return {
  title: product.title,
@@ -1203,5 +1245,6 @@ export function toRSSProductFormat(product: ShopifyProduct): {
  productType: product.productType,
  vendor: product.vendor ?? null,
  available: product.availableForSale !== false, // false only when the source explicitly marks it sold out
+ tags: product.tags ?? [],
  };
 }
