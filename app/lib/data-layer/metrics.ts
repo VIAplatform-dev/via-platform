@@ -76,6 +76,41 @@ export function median(values: number[]): number | null {
 }
 
 /**
+ * Price trend: % change in the median REALIZED sale price this window vs the prior
+ * equal window. null when either side has no sales to take a median from (a % off
+ * nothing is meaningless). Positive → the segment is getting more expensive.
+ */
+export function priceMomentumPct(curPrices: number[], priorPrices: number[]): number | null {
+ const c = median(curPrices);
+ const p = median(priorPrices);
+ if (c == null || p == null || p <= 0) return null;
+ return Math.round(((c - p) / p) * 1000) / 10; // one decimal place
+}
+
+// A segment's direction of travel, from LEADING intent (saves+clicks) vs LAGGING sales (orders).
+// Intent moves before money, so the gap between them forecasts what demand does next — the thing a
+// backward "rising/falling" trend can't see.
+export type Trajectory = "accelerating" | "steady" | "peaking" | "cooling";
+export type TrajectoryBands = { accel: number; cool: number };
+
+/**
+ * accelerating — interest is surging and outrunning sales (demand building before it converts): source ahead.
+ * peaking      — sales are up but interest has stopped growing (clearing the backlog): sell now, don't over-source.
+ * cooling      — interest AND sales are both clearly falling: ease off.
+ * steady       — no decisive divergence.
+ * Zero prior base is treated as full growth from nothing (any signal now is a rise).
+ */
+export function classifyTrajectory(cur: EngagementCounts, prior: EngagementCounts, band: TrajectoryBands): Trajectory {
+ const growth = (c: number, p: number) => (p <= 0 ? (c > 0 ? 1 : 0) : (c - p) / p);
+ const lead = growth(cur.saves + cur.clicks, prior.saves + prior.clicks);
+ const lag = growth(cur.orders, prior.orders);
+ if (lead < band.cool && lag < band.cool) return "cooling";
+ if (lead >= band.accel && lead - lag >= band.accel) return "accelerating";
+ if (lag >= band.accel && lead <= 0) return "peaking";
+ return "steady";
+}
+
+/**
  * Sell-through %: units sold over the window ÷ items currently in stock for the
  * segment. null when there's no active supply to measure against (a rate over
  * zero is meaningless, not "0%").

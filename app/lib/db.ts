@@ -28,6 +28,24 @@ const getDatabaseUrl = () => {
  return url;
 };
 
+// One-time / self-healing cleanup for scrape pollution: a "Condition Guide" nav link once matched as
+// a Condition field and swallowed the store's whole menu into condition/materials/measurements. The
+// scraper no longer does this, but the COALESCE upsert keeps old junk — so null it out. Idempotent:
+// a real value ("Excellent — light wear") never contains these nav phrases, so it's left untouched.
+export async function cleanScrapedNavJunk(): Promise<number> {
+ const sql = neon(getDatabaseUrl());
+ const junk = "(contact us|shop all|sourcing requests?|summer arrivals|private sourcing|add to (cart|bag)|log ?in|newsletter|search cart)";
+ const rows = (await sql`
+  UPDATE products SET
+   condition = CASE WHEN condition ~* ${junk} THEN NULL ELSE condition END,
+   materials = CASE WHEN materials ~* ${junk} THEN NULL ELSE materials END,
+   measurements = CASE WHEN measurements ~* ${junk} THEN NULL ELSE measurements END
+  WHERE condition ~* ${junk} OR materials ~* ${junk} OR measurements ~* ${junk}
+  RETURNING id
+ `.catch(() => [])) as { id: number }[];
+ return rows.length;
+}
+
 export type DBProduct = {
  id: number;
  store_slug: string;

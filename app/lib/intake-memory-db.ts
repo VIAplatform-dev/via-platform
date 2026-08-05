@@ -353,6 +353,13 @@ export type SpecificPiece = {
 
 const SPECIFIC_MIN = 0.82; // asserts "the SAME specific piece" — deliberately high; below this, brand-only
 
+// ── Recall tier (above "specific"): a NEAR-DUPLICATE photo = the SAME physical item, not just a
+// look-alike. Above this bar we RECALL the stored answer verbatim instead of re-generating. Same-logo
+// bags in other colorways land ~0.85–0.93, so the bar is deliberately high — it means "literally this
+// item, re-uploaded", the case where the answer (and price) must not drift.
+export const NEAR_DUP_MIN = 0.97;
+export const RECALL_STALE_DAYS = 365; // reuse a recalled price for up to a year, then re-price fresh
+
 export async function resolveSpecificPiece(embedding: number[], brand?: string | null, opts?: { excludeNearIdentical?: boolean }): Promise<SpecificPiece | null> {
  if (!embedding || embedding.length === 0) return null;
  await ensureItemsTable();
@@ -400,6 +407,108 @@ export async function resolveSpecificPiece(embedding: number[], brand?: string |
  return {
  model, query, similarity: Math.round(best.score * 1000) / 1000, agree: close.length,
  brand: best.brand, era: best.era, category: best.category, priceCents: medPrice, source: best.source,
+ };
+}
+
+// ── Near-duplicate RECALL: the same physical item, re-uploaded ──
+// A draft-time resolution cache so re-drafting the same photo is deterministic BEFORE anything is
+// published (the gap that lost the first "two-way bag" answer). Recall reads this + published items.
+let resolutionsEnsured = false;
+async function ensureResolutionsTable() {
+ if (resolutionsEnsured) return;
+ await db()`
+  CREATE TABLE IF NOT EXISTS intake_resolutions (
+   id SERIAL PRIMARY KEY,
+   store_slug TEXT NOT NULL,
+   image_url TEXT,
+   embedding TEXT NOT NULL,
+   title TEXT, brand TEXT, era TEXT, material TEXT, condition TEXT, category TEXT,
+   price_cents INTEGER, market_cents INTEGER,
+   prompt_version TEXT,
+   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+ `;
+ await db()`CREATE INDEX IF NOT EXISTS idx_intake_resolutions_store ON intake_resolutions (store_slug, created_at DESC)`;
+ resolutionsEnsured = true;
+}
+
+export type DraftResolution = {
+ imageUrl?: string | null;
+ embedding: number[];
+ title?: string | null; brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; category?: string | null;
+ priceCents?: number | null; marketCents?: number | null; promptVersion?: string | null;
+};
+
+/**
+ * Persist a drafted resolution keyed by the photo's fingerprint, so a later draft of the SAME
+ * photo can recall it verbatim — even before the seller publishes. Skipped without a fingerprint
+ * (nothing to match on) or a title (no descriptor worth recalling).
+ */
+export async function rememberDraftResolution(storeSlug: string, r: DraftResolution): Promise<void> {
+ if (!r.embedding || r.embedding.length === 0) return;
+ if (!(r.title && r.title.trim())) return;
+ await ensureResolutionsTable();
+ await db()`
+  INSERT INTO intake_resolutions (store_slug, image_url, embedding, title, brand, era, material, condition, category, price_cents, market_cents, prompt_version)
+  VALUES (${storeSlug}, ${r.imageUrl ?? null}, ${JSON.stringify(r.embedding)},
+   ${r.title!.trim().slice(0, 200)}, ${r.brand ?? null}, ${r.era ?? null}, ${r.material ?? null}, ${r.condition ?? null}, ${r.category ?? null},
+   ${r.priceCents ?? null}, ${r.marketCents ?? null}, ${r.promptVersion ?? null})
+ `.catch(() => {});
+}
+
+export type ExactPiece = {
+ title: string; brand: string | null; era: string | null; material: string | null; condition: string | null; category: string | null;
+ priceCents: number | null; marketCents: number | null; ageDays: number | null;
+ similarity: number; source: string; ownStore: boolean;
+};
+
+type ExactRow = { title: string | null; brand: string | null; era: string | null; material: string | null; condition: string | null; category: string | null; price_cents?: number | null; market_cents?: number | null; embedding: string; created_at: string | Date };
+
+/**
+ * Recall the SAME piece from its photo. Returns a full record only when the best match clears the
+ * NEAR_DUP bar (≈ the same item re-photographed), so the caller can lock identity + reuse the price
+ * instead of re-generating. Own-store rows (published items + draft resolutions) are the only source
+ * we may recall a PRICE from — another store's price stays private; cross-store gives identity only.
+ */
+export async function resolveExactPiece(embedding: number[], storeSlug: string): Promise<ExactPiece | null> {
+ if (!embedding || embedding.length === 0) return null;
+ await ensureItemsTable();
+ await ensureResolutionsTable();
+ const [ownItems, ownDrafts, crossItems] = (await Promise.all([
+  db()`SELECT title, brand, era, material, condition, category, price_cents, market_cents, embedding, created_at
+       FROM intake_memory_items WHERE store_slug = ${storeSlug} AND embedding <> '[]' AND title IS NOT NULL
+       ORDER BY created_at DESC LIMIT 500`.catch(() => []),
+  db()`SELECT title, brand, era, material, condition, category, price_cents, market_cents, embedding, created_at
+       FROM intake_resolutions WHERE store_slug = ${storeSlug} AND embedding <> '[]' AND title IS NOT NULL
+       ORDER BY created_at DESC LIMIT 500`.catch(() => []),
+  db()`SELECT title, brand, era, material, condition, category, embedding, created_at
+       FROM intake_memory_items WHERE store_slug <> ${storeSlug} AND embedding <> '[]' AND title IS NOT NULL
+       ORDER BY created_at DESC LIMIT 800`.catch(() => []),
+ ])) as [ExactRow[], ExactRow[], ExactRow[]];
+
+ type Cand = { score: number; ownStore: boolean; source: string; row: ExactRow };
+ const cands: Cand[] = [];
+ const add = (rows: ExactRow[], ownStore: boolean, source: string) => {
+  for (const r of rows) { const v = parseVec(r.embedding); if (v.length) cands.push({ score: cosine(embedding, v), ownStore, source, row: r }); }
+ };
+ add(ownItems, true, "own-item");
+ add(ownDrafts, true, "own-draft");
+ add(crossItems, false, "cross-item");
+ if (!cands.length) return null;
+ cands.sort((a, c) => c.score - a.score);
+ const best = cands[0];
+ if (best.score < NEAR_DUP_MIN) return null;
+ const row = best.row;
+ const title = (row.title || "").trim();
+ if (!title) return null;
+ const created = row.created_at ? new Date(row.created_at) : null;
+ const ageDays = created && !isNaN(created.getTime()) ? Math.max(0, Math.round((Date.now() - created.getTime()) / 86400000)) : null;
+ return {
+  title, brand: row.brand ?? null, era: row.era ?? null, material: row.material ?? null, condition: row.condition ?? null, category: row.category ?? null,
+  // Price ONLY from this store's own record — never another store's number.
+  priceCents: best.ownStore ? (row.price_cents ?? row.market_cents ?? null) : null,
+  marketCents: best.ownStore ? (row.market_cents ?? null) : null,
+  ageDays, similarity: Math.round(best.score * 1000) / 1000, source: best.source, ownStore: best.ownStore,
  };
 }
 

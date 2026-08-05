@@ -32,6 +32,11 @@ export const DEMAND_WEIGHTS = {
 // fraction either way (±10%). Outside the band → rising / falling.
 export const TREND_FLAT_BAND = 0.1;
 
+// Trajectory bands — leading intent (saves+clicks) vs lagging sales (orders) growth.
+// `accel`: leading growth ≥ +15% AND ≥15pts above sales growth → "accelerating".
+// `cool`: both leading and sales below −10% → "cooling".
+export const TRAJECTORY_BANDS = { accel: 0.15, cool: -0.1 } as const;
+
 // Trailing windows the metric job computes for every segment.
 export const METRIC_WINDOWS = [
  { key: "7d", days: 7 },

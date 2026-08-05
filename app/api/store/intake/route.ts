@@ -7,7 +7,7 @@ import { titleHasBrand, computeListingPricing } from "@/app/lib/intake-pricing";
 import { ghostMannequinFromUrl, isPhotoroomConfigured } from "@/app/lib/photoroom";
 import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
 import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
-import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece } from "@/app/lib/intake-memory-db";
+import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece, resolveExactPiece, rememberDraftResolution } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
 import { reverseImageBestOf, matchesToComps, editorialCaptions, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
@@ -112,6 +112,10 @@ export async function POST(request: NextRequest) {
  needReverse ? reverseImageBestOf(imageUrls, { maxFrames: reverseFrames, strong: strongReverse }) : Promise.resolve({ matches: [] as VisualMatch[], framesUsed: 0 }),
  ]);
  const matches = reverse.matches;
+ // Near-duplicate RECALL: is this photo the SAME item we've already resolved (≥ NEAR_DUP bar)? If so
+ // we lock its stored identity + reuse its price instead of re-generating — and we suppress the
+ // look-alike hints below so a different piece can't bleed its model/copy into this one.
+ const exact = embedding ? await resolveExactPiece(embedding, slug).catch(() => null) : null;
  // Per-store visual memory + CROSS-STORE confirmed pieces (the compounding loop: every seller's
  // verified listings sharpen everyone's — incl. a brand-new store's first upload). Brand-scoped
  // when the seller typed one, so the references are same-brand and directly instructive.
@@ -126,22 +130,43 @@ export async function POST(request: NextRequest) {
  // Specific-piece resolution (Phase 2): match the photo to the exact known model/line in the
  // reference index. When confident, it names the piece (sharpens title/era) AND gives a tight
  // comp query (sharpens price). Null when no close match → graceful fall back to brand-only.
- const specific = embedding && (needReverse || needPrice)
+ // Skip the sub-threshold "specific piece" match when we already have an exact recall (the recall
+ // is authoritative; the look-alike would only add noise/contamination).
+ const specific = !exact && embedding && (needReverse || needPrice)
  ? await resolveSpecificPiece(embedding, has("brand") ? val("brand") : null).catch(() => null)
  : null;
+ // A sub-threshold match is a LOOK-ALIKE, not this piece — it may inform ERA only. It must NOT supply
+ // a model name (that's how a Baguette's copy leaked onto a two-way bag). Model/material come from the
+ // photo; the exact-recall path above is the only thing allowed to assert a specific model.
  const specificHint = specific
- ? `\n\nSIMILAR REFERENCE — a past VYA/catalog piece looks visually similar to this photo (${Math.round(specific.similarity * 100)}% visual match): "${specific.model}"${specific.era ? ` (${specific.era})` : ""}. Use it ONLY as a hint for the likely model/line/silhouette and era — it is a LOOK-ALIKE, not confirmed to be the same piece. Do NOT copy its MATERIAL, condition, or exact variant from it: look-alike pieces — especially bags with the same logo — routinely differ in fabric and trim, so those must come from what you can actually SEE or the care tag, never from this reference. If the photo clearly differs from it, ignore it entirely. Never mention this reference in the copy.`
+ ? `\n\nERA REFERENCE ONLY — a similar-looking ${specific.brand || "catalog"} piece exists (${Math.round(specific.similarity * 100)}% visual match)${specific.era ? `, era ${specific.era}` : ""}. Use it ONLY to calibrate the ERA if the photo is ambiguous. Do NOT borrow a specific MODEL/line name, material, condition, or variant from it — those are a look-alike and routinely differ (same-logo bags especially). Identify the model, silhouette, and material ONLY from what you can SEE in THIS photo or its tag; if unsure of the exact model, describe the silhouette generically rather than naming a famous model. Never mention this reference.`
  : "";
  // If the seller typed the brand, keep only same-brand matches (a look-alike in a
  // different label must not sway the copy) — but still use them to find the runway/era.
  const relevantMatches = has("brand") ? matches.filter((m) => titleHasBrand(m.title, val("brand"))) : matches;
- const hints = reverseImageHint(relevantMatches, has("brand")) + brandHints + visualHints + crossHints + brandPrior + specificHint;
+ // Exact recall: a CONFIRMED identity for this exact photo. Instruct the model to reuse it and NOT
+ // substitute a different (even more famous) model of the same brand.
+ const recallHint = exact
+ ? `\n\nEXACT MATCH — this photo is the SAME piece already catalogued on VYA: "${exact.title}"${exact.era ? ` (${exact.era})` : ""}. This identity is CONFIRMED for this photo — reuse this exact model/piece. Do NOT re-guess the model or substitute a different, more famous model of the same brand. Write the title and description for THIS piece, keeping the specific model in the title.`
+ : "";
+ // With an exact recall we drop the look-alike hints (visual/cross-store/brand-prior/specific) so a
+ // different piece can't contaminate the copy — brand grounding + seller memory + the recall stay.
+ const hints = exact
+ ? reverseImageHint(relevantMatches, has("brand")) + brandHints + recallHint
+ : reverseImageHint(relevantMatches, has("brand")) + brandHints + visualHints + crossHints + brandPrior + specificHint;
 
  // Vision draft (gated) + ghost cover, in parallel. Skip the draft if nothing's blank.
  // Pass the seller's typed fields so the copy honors them (e.g. won't write
  // "excellent" when they said "good"). Price/cost/parcel aren't writing context.
  const known: Record<string, string> = {};
  for (const k of ["title", "brand", "era", "material", "condition", "size", "category", "description"]) if (has(k)) known[k] = val(k);
+ // Recall fills the identity fields the seller left blank, so the draft is written FOR this exact
+ // piece rather than re-guessed. Seller-typed values always win — recall only fills gaps.
+ if (exact) {
+ const fill = (k: string, v: string | null) => { if (v && v.trim() && !known[k]) known[k] = v.trim(); };
+ fill("title", exact.title); fill("brand", exact.brand); fill("era", exact.era);
+ fill("material", exact.material); fill("condition", exact.condition); fill("category", exact.category);
+ }
 
  const [draftRes, ghostPng] = await Promise.allSettled([
  needDraft
@@ -154,6 +179,17 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: draftRes.reason instanceof Error ? draftRes.reason.message : "Draft failed." }, { status: 502 });
  }
  const draft = draftRes.status === "fulfilled" ? draftRes.value : null;
+
+ // Lock the recalled identity onto the draft for every field the seller didn't type — a hint isn't
+ // enough (the model can still drift), so a near-duplicate makes the stored answer authoritative.
+ if (exact && draft) {
+ if (exact.title && !has("title")) draft.title = exact.title;
+ if (exact.era && !has("era")) draft.era = { value: exact.era, confidence: 0.95 };
+ if (exact.material && !has("material")) draft.material = { value: exact.material, confidence: 0.9 };
+ if (exact.condition && !has("condition")) { draft.condition = { value: exact.condition, confidence: 0.9 }; if (!draft.conditionGrade) draft.conditionGrade = exact.condition; }
+ if (exact.category && !has("category")) draft.category = exact.category;
+ if (exact.brand && !has("brand")) draft.brand = { value: exact.brand, confidence: 0.95 };
+ }
 
  let ghostUrl: string | null = null;
  if (ghostPng.status === "fulfilled" && ghostPng.value) {
@@ -231,6 +267,10 @@ export async function POST(request: NextRequest) {
  runwaySoFar: runway,
  celebritySoFar: celebrity,
  draftRanFull: needDraft,
+ // Near-dup recall: reuse THIS store's own prior price for the same item (fresh → verbatim).
+ recalledPriceCents: exact?.ownStore ? exact.priceCents : null,
+ recalledMarketCents: exact?.ownStore ? exact.marketCents : null,
+ recallAgeDays: exact?.ownStore ? exact.ageDays : null,
  });
  estimate = pr.estimate;
  priceFlag = pr.priceFlag;
@@ -239,8 +279,29 @@ export async function POST(request: NextRequest) {
  if (pr.celebrity) celebrity = pr.celebrity;
  }
 
+ // Persist this resolution keyed by the photo's fingerprint, so re-drafting the SAME photo later
+ // recalls it verbatim — the fix for the answer that used to vanish because drafts were never saved.
+ if (Array.isArray(embedding) && embedding.length) {
+ const rTitle = has("title") ? val("title") : (draft?.title || exact?.title || "");
+ if (rTitle) rememberDraftResolution(slug, {
+ imageUrl: mainUrl,
+ embedding,
+ title: rTitle,
+ brand: (has("brand") ? val("brand") : (draft?.brand?.value || exact?.brand)) || null,
+ era: (has("era") ? val("era") : (draft?.era?.value || exact?.era)) || null,
+ material: (has("material") ? val("material") : (draft?.material?.value || exact?.material)) || null,
+ condition: (has("condition") ? val("condition") : (draft?.condition?.value || exact?.condition)) || null,
+ category: (has("category") ? val("category") : (draft?.category || exact?.category)) || null,
+ priceCents: estimate?.suggestedCents ?? null,
+ marketCents: estimate?.marketCents ?? null,
+ promptVersion: PROMPT_VERSION,
+ }).catch(() => {});
+ }
+
  return NextResponse.json({
  ok: true, draft, ghostUrl, photoroom: isPhotoroomConfigured(), estimate, priceFlag, runway, celebrity, embedding, promptVersion: PROMPT_VERSION,
+ // Near-duplicate recall marker — for a "✓ Recognized — same piece you listed" cue in the UI.
+ recalled: exact ? { title: exact.title, similarity: exact.similarity, ageDays: exact.ageDays, ownStore: exact.ownStore, source: exact.source } : null,
  // For phase 2 (/api/store/intake/pricing): the reverse-image comps/titles + whether the draft ran.
  // searchQuery is the EFFECTIVE comp query (the specific-piece query when we resolved one) — the
  // client threads it to /pricing so phase-2 comps are as tight as phase-1's.

@@ -1,6 +1,6 @@
 import { estimatePrice, getMarketReferenceFast, computePriceFlag, type PriceEstimate, type PriceFlag } from "./price-engine";
 import { getMinMarkupBps } from "./store-pricing-db";
-import { getStorePricingSignal, getVisualVyaComps } from "./intake-memory-db";
+import { getStorePricingSignal, getVisualVyaComps, RECALL_STALE_DAYS } from "./intake-memory-db";
 import { getStoreBrief, briefPricingTarget } from "./store-brief-db";
 import { fetchResaleTrend, type Comp } from "./comps";
 import { identifyRunway, identifyCelebrity, isIntakeConfigured } from "./ai-intake";
@@ -88,6 +88,11 @@ export async function computeListingPricing(opts: {
  runwaySoFar: string | null; // runway the seller/draft already provided
  celebritySoFar?: string | null; // celebrity provenance the seller/draft already provided
  draftRanFull: boolean; // did the full vision draft run? gates the proactive runway pass
+ // Near-duplicate recall: this is the SAME item this store already priced. Reuse that price
+ // verbatim (deterministic) unless it's gone stale — the "same price unless a year passed" rule.
+ recalledPriceCents?: number | null;
+ recalledMarketCents?: number | null;
+ recallAgeDays?: number | null;
 }): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; runway: string | null; celebrity: string | null }> {
  const brandVal = opts.brand.trim();
  const baseTitle = opts.title || [opts.era, opts.material, opts.category].filter(Boolean).join(" ");
@@ -115,7 +120,25 @@ export async function computeListingPricing(opts: {
 
  let estimate: PriceEstimate | null = null;
  let priceFlag: PriceFlag | null = null;
- if (needPrice) {
+ // Near-duplicate recall: the SAME item this store priced before, still fresh → reuse that price
+ // verbatim instead of re-valuing. Stale (older than the window) falls through to a fresh valuation.
+ const recallFresh = needPrice && !!opts.recalledPriceCents && opts.recalledPriceCents > 0
+ && opts.recallAgeDays != null && opts.recallAgeDays < RECALL_STALE_DAYS;
+ if (recallFresh) {
+ const cents = opts.recalledPriceCents as number;
+ const mkt = opts.recalledMarketCents && opts.recalledMarketCents > 0 ? opts.recalledMarketCents : cents;
+ estimate = {
+ suggestedCents: cents,
+ marketCents: mkt,
+ floorCents: null,
+ lowCents: Math.round(cents * 0.9),
+ highCents: Math.round(cents * 1.1),
+ confidence: 0.92,
+ comps: [],
+ rationale: `Recalled from the same piece you listed ${opts.recallAgeDays === 0 ? "recently" : `${opts.recallAgeDays}d ago`} — the market hasn't turned over, so the price carries.`,
+ source: "knowledge",
+ };
+ } else if (needPrice) {
  // No price typed → full valuation to SUGGEST a price (accurate, slower path).
  const minMarkupBps = await getMinMarkupBps(opts.slug).catch(() => 3000);
  const trendQuery = brandVal ? (opts.category ? `${brandVal} ${opts.category}` : brandVal) : "";

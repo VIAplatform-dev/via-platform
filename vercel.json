@@ -171,6 +171,10 @@
     {
       "path": "/api/cron/rehost-images",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/pull-substack-trends",
+      "schedule": "0 11 * * 1"
     }
   ]
 }

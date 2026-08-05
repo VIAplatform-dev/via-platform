@@ -4,6 +4,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getBrandHeatIndex, getCategoryHeat, getBrandTrend } from "@/app/lib/brand-heat-db";
 import { getGoogleTrends, getResaleMarket, isMarketTrendsConfigured } from "@/app/lib/market-trends";
 import { getInstagramBuzz, igConfigured } from "@/app/lib/instagram";
+import { getTopColors } from "@/app/lib/data-layer/market-metrics-db";
 
 export const dynamic = "force-dynamic";
 
@@ -94,9 +95,10 @@ export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
- const [heat, categories] = await Promise.all([
+ const [heat, categories, topColors] = await Promise.all([
  getBrandHeatIndex(30, 12).catch(() => ({ generatedAt: "", periodDays: 30, brands: [] })),
  getCategoryHeat(30, 8).catch(() => []),
+ getTopColors("30d", 6).catch(() => []),
  ]);
 
  // The store's own inventory brands, and how each is trending on VYA.
@@ -143,6 +145,7 @@ export async function GET(request: NextRequest) {
  generatedAt: heat.generatedAt,
  rising: heat.brands,
  categories,
+ topColors,
  yourBrands,
  googleTrends,
  resaleMarket,

@@ -12,6 +12,8 @@ import {
  sourceNowScore,
  sourcingVerdict,
  blendedVerdict,
+ priceMomentumPct,
+ classifyTrajectory,
 } from "./metrics.ts";
 import { DEMAND_WEIGHTS, TREND_FLAT_BAND, SOURCING, BLEND } from "./config.ts";
 
@@ -144,4 +146,32 @@ test("blendedVerdict — no VYA/eBay, Google carries a leading (soft) call", () 
  assert.equal(blendedVerdict(null, null, BT, { momentumPct: 3 }).headline, "Quiet");
  // eBay still wins over Google when present.
  assert.equal(blendedVerdict(null, { medianPrice: 200, activeCount: 40, soldPer30d: 35 }, BT, { momentumPct: -29 }).basis, "ebay-sold");
+});
+
+const BANDS = { accel: 0.15, cool: -0.1 };
+
+test("priceMomentumPct — median cur vs prior, null on empty", () => {
+ assert.equal(priceMomentumPct([100, 200, 300], [100, 100, 100]), 100); // median 200 vs 100
+ assert.equal(priceMomentumPct([90, 100, 110], [100, 100, 100]), 0);
+ assert.equal(priceMomentumPct([], [100]), null);   // no current sales
+ assert.equal(priceMomentumPct([100], []), null);   // no prior sales
+});
+
+test("classifyTrajectory — accelerating when intent outruns sales", () => {
+ // saves+clicks 60→120 (+100%), orders 10→11 (+10%) → intent surging ahead
+ assert.equal(classifyTrajectory({ views: 0, saves: 40, clicks: 20, orders: 11 }, { views: 0, saves: 40, clicks: 20, orders: 10 }, BANDS), "steady");
+ assert.equal(classifyTrajectory({ views: 0, saves: 80, clicks: 40, orders: 11 }, { views: 0, saves: 40, clicks: 20, orders: 10 }, BANDS), "accelerating");
+});
+
+test("classifyTrajectory — peaking when sales rise but intent stalls", () => {
+ // intent flat/down, orders up strongly → clearing backlog
+ assert.equal(classifyTrajectory({ views: 0, saves: 30, clicks: 10, orders: 20 }, { views: 0, saves: 40, clicks: 20, orders: 10 }, BANDS), "peaking");
+});
+
+test("classifyTrajectory — cooling when both fall", () => {
+ assert.equal(classifyTrajectory({ views: 0, saves: 20, clicks: 10, orders: 5 }, { views: 0, saves: 40, clicks: 20, orders: 10 }, BANDS), "cooling");
+});
+
+test("classifyTrajectory — zero prior base reads as a rise", () => {
+ assert.equal(classifyTrajectory({ views: 0, saves: 5, clicks: 5, orders: 0 }, { views: 0, saves: 0, clicks: 0, orders: 0 }, BANDS), "accelerating");
 });

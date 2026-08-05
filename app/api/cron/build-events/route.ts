@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildEvents } from "@/app/lib/data-layer/events-db";
+import { buildEvents, backfillEventColors } from "@/app/lib/data-layer/events-db";
 import { sendOpsAlert } from "@/app/lib/email";
 
 // Daily incremental ETL of the capture tables into the unified `events` log.
@@ -14,7 +14,9 @@ export async function GET(request: Request) {
  }
  try {
  const result = await buildEvents({ sinceDays: 3 });
- return NextResponse.json({ ok: true, ...result });
+ // Backfill the colour dimension on older rows (chips away at the backlog each run).
+ const colors = await backfillEventColors().catch(() => ({ scanned: 0, colored: 0, remaining: -1 }));
+ return NextResponse.json({ ok: true, ...result, colorBackfill: colors });
  } catch (err) {
  console.error("[cron/build-events] failed:", err);
  await sendOpsAlert("build-events FAILED", String(err));

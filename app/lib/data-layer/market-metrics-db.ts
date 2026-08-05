@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { getAllProducts } from "../db";
+import { normalizeColor } from "../colorNormalize";
 import { resolveBrand } from "./brands";
 import { WHOLE_WORD_ALIASES } from "../brandData";
 import { loadBrandRef } from "./brands-db";
@@ -9,7 +10,10 @@ import { inferEra } from "./enrich";
 import {
  DEMAND_WEIGHTS,
  TREND_FLAT_BAND,
+ TRAJECTORY_BANDS,
  METRIC_WINDOWS,
+ SOURCING,
+ PRIVACY,
  type MetricWindow,
 } from "./config";
 import {
@@ -19,6 +23,8 @@ import {
  priceBenchmark,
  sellThroughPct,
  supplyGapScore,
+ priceMomentumPct,
+ classifyTrajectory,
 } from "./metrics";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -36,7 +42,7 @@ function db() {
  return neon(url);
 }
 
-export type SegmentType = "brand" | "category" | "era";
+export type SegmentType = "brand" | "category" | "era" | "color";
 
 export async function ensureMarketMetricsTable(): Promise<void> {
  const sql = db();
@@ -62,6 +68,10 @@ export async function ensureMarketMetricsTable(): Promise<void> {
  )
  `;
  await sql`CREATE INDEX IF NOT EXISTS idx_mm_segment ON market_metrics(segment_type, window_key, as_of_date)`;
+ // Self-healing columns (added after the table shipped): realized-price trend + the leading/lagging
+ // trajectory. IF NOT EXISTS so the daily job adds them in place with no migration.
+ await sql`ALTER TABLE market_metrics ADD COLUMN IF NOT EXISTS price_momentum_pct NUMERIC`;
+ await sql`ALTER TABLE market_metrics ADD COLUMN IF NOT EXISTS trajectory TEXT`;
 }
 
 type AggRow = {
@@ -71,6 +81,7 @@ type AggRow = {
  views_prior: number; saves_prior: number; clicks_prior: number; orders_prior: number;
  stores_cur: number; txn_cur: number;
  prices_cur: number[] | null;
+ prices_prior: number[] | null;
 };
 
 // One round trip per window: all three segment dimensions via UNION ALL, each
@@ -85,6 +96,8 @@ async function aggregate(curStart: string, priorStart: string): Promise<AggRow[]
   SELECT 'category'::text, category, event_type, ts, qty, store_slug, sale_price FROM events WHERE category IS NOT NULL AND category <> ''
   UNION ALL
   SELECT 'era'::text, era, event_type, ts, qty, store_slug, sale_price FROM events WHERE era IS NOT NULL AND era <> ''
+  UNION ALL
+  SELECT 'color'::text, color, event_type, ts, qty, store_slug, sale_price FROM events WHERE color IS NOT NULL AND color <> ''
  )
  SELECT seg_type, seg,
   COUNT(*) FILTER (WHERE event_type='view' AND ts >= ${curStart})::int AS views_cur,
@@ -97,7 +110,8 @@ async function aggregate(curStart: string, priorStart: string): Promise<AggRow[]
   COALESCE(SUM(qty) FILTER (WHERE event_type='order_item' AND ts >= ${priorStart} AND ts < ${curStart}),0)::int AS orders_prior,
   COUNT(DISTINCT store_slug) FILTER (WHERE ts >= ${curStart})::int AS stores_cur,
   COUNT(*) FILTER (WHERE event_type='order_item' AND ts >= ${curStart})::int AS txn_cur,
-  array_agg(sale_price) FILTER (WHERE event_type='order_item' AND ts >= ${curStart} AND sale_price IS NOT NULL) AS prices_cur
+  array_agg(sale_price) FILTER (WHERE event_type='order_item' AND ts >= ${curStart} AND sale_price IS NOT NULL) AS prices_cur,
+  array_agg(sale_price) FILTER (WHERE event_type='order_item' AND ts >= ${priorStart} AND ts < ${curStart} AND sale_price IS NOT NULL) AS prices_prior
  FROM agg
  WHERE ts >= ${priorStart}
  GROUP BY seg_type, seg
@@ -115,7 +129,7 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
  const buckets = await loadEraBuckets();
  const brandRef = await loadBrandRef();
  const products = await getAllProducts().catch(() => []);
- const out: Record<SegmentType, Map<string, SegSupply>> = { brand: new Map(), category: new Map(), era: new Map() };
+ const out: Record<SegmentType, Map<string, SegSupply>> = { brand: new Map(), category: new Map(), era: new Map(), color: new Map() };
  const bump = (m: Map<string, SegSupply>, k: string | null, price: number, store: string | null) => {
  if (!k) return;
  const e = m.get(k) ?? { count: 0, prices: [], stores: new Set<string>() };
@@ -132,6 +146,9 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
  bump(out.brand, resolveBrand(p.title, brandRef, WHOLE_WORD_ALIASES), price, store);
  bump(out.category, inferCategoryFromTitle(p.title) as string, price, store);
  bump(out.era, inferEra(`${p.title} ${p.description ?? ""}`, buckets), price, store);
+ // Supply colour: prefer the vision image_color (accurate), fall back to the title — both
+ // normalized to the SAME palette so supply reconciles with the title-derived demand side.
+ bump(out.color, normalizeColor(p.image_color) ?? normalizeColor(p.title), price, store);
  }
  return out;
 }
@@ -139,8 +156,8 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
 // Just the in-stock counts per segment (what the metric job needs for supply / sell-through).
 async function supplyTallies(): Promise<Record<SegmentType, Map<string, number>>> {
  const scan = await scanCatalogBySegment();
- const out: Record<SegmentType, Map<string, number>> = { brand: new Map(), category: new Map(), era: new Map() };
- for (const t of ["brand", "category", "era"] as SegmentType[]) for (const [k, v] of scan[t]) out[t].set(k, v.count);
+ const out: Record<SegmentType, Map<string, number>> = { brand: new Map(), category: new Map(), era: new Map(), color: new Map() };
+ for (const t of ["brand", "category", "era", "color"] as SegmentType[]) for (const [k, v] of scan[t]) out[t].set(k, v.count);
  return out;
 }
 
@@ -150,6 +167,7 @@ type MetricRow = {
  views: number; saves: number; clicks: number; orders: number;
  sellThroughPct: number | null; medianDaysToSale: number | null;
  priceP25: number | null; priceMedian: number | null; priceP75: number | null;
+ priceMomentumPct: number | null; trajectory: string;
  activeSupply: number; supplyGapScore: number; storeCount: number; txnCount: number;
 };
 
@@ -169,10 +187,10 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
  const agg = await aggregate(curStart, priorStart);
 
  // Group rows by segment type so percentile ranks are computed WITHIN a type.
- const byType: Record<SegmentType, AggRow[]> = { brand: [], category: [], era: [] };
+ const byType: Record<SegmentType, AggRow[]> = { brand: [], category: [], era: [], color: [] };
  for (const r of agg) byType[r.seg_type]?.push(r);
 
- for (const segType of ["brand", "category", "era"] as SegmentType[]) {
+ for (const segType of ["brand", "category", "era", "color"] as SegmentType[]) {
   const rows = byType[segType];
   if (rows.length === 0) continue;
 
@@ -196,6 +214,12 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
    sellThroughPct: sellThroughPct(r.orders_cur, supplies[i]),
    medianDaysToSale: null, // no per-item listing date yet — null, never faked (see METRICS.md)
    priceP25: bench.p25, priceMedian: bench.median, priceP75: bench.p75,
+   priceMomentumPct: priceMomentumPct(prices.map(Number), (r.prices_prior ?? []).map(Number)),
+   trajectory: classifyTrajectory(
+    { views: r.views_cur, saves: r.saves_cur, clicks: r.clicks_cur, orders: r.orders_cur },
+    { views: r.views_prior, saves: r.saves_prior, clicks: r.clicks_prior, orders: r.orders_prior },
+    TRAJECTORY_BANDS,
+   ),
    activeSupply: supplies[i],
    supplyGapScore: supplyGapScore(demandIdx[i], supplyPct[i]),
    storeCount: r.stores_cur,
@@ -215,6 +239,109 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
  return { asOfDate: asOf, windows };
 }
 
+// ── Colour of the season: the hottest colours by demand right now ──
+export type ColorTrend = { color: string; demandIndex: number; demandTrend: string; trajectory: string | null; priceMedian: number | null; priceMomentumPct: number | null };
+
+/**
+ * Top colours by demand in the latest snapshot — the "colour of the season" signal (teal summer,
+ * etc.). Cross-market by nature: what's hot in resale tracks what's hot in retail. Aggregated +
+ * privacy-gated (≥ minStores), so it's market-level, never a single store.
+ */
+export async function getTopColors(windowKey: MetricWindow = "30d", limit = 6): Promise<ColorTrend[]> {
+ await ensureMarketMetricsTable();
+ const sql = db();
+ const [latest] = (await sql`SELECT MAX(as_of_date) AS d FROM market_metrics WHERE segment_type = 'color' AND window_key = ${windowKey}`.catch(() => [])) as { d: string | null }[];
+ if (!latest?.d) return [];
+ const rows = (await sql`
+  SELECT segment_value, demand_index, demand_trend, trajectory, price_median, price_momentum_pct
+  FROM market_metrics
+  WHERE segment_type = 'color' AND window_key = ${windowKey} AND as_of_date = ${latest.d} AND store_count >= ${PRIVACY.minStores}
+  ORDER BY demand_index DESC, raw_demand DESC
+  LIMIT ${limit}
+ `.catch(() => [])) as { segment_value: string; demand_index: number; demand_trend: string; trajectory: string | null; price_median: number | null; price_momentum_pct: number | null }[];
+ return rows.map((r) => ({
+  color: r.segment_value,
+  demandIndex: r.demand_index,
+  demandTrend: r.demand_trend,
+  trajectory: r.trajectory,
+  priceMedian: r.price_median,
+  priceMomentumPct: r.price_momentum_pct,
+ }));
+}
+
+// ── Whitespace: rising demand this store DOESN'T carry (the sourcing gap) ──
+export type WhitespacePick = {
+ segmentType: SegmentType;
+ segmentValue: string;
+ demandIndex: number;
+ demandTrend: string;
+ trajectory: string | null;
+ supplyGapScore: number;
+ priceMedian: number | null;
+ priceMomentumPct: number | null;
+ storeCount: number;
+ reason: string;
+};
+
+/**
+ * Per-store whitespace: market segments with real, non-cooling demand and a supply gap that THIS
+ * store doesn't already carry — i.e. what to go source. Reads the latest market_metrics snapshot
+ * (aggregate + privacy-gated to ≥ minStores), subtracts the store's own inventory segments, and
+ * ranks by supply gap then demand. Aggregated only — never another store's numbers.
+ */
+export async function getStoreWhitespace(slug: string, windowKey: MetricWindow = "30d", limit = 12): Promise<WhitespacePick[]> {
+ await ensureMarketMetricsTable();
+ const sql = db();
+ const [latest] = (await sql`SELECT MAX(as_of_date) AS d FROM market_metrics WHERE window_key = ${windowKey}`.catch(() => [])) as { d: string | null }[];
+ if (!latest?.d) return [];
+
+ const rows = (await sql`
+  SELECT segment_type, segment_value, demand_index, demand_trend, trajectory, supply_gap_score, price_median, price_momentum_pct, store_count
+  FROM market_metrics
+  WHERE window_key = ${windowKey} AND as_of_date = ${latest.d}
+   AND demand_index >= ${SOURCING.warmDemand} AND demand_trend <> 'falling'
+   AND store_count >= ${PRIVACY.minStores}
+  ORDER BY supply_gap_score DESC, demand_index DESC
+  LIMIT 200
+ `.catch(() => [])) as {
+  segment_type: SegmentType; segment_value: string; demand_index: number; demand_trend: string;
+  trajectory: string | null; supply_gap_score: number; price_median: number | null; price_momentum_pct: number | null; store_count: number;
+ }[];
+ if (!rows.length) return [];
+
+ // What this store already carries, by segment (case-insensitive). Colour has no items column,
+ // so it's inferred from the item title with the same normalizer the demand side uses.
+ const inv = (await sql`
+  SELECT lower(COALESCE(NULLIF(i.brand, ''), '')) AS b, lower(COALESCE(NULLIF(i.category, ''), '')) AS c, lower(COALESCE(NULLIF(i.era, ''), '')) AS e, i.title AS t
+  FROM items i JOIN sellers s ON s.id = i.seller_id WHERE s.slug = ${slug}
+ `.catch(() => [])) as { b: string; c: string; e: string; t: string | null }[];
+ const has: Record<SegmentType, Set<string>> = { brand: new Set(), category: new Set(), era: new Set(), color: new Set() };
+ for (const r of inv) { if (r.b) has.brand.add(r.b); if (r.c) has.category.add(r.c); if (r.e) has.era.add(r.e); const col = normalizeColor(r.t); if (col) has.color.add(col); }
+
+ const money = (n: number | null) => (n == null ? null : `$${Math.round(n).toLocaleString()}`);
+ return rows
+  .filter((r) => !has[r.segment_type]?.has((r.segment_value || "").toLowerCase()))
+  .slice(0, limit)
+  .map((r) => {
+  const trendNote = r.demand_trend === "rising" ? " and rising" : "";
+  const accel = r.trajectory === "accelerating" ? " Demand is accelerating — get in early." : r.trajectory === "peaking" ? " (Momentum may be peaking.)" : "";
+  const price = money(r.price_median);
+  const priceNote = price ? ` Clears around ${price}${r.price_momentum_pct != null && Math.abs(r.price_momentum_pct) >= 5 ? ` (${r.price_momentum_pct > 0 ? "+" : ""}${Math.round(r.price_momentum_pct)}% vs prior)` : ""}.` : "";
+  return {
+   segmentType: r.segment_type,
+   segmentValue: r.segment_value,
+   demandIndex: r.demand_index,
+   demandTrend: r.demand_trend,
+   trajectory: r.trajectory,
+   supplyGapScore: r.supply_gap_score,
+   priceMedian: r.price_median,
+   priceMomentumPct: r.price_momentum_pct,
+   storeCount: r.store_count,
+   reason: `Strong demand (index ${r.demand_index}${trendNote}) with thin supply, and you don't carry it yet.${accel}${priceNote}`.trim(),
+  };
+  });
+}
+
 async function insertMetrics(asOf: string, rows: MetricRow[]): Promise<void> {
  if (rows.length === 0) return;
  const sql = db();
@@ -223,7 +350,7 @@ async function insertMetrics(asOf: string, rows: MetricRow[]): Promise<void> {
  INSERT INTO market_metrics (
   as_of_date, segment_type, segment_value, window_key, demand_index, demand_trend, raw_demand,
   views, saves, clicks, orders, sell_through_pct, median_days_to_sale,
-  price_p25, price_median, price_p75, active_supply, supply_gap_score, store_count, txn_count
+  price_p25, price_median, price_p75, price_momentum_pct, trajectory, active_supply, supply_gap_score, store_count, txn_count
  )
  SELECT ${asOf}::date, * FROM unnest(
   ${col((r) => r.segmentType)}::text[], ${col((r) => r.segmentValue)}::text[], ${col((r) => r.windowKey)}::text[],
@@ -231,6 +358,7 @@ async function insertMetrics(asOf: string, rows: MetricRow[]): Promise<void> {
   ${col((r) => r.views)}::int[], ${col((r) => r.saves)}::int[], ${col((r) => r.clicks)}::int[], ${col((r) => r.orders)}::int[],
   ${col((r) => r.sellThroughPct)}::numeric[], ${col((r) => r.medianDaysToSale)}::numeric[],
   ${col((r) => r.priceP25)}::numeric[], ${col((r) => r.priceMedian)}::numeric[], ${col((r) => r.priceP75)}::numeric[],
+  ${col((r) => r.priceMomentumPct)}::numeric[], ${col((r) => r.trajectory)}::text[],
   ${col((r) => r.activeSupply)}::int[], ${col((r) => r.supplyGapScore)}::int[], ${col((r) => r.storeCount)}::int[], ${col((r) => r.txnCount)}::int[]
  )
  ON CONFLICT (as_of_date, segment_type, segment_value, window_key) DO UPDATE SET
@@ -238,6 +366,7 @@ async function insertMetrics(asOf: string, rows: MetricRow[]): Promise<void> {
   views = EXCLUDED.views, saves = EXCLUDED.saves, clicks = EXCLUDED.clicks, orders = EXCLUDED.orders,
   sell_through_pct = EXCLUDED.sell_through_pct, median_days_to_sale = EXCLUDED.median_days_to_sale,
   price_p25 = EXCLUDED.price_p25, price_median = EXCLUDED.price_median, price_p75 = EXCLUDED.price_p75,
+  price_momentum_pct = EXCLUDED.price_momentum_pct, trajectory = EXCLUDED.trajectory,
   active_supply = EXCLUDED.active_supply, supply_gap_score = EXCLUDED.supply_gap_score,
   store_count = EXCLUDED.store_count, txn_count = EXCLUDED.txn_count, generated_at = NOW()
  `;

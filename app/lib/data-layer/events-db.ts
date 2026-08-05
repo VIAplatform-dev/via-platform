@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { inferCategoryFromTitle } from "../loadStoreProducts";
+import { normalizeColor } from "../colorNormalize";
 import { storeContactEmails } from "../stores";
 import { WHOLE_WORD_ALIASES } from "../brandData";
 import { ERA_BUCKETS_SEED, EVENT_FILTERS, type EraBucket } from "./config";
@@ -46,6 +47,7 @@ type EventRow = {
  brand: string | null;
  category: string | null;
  era: string | null;
+ color: string | null;
  condition: string | null;
  listedPrice: number | null;
  salePrice: number | null;
@@ -68,6 +70,7 @@ export async function ensureDataLayerTables(): Promise<void> {
   brand TEXT,
   category TEXT,
   era TEXT,
+  color TEXT,
   condition TEXT,
   listed_price NUMERIC(10,2),
   sale_price NUMERIC(10,2),
@@ -80,6 +83,7 @@ export async function ensureDataLayerTables(): Promise<void> {
  await sql`CREATE INDEX IF NOT EXISTS idx_events_brand ON events(brand)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_events_category ON events(category)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_events_era ON events(era)`;
+ await sql`CREATE INDEX IF NOT EXISTS idx_events_color ON events(color)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_events_store ON events(store_slug)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)`;
  // product_history mirrors the identity of removed products so the views join can resolve
@@ -102,6 +106,9 @@ export async function ensureDataLayerTables(): Promise<void> {
  // Title is stored so brand attribution is auditable and the coverage report can
  // surface high-volume UNRESOLVED titles. Safe migration for pre-existing tables.
  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS title TEXT`;
+ // Colour dimension — added after the table shipped; self-heals in place.
+ await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS color TEXT`;
+ await sql`CREATE INDEX IF NOT EXISTS idx_events_color ON events(color)`;
 
  // Canonical brand alias map (seeded like era_buckets) — brand resolution routes
  // through it so an alias can be added to fix coverage without a code deploy.
@@ -150,6 +157,9 @@ function enrich(title: string | null, description: string | null, buckets: EraBu
  brand: resolveBrand(t, brandRef, WHOLE_WORD_ALIASES),
  category: t ? (inferCategoryFromTitle(t) as string) : null,
  era: inferEra(`${t} ${description ?? ""}`, buckets),
+ // Colour of the season is a cross-market signal (retail + resale move together), so it's a
+ // first-class trend dimension. Resolved from the title to the site's canonical palette word.
+ color: normalizeColor(t),
  condition: inferCondition(description),
  };
 }
@@ -175,6 +185,7 @@ async function insertEvents(rows: EventRow[]): Promise<number> {
  const brand = rows.map((r) => r.brand);
  const cat = rows.map((r) => r.category);
  const era = rows.map((r) => r.era);
+ const color = rows.map((r) => r.color);
  const cond = rows.map((r) => r.condition);
  const listed = rows.map((r) => r.listedPrice);
  const sale = rows.map((r) => r.salePrice);
@@ -182,15 +193,39 @@ async function insertEvents(rows: EventRow[]): Promise<number> {
  const qty = rows.map((r) => r.qty);
  const src = rows.map((r) => r.source);
  await sql`
- INSERT INTO events (ts, event_type, user_id, store_slug, product_id, title, brand, category, era, condition, listed_price, sale_price, currency, qty, source)
+ INSERT INTO events (ts, event_type, user_id, store_slug, product_id, title, brand, category, era, color, condition, listed_price, sale_price, currency, qty, source)
  SELECT * FROM unnest(
   ${ts}::timestamptz[], ${type}::text[], ${uid}::text[], ${store}::text[], ${pid}::int[],
-  ${title}::text[], ${brand}::text[], ${cat}::text[], ${era}::text[], ${cond}::text[],
+  ${title}::text[], ${brand}::text[], ${cat}::text[], ${era}::text[], ${color}::text[], ${cond}::text[],
   ${listed}::numeric[], ${sale}::numeric[], ${cur}::text[], ${qty}::int[], ${src}::text[]
  )
  ON CONFLICT (source) DO NOTHING
  `;
  return rows.length;
+}
+
+// Colour was added to events after rows already existed, so fill it in for older rows from their
+// stored title. Incremental (LIMIT) + idempotent; the daily cron chips away at the backlog. Titles
+// with no palette colour get '' (a "processed, no colour" sentinel) so they're never re-scanned —
+// distinct from NULL (not yet processed). Both '' and NULL are excluded from the demand aggregate.
+export async function backfillEventColors(limit = 5000): Promise<{ scanned: number; colored: number; remaining: number }> {
+ const sql = db();
+ await ensureDataLayerTables();
+ const rows = (await sql`
+  SELECT id, title FROM events WHERE color IS NULL AND title IS NOT NULL AND title <> '' ORDER BY id DESC LIMIT ${limit}
+ `.catch(() => [])) as { id: number; title: string }[];
+ const byColor = new Map<string, number[]>();
+ const noColor: number[] = [];
+ for (const r of rows) {
+ const c = normalizeColor(r.title);
+ if (c) { const a = byColor.get(c) ?? []; a.push(Number(r.id)); byColor.set(c, a); }
+ else noColor.push(Number(r.id));
+ }
+ let colored = 0;
+ for (const [c, ids] of byColor) { await sql`UPDATE events SET color = ${c} WHERE id = ANY(${ids}::bigint[])`.catch(() => {}); colored += ids.length; }
+ if (noColor.length) await sql`UPDATE events SET color = '' WHERE id = ANY(${noColor}::bigint[])`.catch(() => {});
+ const [{ n }] = (await sql`SELECT COUNT(*)::int AS n FROM events WHERE color IS NULL AND title IS NOT NULL AND title <> ''`.catch(() => [{ n: 0 }])) as { n: number }[];
+ return { scanned: rows.length, colored, remaining: n };
 }
 
 export type BuildResult = {

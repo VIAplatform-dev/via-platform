@@ -17,7 +17,12 @@ import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 // doesn't serve /site). Always return an absolute URL to where the site actually lives.
 async function siteViewUrl(slug: string): Promise<string> {
  const sf = await getStorefrontBySlug(slug).catch(() => null);
- if (sf?.customDomain) return `https://${sf.customDomain.replace(/^https?:\/\//, "").replace(/\/+$/, "")}`;
+ const cd = (sf?.customDomain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "").trim().toLowerCase();
+ // Use a connected domain ONLY if it's a real external domain. A VYA host (or a bare
+ // "vyaplatform.com" left in custom_domain) would send the seller to the marketplace
+ // home instead of their captured site — fall through to /site/{slug} in that case.
+ const isVyaHost = cd === "vyaplatform.com" || cd.endsWith(".vyaplatform.com") || cd === "getvya.ai" || cd.endsWith(".getvya.ai");
+ if (cd && cd.includes(".") && !isVyaHost) return `https://${cd}`;
  return `https://vyaplatform.com/site/${slug}`;
 }
 

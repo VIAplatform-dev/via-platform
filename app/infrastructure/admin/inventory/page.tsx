@@ -56,6 +56,7 @@ export default function ItemsPage() {
  const [items, setItems] = useState<Item[]>([]);
  const [importOpen, setImportOpen] = useState(false);
  const [q, setQ] = useState(""); // client-side search over title/category
+ const [page, setPage] = useState(1); // client-side pagination of the rendered rows
  // Where each item is posted — real cross-listing status per platform, keyed by itemId.
  const [channels, setChannels] = useState<Record<string, { key: string; status: string }[]>>({});
  const [platformNames, setPlatformNames] = useState<Record<string, string>>({});
@@ -119,6 +120,9 @@ export default function ItemsPage() {
  if (it) { handledDeepLink.current = deepLinkId; openEdit(it); }
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [deepLinkId, items]);
+
+ // A new search or sub-tab resets to the first page.
+ useEffect(() => { setPage(1); }, [q, statusFilter]);
 
  async function act(id: string, action: "sold" | "remove" | "publish") {
  if (action === "remove" && !confirm("Remove this item?")) return;
@@ -236,6 +240,13 @@ export default function ItemsPage() {
  .filter((i) => (term ? `${i.title} ${i.category || ""}`.toLowerCase().includes(term) : true));
  const allChecked = shown.length > 0 && shown.every((i) => selected.has(i.id));
 
+ // Paginate the RENDERED rows — a big inventory (hundreds of image rows) is slow to paint all at
+ // once. Filtering, search, counts and select-all still run over the full set; only the DOM is capped.
+ const PAGE_SIZE = 40;
+ const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+ const pageSafe = Math.min(page, totalPages);
+ const paged = shown.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
  const heading = statusFilter === "draft" ? "Drafts" : statusFilter === "sold" ? "Sold" : "Inventory";
 
  // "Posted on" cell — Store (live on the VYA storefront) + each real cross-listed channel.
@@ -341,7 +352,7 @@ export default function ItemsPage() {
  </tr>
  </thead>
  <tbody>
- {shown.map((it) => (
+ {paged.map((it) => (
  <tr key={it.id} className={`group transition hover:bg-stone-50/70 ${selected.has(it.id) ? "bg-stone-50" : ""}`}>
  <TD className="px-4"><input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${it.title}`} /></TD>
  <TD className="px-3">
@@ -349,7 +360,7 @@ export default function ItemsPage() {
  <div className="h-11 w-9 shrink-0 overflow-hidden rounded-md bg-stone-100 ring-1 ring-stone-200">
  {it.images[0] && (
  // eslint-disable-next-line @next/next/no-img-element
- <img src={it.images[0]} alt="" className="h-full w-full object-cover" />
+ <img src={it.images[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
  )}
  </div>
  <span className="flex min-w-0 flex-col">
@@ -393,6 +404,16 @@ export default function ItemsPage() {
  </tbody>
  </table>
  </div>
+ {totalPages > 1 && (
+ <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3 text-[12px] text-stone-500">
+ <span className="tabular-nums">Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, shown.length)} of {shown.length}</span>
+ <div className="flex items-center gap-2">
+ <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pageSafe <= 1} className="rounded-full border border-stone-200 px-3 py-1 transition enabled:hover:bg-stone-50 disabled:opacity-40">Prev</button>
+ <span className="tabular-nums">Page {pageSafe} / {totalPages}</span>
+ <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={pageSafe >= totalPages} className="rounded-full border border-stone-200 px-3 py-1 transition enabled:hover:bg-stone-50 disabled:opacity-40">Next</button>
+ </div>
+ </div>
+ )}
  </TechCard>
  )}
 

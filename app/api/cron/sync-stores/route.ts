@@ -16,7 +16,7 @@ import { fetchSquareProducts } from "@/app/lib/squareClient";
 import { fetchStripeProducts } from "@/app/lib/stripeClient";
 import { fetchWixProducts } from "@/app/lib/wixClient";
 import { stores, convertCurrencyToUSD, refreshExchangeRates } from "@/app/lib/stores";
-import { syncProducts, initDatabase } from "@/app/lib/db";
+import { syncProducts, initDatabase, cleanScrapedNavJunk } from "@/app/lib/db";
 import { backfillFromProducts } from "@/app/lib/training-data-db";
 
 export async function GET(request: Request) {
@@ -359,11 +359,16 @@ export async function GET(request: Request) {
  console.error("[Sync Stores] Collabs link generation failed:", err);
  }
 
+ // Self-heal any leftover scrape-nav pollution in condition/materials/measurements.
+ const junkCleaned = await cleanScrapedNavJunk().catch(() => 0);
+ if (junkCleaned) console.log(`[Sync Stores] cleaned scrape-nav junk from ${junkCleaned} products`);
+
  return NextResponse.json({
  success: failed === 0,
  stores: results,
  summary: { total: results.length, succeeded, failed },
  notifications: notificationResult,
  collabsLinks: collabsResult,
+ junkCleaned,
  });
 }

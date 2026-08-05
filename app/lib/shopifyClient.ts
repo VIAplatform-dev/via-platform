@@ -1074,6 +1074,14 @@ export type ScrapedPageSections = {
 
 const EMPTY_SECTIONS: ScrapedPageSections = { html: "", condition: null, measurements: null, materials: null };
 
+// Site chrome (nav / menu / footer) that leaks into whole-page scraped text. A captured field value
+// containing several of these isn't a real value — it's the menu (e.g. a "Condition Guide" nav link
+// matched as a "Condition" field and swallowed the whole nav). Used to reject such captures.
+const NAV_JUNK_RE = /\b(?:Contact\s+Us|Search|Cart|Log\s?in|Sign\s?(?:in|up)|Shop\s+All|Collections?|Close|Menu|Newsletter|About\s+Us|My\s+Account|Wishlist|Private\s+Sourcing|Sourcing\s+Requests?|Summer\s+Arrivals|Events|Follow\s+us|Subscribe|Home\b|Rarities)\b/gi;
+function looksLikeNav(v: string): boolean {
+ return (v.match(NAV_JUNK_RE) || []).length >= 2;
+}
+
 export async function scrapeProductPageSections(url: string, extractFallbackDescription = false): Promise<ScrapedPageSections> {
  try {
  const res = await fetch(url, {
@@ -1108,7 +1116,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  // render between product content sections.
  const nextSection = "\\s+(?:Condition|Dimensions?|Measurements?|Materials?|Fabric|Composition|Made\\s+of|Care|Authenticity(?:\\s+Guarantee)?|Model\\s+Number|Serial\\s+Number|Add\\s+to\\s+(?:cart|bag|wishlist)|Subscribe|Order\\s+Polic|Details|Shipping|Returns?|You\\s+may\\s+also|Powered\\s+by|Sign\\s+up|Newsletter|Privacy\\s+(?:Policy|Choices)|Customer\\s+(?:care|service)|Follow\\s+(?:us|me)|Social\\s+Media|Regular\\s+price|Sale\\s+price|Sold\\s+out|In\\s+stock|Unit\\s+price|Product\\s+variant|Decrease\\s+quantity|Increase\\s+quantity|THIS\\s+ITEM\\s+IS|Pick\\s+up\\s+available|Tax\\s+included|\\$\\s*\\d)";
 
- const dimResult = new RegExp(`\\b(?:Dimensions?|Measurements?)\\b\\s*:?\\s*(.+?)(?=${nextSection})`, "i").exec(text);
+ const dimResult = new RegExp(`\\b(?:Dimensions?|Measurements?)\\b\\s*:\\s*(.+?)(?=${nextSection})`, "i").exec(text);
  if (dimResult) {
  let val = dimResult[1].trim();
  // Strip any e-commerce UI text that leaked past the lookahead
@@ -1117,13 +1125,13 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  const half = Math.ceil(val.length / 2);
  const firstHalf = val.slice(0, half);
  if (val.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))) val = firstHalf.trim();
- if (val.length >= 3 && val.length <= 300) {
+ if (!looksLikeNav(val) && val.length >= 3 && val.length <= 300) {
  sections.push(`<p>Measurements: ${val}</p>`);
  measurements = val;
  }
  }
 
- const condResult = new RegExp(`\\bCondition\\b\\s*:?\\s*(.+?)(?=${nextSection})`, "i").exec(text);
+ const condResult = new RegExp(`\\bCondition\\b\\s*:\\s*(.+?)(?=${nextSection})`, "i").exec(text);
  if (condResult) {
  let val = condResult[1].trim();
  // Strip any e-commerce UI text that leaked past the lookahead
@@ -1132,7 +1140,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  const half = Math.ceil(val.length / 2);
  const firstHalf = val.slice(0, half);
  if (val.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))) val = firstHalf.trim();
- if (val.length >= 3 && val.length <= 400) {
+ if (!looksLikeNav(val) && val.length >= 3 && val.length <= 400) {
  sections.push(`<p>Condition: ${val}</p>`);
  condition = val;
  }
@@ -1140,14 +1148,14 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
 
  // Materials / fabric / composition — sellers state this explicitly; capture it structured
  // so intake/training use the real fibre content instead of guessing from the photo.
- const matResult = new RegExp(`\\b(?:Materials?|Fabric|Composition|Made\\s+of)\\b\\s*:?\\s*(.+?)(?=${nextSection})`, "i").exec(text);
+ const matResult = new RegExp(`\\b(?:Materials?|Fabric|Composition|Made\\s+of)\\b\\s*:\\s*(.+?)(?=${nextSection})`, "i").exec(text);
  if (matResult) {
  let val = matResult[1].trim();
  val = val.replace(ECOM_JUNK_RE, "").trim();
  const half = Math.ceil(val.length / 2);
  const firstHalf = val.slice(0, half);
  if (val.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))) val = firstHalf.trim();
- if (val.length >= 2 && val.length <= 200) {
+ if (!looksLikeNav(val) && val.length >= 2 && val.length <= 200) {
  sections.push(`<p>Materials: ${val}</p>`);
  materials = val;
  }
@@ -1183,7 +1191,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  const val = raw.slice(half).trim().startsWith(firstHalf.trim().slice(0, 20))
  ? firstHalf.trim()
  : raw;
- if (val.length >= 20) {
+ if (val.length >= 20 && !looksLikeNav(val)) {
  // Split into individual sentences/lines to produce paragraph HTML
  const paras = val
  .split(/(?<=[.!?])\s{2,}|\.\s+(?=[A-Z])/)

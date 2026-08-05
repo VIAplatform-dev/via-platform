@@ -11,7 +11,22 @@ type GTrend = { brand: string; momentumPct: number | null; avgInterest: number; 
 type Resale = { brand: string; soldCount: number; medianPriceCents: number | null; webMedianCents: number | null; volMomentumPct: number | null; priceMomentumPct: number | null };
 type IgBuzz = { brand: string; buzzScore: number; sampleCount: number; momentumPct: number | null };
 type Play = { brand: string; action: "source" | "price" | "watch" | "cool"; reason: string; suggestedPriceCents: number | null; carried: boolean };
-type Data = { rising: Heat[]; categories: Cat[]; yourBrands: YourBrand[]; googleTrends: GTrend[]; resaleMarket: Resale[]; igBuzz: IgBuzz[]; playbook: Play[]; webConfigured: boolean; socialConfigured: boolean; generatedAt: string };
+type ColorTrend = { color: string; demandIndex: number; demandTrend: string; trajectory: string | null; priceMedian: number | null; priceMomentumPct: number | null };
+type Data = { rising: Heat[]; categories: Cat[]; topColors: ColorTrend[]; yourBrands: YourBrand[]; googleTrends: GTrend[]; resaleMarket: Resale[]; igBuzz: IgBuzz[]; playbook: Play[]; webConfigured: boolean; socialConfigured: boolean; generatedAt: string };
+// The site colour palette → a swatch hex, so the strip shows the actual colour.
+const COLOR_SWATCH: Record<string, string> = {
+ black: "#1a1a1a", white: "#f5f5f0", "off-white": "#efe9dd", ivory: "#f2ead6", cream: "#f0e6d2",
+ grey: "#9a9a9a", charcoal: "#3a3a3a", silver: "#c7ccd1", beige: "#d8c7a8", nude: "#e3c8b0",
+ brown: "#6b4a2f", tan: "#c19a6b", camel: "#c19a6b", cognac: "#9a5b34", chocolate: "#4b2e1e",
+ navy: "#1f2a44", cobalt: "#1f47c7", blue: "#2f6fd3", teal: "#0e8f8f", turquoise: "#1fb6b6",
+ burgundy: "#5d0f17", wine: "#5b1a2b", crimson: "#a01329", red: "#c8102e",
+ pink: "#e78bb0", rose: "#d16a86", blush: "#e8b7bf", fuchsia: "#c81e78",
+ green: "#3f8f4f", olive: "#6b6b23", sage: "#a3b18a", forest: "#234d33", emerald: "#0f8a5f", mint: "#a8e0c4",
+ yellow: "#e8c33d", mustard: "#c99a2e", gold: "#c9a227",
+ orange: "#e2711d", coral: "#f2795b", rust: "#9a4a2a",
+ purple: "#6c3aa0", violet: "#7a4fb0", lavender: "#b9a7d6", lilac: "#c8b6e2",
+ multicolor: "linear-gradient(90deg,#e2711d,#e8c33d,#3f8f4f,#2f6fd3,#6c3aa0)",
+};
 type SourcePick = { segmentType: string; segmentValue: string; score: number; confidence: "high" | "medium"; trend: "rising" | "falling" | "flat"; reason: string };
 type SourceNowData = { picks: SourcePick[]; asOfDate: string | null; empty?: boolean; locked?: boolean };
 type DemandResult = { segmentType: string; segmentValue: string; demandIndex: number; hasPriceData: boolean; priceP25: number | null; priceMedian: number | null; priceP75: number | null; verdict: { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string } };
@@ -20,6 +35,17 @@ type BuyEbay = { medianPrice: number | null; p25: number | null; p75: number | n
 type BuyGoogle = { momentumPct: number | null; avgInterest: number; breakout: boolean };
 type CultureTrend = { keyword: string; growthWow: number | null };
 type CultureData = { trends: CultureTrend[]; empty?: boolean; locked?: boolean };
+type WSPick = { segmentType: string; segmentValue: string; demandIndex: number; demandTrend: string; trajectory: string | null; supplyGapScore: number; priceMedian: number | null; priceMomentumPct: number | null; reason: string };
+type CPick = { segmentType: string; segmentValue: string; writers: number; writersPrior: number; mentions: number; momentum: "new" | "up" | "steady" | "down"; direction: string | null; quotes: string[] };
+const CMOMENTUM: Record<CPick["momentum"], { label: string; tone: "live" | "info" | "pending" | "neutral" }> = {
+ new: { label: "New", tone: "pending" }, up: { label: "Building", tone: "live" }, steady: { label: "Steady", tone: "info" }, down: { label: "Fading", tone: "neutral" },
+};
+const TRAJECTORY_PILL: Record<string, { label: string; tone: "live" | "info" | "pending" | "neutral" }> = {
+ accelerating: { label: "Accelerating", tone: "live" },
+ peaking: { label: "Peaking", tone: "pending" },
+ cooling: { label: "Cooling", tone: "neutral" },
+ steady: { label: "Steady", tone: "info" },
+};
 
 const VERDICT_TONE: Record<DemandResult["verdict"]["rating"], "live" | "info" | "pending" | "neutral"> = {
  source: "live", "buy-sharp": "info", selective: "pending", pass: "neutral",
@@ -61,6 +87,9 @@ export default function TrendsPage() {
  const [data, setData] = useState<Data | null>(null);
  const [sourceNow, setSourceNow] = useState<SourceNowData | null>(null);
  const [culture, setCulture] = useState<CultureData | null>(null);
+ const [whitespace, setWhitespace] = useState<WSPick[] | null>(null);
+ const [consensus, setConsensus] = useState<CPick[] | null>(null);
+ const [consensusScore, setConsensusScore] = useState<{ hitRate: number | null; evaluated: number; hits: number } | null>(null);
  const [loading, setLoading] = useState(true);
  const [buyQ, setBuyQ] = useState("");
  const [buyResults, setBuyResults] = useState<DemandResult[] | null>(null);
@@ -74,6 +103,10 @@ export default function TrendsPage() {
  // Source Now — from VYA's own marketplace data, so it works today (external signals are optional).
  fetch("/api/store/source-now?window=30d").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setSourceNow(d); }).catch(() => {});
  fetch("/api/store/culture-trends").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setCulture(d); }).catch(() => {});
+ // Whitespace — rising demand this store doesn't carry yet (personalized sourcing gaps).
+ fetch("/api/store/whitespace?window=30d").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setWhitespace(d.picks ?? []); }).catch(() => {});
+ // Substack consensus — what fashion writers are collectively calling (leading/editorial signal).
+ fetch("/api/store/substack-consensus").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) { setConsensus(d.picks ?? []); setConsensusScore(d.scorecard ?? null); } }).catch(() => {});
  }, []);
 
  async function runDemandSearch(q: string) {
@@ -116,6 +149,98 @@ export default function TrendsPage() {
  </div>
  </div>
  ))}
+ </div>
+ </TechCard>
+ )}
+
+ {/* Substack consensus — what fashion writers are collectively calling (a leading, editorial signal). */}
+ {consensus && consensus.length > 0 && (
+ <TechCard className="mb-6 p-5">
+ <div className="mb-1 flex items-center justify-between">
+ <p className="text-[13px] font-semibold text-stone-900">What tastemakers are calling</p>
+ <span className="text-[11px] uppercase tracking-wide text-stone-400">Fashion Substack · weekly consensus</span>
+ </div>
+ <p className="mb-3 text-[12px] text-stone-400">Where independent fashion writers converge this week — a leading signal that moves before resale demand. Ranked by how many writers agree, not one loud voice.{consensusScore && consensusScore.hitRate != null && consensusScore.evaluated > 0 ? <span className="font-medium text-[var(--accent-ink)]"> Track record: {consensusScore.hitRate}% of past calls led real VYA demand ({consensusScore.hits}/{consensusScore.evaluated}).</span> : null}</p>
+ <div className="space-y-2">
+ {consensus.map((c) => {
+ const mom = CMOMENTUM[c.momentum];
+ return (
+ <div key={`${c.segmentType}:${c.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
+ <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="Number of independent writers calling this, this week">{c.writers}</span>
+ <div className="min-w-0 flex-1">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[13px] font-semibold capitalize text-stone-900">{c.segmentValue}</span>
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">{c.segmentType}</span>
+ <StatusPill tone={mom.tone}>{mom.label}</StatusPill>
+ <span className="text-[11px] text-stone-400">{c.writers} writer{c.writers === 1 ? "" : "s"}</span>
+ </div>
+ {c.quotes[0] && <p className="mt-0.5 truncate text-[12px] italic leading-relaxed text-stone-500">“{c.quotes[0]}”</p>}
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ <p className="mt-3 text-[11px] text-stone-400">Leading &amp; editorial — treat as an early watch signal, confirmed against VYA demand before you source deep.</p>
+ </TechCard>
+ )}
+
+ {/* Colour of the season — the hottest colours by demand (a cross-market signal: resale tracks retail). */}
+ {data && data.topColors && data.topColors.length > 0 && (
+ <TechCard className="mb-6 p-5">
+ <div className="mb-1 flex items-center justify-between">
+ <p className="text-[13px] font-semibold text-stone-900">Colour of the season</p>
+ <span className="text-[11px] uppercase tracking-wide text-stone-400">Hottest colours · demand</span>
+ </div>
+ <p className="mb-3 text-[12px] text-stone-400">The colours buyers want most right now. Resale tracks retail — when a colour takes over the season, it moves everywhere.</p>
+ <div className="flex flex-wrap gap-2.5">
+ {data.topColors.map((c, i) => {
+ const sw = COLOR_SWATCH[c.color.toLowerCase()] || "#c9c2b6";
+ const traj = c.trajectory ? TRAJECTORY_PILL[c.trajectory] : null;
+ return (
+ <div key={c.color} className={`flex items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3.5 ${i === 0 ? "border-[var(--accent)]/40 bg-[var(--accent-soft)]" : "border-stone-200 bg-white"}`}>
+ <span className="h-7 w-7 shrink-0 rounded-full ring-1 ring-black/10" style={{ background: sw }} />
+ <div className="flex flex-col leading-tight">
+ <span className="text-[12.5px] font-semibold capitalize text-stone-900">{c.color}{i === 0 ? " · top" : ""}</span>
+ <span className="flex items-center gap-1.5 text-[10.5px] text-stone-400">
+ <span className="tabular-nums">demand {c.demandIndex}</span>
+ {c.demandTrend === "rising" && <TrendingUp size={10} className="text-[var(--accent-ink)]" />}
+ {traj && c.trajectory === "accelerating" && <Sparkles size={10} className="text-[var(--accent-ink)]" />}
+ </span>
+ </div>
+ </div>
+ );
+ })}
+ </div>
+ </TechCard>
+ )}
+
+ {/* Whitespace — rising demand you DON'T carry yet (the personalized sourcing gap). */}
+ {whitespace && whitespace.length > 0 && (
+ <TechCard className="mb-6 p-5">
+ <div className="mb-1 flex items-center justify-between">
+ <p className="text-[13px] font-semibold text-stone-900">Gaps in your inventory</p>
+ <span className="text-[11px] uppercase tracking-wide text-stone-400">Rising demand · you don&apos;t carry it</span>
+ </div>
+ <p className="mb-3 text-[12px] text-stone-400">Segments buyers want that aren&apos;t in your inventory yet — the clearest place to expand. Ranked by how far demand outruns supply.</p>
+ <div className="space-y-2">
+ {whitespace.map((p) => {
+ const traj = p.trajectory ? TRAJECTORY_PILL[p.trajectory] : null;
+ return (
+ <div key={`${p.segmentType}:${p.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
+ <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="Supply-gap score (0–100): how far demand outruns supply">{Math.round(p.supplyGapScore)}</span>
+ <div className="min-w-0 flex-1">
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[13px] font-semibold capitalize text-stone-900">{p.segmentValue}</span>
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">{p.segmentType}</span>
+ {p.demandTrend === "rising" && <StatusPill tone="info">Rising</StatusPill>}
+ {traj && p.trajectory !== "steady" && <StatusPill tone={traj.tone}>{traj.label}</StatusPill>}
+ {p.priceMedian != null && <span className="text-[11px] tabular-nums text-stone-400">~{vmoney(p.priceMedian)}{p.priceMomentumPct != null && Math.abs(p.priceMomentumPct) >= 5 ? ` · ${p.priceMomentumPct > 0 ? "+" : ""}${Math.round(p.priceMomentumPct)}%` : ""}</span>}
+ </div>
+ <p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{p.reason}</p>
+ </div>
+ </div>
+ );
+ })}
  </div>
  </TechCard>
  )}
