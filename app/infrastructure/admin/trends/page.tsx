@@ -32,10 +32,13 @@ type SourceNowData = { picks: SourcePick[]; asOfDate: string | null; empty?: boo
 type DemandResult = { segmentType: string; segmentValue: string; demandIndex: number; hasPriceData: boolean; priceP25: number | null; priceMedian: number | null; priceP75: number | null; verdict: { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string } };
 type BuyVerdict = { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string; basis?: string };
 type BuyEbay = { medianPrice: number | null; p25: number | null; p75: number | null; activeCount: number | null; soldPer30d: number | null; priceMomentumPct: number | null };
+type BuyCluster = { label: string; count: number; medianPrice: number | null; p25: number | null; p75: number | null };
 type BuyGoogle = { momentumPct: number | null; avgInterest: number; breakout: boolean };
 type CultureTrend = { keyword: string; growthWow: number | null };
 type CultureData = { trends: CultureTrend[]; empty?: boolean; locked?: boolean };
-type WSPick = { segmentType: string; segmentValue: string; demandIndex: number; demandTrend: string; trajectory: string | null; supplyGapScore: number; priceMedian: number | null; priceMomentumPct: number | null; reason: string };
+type WSPick = { segmentType: string; segmentValue: string; demandIndex: number; demandTrend: string; trajectory: string | null; supplyGapScore: number; priceMedian: number | null; priceP25: number | null; priceP75: number | null; priceMomentumPct: number | null; reason: string };
+// "brand_category" → a readable label; the value ("Dior · bags") already reads as the pair.
+const segLabel = (t: string) => (t === "brand_category" ? "brand × category" : t === "brand_model" ? "model" : t);
 type CPick = { segmentType: string; segmentValue: string; writers: number; writersPrior: number; mentions: number; momentum: "new" | "up" | "steady" | "down"; direction: string | null; quotes: string[] };
 const CMOMENTUM: Record<CPick["momentum"], { label: string; tone: "live" | "info" | "pending" | "neutral" }> = {
  new: { label: "New", tone: "pending" }, up: { label: "Building", tone: "live" }, steady: { label: "Steady", tone: "info" }, down: { label: "Fading", tone: "neutral" },
@@ -96,6 +99,7 @@ export default function TrendsPage() {
  const [buyVerdict, setBuyVerdict] = useState<BuyVerdict | null>(null);
  const [buyEbay, setBuyEbay] = useState<BuyEbay | null>(null);
  const [buyGoogle, setBuyGoogle] = useState<BuyGoogle | null>(null);
+ const [buyClusters, setBuyClusters] = useState<BuyCluster[] | null>(null);
  const [buyLoading, setBuyLoading] = useState(false);
 
  useEffect(() => {
@@ -110,11 +114,11 @@ export default function TrendsPage() {
  }, []);
 
  async function runDemandSearch(q: string) {
- if (q.trim().length < 2) { setBuyResults(null); setBuyVerdict(null); setBuyEbay(null); setBuyGoogle(null); return; }
+ if (q.trim().length < 2) { setBuyResults(null); setBuyVerdict(null); setBuyEbay(null); setBuyGoogle(null); setBuyClusters(null); return; }
  setBuyLoading(true);
  try {
  const r = await fetch(`/api/store/demand-search?q=${encodeURIComponent(q.trim())}&window=30d`);
- if (r.ok) { const d = await r.json(); setBuyResults(d.results ?? []); setBuyVerdict(d.verdict ?? null); setBuyEbay(d.ebay ?? null); setBuyGoogle(d.google ?? null); }
+ if (r.ok) { const d = await r.json(); setBuyResults(d.results ?? []); setBuyVerdict(d.verdict ?? null); setBuyEbay(d.ebay ?? null); setBuyGoogle(d.google ?? null); setBuyClusters(d.clusters ?? null); }
  } finally { setBuyLoading(false); }
  }
 
@@ -141,7 +145,7 @@ export default function TrendsPage() {
  <div className="min-w-0 flex-1">
  <div className="flex flex-wrap items-center gap-2">
  <span className="text-[13px] font-semibold capitalize text-stone-900">{p.segmentValue}</span>
- <span className="text-[10px] uppercase tracking-wide text-stone-400">{p.segmentType}</span>
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">{segLabel(p.segmentType)}</span>
  {p.trend === "rising" && <StatusPill tone="info">Rising</StatusPill>}
  {p.confidence === "high" && <StatusPill tone="live">High confidence</StatusPill>}
  </div>
@@ -231,10 +235,12 @@ export default function TrendsPage() {
  <div className="min-w-0 flex-1">
  <div className="flex flex-wrap items-center gap-2">
  <span className="text-[13px] font-semibold capitalize text-stone-900">{p.segmentValue}</span>
- <span className="text-[10px] uppercase tracking-wide text-stone-400">{p.segmentType}</span>
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">{segLabel(p.segmentType)}</span>
  {p.demandTrend === "rising" && <StatusPill tone="info">Rising</StatusPill>}
  {traj && p.trajectory !== "steady" && <StatusPill tone={traj.tone}>{traj.label}</StatusPill>}
- {p.priceMedian != null && <span className="text-[11px] tabular-nums text-stone-400">~{vmoney(p.priceMedian)}{p.priceMomentumPct != null && Math.abs(p.priceMomentumPct) >= 5 ? ` · ${p.priceMomentumPct > 0 ? "+" : ""}${Math.round(p.priceMomentumPct)}%` : ""}</span>}
+ {p.priceP25 != null && p.priceP75 != null && p.priceP75 > p.priceP25
+ ? <span className="text-[11px] tabular-nums text-stone-400">{vmoney(p.priceP25)}–{vmoney(p.priceP75)}</span>
+ : p.priceMedian != null ? <span className="text-[11px] tabular-nums text-stone-400">~{vmoney(p.priceMedian)}</span> : null}
  </div>
  <p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{p.reason}</p>
  </div>
@@ -263,7 +269,9 @@ export default function TrendsPage() {
  {buyGoogle && buyGoogle.momentumPct != null && <GChip pct={buyGoogle.momentumPct} breakout={buyGoogle.breakout} />}
  </div>
  <p className="mt-1 text-[12px] leading-relaxed text-stone-500">{buyVerdict.detail}</p>
- {buyEbay && (buyEbay.medianPrice != null || buyEbay.activeCount != null || buyEbay.soldPer30d != null) && (
+ {/* Hide the single eBay median when we're about to show the honest sub-market split below —
+     one number for a multi-tier brand is exactly what confuses. */}
+ {buyEbay && !(buyClusters && buyClusters.length >= 2) && (buyEbay.medianPrice != null || buyEbay.activeCount != null || buyEbay.soldPer30d != null) && (
  <p className="mt-1 text-[12px] text-stone-400">
   eBay: {buyEbay.medianPrice != null ? `asks ~${vmoney(buyEbay.medianPrice)}` : "—"}
   {buyEbay.p25 != null ? ` (${vmoney(buyEbay.p25)}–${vmoney(buyEbay.p75)})` : ""}
@@ -273,6 +281,25 @@ export default function TrendsPage() {
  </p>
  )}
  </div>
+ {/* Distinct sub-markets — a wide brand ("Valentino") isn't one price. Pick your tier. */}
+ {buyClusters && buyClusters.length >= 2 && (
+ <div className="rounded-lg border border-stone-200 bg-stone-50/60 px-4 py-3">
+ <p className="text-[12px] font-semibold text-stone-700">This search spans distinct markets — which is yours?</p>
+ <p className="mb-2 text-[11px] text-stone-400">One median would mislead. Here&apos;s how the live listings actually split, each with its own price.</p>
+ <div className="space-y-1">
+ {buyClusters.map((c) => (
+ <div key={c.label} className="flex items-baseline justify-between gap-3 border-b border-stone-200/70 py-1 last:border-0">
+ <span className="text-[12.5px] font-medium capitalize text-stone-800">{c.label}</span>
+ <span className="shrink-0 text-[12px] tabular-nums text-stone-500">
+ {c.medianPrice != null ? `~${vmoney(c.medianPrice)}` : "—"}
+ {c.p25 != null && c.p75 != null ? <span className="text-stone-400"> ({vmoney(c.p25)}–{vmoney(c.p75)})</span> : null}
+ <span className="text-stone-400"> · {c.count}</span>
+ </span>
+ </div>
+ ))}
+ </div>
+ </div>
+ )}
  {/* VYA's own demand matches (the local detail behind the call) */}
  {buyResults && buyResults.map((r) => (
  <div key={`${r.segmentType}:${r.segmentValue}`} className="rounded-lg border border-stone-100 bg-white px-4 py-3">

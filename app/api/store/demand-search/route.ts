@@ -3,8 +3,9 @@ import { neon } from "@neondatabase/serverless";
 import { gateSegments, type RawSegment } from "@/app/lib/data-layer/privacy";
 import { PRIVACY, SOURCING, BLEND } from "@/app/lib/data-layer/config";
 import { sourcingVerdict, blendedVerdict, type Trend } from "@/app/lib/data-layer/metrics";
-import { isEbayConfigured } from "@/app/lib/data-layer/ebay";
+import { isEbayConfigured, searchListings } from "@/app/lib/data-layer/ebay";
 import { getOrFetchEbayComps } from "@/app/lib/data-layer/ebay-history-db";
+import { clusterCompListings } from "@/app/lib/data-layer/comp-clusters";
 import { getOrFetchGoogleTrend } from "@/app/lib/market-trends";
 import { askingPriceLookup } from "@/app/lib/data-layer/asking-price";
 import { resolveStoreSlug } from "@/app/lib/storeAuth";
@@ -92,8 +93,17 @@ export async function GET(request: NextRequest) {
  const ebayOut = ebay ? { medianPrice: ebay.medianPrice, p25: ebay.p25, p75: ebay.p75, activeCount: ebay.activeCount, soldPer30d: ebay.soldPer30d ?? null, priceMomentumPct: ebay.priceMomentumPct } : null;
  const googleOut = google ? { momentumPct: google.momentumPct, avgInterest: google.avgInterest, breakout: google.breakout } : null;
 
+ // A wide/ambiguous brand ("Valentino") isn't one market — cluster the live eBay listings into the
+ // real sub-markets (Garavani / Mario Valentino / RED / fragrance…), each with its own price, so a
+ // single median never lies. Only fires with a decent sample; returns [] when the market is uniform.
+ let clusters: Awaited<ReturnType<typeof clusterCompListings>> = [];
+ if (isEbayConfigured() && (ebay?.sampleSize ?? 0) >= 12) {
+  const listings = await searchListings(q).catch(() => []);
+  if (listings.length >= 12) clusters = await clusterCompListings(q, listings).catch(() => []);
+ }
+
  const asOfDate = rows.length ? (rows[0].as_of as string) : null;
- return NextResponse.json({ query: q, windowKey, asOfDate, results, verdict, ebay: ebayOut, google: googleOut });
+ return NextResponse.json({ query: q, windowKey, asOfDate, results, verdict, ebay: ebayOut, google: googleOut, clusters });
  } catch (err) {
  console.error("[store/demand-search] error:", err);
  return NextResponse.json({ query: q, windowKey, results: [], error: "search_failed" });

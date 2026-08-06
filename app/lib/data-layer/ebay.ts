@@ -52,6 +52,25 @@ export type EbayComps = {
  soldPer30d?: number | null; // filled when Marketplace Insights is enabled
 };
 
+// Raw title+price for the active listings of a query — the input to sub-market clustering.
+// (searchComps discards titles; this keeps them so a wide brand can be split into real segments.)
+export async function searchListings(query: string, limit = 50): Promise<{ title: string; price: number }[]> {
+ const token = await getEbayToken();
+ if (!token) return [];
+ try {
+ const url = `${BROWSE_URL}?q=${encodeURIComponent(query)}&limit=${limit}&filter=${encodeURIComponent("buyingOptions:{FIXED_PRICE}")}`;
+ const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } });
+ if (!res.ok) return [];
+ const data = (await res.json()) as { itemSummaries?: Array<{ title?: string; price?: { value?: string } }> };
+ const out: { title: string; price: number }[] = [];
+ for (const it of data.itemSummaries ?? []) {
+  const v = it.price?.value ? parseFloat(it.price.value) : NaN;
+  if (it.title && Number.isFinite(v) && v > 0) out.push({ title: it.title, price: v });
+ }
+ return out;
+ } catch { return []; }
+}
+
 // Active-listing comps for a query. Returns null if not configured or on error.
 export async function searchComps(query: string): Promise<EbayComps | null> {
  const token = await getEbayToken();

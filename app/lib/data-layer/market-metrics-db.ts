@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { getAllProducts } from "../db";
 import { normalizeColor } from "../colorNormalize";
+import { inferModel } from "./models";
 import { resolveBrand } from "./brands";
 import { WHOLE_WORD_ALIASES } from "../brandData";
 import { loadBrandRef } from "./brands-db";
@@ -42,7 +43,9 @@ function db() {
  return neon(url);
 }
 
-export type SegmentType = "brand" | "category" | "era" | "color";
+// "brand_category" is the actionable composite ("Dior · bags") — the level sellers actually source at,
+// and a far tighter price than a whole house. segment_value is `${brand} · ${category}`.
+export type SegmentType = "brand" | "category" | "era" | "color" | "brand_category" | "brand_model";
 
 export async function ensureMarketMetricsTable(): Promise<void> {
  const sql = db();
@@ -98,6 +101,10 @@ async function aggregate(curStart: string, priorStart: string): Promise<AggRow[]
   SELECT 'era'::text, era, event_type, ts, qty, store_slug, sale_price FROM events WHERE era IS NOT NULL AND era <> ''
   UNION ALL
   SELECT 'color'::text, color, event_type, ts, qty, store_slug, sale_price FROM events WHERE color IS NOT NULL AND color <> ''
+  UNION ALL
+  SELECT 'brand_category'::text, brand || ' · ' || category, event_type, ts, qty, store_slug, sale_price FROM events WHERE brand IS NOT NULL AND brand <> '' AND category IS NOT NULL AND category <> ''
+  UNION ALL
+  SELECT 'brand_model'::text, brand || ' · ' || model, event_type, ts, qty, store_slug, sale_price FROM events WHERE brand IS NOT NULL AND brand <> '' AND model IS NOT NULL AND model <> ''
  )
  SELECT seg_type, seg,
   COUNT(*) FILTER (WHERE event_type='view' AND ts >= ${curStart})::int AS views_cur,
@@ -129,7 +136,7 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
  const buckets = await loadEraBuckets();
  const brandRef = await loadBrandRef();
  const products = await getAllProducts().catch(() => []);
- const out: Record<SegmentType, Map<string, SegSupply>> = { brand: new Map(), category: new Map(), era: new Map(), color: new Map() };
+ const out: Record<SegmentType, Map<string, SegSupply>> = { brand: new Map(), category: new Map(), era: new Map(), color: new Map(), brand_category: new Map(), brand_model: new Map() };
  const bump = (m: Map<string, SegSupply>, k: string | null, price: number, store: string | null) => {
  if (!k) return;
  const e = m.get(k) ?? { count: 0, prices: [], stores: new Set<string>() };
@@ -143,12 +150,19 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
  const store = p.store_slug ?? null;
  // Resolve brand through the SAME canonical alias reference the demand side (events.brand)
  // uses, so supply and demand reconcile when joined by brand for sell-through / supply-gap.
- bump(out.brand, resolveBrand(p.title, brandRef, WHOLE_WORD_ALIASES), price, store);
- bump(out.category, inferCategoryFromTitle(p.title) as string, price, store);
+ const pBrand = resolveBrand(p.title, brandRef, WHOLE_WORD_ALIASES);
+ const pCat = inferCategoryFromTitle(p.title) as string | null;
+ bump(out.brand, pBrand, price, store);
+ bump(out.category, pCat, price, store);
  bump(out.era, inferEra(`${p.title} ${p.description ?? ""}`, buckets), price, store);
  // Supply colour: prefer the vision image_color (accurate), fall back to the title — both
  // normalized to the SAME palette so supply reconciles with the title-derived demand side.
  bump(out.color, normalizeColor(p.image_color) ?? normalizeColor(p.title), price, store);
+ // The actionable composite — same `${brand} · ${category}` key as the demand side.
+ if (pBrand && pCat) bump(out.brand_category, `${pBrand} · ${pCat}`, price, store);
+ // The sharpest composite — `${brand} · ${model}` ("Dior · Saddle").
+ const pModel = pBrand ? inferModel(p.title, pBrand) : null;
+ if (pBrand && pModel) bump(out.brand_model, `${pBrand} · ${pModel}`, price, store);
  }
  return out;
 }
@@ -156,8 +170,8 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
 // Just the in-stock counts per segment (what the metric job needs for supply / sell-through).
 async function supplyTallies(): Promise<Record<SegmentType, Map<string, number>>> {
  const scan = await scanCatalogBySegment();
- const out: Record<SegmentType, Map<string, number>> = { brand: new Map(), category: new Map(), era: new Map(), color: new Map() };
- for (const t of ["brand", "category", "era", "color"] as SegmentType[]) for (const [k, v] of scan[t]) out[t].set(k, v.count);
+ const out: Record<SegmentType, Map<string, number>> = { brand: new Map(), category: new Map(), era: new Map(), color: new Map(), brand_category: new Map(), brand_model: new Map() };
+ for (const t of ["brand", "category", "era", "color", "brand_category", "brand_model"] as SegmentType[]) for (const [k, v] of scan[t]) out[t].set(k, v.count);
  return out;
 }
 
@@ -187,10 +201,10 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
  const agg = await aggregate(curStart, priorStart);
 
  // Group rows by segment type so percentile ranks are computed WITHIN a type.
- const byType: Record<SegmentType, AggRow[]> = { brand: [], category: [], era: [], color: [] };
+ const byType: Record<SegmentType, AggRow[]> = { brand: [], category: [], era: [], color: [], brand_category: [], brand_model: [] };
  for (const r of agg) byType[r.seg_type]?.push(r);
 
- for (const segType of ["brand", "category", "era", "color"] as SegmentType[]) {
+ for (const segType of ["brand", "category", "era", "color", "brand_category", "brand_model"] as SegmentType[]) {
   const rows = byType[segType];
   if (rows.length === 0) continue;
 
@@ -278,6 +292,8 @@ export type WhitespacePick = {
  trajectory: string | null;
  supplyGapScore: number;
  priceMedian: number | null;
+ priceP25: number | null;
+ priceP75: number | null;
  priceMomentumPct: number | null;
  storeCount: number;
  reason: string;
@@ -309,24 +325,69 @@ export async function getStoreWhitespace(slug: string, windowKey: MetricWindow =
  }[];
  if (!rows.length) return [];
 
- // What this store already carries, by segment (case-insensitive). Colour has no items column,
- // so it's inferred from the item title with the same normalizer the demand side uses.
+ // What this store already carries, by segment. Resolve to the SAME canonical vocabulary the demand
+ // side uses (so "Christian Dior" reconciles to "Dior", and the "Dior · bags" composite matches).
+ const [wsBrandRef, wsBuckets] = await Promise.all([loadBrandRef(), loadEraBuckets()]);
  const inv = (await sql`
-  SELECT lower(COALESCE(NULLIF(i.brand, ''), '')) AS b, lower(COALESCE(NULLIF(i.category, ''), '')) AS c, lower(COALESCE(NULLIF(i.era, ''), '')) AS e, i.title AS t
+  SELECT i.brand, i.category, i.era, i.title
   FROM items i JOIN sellers s ON s.id = i.seller_id WHERE s.slug = ${slug}
- `.catch(() => [])) as { b: string; c: string; e: string; t: string | null }[];
- const has: Record<SegmentType, Set<string>> = { brand: new Set(), category: new Set(), era: new Set(), color: new Set() };
- for (const r of inv) { if (r.b) has.brand.add(r.b); if (r.c) has.category.add(r.c); if (r.e) has.era.add(r.e); const col = normalizeColor(r.t); if (col) has.color.add(col); }
+ `.catch(() => [])) as { brand: string | null; category: string | null; era: string | null; title: string | null }[];
+ const has: Record<SegmentType, Set<string>> = { brand: new Set(), category: new Set(), era: new Set(), color: new Set(), brand_category: new Set(), brand_model: new Set() };
+ for (const r of inv) {
+ const b = resolveBrand(`${r.brand ?? ""} ${r.title ?? ""}`, wsBrandRef, WHOLE_WORD_ALIASES);
+ const c = (r.category || "").trim().toLowerCase() || ((r.title ? (inferCategoryFromTitle(r.title) as string | null) : null) ?? null);
+ const e = (r.era || "").trim() || inferEra(r.title ?? "", wsBuckets);
+ const col = normalizeColor(r.title);
+ const m = b ? inferModel(r.title ?? "", b) : null;
+ if (b) has.brand.add(b.toLowerCase());
+ if (c) has.category.add(c.toLowerCase());
+ if (e) has.era.add(String(e).toLowerCase());
+ if (col) has.color.add(col.toLowerCase());
+ if (b && c) has.brand_category.add(`${b} · ${c}`.toLowerCase());
+ if (b && m) has.brand_model.add(`${b} · ${m}`.toLowerCase());
+ }
 
+ // Price from the LIVE catalog asking benchmark (populated) — realized sales are too thin to price on.
+ const scan = await scanCatalogBySegment().catch(() => null);
+ const askOf = (type: SegmentType, value: string) => {
+ const seg = scan?.[type]?.get(value);
+ return seg && seg.prices.length >= 3 ? priceBenchmark(seg.prices) : null;
+ };
  const money = (n: number | null) => (n == null ? null : `$${Math.round(n).toLocaleString()}`);
- return rows
-  .filter((r) => !has[r.segment_type]?.has((r.segment_value || "").toLowerCase()))
+
+ // Surface at the NATURAL granularity: drop a bare brand/category when a more-specific child (its
+ // model or brand×category) explains the demand — so we show "Dior · Saddle", not "Dior" + "Dior ·
+ // Saddle" + "Dior · bags" all at once. A bare segment survives only on a whole-house/whole-category
+ // moment (its own demand clearly beats its best child).
+ const carriedRows = rows.filter((r) => !has[r.segment_type]?.has((r.segment_value || "").toLowerCase()));
+ const bestChildBrand = new Map<string, number>();
+ const bestChildCat = new Map<string, number>();
+ for (const r of carriedRows) {
+ if (r.segment_type === "brand_category" || r.segment_type === "brand_model") {
+  const [cb, tail] = (r.segment_value || "").split(" · ");
+  if (cb) bestChildBrand.set(cb.toLowerCase(), Math.max(bestChildBrand.get(cb.toLowerCase()) ?? 0, r.demand_index));
+  if (r.segment_type === "brand_category" && tail) bestChildCat.set(tail.toLowerCase(), Math.max(bestChildCat.get(tail.toLowerCase()) ?? 0, r.demand_index));
+ }
+ }
+ const GRANULARITY_MARGIN = 3;
+ return carriedRows
+  .filter((r) => {
+  if (r.segment_type === "brand") return r.demand_index > (bestChildBrand.get((r.segment_value || "").toLowerCase()) ?? -1) + GRANULARITY_MARGIN;
+  if (r.segment_type === "category") return r.demand_index > (bestChildCat.get((r.segment_value || "").toLowerCase()) ?? -1) + GRANULARITY_MARGIN;
+  return true;
+  })
   .slice(0, limit)
   .map((r) => {
   const trendNote = r.demand_trend === "rising" ? " and rising" : "";
   const accel = r.trajectory === "accelerating" ? " Demand is accelerating — get in early." : r.trajectory === "peaking" ? " (Momentum may be peaking.)" : "";
-  const price = money(r.price_median);
-  const priceNote = price ? ` Clears around ${price}${r.price_momentum_pct != null && Math.abs(r.price_momentum_pct) >= 5 ? ` (${r.price_momentum_pct > 0 ? "+" : ""}${Math.round(r.price_momentum_pct)}% vs prior)` : ""}.` : "";
+  const ask = askOf(r.segment_type, r.segment_value);
+  const p25 = ask?.p25 ?? null;
+  const p75 = ask?.p75 ?? null;
+  const med = ask?.median ?? r.price_median;
+  // A real range when the catalog has enough listings; else a single number; else nothing (uniform).
+  const priceNote = p25 != null && p75 != null && p75 > p25
+   ? ` Sells around ${money(p25)}–${money(p75)}.`
+   : med != null ? ` Sells around ${money(med)}.` : "";
   return {
    segmentType: r.segment_type,
    segmentValue: r.segment_value,
@@ -334,7 +395,9 @@ export async function getStoreWhitespace(slug: string, windowKey: MetricWindow =
    demandTrend: r.demand_trend,
    trajectory: r.trajectory,
    supplyGapScore: r.supply_gap_score,
-   priceMedian: r.price_median,
+   priceMedian: med,
+   priceP25: p25,
+   priceP75: p75,
    priceMomentumPct: r.price_momentum_pct,
    storeCount: r.store_count,
    reason: `Strong demand (index ${r.demand_index}${trendNote}) with thin supply, and you don't carry it yet.${accel}${priceNote}`.trim(),
