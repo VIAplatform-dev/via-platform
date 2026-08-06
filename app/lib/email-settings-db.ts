@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { getSellerBySlug } from "./db/sellers";
 import { stores, storeContactEmails } from "./stores";
+import { getDisplayNameOverride } from "./store-profile-db";
 import type { EmailBrand } from "./email";
 
 // Per-store email sender settings. A store picks the name + reply-to their emails use,
@@ -83,8 +84,10 @@ export async function resolveStoreSender(storeSlug: string): Promise<StoreSender
  const s = await getEmailSettings(storeSlug).catch(() => null);
  const seller = await getSellerBySlug(storeSlug).catch(() => null);
  const staticStore = stores.find((x) => x.slug === storeSlug);
+ // A seller can rename their store in Settings — that override wins over the curated default.
+ const nameOverride = await getDisplayNameOverride(storeSlug).catch(() => null);
 
- const fromName = s?.fromName || seller?.name || staticStore?.name || storeSlug;
+ const fromName = s?.fromName || nameOverride || seller?.name || staticStore?.name || storeSlug;
  const replyTo = s?.replyTo || seller?.email || storeContactEmails[storeSlug] || null;
  const fromAddress = s?.verified && s?.sendingEmail ? s.sendingEmail : SHARED_FROM;
  return { fromName, fromAddress, replyTo, verified: !!(s?.verified && s?.sendingEmail), website: staticStore?.website || undefined };

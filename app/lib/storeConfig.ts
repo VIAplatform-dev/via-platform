@@ -497,21 +497,21 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  storeDomain: "shopofsubstance.com",
  scrapeProductPage: true,
  },
+ {
+ type: "shopify",
+ name: "Honeybear Vintage",
+ slug: "honey-bear-vintage",
+ storeDomain: "honeybearvintagenyc.com",
+ scrapeProductPage: true,
+ },
 ];
 
 // Big Cartel stores (public JSON API — no token required)
 export const BIGCARTEL_STORES: BigCartelStore[] = [];
 
 // Square stores (webhook-based order tracking, no product catalog sync yet)
-export const SQUARE_STORES: SquareStore[] = [
- {
- type: "square",
- name: "Honeybear Vintage",
- slug: "honey-bear-vintage",
- locationId: "LJ886JKR82R0H",
- accessTokenEnvVar: "SQUARE_ACCESS_TOKEN_HONEY_BEAR_VINTAGE",
- },
-];
+// Honeybear Vintage moved to Shopify (Collabs) — see SHOPIFY_STORES below.
+export const SQUARE_STORES: SquareStore[] = [];
 
 // Wix stores (REST Catalog API — api key + site ID)
 export const WIX_STORES: WixStore[] = [

@@ -524,6 +524,12 @@ export type EmailBrand = {
  showAccentBar?: boolean; // the thin colour bar across the top — on when unset
  buttonStyle?: "rounded" | "pill" | "square"; // CTA corner style — "rounded" when unset
  headerAlign?: "center" | "left"; // logo/heading + button alignment — "center" when unset
+ // The overall STRUCTURE, not just colours — a full-redesign lever, all deliverability-safe:
+ //   classic  = card on a soft grey, rounded, accent bar (the default)
+ //   minimal  = flat full-bleed, no card/bar, a hairline under the header — airy & clean
+ //   editorial= thin-bordered card, outlined button, a magazine frame
+ //   bold     = the whole card is the accent colour, reversed light text — high-impact
+ layout?: "classic" | "minimal" | "editorial" | "bold";
 };
 const DEFAULT_BRAND: EmailBrand = { accent: "#5D0F17", text: "#1c1917", bg: "#ffffff" };
 
@@ -548,6 +554,7 @@ export function sanitizeBrand(input: unknown): EmailBrand | null {
  showAccentBar: b.showAccentBar !== false,
  buttonStyle: b.buttonStyle === "pill" || b.buttonStyle === "square" ? b.buttonStyle : "rounded",
  headerAlign: b.headerAlign === "left" ? "left" : "center",
+ layout: b.layout === "minimal" || b.layout === "editorial" || b.layout === "bold" ? b.layout : "classic",
  };
 }
 
@@ -557,6 +564,13 @@ function fontStack(name: string | undefined, kind: "heading" | "body"): string {
  const serif = "Georgia, 'Times New Roman', serif";
  if (!name) return kind === "heading" ? serif : sans;
  return `'${name}', ${EMAIL_SERIF.has(name) ? serif : sans}`;
+}
+// Darken a hex by fraction f (0..1) — for the "bold" layout's backdrop behind an accent card.
+function darken(hex: string, f: number): string {
+ const h = (hex || "").replace("#", "");
+ if (h.length !== 6) return hex;
+ const d = (x: number) => Math.max(0, Math.min(255, Math.round(x * (1 - f)))).toString(16).padStart(2, "0");
+ return `#${d(parseInt(h.slice(0, 2), 16))}${d(parseInt(h.slice(2, 4), 16))}${d(parseInt(h.slice(4, 6), 16))}`;
 }
 // Readable text over the accent (buttons): near-black on light accents, white on dark.
 function readableOn(hex: string): string {
@@ -636,29 +650,44 @@ export function campaignEmailHtml(opts: { storeName: string; body: string; link?
  // A custom `cta` (used by transactional emails — offer updates, etc.) overrides both the button
  // URL and its label; otherwise fall back to the campaign link + the brand's default button label.
  const cta = opts.cta?.url || (opts.link ? withUtm(opts.link, "campaign") : null);
- const content = renderEmailBody(opts.body, b);
  const bodyStack = fontStack(b.bodyFont, "body");
  const headStack = fontStack(b.headingFont, "heading");
- const btnText = readableOn(b.accent);
  const surface = b.bg || "#ffffff";
+ // ── Layout: the STRUCTURE (not just colours). All four render bulletproof inline-styled HTML. ──
+ const layout = b.layout || "classic";
+ const dark = layout === "bold"; // whole card is the accent → flip content to light
+ const onCard = dark ? "#f5f5f4" : b.text;
+ const content = renderEmailBody(opts.body, dark ? { ...b, text: "#f5f5f4", accent: "#ffffff" } : b);
+ const cardBg = dark ? b.accent : surface;
+ const pageBg = dark ? darken(b.accent, 0.55) : layout === "minimal" ? surface : "#f1efeb";
+ const shell = layout === "classic" ? "border-radius:16px;box-shadow:0 4px 24px -8px rgba(0,0,0,0.12);"
+ : layout === "editorial" ? `border-radius:2px;border:1px solid ${dark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.12)"};`
+ : layout === "bold" ? "border-radius:14px;"
+ : "border-radius:0;"; // minimal — flat, full-bleed
+ const barHtml = layout === "classic" && b.showAccentBar !== false ? `<div style="height:5px;background:${b.accent};"></div>` : "";
+ const headDivide = layout === "minimal" || layout === "editorial" ? `border-bottom:1px solid ${dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.09)"};padding-bottom:22px;` : "";
+ const align = b.headerAlign === "left" ? "left" : "center";
  const header = b.logo
  ? `<img src="${b.logo}" alt="${escapeHtml(cleanName)}" style="max-height:44px;width:auto;display:inline-block;" />`
- : `<div style="font-family:${headStack};font-size:27px;font-weight:700;letter-spacing:-0.015em;color:${b.text};">${escapeHtml(cleanName)}</div>`;
+ : `<div style="font-family:${headStack};font-size:27px;font-weight:700;letter-spacing:-0.015em;color:${onCard};">${escapeHtml(cleanName)}</div>`;
  const btnLabel = escapeHtml((opts.cta?.label || b.buttonLabel || "Shop now").slice(0, 40)) || "Shop now";
+ const btnRadius = b.buttonStyle === "pill" ? "999px" : b.buttonStyle === "square" ? "0" : "9px";
+ // Button: editorial = outlined; bold = light fill on the dark card; else solid accent.
+ const btnBg = layout === "editorial" ? "transparent" : dark ? "#ffffff" : b.accent;
+ const btnFg = layout === "editorial" ? onCard : dark ? b.accent : readableOn(b.accent);
+ const btnBorder = layout === "editorial" ? `border:1.5px solid ${onCard};` : "";
+ const footerColor = dark ? "rgba(245,245,244,0.6)" : "#a29b93";
  const footer = b.footerText != null && b.footerText.trim()
  ? escapeHtml(b.footerText.trim().slice(0, 400)).replace(/\{store\}/g, escapeHtml(cleanName)).replace(/\n/g, "<br />")
  : `You're receiving this because you shopped with ${escapeHtml(cleanName)}.<br />Reply to this email to reach us.`;
- const accentBar = b.showAccentBar === false ? "" : `<div style="height:5px;background:${b.accent};"></div>`;
- const align = b.headerAlign === "left" ? "left" : "center";
- const btnRadius = b.buttonStyle === "pill" ? "999px" : b.buttonStyle === "square" ? "0" : "9px";
  return `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />${fontsHref(b)}</head>
- <body style="margin:0;padding:0;background:#f1efeb;font-family:${bodyStack};color:${b.text};-webkit-font-smoothing:antialiased;">
+ <body style="margin:0;padding:0;background:${pageBg};font-family:${bodyStack};color:${onCard};-webkit-font-smoothing:antialiased;">
  <div style="padding:30px 14px 40px;">
- <div style="max-width:600px;margin:0 auto;background:${surface};border-radius:16px;overflow:hidden;box-shadow:0 4px 24px -8px rgba(0,0,0,0.12);">
- ${accentBar}
- <div style="padding:36px 44px 14px;text-align:${align};">${header}</div>
- <div style="padding:12px 44px 34px;">${content}${cta ? `<div style="text-align:${align};margin:32px 0 8px;"><a href="${cta}" style="display:inline-block;background:${b.accent};color:${btnText};text-decoration:none;padding:15px 38px;border-radius:${btnRadius};font-size:14px;font-weight:600;letter-spacing:0.02em;">${btnLabel}</a></div>` : ""}</div>
- <div style="padding:22px 44px 34px;border-top:1px solid rgba(0,0,0,0.06);font-size:12px;line-height:1.6;color:#a29b93;text-align:center;">${footer}${opts.unsubscribeUrl ? `<br /><br /><a href="${opts.unsubscribeUrl}" style="color:#a29b93;text-decoration:underline;">Unsubscribe</a>` : ""}</div>
+ <div style="max-width:600px;margin:0 auto;background:${cardBg};overflow:hidden;${shell}">
+ ${barHtml}
+ <div style="padding:36px 44px 14px;text-align:${align};${headDivide}">${header}</div>
+ <div style="padding:${headDivide ? "22px" : "12px"} 44px 34px;">${content}${cta ? `<div style="text-align:${align};margin:32px 0 8px;"><a href="${cta}" style="display:inline-block;background:${btnBg};color:${btnFg};${btnBorder}text-decoration:none;padding:15px 38px;border-radius:${btnRadius};font-size:14px;font-weight:600;letter-spacing:0.02em;">${btnLabel}</a></div>` : ""}</div>
+ <div style="padding:22px 44px 34px;border-top:1px solid ${dark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.06)"};font-size:12px;line-height:1.6;color:${footerColor};text-align:center;">${footer}${opts.unsubscribeUrl ? `<br /><br /><a href="${opts.unsubscribeUrl}" style="color:${footerColor};text-decoration:underline;">Unsubscribe</a>` : ""}</div>
  </div>
  <div style="max-width:600px;margin:16px auto 0;text-align:center;font-size:11px;letter-spacing:0.04em;color:#c2bdb6;">Powered by VYA</div>
  </div></body></html>`;

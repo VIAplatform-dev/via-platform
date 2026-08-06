@@ -28,6 +28,9 @@ async function ensureTable() {
  await sql`CREATE INDEX IF NOT EXISTS idx_store_customers_store ON store_customers (store_slug)`;
  // Marketing consent — defaults to subscribed; the seller's email campaigns honor it.
  await sql`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS email_subscribed BOOLEAN NOT NULL DEFAULT true`;
+ // CRM: free-form tags (segments) and a private note per contact.
+ await sql`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}'`;
+ await sql`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS notes TEXT`;
  ensured = true;
 }
 
@@ -89,6 +92,8 @@ export type CustomerProfile = {
  spentCents: number;
  lastOrderAt: string | null; // ISO
  addedAt: string | null; // ISO — when imported
+ tags: string[]; // seller-defined segments
+ notes: string | null; // seller's private note
 };
 
 export async function listCustomerProfiles(storeSlug: string): Promise<CustomerProfile[]> {
@@ -96,7 +101,7 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  const sql = db();
 
  const imported = (await sql`
- SELECT email, name, phone, email_subscribed, created_at FROM store_customers WHERE store_slug = ${storeSlug}
+ SELECT email, name, phone, email_subscribed, created_at, tags, notes FROM store_customers WHERE store_slug = ${storeSlug}
  `) as any[];
 
  // Buyers: aggregate real orders for this store by email, plus their latest shipping
@@ -141,7 +146,7 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  for (const r of imported) {
  const email = String(r.email || "").toLowerCase().trim();
  if (!email) continue;
- map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location: null, subscribed: r.email_subscribed !== false, source: "imported", orders: 0, spentCents: 0, lastOrderAt: null, addedAt: iso(r.created_at) });
+ map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location: null, subscribed: r.email_subscribed !== false, source: "imported", orders: 0, spentCents: 0, lastOrderAt: null, addedAt: iso(r.created_at), tags: Array.isArray(r.tags) ? r.tags : [], notes: r.notes ?? null });
  }
  for (const r of buyers) {
  const email = String(r.email || "").toLowerCase().trim();
@@ -157,7 +162,7 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  existing.phone = existing.phone || r.phone || null;
  existing.location = existing.location || location;
  } else {
- map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location, subscribed: true, source: "buyer", orders: r.orders, spentCents: r.spent_cents, lastOrderAt: iso(r.last_order), addedAt: null });
+ map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location, subscribed: true, source: "buyer", orders: r.orders, spentCents: r.spent_cents, lastOrderAt: iso(r.last_order), addedAt: null, tags: [], notes: null });
  }
  }
 
@@ -210,4 +215,59 @@ export async function setEmailSubscribed(storeSlug: string, email: string, subsc
  VALUES (${storeSlug}, ${email.toLowerCase().trim()}, ${subscribed}, 'unsubscribe')
  ON CONFLICT (store_slug, email) DO UPDATE SET email_subscribed = ${subscribed}
  `.catch(() => {});
+}
+
+// ── CRM: tags (segments) + a private note per contact ──────────────────────────
+// A contact might only exist as a buyer (orders, no store_customers row yet), so every
+// mutation upserts the row first, keyed by (store_slug, email).
+async function ensureCustomerRow(storeSlug: string, email: string): Promise<string> {
+ await ensureTable();
+ const e = email.toLowerCase().trim();
+ await db()`
+ INSERT INTO store_customers (store_slug, email, source)
+ VALUES (${storeSlug}, ${e}, 'crm')
+ ON CONFLICT (store_slug, email) DO NOTHING
+ `.catch(() => {});
+ return e;
+}
+
+/** Replace a contact's full tag set. */
+export async function setCustomerTags(storeSlug: string, email: string, tags: string[]): Promise<void> {
+ const e = await ensureCustomerRow(storeSlug, email);
+ const clean = Array.from(new Set(tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean))).slice(0, 40);
+ await db()`UPDATE store_customers SET tags = ${clean} WHERE store_slug = ${storeSlug} AND email = ${e}`;
+}
+
+/** Add one tag (no-op if already present). */
+export async function addCustomerTag(storeSlug: string, email: string, tag: string): Promise<void> {
+ const e = await ensureCustomerRow(storeSlug, email);
+ const t = String(tag).trim().toLowerCase();
+ if (!t) return;
+ await db()`UPDATE store_customers SET tags = (SELECT ARRAY(SELECT DISTINCT unnest(array_append(tags, ${t})))) WHERE store_slug = ${storeSlug} AND email = ${e}`;
+}
+
+/** Remove one tag. */
+export async function removeCustomerTag(storeSlug: string, email: string, tag: string): Promise<void> {
+ const e = email.toLowerCase().trim();
+ const t = String(tag).trim().toLowerCase();
+ await ensureTable();
+ await db()`UPDATE store_customers SET tags = array_remove(tags, ${t}) WHERE store_slug = ${storeSlug} AND email = ${e}`;
+}
+
+/** Set (or clear with null) a contact's private note. */
+export async function setCustomerNote(storeSlug: string, email: string, note: string | null): Promise<void> {
+ const e = await ensureCustomerRow(storeSlug, email);
+ await db()`UPDATE store_customers SET notes = ${note && note.trim() ? note.trim().slice(0, 2000) : null} WHERE store_slug = ${storeSlug} AND email = ${e}`;
+}
+
+/** Every distinct tag in use for this store, with how many contacts carry it — the segment list. */
+export async function listCustomerTags(storeSlug: string): Promise<{ tag: string; count: number }[]> {
+ await ensureTable();
+ const rows = (await db()`
+ SELECT tag, count(*)::int AS count
+ FROM store_customers, unnest(tags) AS tag
+ WHERE store_slug = ${storeSlug}
+ GROUP BY tag ORDER BY count DESC, tag ASC
+ `.catch(() => [])) as any[];
+ return rows.map((r) => ({ tag: r.tag, count: r.count }));
 }

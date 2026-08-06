@@ -13,6 +13,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/send-scheduled-campaigns",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/consignment-payouts",
       "schedule": "0 10 * * *"
     },
