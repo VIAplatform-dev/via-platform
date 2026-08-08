@@ -20,7 +20,7 @@ type Offer = {
  status: "pending" | "accepted" | "declined" | "expired" | "withdrawn";
  lastActor: "buyer" | "store"; binding: boolean;
 };
-type Settings = { messagingEnabled: boolean; offersEnabled: boolean; offersBinding: boolean; minOfferPct: number; notifyPhone: string | null; notifySms: boolean };
+type Settings = { messagingEnabled: boolean; offersEnabled: boolean; offersBinding: boolean; minOfferPct: number; notifyPhone: string | null; notifySms: boolean; smsAvailable?: boolean };
 
 // Accent is theme-scoped: green inside /infrastructure/admin (via --accent), wine on the seller
 // /store portal (the fallback). --accent-soft is the matching tint for hover/active surfaces.
@@ -164,10 +164,13 @@ export default function InboxPage() {
  { key: "notifySms", label: "Text me new messages", hint: "Get a text (iMessage where possible) the moment a shopper messages you, so you can reply fast." },
  ].map((row) => (
  <div key={row.key} className="flex items-start justify-between gap-6 py-3.5">
- <div><p className="text-[13px] font-medium text-stone-800">{row.label}</p><p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{row.hint}</p></div>
+ <div><p className="text-[13px] font-medium text-stone-800">{row.label}{row.key === "notifySms" && settings.smsAvailable === false && <span className="ml-2 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500 align-middle">Coming soon</span>}</p><p className="mt-0.5 text-[12px] leading-relaxed text-stone-500">{row.hint}</p></div>
  <Toggle on={settings[row.key as keyof Settings] as boolean} onChange={(v) => saveSettings({ [row.key]: v } as Partial<Settings>)} />
  </div>
  ))}
+ {settings.notifySms && settings.smsAvailable === false && (
+ <p className="py-2 text-[12px] leading-relaxed text-amber-700">Text notifications aren’t switched on yet — we’ll start sending to your number once texting goes live. Your preference is saved.</p>
+ )}
  {settings.notifySms && (
  <div className="py-3.5">
  <p className="text-[13px] font-medium text-stone-800">Notify this number</p>
