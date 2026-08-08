@@ -1,0 +1,56 @@
+VYA - Unit Economics & Break-even Model,,,
+ASSUMPTIONS (edit the Value column - everything else recomputes),,,
+Input,Value,Unit,Notes
+Paying stores (N),80,stores,change this to model any scale
+Tier mix - fraction on Starter,0.55,,rest are on Pro
+Starter price,49,$/mo,
+Pro price,99,$/mo,try 129
+New listings per store per month,28,listings,measured from products table
+AOV,375,$,measured (orders + sold_items)
+GMV per store per month,=B8*B9,$,= listings x AOV
+Commission rate,0.01,,1% of all GMV
+Claude cost per listing,0.1,$,estimate (Sonnet tokens)
+Vercel Blob per store per month,0.4,$,image storage + bandwidth
+FIXED COSTS (monthly),,,
+Item,$/mo,Source,
+Payroll (5 x 120k/yr),50000,5 employees,
+SerpApi (Production 15k searches),150,comps pricing + Google Trends,
+Photoroom (Max 3k exports),21,ghost-mannequin / image processing,
+iMessage line,289,text-to-list (Pro tier),
+Claude baseline,100,data-layer ETL + Ask VYA + dev,
+Vercel (base),30,hosting / compute,
+Resend,20,email (50k incl.),
+Neon,10,Postgres database,
+Voyage,0,embeddings (free tier),
+Monitoring / misc,50,Sentry / Firebase / buffer,
+TOTAL FIXED,=SUM(B16:B25),,
+VARIABLE COST PER STORE (monthly),,,
+Claude autofill,=B8*B12,= listings x cost per listing,
+Vercel Blob,=B13,,
+TOTAL VARIABLE PER STORE,=B28+B29,,
+REVENUE PER STORE (monthly),,,
+Blended subscription,=B5*B6+(1-B5)*B7,= mix of Starter/Pro,
+Commission,=B11*B10,= rate x GMV,
+TOTAL REVENUE PER STORE,=B32+B33,,
+KEY OUTPUTS,,,
+Contribution per store,=B34-B30,revenue per store - variable per store,
+Break-even stores,=B26/B36,= fixed / contribution,
+P&L AT CURRENT N (cell B4),,,
+Revenue per month,=B4*B34,,
+Variable cost per month,=B4*B30,,
+Fixed cost per month,=B26,,
+Profit per month,=B39-B40-B41,,
+Profit per year,=B42*12,,
+SCENARIO - profit by store count,,,
+Stores,Revenue/mo,Cost/mo,Profit/mo
+80,=A46*$B$34,=$B$26+A46*$B$30,=B46-C46
+292,=A47*$B$34,=$B$26+A47*$B$30,=B47-C47
+500,=A48*$B$34,=$B$26+A48*$B$30,=B48-C48
+1000,=A49*$B$34,=$B$26+A49*$B$30,=B49-C49
+NOTES,,,
+Stripe fees (2.9% + 30c) paid by the SELLER - not a VYA cost,,,
+Shippo labels covered by shipping margin - not a VYA cost,,,
+SerpApi steps: 150/15k then 275/30k then 725/100k searches,,,
+Photoroom steps: 21/3k then 82.50/10k exports,,,
+iMessage: 1 line ~1000 stores; plus 1000 one-time year 1,,,
+Voyage: 200M free tokens per capability - effectively $0,,,

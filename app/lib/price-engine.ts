@@ -1,5 +1,5 @@
 import { fetchComps, rankComps, isCompsConfigured, type Comp } from "./comps";
-import { getCachedComps, saveComps, getVyaComps } from "./comp-cache-db";
+import { getCachedComps, saveComps, getVyaComps, newestCompAgeDays } from "./comp-cache-db";
 import { inferCategoryFromTitle } from "./loadStoreProducts";
 import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db";
 import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config";
@@ -11,6 +11,9 @@ import { AI_MODELS } from "./ai-models";
 //  suggested     = max(market, floor)
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = AI_MODELS.pricing;
+// Cached comps older than this are treated as stale — the pricer refreshes live even if the
+// cache is well-stocked, so a fast-moving market doesn't get priced off weeks-old data.
+const COMP_FRESH_DAYS = 21;
 
 export type PriceEstimate = {
  suggestedCents: number;
@@ -156,12 +159,25 @@ export async function getMarketReferenceFast(opts: { query: string; brand: strin
  const m = benchmark.medianCents;
  return { suggestedCents: m, marketCents: m, floorCents: null, lowCents: benchmark.p25Cents ?? Math.round(m * 0.85), highCents: benchmark.p75Cents ?? Math.round(m * 1.2), confidence: 0.6, comps: [], rationale: "Market rate from your marketplace data.", source: "benchmark" };
  }
- const pool = [...cached, ...vya];
+ // Grade-path fallback: an item with no benchmark and thin/empty owned comps is one the system
+ // doesn't recognize. Do ONE live comp fetch so a typed price still gets an accurate flag instead
+ // of silence. Results are cached, so the next similar item is free.
+ let pool = [...cached, ...vya];
+ let liveFallback = false;
+ if (pool.filter((c) => c.priceCents > 0).length < 3 && isCompsConfigured()) {
+ const live = await fetchComps(opts.query).catch(() => []);
+ if (live.length) {
+ await saveComps(live, { query: opts.query, brand: opts.brand, category }).catch(() => {});
+ pool = [...pool, ...live];
+ liveFallback = true;
+ }
+ }
  const prices = pool.map((c) => c.priceCents).filter((p) => p > 0).sort((a, b) => a - b);
- if (prices.length < 3) return null; // too little to say anything
+ if (isCompsConfigured()) console.log(`[serpapi] grade "${opts.query.slice(0, 60)}" brand=${opts.brand ?? "?"} owned=${cached.length + vya.length} liveFallback=${liveFallback} prices=${prices.length}`);
+ if (prices.length < 3) return null; // too little to say anything even after a live look
  const q = (f: number) => prices[Math.min(prices.length - 1, Math.floor(prices.length * f))];
  const m = q(0.5);
- return { suggestedCents: m, marketCents: m, floorCents: null, lowCents: q(0.25), highCents: q(0.75), confidence: 0.5, comps: pool.slice(0, 8), rationale: "Market rate from comparable resale + your listings.", source: "comps" };
+ return { suggestedCents: m, marketCents: m, floorCents: null, lowCents: q(0.25), highCents: q(0.75), confidence: 0.5, comps: pool.slice(0, 8), rationale: liveFallback ? "Market rate from a live resale lookup (first time we've priced this)." : "Market rate from comparable resale + your listings.", source: "comps" };
 }
 
 export async function estimatePrice(opts: {
@@ -182,15 +198,20 @@ export async function estimatePrice(opts: {
  // new SerpApi basket. Only hit the live full basket (reverse-image + eBay + Shopping + RealReal)
  // on a cold/thin cache, then write every fresh comp back so the next similar item is free.
  // (Reverse-image comps in extraComps are always fresh — per photo — and also cached.)
- const [cached, benchmark, vyaComps] = await Promise.all([
+ const [cached, benchmark, vyaComps, cacheAgeDays] = await Promise.all([
  getCachedComps({ query: opts.query, brand, category, maxAgeDays: 45, limit: 40 }).catch(() => []),
  getInternalPriceBenchmark({ brand, category }).catch(() => null),
  getVyaComps({ brand, limit: 15 }).catch(() => []),
+ newestCompAgeDays(opts.query).catch(() => null),
  ]);
+ // Go live when the cache is thin OR stale (newest cached comp older than COMP_FRESH_DAYS), so a
+ // "known" item sitting on weeks-old comps still gets a fresh market read.
+ const stale = cacheAgeDays != null && cacheAgeDays > COMP_FRESH_DAYS;
  let live: Comp[] = [];
- if (cached.length < 8) {
+ if (cached.length < 8 || stale) {
  live = await fetchComps(opts.query).catch(() => []);
  }
+ if (isCompsConfigured()) console.log(`[serpapi] estimate "${opts.query.slice(0, 60)}" brand=${brand ?? "?"} cached=${cached.length} ageDays=${cacheAgeDays ?? "none"} stale=${stale} live=${live.length}`);
  // Persist this run's fresh EXTERNAL comps (reverse-image + any live) for future reuse. VYA
  // comps come straight from our own tables, so there's nothing to cache.
  const fresh = rankComps([...(opts.extraComps || []), ...live]);

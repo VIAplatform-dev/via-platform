@@ -123,6 +123,20 @@ export async function getCachedComps(opts: {
 }
 
 /**
+ * Days since the most recent cached comp for this exact query (null if none cached). Lets the
+ * pricer refresh a STALE cache — plenty of comps, but all weeks old — not just a cold one.
+ */
+export async function newestCompAgeDays(query: string): Promise<number | null> {
+ await ensure();
+ const sql = db();
+ const qn = normalizeQuery(query);
+ const rows = (await sql`SELECT MAX(fetched_at) AS newest FROM comp_cache WHERE query_norm = ${qn}`.catch(() => [])) as Array<{ newest: string | null }>;
+ const newest = rows[0]?.newest;
+ if (!newest) return null;
+ return Math.floor((Date.now() - new Date(newest).getTime()) / 86_400_000);
+}
+
+/**
  * Comps from VYA's OWN data, matched by brand:
  *  - sold_items → items that actually SOLD on the marketplace (real transactions, weighted high)
  *  - products → items currently LISTED (asking prices — a soft reference only; kept as

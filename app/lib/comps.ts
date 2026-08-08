@@ -20,11 +20,15 @@ async function serp(params: Record<string, string>): Promise<any | null> {
  const url = new URL(SERPAPI_URL);
  url.searchParams.set("api_key", apiKey);
  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+ const q = (params.q ?? params._nkw ?? params.url ?? "").slice(0, 50);
+ const t0 = Date.now();
  try {
  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+ console.log(`[serpapi] call engine=${params.engine} q="${q}" ${res.ok ? "ok" : res.status} ${Date.now() - t0}ms`);
  if (!res.ok) return null;
  return await res.json();
  } catch {
+ console.log(`[serpapi] call engine=${params.engine} q="${q}" error ${Date.now() - t0}ms`);
  return null;
  }
 }
