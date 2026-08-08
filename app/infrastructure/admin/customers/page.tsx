@@ -191,8 +191,7 @@ export default function CustomersPage() {
  <table className="w-full text-[13px]">
  <thead>
  <tr>
- <TH className="px-4 w-9"><input type="checkbox" disabled className="h-3.5 w-3.5 accent-[var(--accent,#0e9f76)]" aria-label="Select all" /></TH>
- <TH className="px-3">Customer name</TH>
+  <TH className="px-3">Customer name</TH>
  <TH className="px-5">Email subscription</TH>
  <TH className="px-5">Location</TH>
  <TH right className="px-5">Orders</TH>
@@ -202,8 +201,7 @@ export default function CustomersPage() {
  <tbody>
  {filtered.map((c) => (
  <tr key={c.email} className="transition hover:bg-stone-50/70">
- <TD className="px-4"><input type="checkbox" className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${c.email}`} /></TD>
- <TD className="px-3">
+  <TD className="px-3">
  <Link href={`/admin/customers/${encodeURIComponent(c.email)}`} className="group/name inline-block">
  <div className="font-medium text-stone-900 group-hover/name:underline">{c.name || c.email}</div>
  {c.name && <div className="text-[12px] text-stone-400">{c.email}</div>}
@@ -220,7 +218,7 @@ export default function CustomersPage() {
  </tr>
  ))}
  {filtered.length === 0 && (
- <tr><td colSpan={6} className="px-5 py-10 text-center text-stone-400">No customers match “{q}”.</td></tr>
+ <tr><td colSpan={5} className="px-5 py-10 text-center text-stone-400">No customers match “{q}”.</td></tr>
  )}
  </tbody>
  </table>

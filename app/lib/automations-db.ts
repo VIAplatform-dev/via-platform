@@ -33,13 +33,15 @@ async function ensureTable() {
  ensured = true;
 }
 
-// VYA's built-in flows, each backed by a scheduled job that honors these toggles.
+// VYA's built-in flows, each backed by a scheduled job that ACTUALLY honors these per-store toggles
+// (sendNewListingsDigest + sendAbandonedCartEmail both gate on isAutomationEnabled). Only flows that
+// send AS the store belong here. Saved-search / viewed-item / win-back were removed: those crons are
+// marketplace-level buyer notifications (VYA-branded, keyed on user_id across ALL stores), so a
+// per-store toggle never controlled them — showing it was a dead switch. Re-add only if/when a
+// genuinely store-scoped version exists.
 export const BUILTIN_AUTOMATIONS: { key: string; name: string; body: string; cadence: string }[] = [
  { key: "abandoned_cart", name: "Abandoned cart", body: "Nudges a shopper who added to cart but didn’t check out — with the item and a link back.", cadence: "Within a day of drop-off" },
  { key: "new_arrivals", name: "New arrivals", body: "Emails your audience when you publish fresh pieces, so your best customers see them first.", cadence: "On a new drop" },
- { key: "saved_search", name: "Saved-search alerts", body: "When a new listing matches what a shopper favorited or searched, they get a heads-up.", cadence: "As matches appear" },
- { key: "viewed_item", name: "Viewed-item reminder", body: "Follows up with a shopper who lingered on a one-of-one piece before it sells.", cadence: "A day later" },
- { key: "winback", name: "Win-back", body: "Re-engages customers who haven’t bought in a while with what’s new.", cadence: "Periodically" },
 ];
 export const CUSTOM_TRIGGERS: { value: string; label: string }[] = [
  { value: "new_listing", label: "When I publish a new listing" },

@@ -68,10 +68,12 @@ export default function OnboardingWizard() {
    const data = await res.json().catch(() => ({}));
    if (!res.ok) { setError(data?.error || "Something went wrong — try again."); setBusy(false); return; }
    // Brought an existing site → kick off the import now so their products + pages are waiting
-   // when they land. Best-effort: a failure still lands them on home, where they can retry.
+   // when they land. If it fails, don't strand them on an empty home — route to the
+   // Bring-your-site page, which has the full import + retry UI.
    if (data?.hasWebsite && data?.websiteUrl) {
     setImporting(true);
-    await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: data.websiteUrl }) }).catch(() => {});
+    const cap = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: data.websiteUrl }) }).catch(() => null);
+    if (!cap || !cap.ok) { router.replace("/admin/import?from=onboarding"); return; }
    }
    router.replace("/admin/home");
   } catch {

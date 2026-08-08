@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
  const base = baseUrl(request);
  const link = await stripePost("account_links", {
  account: accountId,
- refresh_url: `${base}/store/payments?refresh=1`,
- return_url: `${base}/store/payments?done=1`,
+ refresh_url: `${base}/admin/payments?refresh=1`,
+ return_url: `${base}/admin/payments?done=1`,
  type: "account_onboarding",
  });
 

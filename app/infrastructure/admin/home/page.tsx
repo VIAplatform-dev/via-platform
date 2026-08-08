@@ -41,6 +41,7 @@ export default function WorkspaceHome() {
  const [offersList, setOffersList] = useState<Offer[]>([]);
  const [inboxMsgs, setInboxMsgs] = useState<InboxMsg[]>([]);
  const [demand, setDemand] = useState<{ name: string; trend: string; index: number }[]>([]);
+ const [demandLocked, setDemandLocked] = useState(false); // market-insights is Pro-gated → show upsell, not a misleading empty state
  const [period, setPeriod] = useState("30d");
  const [nowMs] = useState(() => Date.now()); // stable "now" (set once) — keeps date math pure in render
 
@@ -65,6 +66,7 @@ export default function WorkspaceHome() {
  }).catch(() => {});
  fetch("/api/store/messages").then((r) => (r.ok ? r.json() : null)).then((d) => { const m = d?.messages || d?.threads || d; if (Array.isArray(m)) setInboxMsgs(m); }).catch(() => {});
  fetch("/api/store/market-insights").then((r) => (r.ok ? r.json() : null)).then((d) => {
+ if (d?.locked) { setDemandLocked(true); return; }
  if (Array.isArray(d?.trending) && d.trending.length) setDemand(d.trending.slice(0, 6).map((t: { segmentValue: string; demandTrend: string; demandIndex: number }) => ({ name: t.segmentValue, trend: t.demandTrend, index: t.demandIndex })));
  }).catch(() => {});
  // Load any saved conversation so the chat (and its memory) continues where it left off.
@@ -353,6 +355,11 @@ export default function WorkspaceHome() {
  </div>
  );
  })}
+ </div>
+ ) : demandLocked ? (
+ <div className="py-6 text-center">
+ <p className="text-[13px] text-stone-500">See what VYA buyers are demanding right now — the exact brands and categories to source before prices climb.</p>
+ <Link href={`${B}/billing`} className="mt-3 inline-block rounded-lg bg-stone-900 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-stone-800">Upgrade to unlock</Link>
  </div>
  ) : (
  <p className="py-8 text-center text-[13px] text-stone-400">Demand insights build as marketplace data grows — see the Trends page for what’s heating up.</p>

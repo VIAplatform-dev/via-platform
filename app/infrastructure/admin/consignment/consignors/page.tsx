@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Users, ArrowLeft } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, SectionLabel, TH, TD } from "../../ui";
 
-type Consignor = { id: number; name: string; email: string | null; phone: string | null; defaultSplitPct: number | null; payoutMethod: string | null; status: string; balanceCents: number };
+type Consignor = { id: number; name: string; email: string | null; phone: string | null; defaultSplitPct: number | null; payoutMethod: string | null; status: string; balanceCents: number; stripeAccountId: string | null; portalToken: string | null };
 
 const label = "block text-[11px] font-medium uppercase tracking-wide text-stone-500 mb-1";
 const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400";
@@ -17,6 +17,15 @@ export default function ConsignorsPage() {
  const [form, setForm] = useState({ name: "", email: "", phone: "", defaultSplitPct: "" });
  const [saving, setSaving] = useState(false);
  const [err, setErr] = useState<string | null>(null);
+ const [copiedId, setCopiedId] = useState<number | null>(null);
+
+ // Consignors connect their own bank in the consignor portal (Stripe Express, /api/consignor/connect) —
+ // the store never touches bank details. This copies the portal link so the store can nudge someone
+ // who hasn't set up direct deposit yet.
+ function copySetupLink(id: number) {
+ const url = `${window.location.origin}/consignor`;
+ navigator.clipboard?.writeText(url).then(() => { setCopiedId(id); setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500); }).catch(() => {});
+ }
 
  async function reload() {
  const r = await fetch("/api/store/consignment/consignors");
@@ -91,6 +100,7 @@ export default function ConsignorsPage() {
  <TH className="px-4">Consignor</TH>
  <TH className="px-4">Default split</TH>
  <TH right className="px-4">Balance owed</TH>
+ <TH className="px-4">Direct deposit</TH>
  <TH className="px-4">Status</TH>
  </tr>
  </thead>
@@ -111,6 +121,16 @@ export default function ConsignorsPage() {
  {c.defaultSplitPct != null && <span className="ml-1 text-stone-400">%</span>}
  </TD>
  <TD right className="px-4 font-medium text-stone-900">{money(c.balanceCents)}</TD>
+ <TD className="px-4">
+ {c.stripeAccountId ? (
+ <StatusPill tone="live" dot>Ready</StatusPill>
+ ) : (
+ <button type="button" onClick={() => copySetupLink(c.id)} className="inline-flex items-center gap-1.5" title="Copy the consignor portal link so they can connect their bank">
+ <StatusPill tone="neutral">Not set up</StatusPill>
+ <span className="text-[11px] text-stone-400 underline">{copiedId === c.id ? "Copied!" : "Copy setup link"}</span>
+ </button>
+ )}
+ </TD>
  <TD className="px-4">
  <div className="flex items-center gap-3">
  <button type="button" onClick={() => patchConsignor(c.id, { status: c.status === "active" ? "inactive" : "active" })} className="inline-flex" title={`Toggle ${c.name}'s status`}>

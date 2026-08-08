@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, StatusPill, TechButton } from "../ui";
 
@@ -153,6 +154,19 @@ export default function TrendsPage() {
  </div>
  </div>
  ))}
+ </div>
+ </TechCard>
+ )}
+
+ {/* Source Now is Pro — when locked, show the upsell instead of silently rendering nothing. */}
+ {sourceNow?.locked && (
+ <TechCard className="mb-6 p-5">
+ <div className="flex items-center justify-between gap-4">
+ <div>
+ <p className="text-[13px] font-semibold text-stone-900">Source now</p>
+ <p className="mt-0.5 text-[12px] text-stone-500">What to buy right now — where VYA buyers&apos; demand is rising and few stores carry it. Available on Pro.</p>
+ </div>
+ <Link href="/admin/billing" className="shrink-0 rounded-lg bg-stone-900 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-stone-800">Upgrade to Pro</Link>
  </div>
  </TechCard>
  )}
