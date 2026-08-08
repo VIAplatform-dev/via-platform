@@ -9,9 +9,10 @@ export default function AdminLoginClient() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
-  const [step, setStep] = useState<"password" | "otp">("password");
+  const [step, setStep] = useState<"password" | "otp" | "reset">("password");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
@@ -22,6 +23,17 @@ export default function AdminLoginClient() {
     setLoading(true);
 
     try {
+      if (step === "reset") {
+        await fetch("/api/admin/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        // Always show the same confirmation — the endpoint never reveals whether the email matched.
+        setResetSent(true);
+        return;
+      }
+
       const body =
         step === "otp" ? { email, password, otpCode: totpCode } : { email, password };
 
@@ -69,6 +81,8 @@ export default function AdminLoginClient() {
             <p className="text-sm" style={{ color: "rgba(93,15,23,0.6)" }}>
               {step === "password"
                 ? "Sign in to continue"
+                : step === "reset"
+                ? "Enter your email to reset your password"
                 : `Check ${email || "hana@vyaplatform.com"} for your code`}
             </p>
           </div>
@@ -102,6 +116,41 @@ export default function AdminLoginClient() {
                   onFocus={(e) => (e.target.style.borderColor = "#5D0F17")}
                   onBlur={(e) => (e.target.style.borderColor = "rgba(93,15,23,0.3)")}
                 />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("reset");
+                    setError("");
+                  }}
+                  className="text-xs transition-colors"
+                  style={{ color: "rgba(93,15,23,0.5)" }}
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            ) : step === "reset" ? (
+              <div>
+                <input
+                  id="reset-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email"
+                  autoFocus
+                  autoComplete="username"
+                  required
+                  disabled={resetSent}
+                  className="w-full px-4 py-3 border text-sm outline-none transition-colors disabled:opacity-50"
+                  style={{ borderColor: "rgba(93,15,23,0.3)", color: "#5D0F17" }}
+                  onFocus={(e) => (e.target.style.borderColor = "#5D0F17")}
+                  onBlur={(e) => (e.target.style.borderColor = "rgba(93,15,23,0.3)")}
+                />
+                {resetSent && (
+                  <p className="text-sm text-center mt-4" style={{ color: "rgba(93,15,23,0.7)" }}>
+                    If that email belongs to an admin, a reset link is on its way. The link
+                    expires in 1 hour.
+                  </p>
+                )}
               </div>
             ) : (
               <div>
@@ -132,27 +181,39 @@ export default function AdminLoginClient() {
               <p className="text-red-600 text-sm text-center">{error}</p>
             )}
 
-            <button
-              type="submit"
-              disabled={loading || (step === "password" ? !password : !totpCode)}
-              className="w-full py-3 text-sm uppercase tracking-wide transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#5D0F17", color: "#FFFDF8" }}
-            >
-              {loading ? "Verifying…" : step === "password" ? "Continue" : "Sign In"}
-            </button>
+            {!(step === "reset" && resetSent) && (
+              <button
+                type="submit"
+                disabled={
+                  loading ||
+                  (step === "password" ? !password : step === "reset" ? !email : !totpCode)
+                }
+                className="w-full py-3 text-sm uppercase tracking-wide transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: "#5D0F17", color: "#FFFDF8" }}
+              >
+                {loading
+                  ? "Verifying…"
+                  : step === "password"
+                  ? "Continue"
+                  : step === "reset"
+                  ? "Send reset link"
+                  : "Sign In"}
+              </button>
+            )}
 
-            {step === "otp" && (
+            {(step === "otp" || step === "reset") && (
               <button
                 type="button"
                 onClick={() => {
                   setStep("password");
                   setTotpCode("");
                   setError("");
+                  setResetSent(false);
                 }}
                 className="w-full text-sm transition-colors"
                 style={{ color: "rgba(93,15,23,0.5)" }}
               >
-                Back
+                Back to sign in
               </button>
             )}
           </form>

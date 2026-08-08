@@ -127,6 +127,10 @@ export async function GET(request: NextRequest) {
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
   };
 
+  // Surface Collabs failures instead of hiding them: a stale cookie/CSRF token makes every
+  // group query error, which otherwise looks identical to a genuine "not found".
+  const collabsErrors: string[] = [];
+  let nodesScanned = 0;
   for (const group of GROUPS) {
     try {
       const res = await fetch(COLLABS_GRAPHQL_URL, {
@@ -145,9 +149,17 @@ export async function GET(request: NextRequest) {
           }`,
         }),
       });
+      if (!res.ok) {
+        collabsErrors.push(`${group}: HTTP ${res.status}`);
+        continue;
+      }
       const json = await res.json();
-      if (json.errors) continue;
+      if (json.errors) {
+        collabsErrors.push(`${group}: ${JSON.stringify(json.errors).slice(0, 300)}`);
+        continue;
+      }
       const nodes = json?.data?.payouts?.partnershipCommissions?.nodes ?? [];
+      nodesScanned += nodes.length;
       const found = nodes.find((n: { id: string }) =>
         n.id === commissionId ||
         n.id.endsWith(`/${commissionId}`) ||
@@ -169,8 +181,21 @@ export async function GET(request: NextRequest) {
           },
         });
       }
-    } catch { continue; }
+    } catch (e) {
+      collabsErrors.push(`${group}: ${e instanceof Error ? e.message : String(e)}`);
+      continue;
+    }
   }
 
-  return NextResponse.json({ found: false, partnershipId, commissionId });
+  // If every group errored (and none returned data), it's almost certainly a stale Collabs
+  // session (refresh collabs_cookie / collabs_csrf_token) — not a real miss.
+  const likelyAuthFailure = collabsErrors.length === GROUPS.length && nodesScanned === 0;
+  return NextResponse.json({
+    found: false,
+    partnershipId,
+    commissionId,
+    nodesScanned,
+    likelyAuthFailure,
+    collabsErrors: collabsErrors.length ? collabsErrors : undefined,
+  });
 }

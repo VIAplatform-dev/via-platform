@@ -96,6 +96,24 @@ export async function setPasswordFromInvite(token: string, password: string): Pr
  return true;
 }
 
+/**
+ * Self-service password reset: issue a fresh token for an EXISTING, ACTIVE admin so they can
+ * reset from their own inbox. Returns the token + canonical email, or null if the email isn't a
+ * known active admin (the caller returns a generic success either way to avoid user enumeration).
+ * Deliberately separate from inviteAdmin — this never creates accounts and never touches inactive
+ * (never-onboarded) rows, so the public endpoint can't be used to provision or probe admins.
+ */
+export async function requestPasswordReset(email: string): Promise<{ token: string; email: string } | null> {
+ await ensureTable();
+ const e = normEmail(email);
+ const rows = await db()`SELECT email FROM admin_users WHERE email = ${e} AND active = true AND password_hash IS NOT NULL LIMIT 1`;
+ if (!rows[0]) return null;
+ const token = crypto.randomBytes(32).toString("hex");
+ const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1-hour reset window
+ await db()`UPDATE admin_users SET invite_token = ${token}, invite_expires = ${expires} WHERE email = ${e}`;
+ return { token, email: e };
+}
+
 /** Verify an admin's email + password. Returns the canonical email on success. */
 export async function verifyAdminLogin(email: string, password: string): Promise<string | null> {
  const a = await getAdminByEmail(email);
