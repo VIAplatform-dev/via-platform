@@ -1,6 +1,26 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Don't advertise the framework/version.
+  poweredByHeader: false,
+  // Baseline security headers on every response. Deliberately NOT a full content-security-policy
+  // (that risks breaking inline scripts/embeds and needs its own rollout); frame-ancestors here
+  // gives robust clickjacking protection without touching resource loading.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        ],
+      },
+    ];
+  },
   async redirects() {
     const socialSources = [
       { path: "instagram", source: "instagram", campaign: "instagram_bio" },

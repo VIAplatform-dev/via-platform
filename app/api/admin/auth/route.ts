@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import crypto from "crypto";
 import { Resend } from "resend";
 import { verifyAdminLogin } from "@/app/lib/admin-users-db";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 const FALLBACK_OTP_EMAIL = "hana@vyaplatform.com";
 
@@ -92,6 +93,15 @@ body { margin: 0; padding: 0; background-color: #FFFDF8; font-family: Georgia, '
 
 export async function POST(request: Request) {
  try {
+ // Throttle per IP: caps password brute-force AND the OTP emails each password submit triggers.
+ // A real sign-in is only a couple of requests, so 20 / 15 min is generous.
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "admin-auth", ip, max: 20, windowMinutes: 15 })) {
+ return NextResponse.json(
+ { error: "Too many attempts. Please wait a few minutes and try again." },
+ { status: 429 }
+ );
+ }
  const { email, password, otpCode } = await request.json();
  const expectedPassword = process.env.ADMIN_PASSWORD;
 
