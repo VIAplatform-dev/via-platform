@@ -10,6 +10,7 @@ import { neon } from "@neondatabase/serverless";
 export type SellerPayments = {
  storeSlug: string;
  stripeAccountId: string | null;
+ shipAccountId: string | null; // shipping sub-account handle (EasyPost Child-User key / Shippo managed-account id)
  chargesEnabled: boolean; // can accept payments
  payoutsEnabled: boolean; // can receive payouts to bank
  detailsSubmitted: boolean; // finished Stripe onboarding
@@ -37,6 +38,9 @@ function ensureTable(): Promise<void> {
  updated_at TIMESTAMPTZ DEFAULT NOW()
  )
  `;
+ // Shipping sub-account per store (EasyPost Forge Child-User key / Shippo managed-account id).
+ // Self-healing add so existing rows get the column with no migration step.
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS ship_account_id TEXT`;
  })().catch((e) => {
  tableReady = null;
  throw e;
@@ -50,6 +54,7 @@ function rowTo(r: any): SellerPayments {
  return {
  storeSlug: r.store_slug,
  stripeAccountId: r.stripe_account_id ?? null,
+ shipAccountId: r.ship_account_id ?? null,
  chargesEnabled: Boolean(r.charges_enabled),
  payoutsEnabled: Boolean(r.payouts_enabled),
  detailsSubmitted: Boolean(r.details_submitted),
@@ -79,6 +84,25 @@ export async function saveStripeAccount(storeSlug: string, accountId: string): P
  INSERT INTO seller_payments (store_slug, stripe_account_id, updated_at)
  VALUES (${storeSlug}, ${accountId}, NOW())
  ON CONFLICT (store_slug) DO UPDATE SET stripe_account_id = EXCLUDED.stripe_account_id, updated_at = NOW()
+ `;
+}
+
+/** The store's shipping sub-account handle (EasyPost Child-User key / Shippo managed-account id), or null. */
+export async function getShipAccountId(storeSlug: string): Promise<string | null> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ const rows = await sql`SELECT ship_account_id FROM seller_payments WHERE store_slug = ${storeSlug}`;
+ return rows.length ? ((rows[0].ship_account_id as string) ?? null) : null;
+}
+
+/** Record a store's shipping sub-account handle (created lazily on first shipment). */
+export async function saveShipAccount(storeSlug: string, shipAccountId: string): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`
+ INSERT INTO seller_payments (store_slug, ship_account_id, updated_at)
+ VALUES (${storeSlug}, ${shipAccountId}, NOW())
+ ON CONFLICT (store_slug) DO UPDATE SET ship_account_id = EXCLUDED.ship_account_id, updated_at = NOW()
  `;
 }
 

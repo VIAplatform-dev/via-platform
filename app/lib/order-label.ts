@@ -1,7 +1,7 @@
 import { getOrderDetail, setOrderLabel, setReturnLabel, getReturnLabelInfo, setShipBackLabel } from "./db/orders";
 import { getSellerById } from "./db/sellers";
 import { getShippingSettings, hasShipFrom } from "./store-shipping-db";
-import { getRates, buyLabel, voidLabel, isShippoConfigured } from "./shippo";
+import { getRates, buyLabel, voidLabel, isShipConfigured, getOrCreateShipAccount } from "./ship-provider";
 import { recordLabelTransaction, getLabelTransaction, markLabelVoided } from "./shippo-labels-db";
 import { MIN_MARGIN_CENTS } from "./shipping-tiers";
 import { sendOpsAlert } from "./email";
@@ -16,7 +16,7 @@ import { sendOpsAlert } from "./email";
  * manual "generate label" button. Buys the cheapest service.
  */
 export async function generateOrderLabel(orderId: string): Promise<{ ok: boolean; reason?: string }> {
- if (!isShippoConfigured()) return { ok: false, reason: "shippo-not-configured" };
+ if (!isShipConfigured()) return { ok: false, reason: "ship-not-configured" };
  const order = await getOrderDetail(orderId);
  if (!order) return { ok: false, reason: "order-not-found" };
  if (order.labelUrl) return { ok: true, reason: "already-labeled" };
@@ -32,9 +32,10 @@ export async function generateOrderLabel(orderId: string): Promise<{ ok: boolean
  const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
- const rates = await getRates(from, to, parcel);
+ const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
+ const rates = await getRates(from, to, parcel, shipAcct);
  if (!rates.length) return { ok: false, reason: "no-rates" };
- const label = await buyLabel(rates[0].rateId);
+ const label = await buyLabel(rates[0].rateId, shipAcct);
  if (!label) return { ok: false, reason: "label-failed" };
  await setOrderLabel(orderId, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
  await recordLabelTransaction(orderId, label.transactionId); // so we can void it if the order is refunded
@@ -73,7 +74,7 @@ export async function voidOrderLabel(orderId: string): Promise<boolean> {
  * (returns the existing label) + best-effort (a reason instead of throwing).
  */
 export async function generateReturnLabel(orderId: string): Promise<{ ok: boolean; reason?: string; labelUrl?: string; trackingNumber?: string; costCents?: number }> {
- if (!isShippoConfigured()) return { ok: false, reason: "shippo-not-configured" };
+ if (!isShipConfigured()) return { ok: false, reason: "ship-not-configured" };
  const order = await getOrderDetail(orderId);
  if (!order) return { ok: false, reason: "order-not-found" };
 
@@ -92,9 +93,10 @@ export async function generateReturnLabel(orderId: string): Promise<{ ok: boolea
  const to = { name: s.name || seller.name, street1: s.street1!, street2: s.street2, city: s.city!, state: s.state!, zip: s.zip!, country: s.country || "US", phone: s.phone, email: seller.email };
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
- const rates = await getRates(from, to, parcel);
+ const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
+ const rates = await getRates(from, to, parcel, shipAcct);
  if (!rates.length) return { ok: false, reason: "no-rates" };
- const label = await buyLabel(rates[0].rateId);
+ const label = await buyLabel(rates[0].rateId, shipAcct);
  if (!label) return { ok: false, reason: "label-failed" };
  await setReturnLabel(orderId, { url: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents });
  return { ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents };
@@ -105,7 +107,7 @@ export async function generateReturnLabel(orderId: string): Promise<{ ok: boolea
  * outbound, bought fresh and stored separately so it doesn't clash with the original fulfillment label).
  */
 export async function generateShipBackLabel(orderId: string): Promise<{ ok: boolean; reason?: string; labelUrl?: string; trackingNumber?: string; costCents?: number }> {
- if (!isShippoConfigured()) return { ok: false, reason: "shippo-not-configured" };
+ if (!isShipConfigured()) return { ok: false, reason: "ship-not-configured" };
  const order = await getOrderDetail(orderId);
  if (!order) return { ok: false, reason: "order-not-found" };
  if (!order.shipLine1 || !order.shipCity) return { ok: false, reason: "no-buyer-address" };
@@ -119,9 +121,10 @@ export async function generateShipBackLabel(orderId: string): Promise<{ ok: bool
  const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
- const rates = await getRates(from, to, parcel);
+ const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
+ const rates = await getRates(from, to, parcel, shipAcct);
  if (!rates.length) return { ok: false, reason: "no-rates" };
- const label = await buyLabel(rates[0].rateId);
+ const label = await buyLabel(rates[0].rateId, shipAcct);
  if (!label) return { ok: false, reason: "label-failed" };
  await setShipBackLabel(orderId, label.labelUrl);
  return { ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents };

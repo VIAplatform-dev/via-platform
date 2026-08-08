@@ -12,7 +12,7 @@ import { recordLabelTransaction } from "@/app/lib/shippo-labels-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
-import { getRates, buyLabel, isShippoConfigured } from "@/app/lib/shippo";
+import { getRates, buyLabel, isShipConfigured, getOrCreateShipAccount } from "@/app/lib/ship-provider";
 import { shippingMarginCents } from "@/app/lib/shipping-tiers";
 import { logError } from "@/app/lib/error-log";
 import { sendBuyerTrackingEmail } from "@/app/lib/email";
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, status: "shipped" });
  }
 
- if (!isShippoConfigured()) return NextResponse.json({ error: "Shipping labels aren’t enabled yet." }, { status: 503 });
+ if (!isShipConfigured()) return NextResponse.json({ error: "Shipping labels aren’t enabled yet." }, { status: 503 });
  const shipping = await getShippingSettings(slug);
  if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping first." }, { status: 400 });
  if (!order.shipLine1 || !order.shipCity) return NextResponse.json({ error: "This order has no shipping address." }, { status: 400 });
@@ -200,7 +200,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
- const rates = await getRates(from, to, parcel);
+ const shipAcct = await getOrCreateShipAccount(slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
+ const rates = await getRates(from, to, parcel, shipAcct);
  if (!rates.length) return NextResponse.json({ error: "No shipping rates available for this address." }, { status: 502 });
  const cheapest = rates[0];
 
@@ -220,7 +221,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // Free-shipping labels are billed to the seller — require a card up front.
  if (sellerPays && !seller.stripeCustomerId) return NextResponse.json({ error: "Add a payment method to cover free-shipping labels first." }, { status: 400 });
  // Buy the label FIRST: if Shippo fails, the seller is never left charged for a label they didn't get.
- const label = await buyLabel(rateId);
+ const label = await buyLabel(rateId, shipAcct);
  if (!label) return NextResponse.json({ error: "Label purchase failed — try again." }, { status: 502 });
  // Then recover the cost from the seller. Idempotency key stops a double-click double-charge; and if
  // billing fails the order still ships — we don't strand the buyer over a seller-card problem, just log it.
