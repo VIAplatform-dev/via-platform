@@ -198,6 +198,62 @@ export async function markGolden(ids: number[], on = true): Promise<number> {
  return rows[0]?.n ?? 0;
 }
 
+/**
+ * Seed the golden answer key from the most-trusted existing rows (no manual review). Promotes up to
+ * `limit` not-yet-golden examples, ranked by: trust tier (high › medium › other), then LABEL RICHNESS
+ * (how many of era/material/condition/category are filled — so the benchmark can grade every field,
+ * not just brand), then seller-confirmed sources (intake/items/sold over marketplace), then recency.
+ * Requires a brand label + a usable photo. Returns how many were promoted + the new golden count.
+ */
+export async function seedGolden(limit = 150): Promise<{ promoted: number; goldenCount: number }> {
+ await ensureTable();
+ const n = Math.max(1, Math.min(500, Math.round(Number(limit)) || 150));
+ const promoted = (await db()`
+  UPDATE training_examples SET golden = true, golden_at = now()
+  WHERE id IN (
+   SELECT id FROM training_examples
+   WHERE NOT golden AND brand IS NOT NULL AND brand <> '' AND jsonb_array_length(image_urls) > 0
+     -- Anti-circularity: never grade the model against its OWN accepted guess. If the final brand is
+     -- identical to what the AI predicted (ai_brand), we can't tell "human verified" from "human
+     -- rubber-stamped," so it's not a trustworthy answer key. Store-originated labels have ai_brand
+     -- NULL and pass; only seller-EDITED intake rows (brand ≠ ai_brand) or independent sources qualify.
+     AND NOT (ai_brand IS NOT NULL AND ai_brand <> '' AND lower(trim(brand)) = lower(trim(ai_brand)))
+   ORDER BY
+    (CASE WHEN trust = 'high' THEN 0 WHEN trust = 'medium' THEN 1 ELSE 2 END),
+    ((era IS NOT NULL AND era <> '')::int + (material IS NOT NULL AND material <> '')::int
+     + (condition IS NOT NULL AND condition <> '')::int + (category IS NOT NULL AND category <> '')::int) DESC,
+    (source IN ('intake','items','sold')) DESC,
+    created_at DESC
+   LIMIT ${n}
+  )
+  RETURNING id
+ `.catch(() => [])) as { id: number }[];
+ const cnt = (await db()`SELECT COUNT(*)::int AS n FROM training_examples WHERE golden`.catch(() => [{ n: 0 }])) as { n: number }[];
+ return { promoted: promoted.length, goldenCount: Number(cnt[0]?.n ?? 0) };
+}
+
+export type GoldenReviewRow = {
+ id: number; source: string; imageUrls: string[];
+ brand: string | null; era: string | null; material: string | null;
+ condition: string | null; category: string | null; priceCents: number | null; title: string | null;
+};
+/** Current golden rows with their photos + labels, for a human spot-check of the answer key. */
+export async function getGoldenForReview(limit = 40): Promise<GoldenReviewRow[]> {
+ await ensureTable();
+ const n = Math.max(1, Math.min(200, Math.round(Number(limit)) || 40));
+ const rows = (await db()`
+  SELECT id, source, image_urls, brand, era, material, condition, category, price_cents, title
+  FROM training_examples WHERE golden ORDER BY golden_at DESC NULLS LAST, id DESC LIMIT ${n}
+ `.catch(() => [])) as Record<string, unknown>[];
+ return rows.map((r) => ({
+  id: Number(r.id), source: String(r.source || ""),
+  imageUrls: Array.isArray(r.image_urls) ? (r.image_urls as string[]) : [],
+  brand: (r.brand as string) ?? null, era: (r.era as string) ?? null, material: (r.material as string) ?? null,
+  condition: (r.condition as string) ?? null, category: (r.category as string) ?? null,
+  priceCents: (r.price_cents as number) ?? null, title: (r.title as string) ?? null,
+ }));
+}
+
 export type GoldenStats = { total: number; byCategory: { category: string; n: number }[]; withPrice: number; tiers: { trust: string; n: number }[] };
 export async function getGoldenStats(): Promise<GoldenStats> {
  await ensureTable();

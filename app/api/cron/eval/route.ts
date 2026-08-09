@@ -22,7 +22,9 @@ export async function GET(request: Request) {
  const sample = Math.max(1, Math.min(50, Number(process.env.EVAL_NIGHTLY_SAMPLE) || 20));
  const withPrice = process.env.EVAL_NIGHTLY_PRICE === "true";
  try {
- const result = await runEval({ sample, withReverseImage: true, withPrice });
+ // Grade against the hand-verified golden key when it exists (runEval falls back to the full
+ // set automatically if none has been seeded yet), so the weekly number is the trustworthy one.
+ const result = await runEval({ sample, withReverseImage: true, withPrice, goldenOnly: true });
  await saveEvalRun(result);
  return NextResponse.json({ ok: true, ...result });
  } catch (e) {

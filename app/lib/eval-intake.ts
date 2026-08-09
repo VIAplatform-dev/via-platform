@@ -64,6 +64,10 @@ export type EvalResult = {
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// Condition is a free-text note ("Excellent — light wear to the sole"), so grade on the leading
+// grade word rather than an exact string match — that's the part the resale grade actually turns on.
+function gradeWord(s: string | null | undefined): string { return norm((s || "").split(/[—:\-]/)[0]); }
+
 export async function runEval(opts: { sample: number; withReverseImage: boolean; withPrice: boolean; goldenOnly?: boolean }): Promise<EvalResult> {
  const sample = Math.max(1, Math.min(50, Math.round(opts.sample) || 15));
  const sql = db();
@@ -73,7 +77,7 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  // (not noisy auto-labels). Falls back to the full set if no golden items exist yet.
  let rows = opts.goldenOnly
  ? (await sql`
-   SELECT item_ref, image_urls, brand, era, category, price_cents, title
+   SELECT item_ref, image_urls, brand, era, material, condition, category, price_cents, title
    FROM training_examples
    WHERE golden AND brand IS NOT NULL AND brand <> '' AND jsonb_array_length(image_urls) > 0
    ORDER BY random() LIMIT ${sample}
@@ -82,7 +86,7 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  const ranGolden = rows.length > 0; // golden path succeeded only if it actually returned items
  if (!rows.length) {
  rows = (await sql`
-  SELECT item_ref, image_urls, brand, era, category, price_cents
+  SELECT item_ref, image_urls, brand, era, material, condition, category, price_cents, title
   FROM training_examples
   WHERE brand IS NOT NULL AND brand <> '' AND jsonb_array_length(image_urls) > 0
   ORDER BY random() LIMIT ${sample}
@@ -114,6 +118,8 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  brand: { guess: brand, truth: r.brand as string, ok: brandMatch(brand, r.brand) },
  era: { guess: draft.era?.value ?? null, truth: r.era as string | null, ok: r.era ? norm(draft.era?.value) === norm(r.era) : null },
  category: { guess: draft.category ?? null, truth: r.category as string | null, ok: r.category ? norm(draft.category) === norm(r.category) : null },
+ material: { guess: draft.material?.value ?? null, truth: r.material as string | null, ok: r.material ? norm(draft.material?.value) === norm(r.material) : null },
+ condition: { guess: draft.condition?.value ?? null, truth: r.condition as string | null, ok: r.condition ? gradeWord(draft.condition?.value) === gradeWord(r.condition) : null },
  // Did the AI's own title/query name the right model? truth is null when the answer key
  // carries nothing specific (just "brand + garment"), so those items don't count against it.
  specific: { guess: draft.searchQuery || draft.title || null, truth: specOk === null ? null : (r.title as string), ok: specOk },
@@ -131,14 +137,14 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  };
 
  const misses: EvalMiss[] = [];
- for (const v of valid) for (const k of ["brand", "era", "category", "specific"]) if (v[k].truth && v[k].ok === false) misses.push({ field: k, image: v.image, guessed: v[k].guess, truth: v[k].truth });
+ for (const v of valid) for (const k of ["brand", "era", "material", "condition", "category", "specific"]) if (v[k].truth && v[k].ok === false) misses.push({ field: k, image: v.image, guessed: v[k].guess, truth: v[k].truth });
 
  const priceGraded = valid.filter((v) => v.priceOk !== null);
  const price = opts.withPrice && priceGraded.length
  ? { within20: priceGraded.filter((v) => v.priceOk).length, total: priceGraded.length, pct: Math.round((priceGraded.filter((v) => v.priceOk).length / priceGraded.length) * 100) }
  : undefined;
 
- return { sample: valid.length, withReverseImage: opts.withReverseImage, goldenOnly: ranGolden, fields: ["brand", "era", "category", "specific"].map(fieldStat), price, misses: misses.slice(0, 30) };
+ return { sample: valid.length, withReverseImage: opts.withReverseImage, goldenOnly: ranGolden, fields: ["brand", "era", "material", "condition", "category", "specific"].map(fieldStat), price, misses: misses.slice(0, 30) };
 }
 
 // ── Nightly exam history — one row per automated run, so the trend is visible each
@@ -155,6 +161,8 @@ async function ensureRunsTable() {
    result JSONB
   )
  `;
+ await db()`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS material_pct INTEGER`.catch(() => {});
+ await db()`ALTER TABLE eval_runs ADD COLUMN IF NOT EXISTS condition_pct INTEGER`.catch(() => {});
  runsEnsured = true;
 }
 
@@ -164,8 +172,8 @@ export async function saveEvalRun(r: EvalResult): Promise<void> {
  await ensureRunsTable();
  const pct = (f: string) => r.fields.find((x) => x.field === f)?.pct ?? null;
  await db()`
-  INSERT INTO eval_runs (sample, brand_pct, era_pct, category_pct, price_pct, result)
-  VALUES (${r.sample}, ${pct("brand")}, ${pct("era")}, ${pct("category")}, ${r.price?.pct ?? null}, ${JSON.stringify(r)})
+  INSERT INTO eval_runs (sample, brand_pct, era_pct, material_pct, condition_pct, category_pct, price_pct, result)
+  VALUES (${r.sample}, ${pct("brand")}, ${pct("era")}, ${pct("material")}, ${pct("condition")}, ${pct("category")}, ${r.price?.pct ?? null}, ${JSON.stringify(r)})
  `.catch(() => {});
 }
 

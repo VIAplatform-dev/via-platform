@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, type LucideIcon } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, Gem, type LucideIcon } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
 import CommandBar from "./CommandBar";
 
@@ -65,6 +65,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { label: "Platform", items: [
  { href: `${B}/trends`, label: "Trends", icon: TrendingUp },
  { href: `${B}/ai`, label: "AI accuracy", icon: Target },
+ { href: `${B}/golden-review`, label: "Golden set", icon: Gem },
  ] },
 ];
 
