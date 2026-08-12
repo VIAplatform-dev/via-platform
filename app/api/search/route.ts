@@ -358,9 +358,11 @@ function detectBrand(q: string, words: string[]): (typeof brands)[0] | null {
     if (b.keywords.some(kw => q === kw)) return b;
   }
   for (const b of brands) {
-    // Substring match for long aliases, but whole-word for substrings-of-common-
-    // words (etro→retro, boss→embossed) — consistent with resolveBrand et al.
-    if (b.keywords.some(kw => kw.length > 3 && aliasMatches(q, kw, WHOLE_WORD_ALIASES.has(kw)))) return b;
+    // Match any alias as a whole word/phrase anywhere in the query. aliasMatches whole-words the
+    // short (≤3) and flagged aliases (ysl, lv, cd → never "velvet"/"embossed") and substring-matches
+    // the long ones. Dropping the old length>3 guard is what lets "ysl bag" / "black ysl heels"
+    // resolve to Saint Laurent, not only a bare "ysl".
+    if (b.keywords.some(kw => aliasMatches(q, kw, WHOLE_WORD_ALIASES.has(kw)))) return b;
   }
   if (words.length > 1) {
     for (const b of brands) {
@@ -434,6 +436,14 @@ export async function GET(request: Request) {
     const brandPtPattern = detectedBrand
       ? `%${detectedBrand.keywords[0]}%`
       : phrasePattern;
+
+    // Every alias of the detected brand, as whole-word regexes — so "ysl" ALSO pulls titles that
+    // say "Yves Saint Laurent" / "Saint Laurent" (and vice versa), instead of each spelling being
+    // its own island. Whole-word \y keeps short aliases safe ("lv" ≠ "velvet").
+    const brandAliasRegexes = detectedBrand
+      ? detectedBrand.keywords.map((k) => `\\y${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\y`)
+      : [];
+    const useBrandExpansion = brandAliasRegexes.length > 0;
 
     // ── Category expansion ──
     // If the query IS a category term ("shirt", "boots"), expand it to the WHOLE
@@ -516,6 +526,12 @@ export async function GET(request: Request) {
             + CASE WHEN unaccent(LOWER(title)) LIKE ALL(${originalWordPatterns}) THEN 500 ELSE 0 END
             + CASE WHEN unaccent(LOWER(title)) LIKE ANY(${expandedWordPatterns}) THEN 300 ELSE 0 END
             + CASE
+                WHEN ${useBrandExpansion}
+                AND (unaccent(LOWER(title)) ~* ANY(${brandAliasRegexes}::text[])
+                     OR (product_type IS NOT NULL AND unaccent(LOWER(product_type)) ~* ANY(${brandAliasRegexes}::text[])))
+                THEN 3000 ELSE 0
+              END
+            + CASE
                 WHEN product_type IS NOT NULL
                 AND LOWER(product_type) LIKE ${brandPtPattern}
                 THEN 800
@@ -549,6 +565,11 @@ export async function GET(request: Request) {
                 AND LOWER(product_type) LIKE ${brandPtPattern})
             OR (description IS NOT NULL
                 AND unaccent(LOWER(description)) LIKE ANY(${phrasePatterns}))
+            -- Detected brand → every product titled/typed with ANY of its alias spellings
+            -- (ysl ↔ yves saint laurent ↔ saint laurent), whole-word matched.
+            OR (${useBrandExpansion}
+                AND (unaccent(LOWER(title)) ~* ANY(${brandAliasRegexes}::text[])
+                     OR (product_type IS NOT NULL AND unaccent(LOWER(product_type)) ~* ANY(${brandAliasRegexes}::text[]))))
             -- Category-term query → the whole category (whole-word matched)
             OR (${useCategoryExpansion} AND unaccent(LOWER(title)) ~* ANY(${categoryRegexes}::text[]))
           )

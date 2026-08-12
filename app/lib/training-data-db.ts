@@ -254,6 +254,57 @@ export async function getGoldenForReview(limit = 40): Promise<GoldenReviewRow[]>
  }));
 }
 
+// ── AI-assisted labeling: existing data has almost no real labels (brands are store names, era/
+// material/condition/category are empty), so a human builds the golden answer key by confirming or
+// correcting the AI's proposal on diverse real photos. Each saved row carries BOTH the human-verified
+// label AND the AI's proposal, so it's an answer key AND a direct read on model accuracy. ──
+
+export type LabelCandidate = { productId: number; storeSlug: string; storeName: string | null; title: string; image: string; priceCents: number | null };
+/** A diverse set of real item photos to label — spread across stores, skipping ones already labeled. */
+export async function getLabelingCandidates(limit = 20): Promise<LabelCandidate[]> {
+ await ensureTable();
+ const n = Math.max(1, Math.min(50, Math.round(Number(limit)) || 20));
+ const rows = (await db()`
+  SELECT p.id, p.store_slug, p.store_name, p.title, p.image, p.price
+  FROM products p
+  WHERE p.image IS NOT NULL AND p.image <> '' AND p.title IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM training_examples te WHERE te.source = 'golden' AND te.item_ref = 'label-' || p.id::text)
+  ORDER BY random() LIMIT ${n}
+ `.catch(() => [])) as Record<string, unknown>[];
+ return rows.map((r) => ({
+  productId: Number(r.id), storeSlug: String(r.store_slug || ""), storeName: (r.store_name as string) ?? null,
+  title: String(r.title || ""), image: String(r.image || ""),
+  priceCents: r.price != null ? Math.round(Number(r.price) * 100) : null,
+ }));
+}
+
+/** Save a human-verified label as a golden row (upsert), keeping the AI's proposal for accuracy scoring. */
+export async function saveGoldenLabel(x: {
+ productId: number; storeSlug: string; image: string; title: string; priceCents: number | null;
+ brand: string | null; era: string | null; material: string | null; condition: string | null; category: string | null;
+ ai: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; category?: string | null };
+}): Promise<void> {
+ await ensureTable();
+ const ref = "label-" + x.productId;
+ const s = (v: string | null | undefined) => (v && String(v).trim() ? String(v).trim().slice(0, 200) : null);
+ await db()`
+  INSERT INTO training_examples (source, store_slug, item_ref, image_urls, brand, era, material, condition, category, title, price_cents,
+   ai_brand, ai_era, ai_material, ai_condition, ai_category, trust, golden, golden_at)
+  VALUES ('golden', ${x.storeSlug}, ${ref}, ${JSON.stringify([x.image])}, ${s(x.brand)}, ${s(x.era)}, ${s(x.material)}, ${s(x.condition)}, ${s(x.category)}, ${s(x.title)}, ${x.priceCents},
+   ${s(x.ai.brand)}, ${s(x.ai.era)}, ${s(x.ai.material)}, ${s(x.ai.condition)}, ${s(x.ai.category)}, 'golden', true, now())
+  ON CONFLICT (source, item_ref) DO UPDATE SET
+   brand = EXCLUDED.brand, era = EXCLUDED.era, material = EXCLUDED.material, condition = EXCLUDED.condition,
+   category = EXCLUDED.category, golden = true, golden_at = now()
+ `.catch(() => {});
+}
+
+/** Demote the bad auto-seeded golden rows (store-name brands, no real labels). Keeps hand-labeled + intake. */
+export async function clearSeededGolden(): Promise<number> {
+ await ensureTable();
+ const rows = (await db()`UPDATE training_examples SET golden = false, golden_at = null WHERE golden AND source IN ('marketplace','sold','items') RETURNING id`.catch(() => [])) as { id: number }[];
+ return rows.length;
+}
+
 export type GoldenStats = { total: number; byCategory: { category: string; n: number }[]; withPrice: number; tiers: { trust: string; n: number }[] };
 export async function getGoldenStats(): Promise<GoldenStats> {
  await ensureTable();

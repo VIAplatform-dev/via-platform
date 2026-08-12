@@ -45,7 +45,7 @@ function reverseImageHint(matches: VisualMatch[], brandKnown = false): string {
  const list = rows.map((m) => `- "${m.title.slice(0, 110)}"${m.source ? ` — ${m.source}` : ""}`).join("\n");
  const head = `\n\nINTERNAL EVIDENCE — reverse-image search of the primary photo returned these visually-matching products from across the web:\n${list}\n\n`;
  const body = brandKnown
- ? `The seller already gave the brand (authoritative — keep it). Use these same-brand matches to pin down the ERA and the specific runway COLLECTION/SEASON: if they consistently indicate a season/year (e.g. "F/W 2004"), set the runway and era fields precisely. Do NOT change the brand.`
+ ? `The seller already gave the brand (authoritative — keep it). Use these same-brand matches to pin down the ERA. Only set the runway field if this is genuinely a documented archival RUNWAY look AND the matches consistently name the same specific season — a mass-produced production piece (e.g. a Baguette or other standard handbag line) is NOT runway even if some titles cite a debut season, so leave runway null for it. Do NOT change the brand.`
  : `These are the STRONGEST evidence of the ACTUAL brand/designer, item type, and era — the same piece found elsewhere. If they consistently point to a brand/designer, use it with high confidence even if your visual instinct differs; if they're clearly irrelevant or contradictory, return brand null rather than forcing one.`;
  const tail = ` THIS IS BACKGROUND DATA FOR YOU ONLY: never mention the reverse-image search, "web matches", or "the photos" in the title or description — silently use it to fill the brand/era/runway fields.`;
  return head + body + tail;

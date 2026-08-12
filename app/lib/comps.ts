@@ -4,6 +4,8 @@
 // subscribe and flip PHOTOROOM-style SERPAPI_ENABLED=true.
 
 import { unstable_cache } from "next/cache";
+import { getCachedLens, saveCachedLens } from "./lens-cache-db";
+import { recordSerp } from "./cost-tracker";
 
 const SERPAPI_URL = "https://serpapi.com/search.json";
 
@@ -26,7 +28,9 @@ async function serp(params: Record<string, string>): Promise<any | null> {
  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
  console.log(`[serpapi] call engine=${params.engine} q="${q}" ${res.ok ? "ok" : res.status} ${Date.now() - t0}ms`);
  if (!res.ok) return null;
- return await res.json();
+ const json = await res.json();
+ await recordSerp(params.engine);
+ return json;
  } catch {
  console.log(`[serpapi] call engine=${params.engine} q="${q}" error ${Date.now() - t0}ms`);
  return null;
@@ -53,12 +57,18 @@ export type VisualMatch = { title: string; priceCents: number | null; source: st
  *  piece listed across the web instead of guessing from the look. [] if not enabled. */
 export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch[]> {
  if (!isCompsConfigured() || !imageUrl) return [];
+ // Same photo → same matches. Reuse a cached result (no SerpApi spend) before searching.
+ const cached = await getCachedLens(imageUrl);
+ if (cached) return cached;
  const r = await serp({ engine: "google_lens", url: imageUrl, country: "us" });
- const matches = (r?.visual_matches || []) as any[];
- return matches
+ const matches = ((r?.visual_matches || []) as any[])
  .slice(0, 25)
  .map((m) => ({ title: String(m.title || ""), priceCents: priceToCents(m.price), source: String(m.source || ""), link: m.link as string | undefined }))
  .filter((m) => m.title);
+ // Cache only a genuine SerpApi response (r != null) — never persist a transient timeout/error as
+ // "no matches", which would poison this photo's lookups for the whole TTL.
+ if (r) await saveCachedLens(imageUrl, matches);
+ return matches;
 }
 
 /** Adaptive multi-frame reverse image. Sellers upload several photos but only the first

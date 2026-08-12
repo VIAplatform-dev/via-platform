@@ -856,7 +856,7 @@ header.nav.theme-dark .brand-mark{filter:invert(1) brightness(2)}
   .vs-steps{--g:'Hanken Grotesk',sans-serif;--accent:#33d18f;
     --bg:#040405;--card:linear-gradient(160deg,#141619,#0c0d10);--line:rgba(255,255,255,0.09);--t2:rgba(255,255,255,0.5);--faint:rgba(255,255,255,0.34)}
   
-  .vs-steps{position:relative;height:540vh}
+  .vs-steps{position:relative;height:700vh}
   .vs-sticky{position:sticky;top:0;height:100vh;overflow:hidden}
   .vs-wrap{max-width:1440px;margin:0 auto;height:100vh;display:grid;grid-template-columns:0.82fr 1.18fr;gap:56px;padding:0 64px;align-items:stretch}
   .vs-left{height:100vh;display:flex;flex-direction:column;padding:120px 0 0;min-width:0}
@@ -1322,3 +1322,19 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 @keyframes psStepOn{from{color:rgba(255,255,255,0.4)}to{color:#42d69d}}
 @keyframes psFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @media (prefers-reduced-motion:reduce){.feat-row.in .ps-card,.feat-row.in .ps-card .mk-pill,.feat-row.in .ps-pay .mk-tick,.feat-row.in .ps-step.done,.feat-row.in .ps-line.done{animation:none}}
+
+/* Storefront import "takeover" — the demo box becomes her ACTUAL site, cloned live into a sandboxed
+   iframe (/api/public/clone-homepage — the same raw-HTML mirror the backend produces at /site/{slug}). */
+#vsTakeover{position:absolute;inset:0;z-index:6;display:none;flex-direction:column;background:#0b0c0f;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,0.09);box-shadow:0 20px 60px rgba(0,0,0,0.45)}
+#vsTakeover.on{display:flex}
+.vs-tk-bar{position:relative;z-index:3;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:rgba(10,11,14,0.96);border-bottom:1px solid rgba(255,255,255,0.08)}
+.vs-tk-back{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.1);color:#f2f3f5;font:600 11px var(--g);border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
+.vs-tk-back:hover{background:rgba(255,255,255,0.18)}
+.vs-tk-live{font:500 10px var(--g);letter-spacing:0.03em;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-tk-live b{color:#33d18f;font-weight:600}
+.vs-tk-body{position:relative;flex:1 1 auto;background:#fff;min-height:0}
+/* Scrollable but not clickable: the clone doc (noclick=1) cancels clicks/navigation server-side; scrolling stays live. */
+.vs-tk-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+.vs-tk-load{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:10px;background:#0b0c0f;color:rgba(255,255,255,0.72);font:500 12px var(--g)}
+.vs-tk-spin{width:15px;height:15px;border-radius:50%;border:2px solid rgba(255,255,255,0.18);border-top-color:#33d18f;animation:vsspin .7s linear infinite}
+@keyframes vsspin{to{transform:rotate(360deg)}}

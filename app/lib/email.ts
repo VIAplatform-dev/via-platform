@@ -806,15 +806,18 @@ export function newArrivalsEmailHtml(opts: {
  shopUrl?: string;
 }): string {
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
+ const sans = "'Helvetica Neue',Arial,sans-serif";
+ // Uniform tiles: a FIXED-height cover image + a fixed-height (2-line) title block, so every card in
+ // a row lines up — the price sits on the same baseline regardless of title length or photo aspect.
  const card = (p: { title: string; image: string | null; priceCents: number; currency: string; url: string }) => {
  const img = p.image
- ? `<a href="${p.url}"><img src="${p.image}" alt="${escapeHtml(p.title)}" width="252" style="display:block;width:100%;height:auto;border-radius:8px;border:0;background:#efe6d7;" border="0" /></a>`
- : `<div style="width:100%;padding-bottom:120%;background:#efe6d7;border-radius:8px;"></div>`;
- return `<td width="50%" valign="top" style="padding:8px;">
+ ? `<a href="${p.url}" style="text-decoration:none;"><img src="${p.image}" alt="${escapeHtml(p.title)}" width="260" style="display:block;width:100%;height:300px;object-fit:cover;border-radius:10px;border:0;background:#efe6d7;" border="0" /></a>`
+ : `<div style="width:100%;height:300px;background:#efe6d7;border-radius:10px;"></div>`;
+ return `<td width="50%" valign="top" style="padding:10px;">
  ${img}
- <a href="${p.url}" style="text-decoration:none;">
- <div style="margin:10px 2px 2px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;line-height:1.35;color:#292524;">${escapeHtml(p.title)}</div>
- <div style="margin:2px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;font-weight:600;color:#1c1917;">${formatEmailPrice(p.priceCents / 100, p.currency)}</div>
+ <a href="${p.url}" style="text-decoration:none;display:block;">
+ <div style="margin:12px 2px 0;font-family:${sans};font-size:13px;line-height:1.35;color:#44403c;height:36px;overflow:hidden;">${escapeHtml(p.title)}</div>
+ <div style="margin:6px 2px 0;font-family:${sans};font-size:14px;font-weight:600;color:#1c1917;">${formatEmailPrice(p.priceCents / 100, p.currency)}</div>
  </a>
  </td>`;
  };
@@ -823,17 +826,21 @@ export function newArrivalsEmailHtml(opts: {
  rows.push(`<tr>${card(opts.products[i])}${opts.products[i + 1] ? card(opts.products[i + 1]) : '<td width="50%"></td>'}</tr>`);
  }
  const cta = opts.shopUrl
- ? `<div style="text-align:center;padding:20px 0 4px;"><a href="${withUtm(opts.shopUrl, "new_arrivals")}" style="display:inline-block;background:#1c1917;color:#ffffff;text-decoration:none;padding:13px 30px;border-radius:6px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;">Shop new arrivals</a></div>`
+ ? `<div style="text-align:center;padding:24px 0 6px;"><a href="${withUtm(opts.shopUrl, "new_arrivals")}" style="display:inline-block;background:#1c1917;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:8px;font-family:${sans};font-size:14px;font-weight:600;letter-spacing:0.01em;">Shop new arrivals</a></div>`
  : "";
- return `<!doctype html><html><body style="margin:0;background:#f6f5f2;font-family:'Helvetica Neue',Arial,sans-serif;color:#1c1917;">
+ return `<!doctype html><html><body style="margin:0;background:#f6f5f2;font-family:${sans};color:#1c1917;">
  <div style="max-width:600px;margin:0 auto;background:#ffffff;">
- <div style="padding:30px 28px 4px;text-align:center;"><h1 style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:600;letter-spacing:0.01em;">${escapeHtml(cleanName)}</h1></div>
- <div style="padding:10px 28px 6px;text-align:center;font-size:15px;line-height:1.6;color:#57534e;">${escapeHtml(opts.intro)}</div>
- <div style="padding:8px 20px 8px;">
+ <div style="padding:36px 28px 0;text-align:center;">
+ <div style="font-family:${sans};font-size:11px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#a8a29e;">New arrivals</div>
+ <h1 style="margin:9px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:600;letter-spacing:0.01em;color:#1c1917;">${escapeHtml(cleanName)}</h1>
+ </div>
+ <div style="padding:12px 34px 0;text-align:center;font-family:${sans};font-size:15px;line-height:1.6;color:#57534e;">${escapeHtml(opts.intro)}</div>
+ <div style="padding:0 28px;"><div style="border-top:1px solid #ece8e1;margin:22px 0 4px;"></div></div>
+ <div style="padding:2px 12px 6px;">
  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join("")}</table>
  </div>
  ${cta}
- <div style="padding:22px 28px 30px;border-top:1px solid #eeeeee;margin-top:16px;font-size:12px;color:#a8a29e;text-align:center;">You're receiving this because you shopped with ${escapeHtml(cleanName)}. Reply to this email to reach us.</div>
+ <div style="padding:26px 28px 32px;border-top:1px solid #eeeeee;margin-top:20px;font-family:${sans};font-size:12px;line-height:1.5;color:#a8a29e;text-align:center;">You&rsquo;re receiving this because you shopped with ${escapeHtml(cleanName)}. Reply to this email to reach us.</div>
  </div></body></html>`;
 }
 

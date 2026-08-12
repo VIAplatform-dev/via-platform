@@ -4,6 +4,7 @@ import { inferCategoryFromTitle } from "./loadStoreProducts";
 import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db";
 import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config";
 import { AI_MODELS } from "./ai-models";
+import { recordAnthropic } from "./cost-tracker";
 
 // The price engine: turn real comps into one defensible number.
 //  market value  = comps, filtered to TRUE comparables by the model (sold > asking)
@@ -108,6 +109,7 @@ export async function valueFromComps(
  }
  if (!res || !res.ok) return fallback();
  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+ await recordAnthropic(MODEL, "pricing", data);
  const t = data.content?.find((c) => c.type === "text")?.text ?? "";
  const m = t.match(/\{[\s\S]*\}/);
  const raw: any = m ? JSON.parse(m[0]) : {};

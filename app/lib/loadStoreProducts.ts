@@ -49,10 +49,15 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  // NOTE: gemstone/material words (ruby, emerald, pearl…) are intentionally NOT
  // here — they double as colors ("ruby red", "pearl white") and are checked
  // later (see "jewelry — gemstone" block below) so they don't steal shoes/bags.
+ // Only UNAMBIGUOUS jewelry nouns here (checked before shoes/bags/clothing) — a title with
+ // "necklace"/"earring"/"bracelet" is jewelry regardless of designer/other words. The ambiguous
+ // detail-words ("ring", "cuff", "pendant") that ALSO describe garments/shoes ("ring-accent dress",
+ // "cuff heels") are deliberately NOT here — they're checked in the LATE jewelry pass below, after
+ // the garment/shoe/bag nouns, so a real dress/heel/bag wins.
  ["jewelry", [
- "earring", "necklace", "bracelet", "pendant",
- "brooch", "bangle", "choker", "locket", "cuff bracelet", "cuff", "d'ancre", "anklet",
- "ring", "rings", "signet", "lapel pin", "cufflink", "cuff link",
+ "earring", "necklace", "bracelet",
+ "brooch", "bangle", "choker", "locket", "cuff bracelet", "d'ancre", "anklet",
+ "signet", "lapel pin", "cufflink", "cuff link",
  "charm bracelet",
  "jewelry", "jewellery",
  ]],
@@ -149,6 +154,11 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "vermeil", "gemstone", "topaz", "sapphire", "diamond",
  "ruby", "emerald", "pearl", "amethyst", "opal", "garnet",
  "turquoise", "onyx",
+ // Ambiguous jewelry words that also appear as garment/shoe/bag DETAILS ("ring accents",
+ // "cuff heels", "pendant sleeve"). Checked here — after every garment/shoe/bag noun above —
+ // so they classify as jewelry ONLY when nothing else matched (a bare "gold ring", "wide cuff").
+ // Word-boundary matching keeps them safe (\bring\b never hits "string"/"earring"/"keyring").
+ "ring", "cuff", "pendant",
  ]],
  // Accessory subcategories checked before generic "accessories" catch-all
  ["sunglasses", ["sunglasses", "sunglass", "eyewear", "spectacles"]],

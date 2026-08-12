@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { priceToCents } from "./comps";
+import { recordSerp } from "./cost-tracker";
 
 // External market signal for the Trends tab, PERSISTED in Postgres:
 //   • a daily cron CAPTURES from SerpApi (Google Search interest + eBay sold listings) → snapshots
@@ -26,7 +27,9 @@ async function serp(params: Record<string, string>): Promise<any | null> {
  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
  console.log(`[serpapi] call engine=${params.engine} q="${q}" ${res.ok ? "ok" : res.status} ${Date.now() - t0}ms`);
  if (!res.ok) return null;
- return await res.json();
+ const json = await res.json();
+ await recordSerp(params.engine);
+ return json;
  } catch { console.log(`[serpapi] call engine=${params.engine} q="${q}" error ${Date.now() - t0}ms`); return null; }
 }
 

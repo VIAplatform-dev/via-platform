@@ -41,10 +41,16 @@ export function titleHasBrand(title: string, brand: string): boolean {
 }
 
 // Resellers date archival pieces in their titles (e.g. "Prada F/W 1998 leather skirt").
-// Mine the SAME-BRAND comp/match titles for the most-cited season+year → runway string.
+// Mine the SAME-BRAND comp/match titles for a season+year — but only assert it when the SAME season
+// is cited REPEATEDLY and DOMINANTLY. A lone or scattered mention is NOT provenance: resellers of
+// mass-produced production pieces (e.g. the Fendi Baguette) routinely copy a famous debut season
+// into titles, which would otherwise mis-flag an ordinary bag as runway.
+const RUNWAY_MIN_HITS = 3;      // need at least this many titles citing the winning season
+const RUNWAY_MIN_SHARE = 0.6;   // …and it must be a clear majority of season-citing same-brand titles
 export function extractRunway(brand: string, titles: string[]): string | null {
  if (!brand) return null;
  const tally = new Map<string, number>();
+ let seasonCiting = 0;
  for (const t of titles) {
  if (!titleHasBrand(t, brand)) continue;
  const year = t.match(/\b(199\d|20[01]\d)\b/)?.[0];
@@ -53,12 +59,14 @@ export function extractRunway(brand: string, titles: string[]): string | null {
  const season = /(s\/s|\bss\b|spring|resort|cruise)/.test(low) ? "S/S"
  : /(f\/w|a\/w|\bfw\b|\baw\b|fall|autumn|winter)/.test(low) ? "F/W" : "";
  if (!season) continue;
+ seasonCiting++;
  const key = `${season} ${year}`;
  tally.set(key, (tally.get(key) || 0) + 1);
  }
  let best: string | null = null, n = 0;
  for (const [k, v] of tally) if (v > n) { best = k; n = v; }
- return best ? `${brand} ${best}` : null;
+ if (!best || n < RUNWAY_MIN_HITS || n / seasonCiting < RUNWAY_MIN_SHARE) return null;
+ return `${brand} ${best}`;
 }
 
 /**
@@ -170,18 +178,22 @@ export async function computeListingPricing(opts: {
  }
  }
 
- // Runway — resolve if not already provided.
+ // Runway — resolve if not already provided. This is a strong buyer-facing claim, so we lean on the
+ // conservative archivist (identifyRunway) rather than raw title-scraping, which over-flags production
+ // pieces whose resellers cite a famous season. When the full draft ran it already judged runway (and
+ // left it null for production pieces) — we do NOT second-guess that with the title heuristic.
  let runway: string | null = opts.runwaySoFar;
  if (!runway && brandVal) {
  runway = await getPieceRunway(brandVal, opts.title).catch(() => null); // seen this exact piece before?
+ if (!runway && !opts.draftRanFull) {
  // Editorial/Getty captions (e.g. "…walks the runway at the Prada F/W 2004 show") are prime
  // season evidence and are included here even though they skip the brand filter used for pricing.
  const titles = [...opts.reverseTitles, ...editorialTitles, ...(estimate?.comps || []).map((c) => c.title)];
- if (!runway) runway = extractRunway(brandVal, titles); // resellers often cite the season in comps
- if (!runway && !opts.draftRanFull && isIntakeConfigured()) {
- // Proactive: recognize the piece from the photo + comps even when nobody labeled it a runway.
- // Only when the full draft was SKIPPED — when it ran it already assessed runway.
- runway = await AI_GATE().run(() => identifyRunway(opts.imageUrls, brandVal, opts.title, titles)).catch(() => null);
+ runway = isIntakeConfigured()
+ // Let the archivist weigh the photo + these titles and reject production pieces.
+ ? await AI_GATE().run(() => identifyRunway(opts.imageUrls, brandVal, opts.title, titles)).catch(() => null)
+ // Offline fallback: the strict consensus heuristic (repeated + dominant season only).
+ : extractRunway(brandVal, titles);
  }
  }
  if (runway && brandVal && opts.title) await savePieceRunway(brandVal, opts.title, runway).catch(() => {});

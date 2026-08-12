@@ -55,5 +55,16 @@ export async function GET(request: NextRequest) {
  // Inject our <base> so every relative CSS/img/font/script URL resolves to the store's origin.
  $("head").prepend(`<base href="${baseHref}">`);
 
+ // Display-only mode (?noclick=1): the demo lets you SCROLL their real site but not click into it.
+ // We cancel clicks / middle-clicks / form submits (capture phase, so it also catches theme-JS-added
+ // links), but leave wheel/touch/keyboard scrolling untouched.
+ if (new URL(request.url).searchParams.get("noclick") === "1") {
+  $("head").append(`<style>a,button,[role="button"],label,summary,input,select{cursor:default!important}</style>`);
+  $("body").append(
+   `<script>(function(){function k(e){if(e.preventDefault)e.preventDefault();if(e.stopPropagation)e.stopPropagation();return false;}` +
+   `["click","auxclick","submit","contextmenu","dblclick"].forEach(function(t){document.addEventListener(t,k,true);});})();</script>`
+  );
+ }
+
  return html($.html());
 }

@@ -5,6 +5,8 @@
 // Gated on VOYAGE_API_KEY — if it's not set, embedImage returns null and the whole
 // visual-retrieval path degrades gracefully back to the v1 text hints.
 
+import { recordVoyage } from "./cost-tracker";
+
 const VOYAGE_URL = "https://api.voyageai.com/v1/multimodalembeddings";
 const MODEL = "voyage-multimodal-3"; // 1024-dim, text+image
 
@@ -40,9 +42,10 @@ export async function embedImageResult(imageUrl: string): Promise<{ embedding: n
   console.error(`[embeddings] Voyage ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
   return { embedding: null, status: "bad_image" }; // 4xx = the image URL itself is the problem
  }
- const data = (await res.json()) as { data?: Array<{ embedding?: number[] }> };
+ const data = (await res.json()) as { data?: Array<{ embedding?: number[] }>; usage?: { total_tokens?: number } };
  const emb = data?.data?.[0]?.embedding;
- return Array.isArray(emb) && emb.length > 0 ? { embedding: emb, status: "ok" } : { embedding: null, status: "bad_image" };
+ if (Array.isArray(emb) && emb.length > 0) { await recordVoyage(data); return { embedding: emb, status: "ok" }; }
+ return { embedding: null, status: "bad_image" };
  } catch (err) {
   if (attempt < 2) { await sleep(800 * (attempt + 1)); continue; }
   console.error("[embeddings] failed:", err);
