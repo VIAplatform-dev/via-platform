@@ -504,6 +504,13 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  storeDomain: "honeybearvintagenyc.com",
  scrapeProductPage: true,
  },
+ {
+ type: "shopify",
+ name: "The Haus Archive",
+ slug: "the-haus-archive",
+ storeDomain: "thehausarchive.com",
+ scrapeProductPage: true,
+ },
 ];
 
 // Big Cartel stores (public JSON API — no token required)

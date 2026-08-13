@@ -1222,6 +1222,30 @@ export const stores = [
  "Returns accepted up to 14 days after delivery for store credit (not a cash refund) — you receive the full order amount minus shipping. Items must be returned in the same condition they were sent, and all sale items are final. Email hello@tesselizabeth.com to arrange a return.",
  },
  {
+ slug: "the-haus-archive",
+ dashboardToken: "tha-9d4c2f7a1b6e",
+ name: "The Haus Archive",
+ location: "Greensboro, NC",
+ description:
+ "The Haus Archive is a curated luxury resale and vintage boutique in Greensboro, NC, founded by Claribel Paulino for women who believe style should have story. The shop specializes in designer handbags, vintage fashion, small leather goods, statement accessories, consignment, and sourcing — every piece selected with intention for its character, craftsmanship, and history. A world that is curated, not crowded: timeless designer pieces, vintage treasures, and second-life luxury, offered through an intimate shopping experience that feels personal and elevated. Curated. Archived. Reawakened.",
+ website: "https://thehausarchive.com",
+ contactEmail: "hello@verdehausmedia.com",
+ dataSource: "the-haus-archive",
+ image: "/stores/the-haus-archive.jpg",
+ logo: "/stores/the-haus-archive.jpg",
+ logoBg: "#ffffff",
+ currency: "USD",
+ commissionType: "shopify-collabs" as const,
+ affiliatePath: "VYA",
+ collabsStoreId: "253109",
+ authenticityPolicy:
+ "Every piece at The Haus Archive is hand-selected and inspected by founder Claribel Paulino before listing, and accurately described with full condition details. Designer pieces are authenticated for craftsmanship, hardware, and historical design details.",
+ shippingPolicy:
+ "Ships from Greensboro, NC. Shipping rates are calculated at checkout.",
+ returnPolicy:
+ "All sales are final. As a curated resale and vintage boutique specializing in one-of-a-kind pieces, please review all item details and photos carefully before purchasing.",
+ },
+ {
  slug: "the-objects-of-affection",
  dashboardToken: "tooa-2f9a4c8b1e7d",
  name: "The Objects of Affection",
@@ -1487,6 +1511,7 @@ export function getCommissionAmount(price: number): number {
  * Fill in each store's email address — leave blank to skip that store.
  */
 export const storeContactEmails: Record<string, string> = {
+ "the-haus-archive": "hello@verdehausmedia.com",
  "the-vintage-new-yorker": "info@thevintagenewyorker.com",
  "lamash": "mollyashmore6@gmail.com",
  "stone-studio-vintage": "stonestudiovintage@gmail.com",
