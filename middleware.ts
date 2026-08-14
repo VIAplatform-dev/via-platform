@@ -75,6 +75,10 @@ const PUBLIC_ROUTES = [
   "/api/store/shopify-connect",
   "/api/store/shopify-oauth",
   "/api/store/connect",
+  // eBay OAuth: the callback authenticates via the signed `state` (no session — eBay redirects
+  // here cross-domain), and connect/status/setup enforce their own auth (resolveStoreSlugAny).
+  // Without this, eBay's redirect to the callback hits the login wall and no token is ever stored.
+  "/api/store/cross-listing",
   "/api/checkout",
   "/api/storefront",
   "/checkout",

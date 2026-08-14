@@ -153,6 +153,47 @@ export default function IntakePage() {
  fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  }, []);
 
+ // ── Auto-save the in-progress listing as a DRAFT, so leaving before publish/schedule never loses it.
+ const draftIdRef = useRef<string | null>(null);
+ const [autoSavedAt, setAutoSavedAt] = useState<number | null>(null);
+ const draftPayload = () => ({
+ draftId: draftIdRef.current,
+ title: form.title,
+ price: Number(form.price) || 0,
+ images: [ghost, ...photos].filter(Boolean),
+ size: form.size || null,
+ description: form.description || null,
+ category: form.category || null,
+ collections: selectedCols,
+ status: "draft" as const,
+ });
+ // Kept current every render so the tab-close / unmount beacon always sends the latest state.
+ const beaconRef = useRef<{ canSave: boolean; payload: unknown }>({ canSave: false, payload: null });
+ beaconRef.current = { canSave: phase === "form" && photos.length > 0 && !busy, payload: draftPayload() };
+ // Debounced autosave: 2s after any edit to photos/fields, while still editing.
+ useEffect(() => {
+ if (phase !== "form" || busy || !photos.length) return;
+ const t = setTimeout(async () => {
+  try {
+  const r = await fetch("/api/store/intake/autosave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draftPayload()) });
+  const d = await r.json().catch(() => null);
+  if (d?.id) { draftIdRef.current = d.id; setAutoSavedAt(Date.now()); }
+  } catch {}
+ }, 2000);
+ return () => clearTimeout(t);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [photos, form, selectedCols, ghost, phase, busy]);
+ // Final save on tab close (beforeunload) AND in-app navigation away (unmount) — fire-and-forget.
+ useEffect(() => {
+ const beacon = () => {
+  const { canSave, payload } = beaconRef.current;
+  if (!canSave) return;
+  try { navigator.sendBeacon("/api/store/intake/autosave", new Blob([JSON.stringify(payload)], { type: "application/json" })); } catch {}
+ };
+ window.addEventListener("beforeunload", beacon);
+ return () => { window.removeEventListener("beforeunload", beacon); beacon(); };
+ }, []);
+
  function set<K extends keyof Form>(k: K, v: string) {
  setForm((f) => ({ ...f, [k]: v }));
  if ((RISKY as readonly string[]).includes(k)) setConfirmed((c) => ({ ...c, [k]: true })); // editing = reviewed
@@ -404,6 +445,8 @@ export default function IntakePage() {
  if (!r.ok) throw new Error(d.error || "Publish failed");
  setScheduledAt(d.scheduled ? d.publishAt : null);
  setSavedDraft(status === "draft" && !d.scheduled);
+ // Publishing supersedes any autosaved draft — remove it so we don't leave a duplicate behind.
+ if (draftIdRef.current) { fetch(`/api/store/listings/${draftIdRef.current}`, { method: "DELETE" }).catch(() => {}); draftIdRef.current = null; }
  setPhase("done");
  } catch (e) {
  setErr(e instanceof Error ? e.message : "Publish failed");
@@ -412,6 +455,7 @@ export default function IntakePage() {
  }
 
  function reset() {
+ draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
  setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
  setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null);
@@ -461,6 +505,12 @@ export default function IntakePage() {
  title="Add a listing"
  subtitle="Add photos and fill in what you know — then let AI complete the rest. Anything you type, it keeps."
  />
+
+ {autoSavedAt && phase === "form" && (
+ <div className="mb-4 flex items-center gap-1.5 text-[11px] text-stone-400">
+ <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Draft auto-saved — it’s safe in your inventory if you leave.
+ </div>
+ )}
 
  {reverseImage && (
  reverseImage.brand

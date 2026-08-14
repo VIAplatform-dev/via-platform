@@ -166,6 +166,31 @@ async function policyIds(token: string): Promise<{ fulfillment?: string; payment
  };
 }
 
+// The seller's inventory (ship-from) location — REQUIRED to publish an offer. Publishing without a
+// merchantLocationKey fails with error 25002 ("The merchantLocationKey is required"), the silent
+// blocker behind "I'm a business account but it still won't list". We prefer an ENABLED location the
+// seller already has (established accounts do — correct address, no guessing); only if they have none
+// do we create a default one under their account. Idempotent + best-effort.
+async function ensureLocationKey(token: string): Promise<string | null> {
+ const list = await ebayFetch(token, `/sell/inventory/v1/location?limit=100`);
+ const locs: any[] = Array.isArray(list.json?.locations) ? list.json.locations : [];
+ const enabled = locs.find((l) => String(l?.merchantLocationStatus || "").toUpperCase() === "ENABLED");
+ const reuse = enabled || locs[0];
+ if (reuse?.merchantLocationKey) return String(reuse.merchantLocationKey);
+ // None exists — create a default. postalCode is required for US; EBAY_DEFAULT_POSTAL lets ops set a
+ // real ship-from zip (shipping here is flat-rate, so distance doesn't affect buyer cost).
+ const key = "VYA_DEFAULT";
+ const res = await ebayFetch(token, `/sell/inventory/v1/location/${key}`, {
+  method: "POST",
+  body: JSON.stringify({
+   location: { address: { country: "US", postalCode: process.env.EBAY_DEFAULT_POSTAL || "10001" } },
+   name: "VYA Default Location", locationTypes: ["WAREHOUSE"], merchantLocationStatus: "ENABLED",
+  }),
+ });
+ if (res.ok || /already exists|25801/i.test(JSON.stringify(res.json || ""))) return key;
+ return null;
+}
+
 const CAT_TYPES = [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }];
 
 // Make a freshly-connected account able to list WITHOUT the seller ever touching eBay's settings:
@@ -288,9 +313,9 @@ type PolicyProbe = { status: number; count: number; error: string | null };
 export async function testEbayConnection(storeSlug: string): Promise<{
  ok: boolean; configured: boolean; tokenValid: boolean; marketplace: string;
  policies: { fulfillment: boolean; payment: boolean; return: boolean };
- readyToList: boolean; debug?: { fulfillment: PolicyProbe; payment: PolicyProbe; return: PolicyProbe }; error?: string;
+ hasLocation: boolean; readyToList: boolean; debug?: { fulfillment: PolicyProbe; payment: PolicyProbe; return: PolicyProbe }; error?: string;
 }> {
- const base = { ok: false, configured: ebayConfigured(), tokenValid: false, marketplace: MARKETPLACE, policies: { fulfillment: false, payment: false, return: false }, readyToList: false };
+ const base = { ok: false, configured: ebayConfigured(), tokenValid: false, marketplace: MARKETPLACE, policies: { fulfillment: false, payment: false, return: false }, hasLocation: false, readyToList: false };
  if (!ebayConfigured()) return { ...base, error: "eBay app keys aren’t set on the server." };
  const token = await accessToken(storeSlug);
  if (!token) return { ...base, error: "No valid eBay token — the account isn’t connected, or the refresh token failed. Reconnect it." };
@@ -309,10 +334,16 @@ export async function testEbayConnection(storeSlug: string): Promise<{
  });
  const debug = { fulfillment: probe(f, "fulfillmentPolicies"), payment: probe(p, "paymentPolicies"), return: probe(r, "returnPolicies") };
  const policies = { fulfillment: debug.fulfillment.count > 0, payment: debug.payment.count > 0, return: debug.return.count > 0 };
- const readyToList = policies.fulfillment && policies.payment && policies.return;
+ // A ship-from inventory location is also required to publish (missing one → error 25002 on publish).
+ const locRes = await ebayFetch(token, `/sell/inventory/v1/location?limit=1`);
+ const hasLocation = Array.isArray(locRes.json?.locations) && locRes.json.locations.length > 0;
+ const policiesOk = policies.fulfillment && policies.payment && policies.return;
+ const readyToList = policiesOk && hasLocation;
  return {
- ok: true, configured: true, tokenValid: true, marketplace: MARKETPLACE, policies, readyToList, debug,
- error: readyToList ? undefined : "No EBAY_US business policies found — see `debug` for eBay’s exact response per policy (opt-in required, wrong marketplace/country, or a specific error).",
+ ok: true, configured: true, tokenValid: true, marketplace: MARKETPLACE, policies, hasLocation, readyToList, debug,
+ error: readyToList ? undefined : !policiesOk
+ ? "No EBAY_US business policies found — see `debug` for eBay’s exact response per policy (opt-in required, wrong marketplace/country, or a specific error)."
+ : "No eBay inventory location — a ship-from location is required to publish (it will be auto-created on first list).",
  };
 }
 
@@ -368,23 +399,26 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  });
  if (!inv.ok) return { ok: false, error: ebayErr(inv.json) || "Couldn’t create the inventory item." };
 
- // 3) offer (category resolved above).
+ // 3) offer (category resolved above) — needs a ship-from location, or publish 25002's.
+ const locationKey = await ensureLocationKey(token);
+ if (!locationKey) return { ok: false, error: "eBay needs a ship-from inventory location and one couldn’t be set up — reconnect eBay and try again." };
  const price = (item.priceCents / 100).toFixed(2);
- const offer = await ebayFetch(token, `/sell/inventory/v1/offer`, {
- method: "POST",
- body: JSON.stringify({
+ const offerBody = {
  sku, marketplaceId: MARKETPLACE, format: "FIXED_PRICE", availableQuantity: 1,
+ merchantLocationKey: locationKey,
  ...(categoryId ? { categoryId } : {}),
  pricingSummary: { price: { value: price, currency: item.currency || "USD" } },
  listingPolicies: { fulfillmentPolicyId: pol.fulfillment, paymentPolicyId: pol.payment, returnPolicyId: pol.return },
- }),
- });
- // Offer may already exist (re-list) — look it up and update instead.
+ };
+ const offer = await ebayFetch(token, `/sell/inventory/v1/offer`, { method: "POST", body: JSON.stringify(offerBody) });
+ // Offer may already exist (re-list) — look it up and UPDATE it, so an offer created before this fix
+ // (without a location) gets the merchantLocationKey + current price/policies before publishing.
  let offerId: string | undefined = offer.json?.offerId;
  if (!offer.ok) {
  const existing = await ebayFetch(token, `/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}`);
  offerId = existing.json?.offers?.[0]?.offerId;
  if (!offerId) return { ok: false, error: ebayErr(offer.json) || "Couldn’t create the eBay offer." };
+ await ebayFetch(token, `/sell/inventory/v1/offer/${offerId}`, { method: "PUT", body: JSON.stringify(offerBody) });
  }
 
  // 4) publish
