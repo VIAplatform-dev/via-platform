@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as cheerio from "cheerio";
-import { prepareEditMode, applyEdits, injectCollectionItems } from "./site-capture.ts";
+import { prepareEditMode, applyEdits, injectCollectionItems, deShopify, deLazy } from "./site-capture.ts";
 
 const COLL_ITEMS = [
  { id: "a1", title: "1990s Silk Slip", priceCents: 18000, currency: "USD", images: ["https://x/img1.jpg"] },
@@ -175,4 +175,54 @@ test("shopify-section wrappers are used as sections and reorder correctly", () =
  const out = applyEdits(SHOPIFY, { sections: [2, 1, 0] });
  const $ = cheerio.load(out);
  assert.deepEqual($(".shopify-section h2").map((_, el) => $(el).text()).get(), ["Three", "Two", "One"]);
+});
+
+test("deShopify swaps Powered by Shopify → VYA and strips payment/Shop-Pay chrome", () => {
+ const html = `<html><body><footer>
+  <ul class="list-payment"><li><svg>visa</svg></li><li><svg>amex</svg></li></ul>
+  <shop-follow-button>Follow on shop</shop-follow-button>
+  <small class="copyright__content">© 2026, To Us Vintage Powered by <a href="https://www.shopify.com?utm=x">Shopify</a></small>
+ </footer></body></html>`;
+ const $ = cheerio.load(html);
+ deShopify($);
+ const out = $.html();
+ assert.equal($(".list-payment").length, 0, "payment badges removed");
+ assert.equal($("shop-follow-button").length, 0, "Follow on shop removed");
+ assert.equal($('a[href*="shopify.com"]').length, 0, "shopify.com link gone");
+ assert.match(out, /Powered by VYA/);
+ assert.doesNotMatch(out, /Powered by <a|Powered by Shopify/);
+});
+
+test("deShopify rewrites an unlinked 'Powered by Shopify' text node", () => {
+ const $ = cheerio.load(`<footer><small>Powered by Shopify</small></footer>`);
+ deShopify($);
+ assert.match($.html(), /Powered by VYA/);
+ assert.doesNotMatch($.html(), /Powered by Shopify/);
+});
+
+test("deLazy fills lazysizes {width} templates and promotes data-src", () => {
+ const $ = cheerio.load(`<img class="grid-product__image lazyload" data-src="//cdn/shop/a_{width}x.jpg" data-widths="[180,360,1080,1800]">`);
+ deLazy($, "https://store.com/");
+ const img = $("img");
+ assert.equal(img.attr("src"), "https://cdn/shop/a_1080x.jpg", "{width} filled with the largest ≤1200 rung, absolutized");
+ assert.ok(!/\{width\}/.test(img.attr("src") || ""), "no template left");
+ assert.ok(!img.hasClass("lazyload") && img.hasClass("lazyloaded"), "flipped to visible");
+});
+
+test("deLazy unwraps a bg <noscript> fallback but dedupes a product one", () => {
+ const $ = cheerio.load(
+  `<div class="hero lazyload" data-bgset="//cdn/hero_{width}x.jpg"></div><noscript><img class="hero" src="//cdn/hero_1800x.jpg"></noscript>` +
+  `<a><img class="p lazyload" data-src="//cdn/p_600x.jpg"></a><noscript><img class="p" src="//cdn/p_600x.jpg"></noscript>`
+ );
+ deLazy($, "https://store.com/");
+ assert.equal($("img.hero").length, 1, "hero fallback surfaced");
+ assert.equal($("img.hero").attr("src"), "https://cdn/hero_1800x.jpg");
+ assert.equal($("img.p").length, 1, "product image not duplicated (noscript dropped)");
+});
+
+test("deLazy applies a data-bgset background when there is no noscript fallback", () => {
+ const $ = cheerio.load(`<div class="banner lazyload" data-bgset="//cdn/b_{width}x.jpg 1200w"></div>`);
+ deLazy($, "https://store.com/");
+ const style = $("div.banner").attr("style") || "";
+ assert.match(style, /background-image:url\('https:\/\/cdn\/b_1600x\.jpg'\)/);
 });

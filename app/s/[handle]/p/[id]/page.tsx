@@ -150,6 +150,12 @@ export default async function ProductPage({ params, searchParams }: Props) {
  <p className="mt-4 text-xl" style={{ color: sold ? "inherit" : c.accent, opacity: sold ? 0.5 : 1 }}>{price}{sold ? " · Sold" : ""}</p>
  {item.size && <p className="mt-4 text-[11px] uppercase tracking-[0.18em] opacity-50">Size {item.size}</p>}
  {item.description && <p className="mt-7 text-sm leading-[1.9] opacity-75 whitespace-pre-wrap">{item.description}</p>}
+ {item.measurements && (
+ <div className="mt-6 border-t border-current/10 pt-4">
+ <p className="text-[10px] uppercase tracking-[0.2em] opacity-40">Measurements</p>
+ <p className="mt-1.5 text-sm leading-[1.7] opacity-75 whitespace-pre-wrap">{item.measurements}</p>
+ </div>
+ )}
 
  <div className="mt-9 max-w-sm">
  {sold ? (

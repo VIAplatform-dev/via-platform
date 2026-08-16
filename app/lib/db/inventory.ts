@@ -3,6 +3,7 @@ import { getDb, items, reservations, orders, payouts } from "./index";
 import type { Item, NewItem, Reservation } from "./index";
 import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-core";
 import { logError } from "@/app/lib/error-log";
+import { cleanDescription } from "@/app/lib/clean-description";
 
 // ───────────────────────────────────────────────────────────────────────────
 // One-of-one inventory engine. Every mutation that changes availability is a
@@ -13,17 +14,22 @@ import { logError } from "@/app/lib/error-log";
 /** Create an item (defaults to draft). */
 export async function createItem(item: NewItem): Promise<Item> {
  const db = getDb();
- const [row] = await db.insert(items).values(item).returning();
+ // Clean HTML out of imported descriptions at the single write path, so EVERY item — from any
+ // importer (Shopify/Squarespace/connected adapters), bulk upload, or a future source — is stored
+ // as tidy plain text. Plain text passes through untouched (see cleanDescription).
+ const values = item.description ? { ...item, description: cleanDescription(item.description) } : item;
+ const [row] = await db.insert(items).values(values).returning();
  return row;
 }
 
-// Self-heal the scheduled-publish column so a deploy works even before `db:push` runs. Idempotent
-// + memoized, so it's a no-op after the first call (or once the migration has been applied).
+// Self-heal newer item columns so a deploy works even before `db:push` runs. Idempotent + memoized,
+// so it's a no-op after the first call (or once the migration has been applied).
 let publishAtEnsured = false;
 export async function ensurePublishAtColumn(): Promise<void> {
  if (publishAtEnsured) return;
  try {
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS publish_at timestamptz`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements text`);
  publishAtEnsured = true;
  } catch { /* db:push covers it; ignore if we lack DDL rights */ }
 }
@@ -44,7 +50,7 @@ export async function publishDueScheduledItems(now: Date): Promise<Item[]> {
  * touch availability locks (use reserve/markSold for those). */
 export async function updateItem(
  itemId: string,
- patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn">>,
+ patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn">>,
 ): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();

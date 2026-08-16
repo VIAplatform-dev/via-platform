@@ -30,5 +30,5 @@ export async function GET(request: NextRequest) {
  const threshold = shipping?.freeThresholdCents ?? null;
  const freeShipping = mode === "store_pays" || (mode === "free_over" && threshold != null && subtotal >= threshold);
 
- return NextResponse.json({ items, storeName: seller?.name || "the store", freeShipping, subtotalCents: subtotal });
+ return NextResponse.json({ items, storeName: seller?.name || "the store", freeShipping, subtotalCents: subtotal, publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim() });
 }

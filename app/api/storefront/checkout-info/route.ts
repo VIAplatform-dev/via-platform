@@ -45,5 +45,6 @@ export async function GET(request: NextRequest) {
  storeName: seller?.name || "the store",
  freeShipping,
  agreed,
+ publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim(),
  });
 }

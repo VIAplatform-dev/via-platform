@@ -9,25 +9,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Sidekick from "../../Sidekick";
 import Blocks from "@/app/s/Blocks";
-import { makeBlock, pageSlugify, type Block, type StorePage } from "@/app/lib/storefront-blocks";
-import { STOREFRONT_TEMPLATES, templateBlocks, type StorefrontTemplate } from "@/app/lib/storefront-templates";
-import { ChevronLeft, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, Plus, X, Check, LayoutTemplate } from "lucide-react";
+import { makeBlock, makeOverlay, newBlockId, pageSlugify, BLOCK_TYPES, type Block, type BlockType, type BlockStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
+import { STOREFRONT_TEMPLATES, templateBlocks, STOREFRONT_PALETTES, RADIUS_OPTIONS, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
+import { ChevronLeft, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, MousePointerClick, Trash2, Copy } from "lucide-react";
 
 type Colors = { bg: string; text: string; accent: string };
 type Fonts = { heading: string; body: string };
+type Radius = "sharp" | "soft" | "round";
+type RailTab = "design" | "add" | "assist";
 type Product = { title: string; price: number | null; currency: string; image: string };
 type Device = "desktop" | "tablet" | "phone";
 type Settings = { handle: string; enabled: boolean; tagline: string | null; accentColor: string | null; heroImage: string | null; about: string | null };
 
-const SERIFS = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces"]);
-const ff = (name?: string) => (name ? `'${name}', ${SERIFS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
+const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 const money = (c: number | null, cur: string) => (c == null ? "" : new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(c));
+
+// One-click font pairings for the Design panel (heading × body). Click sets both at once — the
+// dropdowns below stay for anyone who wants to mix their own.
+const FONT_PAIRS: { name: string; heading: string; body: string }[] = [
+ { name: "Editorial", heading: "Playfair Display", body: "Inter" },
+ { name: "Modern", heading: "Outfit", body: "Inter" },
+ { name: "Literary", heading: "Newsreader", body: "Newsreader" },
+ { name: "Bold", heading: "Archivo", body: "Inter" },
+ { name: "Romantic", heading: "Cormorant Garamond", body: "Poppins" },
+ { name: "Clean", heading: "Space Grotesk", body: "Work Sans" },
+];
+// The corner-preview curve for each shape option, so the segmented control shows what it does.
+const RADIUS_PREVIEW: Record<Radius, string> = { sharp: "0px", soft: "6px", round: "12px" };
 
 export default function StorefrontStudio() {
  const [settings, setSettings] = useState<Settings | null>(null);
  const [storeName, setStoreName] = useState("Your store");
  const [colors, setColors] = useState<Colors>({ bg: "#FFFDF8", text: "#1a1a1a", accent: "#5D0F17" });
  const [fonts, setFonts] = useState<Fonts>({ heading: "Playfair Display", body: "Inter" });
+ const [radius, setRadius] = useState<Radius>("sharp");
+ const [railTab, setRailTab] = useState<RailTab>("design");
  const [products, setProducts] = useState<Product[]>([]);
  const [blocks, setBlocks] = useState<Block[]>([]);
  const [shopBlocks, setShopBlocks] = useState<Block[]>([]);
@@ -35,6 +51,11 @@ export default function StorefrontStudio() {
  const [customCss, setCustomCss] = useState("");
  const [activeSlug, setActiveSlug] = useState("home");
  const [selBlock, setSelBlock] = useState<string | null>(null);
+ const [selOverlay, setSelOverlay] = useState<{ blockId: string; overlayId: string } | null>(null);
+ const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null); // where the floating toolbar sits (above the selection)
+ const [ovlDragging, setOvlDragging] = useState(false); // hide the toolbar while dragging an element
+ const [fileDrag, setFileDrag] = useState(false); // an image file is being dragged over the canvas
+ const [uploading, setUploading] = useState(false);
  const [dragIdx, setDragIdx] = useState<number | null>(null);
  const [canvasOver, setCanvasOver] = useState<number | null>(null);
  const [fmtBar, setFmtBar] = useState<{ top: number; left: number } | null>(null);
@@ -55,6 +76,7 @@ export default function StorefrontStudio() {
  const d = await r.json();
  if (d.colors) setColors(d.colors);
  if (d.fonts) setFonts(d.fonts);
+ if (d.radius === "sharp" || d.radius === "soft" || d.radius === "round") setRadius(d.radius);
  setProducts(d.products || []);
  setBlocks(d.blocks || []);
  setShopBlocks(d.shopBlocks || []);
@@ -74,6 +96,16 @@ export default function StorefrontStudio() {
  setLoading(false);
  })();
  }, [loadDesign]);
+
+ // Load every option font once so the live preview — and the font-picker labels — render in their real
+ // faces instead of a fallback. Editor-only; the live storefront loads just its two chosen families.
+ useEffect(() => {
+ const id = "vya-studio-fonts";
+ if (document.getElementById(id)) return;
+ const link = document.createElement("link");
+ link.id = id; link.rel = "stylesheet"; link.href = storefrontFontsHref(ALL_STOREFRONT_FONTS);
+ document.head.appendChild(link);
+ }, []);
 
  // VYA changed the store from chat → pull the new design in.
  useEffect(() => {
@@ -118,7 +150,7 @@ export default function StorefrontStudio() {
  onEnd: () => { setDragIdx(null); setCanvasOver(null); },
  onDrop: (i: number) => { reorderTo(i); setCanvasOver(null); },
  };
- function switchPage(slug: string) { setActiveSlug(slug); setSelBlock(null); setFmtBar(null); setDdOpen(false); }
+ function switchPage(slug: string) { setActiveSlug(slug); setSelBlock(null); setSelOverlay(null); setFmtBar(null); setDdOpen(false); }
  function addPage() {
  const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
  if (!title || !title.trim()) return;
@@ -166,6 +198,196 @@ export default function StorefrontStudio() {
  setSelBlock(null);
  setShowTemplates(false);
  await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.id, colors: t.colors, fonts: t.fonts }) }).catch(() => {});
+ }
+
+ // ── Design panel: direct-manipulation colour / font / corner controls (the "Canva-easy" surface) ──
+ // Tokens live on the theme, not the blocks, so they persist through their own debounced POST (the
+ // blocks autosave effect only handles sections). Colour pickers fire rapidly while dragging, hence the
+ // debounce; palette / font / corner clicks are discrete but ride the same path.
+ const designTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+ const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius }) => {
+ if (designTimer.current) clearTimeout(designTimer.current);
+ setSave("saving");
+ designTimer.current = setTimeout(async () => {
+ await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }).catch(() => {});
+ setSave("saved");
+ }, 400);
+ }, []);
+ function applyPalette(c: Colors) { setColors(c); pushDesign({ colors: c }); }
+ function changeColor(key: keyof Colors, val: string) { const next = { ...colors, [key]: val }; setColors(next); pushDesign({ colors: next }); }
+ function changeFont(which: keyof Fonts, val: string) { const next = { ...fonts, [which]: val }; setFonts(next); pushDesign({ fonts: next }); }
+ function changeFont2(heading: string, body: string) { const next = { heading, body }; setFonts(next); pushDesign({ fonts: next }); }
+ function changeRadius(r: Radius) { setRadius(r); pushDesign({ radius: r }); }
+ // Add a section to the current page (Canva's "Elements" analog for a section-based builder) and
+ // select it so the seller can immediately edit it on the canvas.
+ function addSection(type: BlockType) {
+ const b = makeBlock(type);
+ updateCur((bs) => [...bs, b]);
+ setSelBlock(b.id);
+ requestAnimationFrame(() => canvasRef.current?.scrollTo({ top: canvasRef.current.scrollHeight, behavior: "smooth" }));
+ }
+
+ // ── Section styling (the inspector that appears when a section is selected) ──
+ // Setting a value to "" / undefined clears that override, so a section drops back to the theme default.
+ function setBlockStyle(id: string, key: keyof BlockStyle, value: string | undefined) {
+ updateCur((bs) => bs.map((b) => {
+ if (b.id !== id) return b;
+ const style: BlockStyle = { ...(b.style || {}) };
+ if (value == null || value === "") delete style[key];
+ else (style as Record<string, string>)[key] = value;
+ return { ...b, style: Object.keys(style).length ? style : undefined };
+ }));
+ }
+ function removeBlock(id: string) {
+ updateCur((bs) => bs.filter((b) => b.id !== id));
+ setSelBlock(null); setSelOverlay(null);
+ }
+ // A hero (and a plain image section) render props.image as their OWN visible picture — so a "background
+ // photo" there must set props.image, or it hides behind the section's own render. Every other section
+ // paints style.bgImage full-bleed behind its content.
+ const sectionUsesPropsImage = (type: string) => type === "hero" || type === "image";
+ const sectionBgUrl = (b: Block) => (sectionUsesPropsImage(b.type) ? b.props?.image || "" : b.style?.bgImage || "");
+ function setSectionBgImage(b: Block, url: string | undefined) {
+ if (sectionUsesPropsImage(b.type)) {
+ // These render props.image. Also drop any stale style.bgImage so a leftover full-bleed layer
+ // (e.g. from an earlier attempt) can't linger behind — or reappear when the photo is removed.
+ updateCur((bs) => bs.map((x) => {
+ if (x.id !== b.id) return x;
+ const style = { ...(x.style || {}) };
+ delete style.bgImage;
+ return { ...x, props: { ...x.props, image: url || "" }, style: Object.keys(style).length ? style : undefined };
+ }));
+ } else setBlockStyle(b.id, "bgImage", url);
+ }
+ function duplicateBlock(id: string) {
+ updateCur((bs) => {
+ const i = bs.findIndex((b) => b.id === id);
+ if (i < 0) return bs;
+ const src = bs[i];
+ const copy: Block = { ...src, id: newBlockId(), overlays: src.overlays?.map((o) => ({ ...o, id: `o_${newBlockId()}` })) };
+ return [...bs.slice(0, i + 1), copy, ...bs.slice(i + 1)];
+ });
+ }
+
+ // ── Free-form overlay elements (drag a button/text/image anywhere on a section) ──
+ // Overlays live inside their section's block, so the blocks autosave persists them for free.
+ function patchOverlay(blockId: string, overlayId: string, patch: Partial<Overlay>) {
+ updateCur((bs) => bs.map((b) => (b.id === blockId ? { ...b, overlays: (b.overlays || []).map((o) => (o.id === overlayId ? { ...o, ...patch } : o)) } : b)));
+ }
+ function patchOverlayProps(blockId: string, overlayId: string, kv: Record<string, string>) {
+ updateCur((bs) => bs.map((b) => (b.id === blockId ? { ...b, overlays: (b.overlays || []).map((o) => (o.id === overlayId ? { ...o, props: { ...o.props, ...kv } } : o)) } : b)));
+ }
+ function removeOverlay(blockId: string, overlayId: string) {
+ updateCur((bs) => bs.map((b) => (b.id === blockId ? { ...b, overlays: (b.overlays || []).filter((o) => o.id !== overlayId) } : b)));
+ setSelOverlay(null);
+ }
+ // Add an element to the SELECTED section (fallback: the last section on the page), then select it.
+ function addElement(kind: OverlayKind) {
+ const targetId = selBlock && curBlocks.some((b) => b.id === selBlock) ? selBlock : curBlocks[curBlocks.length - 1]?.id;
+ if (!targetId) { setRailTab("add"); window.alert("Add a section first, then drop elements onto it."); return; }
+ const o = makeOverlay(kind);
+ updateCur((bs) => bs.map((b) => (b.id === targetId ? { ...b, overlays: [...(b.overlays || []), o] } : b)));
+ setSelBlock(targetId);
+ setSelOverlay({ blockId: targetId, overlayId: o.id });
+ }
+ // Drag math (px → %) lives here because it needs the live section rect. Listeners close over the
+ // current page state at drag-start — a drag is short-lived, so this stays correct without refs.
+ const overlayEdit = {
+ selectedId: selOverlay?.overlayId ?? null,
+ onSelect: (blockId: string, overlayId: string) => { setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); },
+ onDragStart: (blockId: string, overlayId: string, e: React.PointerEvent) => {
+ const el = e.currentTarget as HTMLElement;
+ const sec = el.closest(".vya-sec") as HTMLElement | null;
+ if (!sec) return;
+ const rect = sec.getBoundingClientRect();
+ if (!rect.width || !rect.height) return;
+ const cur = curBlocks.find((b) => b.id === blockId)?.overlays?.find((o) => o.id === overlayId);
+ const ox = cur?.x ?? 0, oy = cur?.y ?? 0, sx = e.clientX, sy = e.clientY;
+ setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); setOvlDragging(true);
+ el.setPointerCapture?.(e.pointerId);
+ const move = (ev: PointerEvent) => {
+ const nx = Math.min(100, Math.max(0, ox + ((ev.clientX - sx) / rect.width) * 100));
+ const ny = Math.min(100, Math.max(0, oy + ((ev.clientY - sy) / rect.height) * 100));
+ patchOverlay(blockId, overlayId, { x: Math.round(nx * 10) / 10, y: Math.round(ny * 10) / 10 });
+ };
+ const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); };
+ window.addEventListener("pointermove", move);
+ window.addEventListener("pointerup", up);
+ },
+ };
+ const selOverlayObj = selOverlay ? curBlocks.find((b) => b.id === selOverlay.blockId)?.overlays?.find((o) => o.id === selOverlay.overlayId) ?? null : null;
+ // A section is "inspected" when it's selected and no overlay on it is selected.
+ const selBlockObj = selBlock && !selOverlay ? curBlocks.find((b) => b.id === selBlock) ?? null : null;
+
+ // ── Floating toolbar anchoring (Canva-style: sits just above the selection, follows canvas scroll) ──
+ useEffect(() => {
+ const canvas = canvasRef.current;
+ if ((!selBlock && !selOverlay) || !canvas) { setAnchor(null); return; }
+ const measure = () => {
+ const c = canvasRef.current;
+ if (!c) return;
+ const el = (selOverlay ? c.querySelector(`[data-ovl="${selOverlay.overlayId}"]`) : c.querySelector(`.vya-b-${selBlock}`)) as HTMLElement | null;
+ if (!el) { setAnchor(null); return; }
+ const r = el.getBoundingClientRect(), cr = c.getBoundingClientRect();
+ const BAR = 46, GAP = 10;
+ let top = r.top - GAP - BAR; // above the selection…
+ if (top < cr.top + 6) top = cr.top + 6; // …unless it'd clip the canvas top, then pin near the top
+ const left = Math.min(cr.right - 24, Math.max(cr.left + 24, r.left + r.width / 2));
+ setAnchor({ top, left });
+ };
+ measure();
+ canvas.addEventListener("scroll", measure, { passive: true });
+ window.addEventListener("resize", measure);
+ return () => { canvas.removeEventListener("scroll", measure); window.removeEventListener("resize", measure); };
+ }, [selBlock, selOverlay, blocks, shopBlocks, extraPages, activeSlug, device]);
+
+ // ── Image upload + drag-and-drop (no more URL fields) ──
+ async function uploadImage(file: File): Promise<string | null> {
+ if (!file.type.startsWith("image/")) return null;
+ const fd = new FormData(); fd.append("file", file);
+ setUploading(true);
+ try {
+ const r = await fetch("/api/store/assets", { method: "POST", body: fd });
+ if (!r.ok) return null;
+ const d = await r.json().catch(() => null);
+ return d?.url || null;
+ } finally { setUploading(false); }
+ }
+ // Pick a file, upload it, and hand back the hosted URL (used by the toolbar "Upload" buttons).
+ async function pickAndUpload(onUrl: (url: string) => void) {
+ const inp = document.createElement("input");
+ inp.type = "file"; inp.accept = "image/*";
+ inp.onchange = async () => { const f = inp.files?.[0]; if (f) { const url = await uploadImage(f); if (url) onUrl(url); } };
+ inp.click();
+ }
+ // Resolve which section (and overlay, if any) a drop landed on, from the drop point.
+ function targetFromPoint(x: number, y: number): { blockId?: string; overlayId?: string } {
+ const el = document.elementFromPoint(x, y) as HTMLElement | null;
+ const overlayId = (el?.closest(".vya-ovl") as HTMLElement | null)?.getAttribute("data-ovl") || undefined;
+ const sec = el?.closest(".vya-sec") as HTMLElement | null;
+ const cls = sec ? [...sec.classList].find((c) => c.startsWith("vya-b-")) : undefined;
+ return { blockId: cls ? cls.slice("vya-b-".length) : undefined, overlayId };
+ }
+ function onCanvasDragOver(e: React.DragEvent) {
+ if (!Array.from(e.dataTransfer.types).includes("Files")) return; // ignore section-reorder drags
+ e.preventDefault();
+ if (!fileDrag) setFileDrag(true);
+ }
+ async function onCanvasDrop(e: React.DragEvent) {
+ if (!e.dataTransfer.files?.length) return; // a reorder drop, not a file
+ e.preventDefault();
+ setFileDrag(false);
+ const file = e.dataTransfer.files[0];
+ const { blockId, overlayId } = targetFromPoint(e.clientX, e.clientY);
+ if (!blockId && !overlayId) return;
+ const url = await uploadImage(file);
+ if (!url) return;
+ // Dropped on an image element → set its picture; otherwise it's the section's background.
+ if (blockId && overlayId) {
+ const o = curBlocks.find((b) => b.id === blockId)?.overlays?.find((x) => x.id === overlayId);
+ if (o?.kind === "image") { patchOverlayProps(blockId, overlayId, { src: url }); setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); return; }
+ }
+ if (blockId) { const blk = curBlocks.find((x) => x.id === blockId); if (blk) setSectionBgImage(blk, url); setSelBlock(blockId); setSelOverlay(null); }
  }
 
  async function togglePublish() {
@@ -219,9 +441,130 @@ export default function StorefrontStudio() {
  </div>
  )}
 
- {/* Body: chat (primary) + editable live preview */}
+ {/* Body: editing rail (Design / Add / Assist) + editable live preview */}
  <div className="flex min-h-0 flex-1">
- <div className="w-[400px] max-w-[42vw] shrink-0 overflow-hidden border-r border-black/10"><Sidekick docked /></div>
+ <div className="flex w-[380px] max-w-[42vw] shrink-0 flex-col overflow-hidden border-r border-black/10 bg-[#fbf9f5]">
+ {/* Tab strip — direct-manipulation panels, with the AI assistant as one tab (not the whole side) */}
+ <div className="flex shrink-0 gap-1 border-b border-black/10 p-1.5">
+ {([["design", "Design", Palette], ["add", "Add section", Layers], ["assist", "Assist", Sparkles]] as const).map(([id, label, Icon]) => (
+ <button key={id} type="button" onClick={() => setRailTab(id)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition ${railTab === id ? "bg-[#5D0F17] text-white shadow-sm" : "text-stone-600 hover:bg-stone-100"}`}>
+ <Icon size={14} strokeWidth={2} /> <span className="hidden md:inline">{label}</span>
+ </button>
+ ))}
+ </div>
+
+ {/* Assist keeps the full-height chat; Design & Add are scrollable control panels */}
+ <div className="min-h-0 flex-1 overflow-hidden">
+ {railTab === "assist" ? (
+ <Sidekick docked />
+ ) : railTab === "design" ? (
+ <div className="h-full overflow-y-auto px-4 py-4">
+ {/* Palettes */}
+ <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Colour palette</p>
+ <div className="grid grid-cols-3 gap-2">
+ {STOREFRONT_PALETTES.map((p) => {
+ const active = colors.bg === p.colors.bg && colors.text === p.colors.text && colors.accent === p.colors.accent;
+ return (
+ <button key={p.id} type="button" onClick={() => applyPalette(p.colors)} title={p.name} className={`overflow-hidden rounded-lg border text-left transition ${active ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <div className="flex h-11" style={{ background: p.colors.bg }}>
+ <span className="m-auto flex gap-1">
+ <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: p.colors.text }} />
+ <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: p.colors.accent }} />
+ </span>
+ </div>
+ <p className="truncate px-1.5 py-1 text-[9px] font-medium text-stone-500">{p.name}</p>
+ </button>
+ );
+ })}
+ </div>
+
+ {/* Fine-tune colours */}
+ <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Colours</p>
+ <div className="space-y-1.5">
+ {([["bg", "Background"], ["text", "Text"], ["accent", "Accent"]] as const).map(([key, label]) => (
+ <label key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
+ <span className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md ring-1 ring-black/15" style={{ background: colors[key] }}>
+ <input type="color" value={colors[key]} onChange={(e) => changeColor(key, e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+ </span>
+ <span className="flex-1 text-[13px] text-stone-700">{label}</span>
+ <span className="font-mono text-[11px] uppercase text-stone-400">{colors[key]}</span>
+ </label>
+ ))}
+ </div>
+
+ {/* Corners ("shapes") */}
+ <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Corners</p>
+ <div className="grid grid-cols-3 gap-2">
+ {RADIUS_OPTIONS.map((r) => (
+ <button key={r.id} type="button" onClick={() => changeRadius(r.id)} className={`flex flex-col items-center gap-2 rounded-lg border py-3 transition ${radius === r.id ? "border-[#5D0F17] bg-[#5D0F17]/[0.05] ring-1 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <span className="h-7 w-7 border-2 border-stone-500" style={{ borderRadius: RADIUS_PREVIEW[r.id] }} />
+ <span className="text-[11px] font-medium text-stone-600">{r.name}</span>
+ </button>
+ ))}
+ </div>
+
+ {/* Fonts */}
+ <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Fonts</p>
+ <div className="grid grid-cols-2 gap-2">
+ {FONT_PAIRS.map((fp) => {
+ const active = fonts.heading === fp.heading && fonts.body === fp.body;
+ return (
+ <button key={fp.name} type="button" onClick={() => changeFont2(fp.heading, fp.body)} className={`rounded-lg border px-3 py-2 text-left transition ${active ? "border-[#5D0F17] ring-1 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <span className="block truncate text-[15px] leading-tight text-stone-800" style={{ fontFamily: ff(fp.heading) }}>{fp.name}</span>
+ <span className="block truncate text-[10px] text-stone-400" style={{ fontFamily: ff(fp.body) }}>{fp.heading} · {fp.body}</span>
+ </button>
+ );
+ })}
+ </div>
+ <div className="mt-2.5 space-y-1.5">
+ <label className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-1.5">
+ <span className="w-16 shrink-0 text-[11px] uppercase tracking-wide text-stone-400">Heading</span>
+ <select value={fonts.heading} onChange={(e) => changeFont("heading", e.target.value)} className="flex-1 bg-transparent text-[13px] text-stone-700 outline-none">
+ {HEADING_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+ </select>
+ </label>
+ <label className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-1.5">
+ <span className="w-16 shrink-0 text-[11px] uppercase tracking-wide text-stone-400">Body</span>
+ <select value={fonts.body} onChange={(e) => changeFont("body", e.target.value)} className="flex-1 bg-transparent text-[13px] text-stone-700 outline-none">
+ {BODY_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
+ </select>
+ </label>
+ </div>
+
+ <button type="button" onClick={() => setShowTemplates(true)} className="mt-6 flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 py-2.5 text-[12px] font-semibold text-stone-600 transition hover:bg-stone-100"><LayoutTemplate size={13} /> Start from a full template</button>
+ <p className="mt-2 text-center text-[11px] leading-snug text-stone-400">Change anything here, or switch to <button type="button" onClick={() => setRailTab("assist")} className="font-semibold text-[#5D0F17] underline">Assist</button> and just describe it.</p>
+ </div>
+ ) : (
+ <div className="h-full overflow-y-auto px-4 py-4">
+ {/* Free-form elements — drop onto a section, then drag anywhere */}
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">Drop onto {selBlock ? "the selected section" : "the last section"}, then drag it anywhere. It scales with the layout and stacks neatly on mobile.</p>
+ <div className="mb-6 grid grid-cols-3 gap-2">
+ {([["button", "Button", MousePointerClick], ["text", "Text", Type], ["image", "Image", ImageIcon]] as const).map(([kind, label, Icon]) => (
+ <button key={kind} type="button" onClick={() => addElement(kind)} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03] hover:text-[#5D0F17]">
+ <Icon size={17} strokeWidth={1.8} />
+ <span className="text-[11px] font-medium">{label}</span>
+ </button>
+ ))}
+ </div>
+
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add to {activeTitle}</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Full-width sections. Click one to drop it at the bottom of the page.</p>
+ <div className="space-y-1.5">
+ {BLOCK_TYPES.map((bt) => (
+ <button key={bt.type} type="button" onClick={() => addSection(bt.type)} className="group flex w-full items-start gap-3 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-left transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03]">
+ <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-500 group-hover:bg-[#5D0F17] group-hover:text-white"><Plus size={13} /></span>
+ <span className="min-w-0">
+ <span className="block text-[13px] font-semibold capitalize text-stone-800">{bt.label}</span>
+ <span className="block text-[11px] leading-snug text-stone-400">{bt.description}</span>
+ </span>
+ </button>
+ ))}
+ </div>
+ </div>
+ )}
+ </div>
+ </div>
 
  <div className="flex min-w-0 flex-1 flex-col items-center overflow-hidden p-5">
  <div className="mb-3 flex items-center gap-2 text-[12px] text-stone-500">
@@ -268,10 +611,15 @@ export default function StorefrontStudio() {
  </div>
 
  {/* editable canvas */}
- <div ref={canvasRef} className="min-h-0 flex-1 overflow-y-auto" style={{ background: colors.bg }}>
+ <div ref={canvasRef} onDragOver={onCanvasDragOver} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setFileDrag(false); }} onDrop={onCanvasDrop} className="relative min-h-0 flex-1 overflow-y-auto" style={{ background: colors.bg }}>
+ {fileDrag && (
+ <div className="pointer-events-none absolute inset-0 z-40 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-[#5D0F17] bg-[#5D0F17]/[0.06]">
+ <span className="rounded-full bg-[#5D0F17] px-4 py-1.5 text-[12px] font-semibold text-white shadow">Drop a photo onto a section to set its background</span>
+ </div>
+ )}
  {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
  {curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={setSelBlock} selectedId={selBlock} edit onEditField={editField} reorder={canvasReorder} />
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); }} selectedId={selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} />
  ) : (
  <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 px-8 text-center">
  <p className="text-[14px] text-stone-400" style={{ fontFamily: ff(fonts.body) }}>This page is empty.</p>
@@ -299,6 +647,116 @@ export default function StorefrontStudio() {
  </label>
  </div>
  )}
+
+ {/* Selected free-form element — contextual toolbar, floating just above it (Canva-style) */}
+ {selOverlayObj && selOverlay && anchor && !ovlDragging && (() => {
+ const { blockId, overlayId } = selOverlay;
+ const p = selOverlayObj.props || {};
+ const swatch = (val: string, onChange: (v: string) => void, title: string) => (
+ <label title={title} className="relative grid h-7 w-7 cursor-pointer place-items-center rounded-md ring-1 ring-black/10" style={{ background: val }}>
+ <input type="color" value={val} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+ </label>
+ );
+ const inp = "rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
+ return (
+ <div style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[92vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
+ <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 capitalize">{selOverlayObj.kind}</span>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ {selOverlayObj.kind === "button" && (
+ <>
+ <input value={p.label || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { label: e.target.value })} placeholder="Label" className={`w-28 ${inp}`} />
+ <input value={p.href || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { href: e.target.value })} placeholder="/shop or https://…" className={`w-40 ${inp}`} />
+ {swatch(p.bg || "#1a1a1a", (v) => patchOverlayProps(blockId, overlayId, { bg: v }), "Fill")}
+ {swatch(p.color || "#ffffff", (v) => patchOverlayProps(blockId, overlayId, { color: v }), "Text colour")}
+ </>
+ )}
+ {selOverlayObj.kind === "text" && (
+ <>
+ <input value={p.text || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { text: e.target.value })} placeholder="Text" className={`w-44 ${inp}`} />
+ <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
+ <button type="button" onClick={() => patchOverlayProps(blockId, overlayId, { bold: p.bold === "1" ? "" : "1" })} title="Bold" className={`w-7 py-1 text-[13px] font-bold transition ${p.bold === "1" ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`}>B</button>
+ <button type="button" onClick={() => patchOverlayProps(blockId, overlayId, { italic: p.italic === "1" ? "" : "1" })} title="Italic" className={`w-7 py-1 font-serif text-[13px] italic transition ${p.italic === "1" ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`}>I</button>
+ </div>
+ <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
+ {(["sm", "md", "lg", "xl"] as const).map((s) => (
+ <button key={s} type="button" onClick={() => patchOverlayProps(blockId, overlayId, { size: s })} className={`px-2 py-1 text-[11px] font-medium uppercase transition ${p.size === s || (!p.size && s === "md") ? "bg-[#5D0F17] text-white" : "text-stone-500 hover:bg-stone-100"}`}>{s}</button>
+ ))}
+ </div>
+ {swatch(p.color || "#ffffff", (v) => patchOverlayProps(blockId, overlayId, { color: v }), "Text colour")}
+ </>
+ )}
+ {selOverlayObj.kind === "image" && (
+ <>
+ {p.src
+ ? <span className="h-7 w-7 shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url("${p.src.replace(/"/g, "%22")}")` }} />
+ : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-400"><ImageIcon size={13} /></span>}
+ <button type="button" disabled={uploading} onClick={() => pickAndUpload((url) => patchOverlayProps(blockId, overlayId, { src: url }))} className="shrink-0 rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "Uploading…" : p.src ? "Replace" : "Upload"}</button>
+ <div className="flex shrink-0 items-center gap-1.5">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Size</span>
+ <input type="range" min={8} max={100} value={selOverlayObj.w ?? 28} onChange={(e) => patchOverlay(blockId, overlayId, { w: Number(e.target.value) })} className="w-24 accent-[#5D0F17]" />
+ </div>
+ </>
+ )}
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ <button type="button" onClick={() => removeOverlay(blockId, overlayId)} title="Delete element" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ </div>
+ );
+ })()}
+
+ {/* Selected section — contextual toolbar floating just above it (background incl. photo, text, align, spacing) */}
+ {selBlockObj && anchor && (() => {
+ const b = selBlockObj, st = b.style || {};
+ const bid = b.id;
+ const bgUrl = sectionBgUrl(b);
+ const chip = (on: boolean) => `rounded-md px-2 py-1 text-[11px] font-medium transition ${on ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`;
+ return (
+ <div style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
+ <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{b.type.replace(/[-_]/g, " ")}</span>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ {/* Background */}
+ <span className="shrink-0 text-[10px] uppercase tracking-wide text-stone-400">Bg</span>
+ <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
+ <button type="button" onClick={() => { setBlockStyle(bid, "bg", undefined); setBlockStyle(bid, "bgImage", undefined); }} className={chip(!st.bg && !st.bgImage)}>Page</button>
+ <button type="button" onClick={() => setBlockStyle(bid, "bg", "accent")} className={chip(st.bg === "accent")}>Accent</button>
+ <button type="button" onClick={() => setBlockStyle(bid, "bg", "dark")} className={chip(st.bg === "dark")}>Dark</button>
+ </div>
+ <label title="Custom colour" className="relative grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md ring-1 ring-black/10" style={{ background: /^#/.test(st.bg || "") ? st.bg : "#ffffff" }}>
+ <input type="color" value={/^#/.test(st.bg || "") ? st.bg! : "#ffffff"} onChange={(e) => setBlockStyle(bid, "bg", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+ </label>
+ {/* Background photo — upload or drag-drop (no URLs) */}
+ <div className="flex shrink-0 items-center gap-1.5">
+ {bgUrl
+ ? <span className="h-7 w-7 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url("${bgUrl.replace(/"/g, "%22")}")` }} />
+ : <span className="grid h-7 w-7 place-items-center rounded-md bg-stone-100 text-stone-400"><ImageIcon size={13} /></span>}
+ <button type="button" disabled={uploading} onClick={() => pickAndUpload((url) => setSectionBgImage(b, url))} className="rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "Uploading…" : bgUrl ? "Replace photo" : "Photo"}</button>
+ {bgUrl && <button type="button" onClick={() => setSectionBgImage(b, undefined)} title="Remove photo" className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-600"><X size={13} /></button>}
+ </div>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ {/* Text colour */}
+ <label title="Text colour" className="relative grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md ring-1 ring-black/10" style={{ background: st.textColor || "#111111" }}>
+ <input type="color" value={st.textColor || "#111111"} onChange={(e) => setBlockStyle(bid, "textColor", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+ </label>
+ {/* Alignment */}
+ <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
+ {(["left", "center", "right"] as const).map((a) => (
+ <button key={a} type="button" onClick={() => setBlockStyle(bid, "align", st.align === a ? undefined : a)} className={chip(st.align === a)}>{a[0].toUpperCase()}</button>
+ ))}
+ </div>
+ {/* Spacing */}
+ <div className="flex shrink-0 items-center gap-1">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Space</span>
+ <div className="flex overflow-hidden rounded-md border border-black/10">
+ {(["sm", "md", "lg", "xl"] as const).map((s) => (
+ <button key={s} type="button" onClick={() => setBlockStyle(bid, "space", st.space === s ? undefined : s)} className={chip(st.space === s)}>{s.toUpperCase()}</button>
+ ))}
+ </div>
+ </div>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ <button type="button" onClick={() => duplicateBlock(bid)} title="Duplicate section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"><Copy size={14} /></button>
+ <button type="button" onClick={() => removeBlock(bid)} title="Delete section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ </div>
+ );
+ })()}
 
  {/* Template picker — pick a vibe; restyles + lays out a fresh home page */}
  {showTemplates && (

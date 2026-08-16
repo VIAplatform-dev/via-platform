@@ -338,9 +338,21 @@ async function saveCollabsConversions(
  orderTotal = lineItems.reduce((sum, it) => sum + it.price, 0);
  }
 
- // Commission still in holding period — no amount available yet. Don't insert $0;
- // caller will hold back the snapshot so the next cron run retries.
+ // The individual commission node hasn't resolved an amount yet (holding period). Don't hold the whole
+ // sale back — recover the REAL order total from the Shopify order-webhook cache (matched by order name),
+ // else back-calculate it from the known partnership commission delta. Only give up if there's no signal
+ // at all. This keeps the conversion in the table immediately instead of waiting for Collabs to finalize.
+ if (orderTotal <= 0) {
+ const held = await findCachedOrder({ storeSlug, orderName: shopifyOrderName ?? null, totalUsd: null, aroundIso: ts }).catch(() => null);
+ if (held && held.totalUsd > 0) {
+ orderTotal = held.totalUsd;
+ if (held.items.length > 0) lineItems = held.items;
+ } else if (deltaCommission > 0) {
+ orderTotal = calculateOrderTotal(convertCurrencyToUSD(deltaCommission, currency) / Math.max(1, deltaOrders), commissionRules);
+ lineItems = [{ productName: firstItem.productName ?? (click?.product_name as string | null) ?? "Item via Shopify Collabs", quantity: 1, price: orderTotal }];
+ }
  if (orderTotal <= 0) return false;
+ }
 
  // Enrich with the REAL line items from the Shopify order-webhook cache. Collabs
  // frequently returns no itemized data, so without this the conversion is labeled
@@ -716,7 +728,10 @@ export async function GET(request: Request) {
  const snapshotToSave = partnerships.map((p: Record<string, unknown> & { id: string; totalOrders: number }) => {
  if (holdbackIds.has(p.id)) {
  const prev = prevMap.get(p.id);
- return { ...p, totalOrders: prev?.totalOrders ?? p.totalOrders };
+ // Hold BOTH the order count and the commission at their previous values. Advancing the commission
+ // while holding the order count (the old behavior) made the retry see deltaOrders>0 but deltaCommission=0,
+ // so it could never back-calculate an amount and stayed stuck. Preserving both keeps the full delta intact.
+ return { ...p, totalOrders: prev?.totalOrders ?? p.totalOrders, ...(prev ? { totalCommissionEarned: prev.totalCommissionEarned } : {}) };
  }
  return p;
  });

@@ -383,6 +383,10 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  const aspects: Record<string, string[]> = {};
  if (item.brand) aspects.Brand = [item.brand];
  if (sizeAspect) aspects.Size = [sizeAspect];
+ // eBay requires an MPN (Manufacturer Part Number) aspect on many fashion categories; vintage/
+ // resale pieces don't have one, so send the value eBay mandates for that case, or publish fails
+ // with "Input data for tag <BrandMPN> is invalid or missing".
+ aspects.MPN = ["Does Not Apply"];
  const inv = await ebayFetch(token, `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`, {
  method: "PUT",
  body: JSON.stringify({

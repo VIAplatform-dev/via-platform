@@ -1,10 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import EmbeddedPayments from "@/app/store/payments/EmbeddedPayments";
 
 type Item = { status: string; splitPct: number; listedPriceCents: number | null; soldPriceCents: number | null; intakeDate: string; soldAt: string | null };
 type Ledger = { type: string; amountCents: number; orderId: string | null; createdAt: string; note: string | null };
-type Consignment = { consignorId: number; store: string; name: string; connected: boolean; balanceCents: number; items: Item[]; ledger: Ledger[]; payouts: { amountCents: number; method: string; status: string; createdAt: string }[] };
+type Consignment = { consignorId: number; store: string; storeName: string; name: string; connected: boolean; payoutMethod: string; payableCents: number; balanceCents: number; items: Item[]; ledger: Ledger[]; payouts: { amountCents: number; method: string; status: string; createdAt: string }[] };
+
+const METHOD_LABEL: Record<string, string> = { cash: "cash", check: "a check", store_credit: "store credit" };
+// For consignors paid out-of-band (cash / check / store credit) — VYA doesn't deposit their money,
+// the store hands it over in person, so tell them where + when to collect it.
+function collectNote(con: Consignment): { text: string; tone: "ready" | "pending" | "none" } {
+ const label = METHOD_LABEL[con.payoutMethod] || "store credit";
+ if (con.payableCents > 0) return { text: `${money(con.payableCents)} in ${label} is ready — stop by ${con.storeName} to collect it.`, tone: "ready" };
+ if (con.balanceCents > 0) return { text: `${money(con.balanceCents)} is clearing the return window. Once it’s ready, you can collect it in ${label} at ${con.storeName}.`, tone: "pending" };
+ return { text: `You’re paid in ${label} at ${con.storeName}.`, tone: "none" };
+}
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const day = (s: string) => new Date(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
@@ -27,9 +38,14 @@ export default function ConsignorPortal() {
  const [sent, setSent] = useState(false);
  const [sending, setSending] = useState(false);
  const [err, setErr] = useState<string | null>(null);
+ // Which consignor is showing the embedded bank surface, and in what mode (add bank vs manage).
+ const [bank, setBank] = useState<{ id: number; mode: "onboarding" | "manage" } | null>(null);
 
+ function reload() {
+ return fetch("/api/consignor/me").then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => { setConsignments(d.consignments || []); setState("in"); });
+ }
  useEffect(() => {
- fetch("/api/consignor/me").then((r) => (r.ok ? r.json() : Promise.reject())).then((d) => { setConsignments(d.consignments || []); setState("in"); }).catch(() => {
+ reload().catch(() => {
  setState("out");
  if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("error") === "expired") setErr("That link expired. Enter your email for a fresh one.");
  });
@@ -46,11 +62,6 @@ export default function ConsignorPortal() {
  setSent(true);
  }
  async function signOut() { await fetch("/api/consignor/me", { method: "DELETE" }); setConsignments([]); setState("out"); setSent(false); }
- async function connectBank(consignorId: number) {
- const r = await fetch("/api/consignor/connect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ consignorId }) });
- const d = await r.json().catch(() => null);
- if (r.ok && d?.url) window.location.assign(d.url);
- }
 
  if (state === "loading") return <div className="flex min-h-screen items-center justify-center text-[13px] text-stone-400" style={{ fontFamily: FONT_FAMILY }}>Loading…</div>;
 
@@ -93,10 +104,32 @@ export default function ConsignorPortal() {
  <p className="text-[12px] text-stone-300">Current balance</p>
  <p className="mt-0.5 text-[30px] font-semibold tabular-nums">{money(con.balanceCents)}</p>
  </div>
- {con.connected ? (
- <p className="mt-2.5 text-[12px] text-emerald-600">✓ Direct deposit connected — payouts go to your bank.</p>
+ {con.payoutMethod === "stripe" ? (
+ con.connected ? (
+ <div className="mt-2.5 flex items-center gap-3">
+ <p className="text-[12px] text-emerald-600">✓ Direct deposit connected — payouts go to your bank.</p>
+ <button onClick={() => setBank((b) => (b?.id === con.consignorId && b.mode === "manage" ? null : { id: con.consignorId, mode: "manage" }))} className="text-[12px] text-stone-400 underline underline-offset-2 hover:text-stone-700">{bank?.id === con.consignorId && bank.mode === "manage" ? "Hide" : "Manage"}</button>
+ </div>
  ) : (
- <button onClick={() => connectBank(con.consignorId)} className="mt-3 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-[12.5px] font-medium text-stone-700 transition hover:border-stone-400">Connect bank for direct deposit →</button>
+ <button onClick={() => setBank({ id: con.consignorId, mode: "onboarding" })} disabled={bank?.id === con.consignorId} className="mt-3 rounded-lg border border-stone-300 bg-white px-3.5 py-2 text-[12.5px] font-medium text-stone-700 transition hover:border-stone-400 disabled:opacity-50">Connect bank for direct deposit →</button>
+ )
+ ) : (() => {
+ const n = collectNote(con);
+ return (
+ <p className={`mt-2.5 text-[12px] ${n.tone === "ready" ? "font-medium text-emerald-600" : n.tone === "pending" ? "text-amber-600" : "text-stone-500"}`}>{n.tone === "ready" ? "✓ " : ""}{n.text}</p>
+ );
+ })()}
+
+ {/* Embedded Stripe surface — only for direct-deposit consignors, no redirect. */}
+ {con.payoutMethod === "stripe" && bank?.id === con.consignorId && (
+ <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
+ <EmbeddedPayments
+ endpoint="/api/consignor/account-session"
+ body={{ consignorId: con.consignorId }}
+ mode={bank.mode}
+ onComplete={bank.mode === "onboarding" ? () => { setBank(null); reload(); } : undefined}
+ />
+ </div>
  )}
 
  <h2 className="mt-8 text-[13px] font-semibold text-stone-800">Your items</h2>

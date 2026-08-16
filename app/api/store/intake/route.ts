@@ -9,7 +9,7 @@ import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
 import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
 import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece, resolveExactPiece, rememberDraftResolution } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
-import { reverseImageBestOf, matchesToComps, editorialCaptions, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { reverseImageBestOf, matchesToComps, editorialCaptions, verifyMatchesByImage, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
 
@@ -240,8 +240,14 @@ export async function POST(request: NextRequest) {
  const resolvedBrand = (has("brand") ? val("brand") : (draft?.brand?.value || idBrand.brand)) || "";
  const brandFiltered = resolvedBrand ? matches.filter((m) => titleHasBrand(m.title, resolvedBrand)) : [];
  const pricingMatches = brandFiltered.length ? brandFiltered : relevantMatches;
- const reverseComps = matchesToComps(pricingMatches);
- const reverseTitles = pricingMatches.map((m) => m.title);
+ // VISUALLY verify the pricing comps. Brand-filtering keeps same-brand, but a different MODEL of
+ // that brand still poisons the valuation (the look-alike that priced an $1,800 piece at $685).
+ // Keep only matches whose photo actually looks like this one; when the check genuinely ran we
+ // trust its verdict (even if it leaves few), else fall back to the brand-filtered set.
+ const { verified: verifiedPricing, filtered: visFiltered } = await verifyMatchesByImage(embedding, pricingMatches).catch(() => ({ verified: pricingMatches, filtered: false }));
+ const finalPricingMatches = visFiltered ? verifiedPricing : pricingMatches;
+ const reverseComps = matchesToComps(finalPricingMatches);
+ const reverseTitles = finalPricingMatches.map((m) => m.title);
  // Editorial/Getty captions from the FULL match set (not brand-filtered) — provenance evidence
  // for runway season + celebrity "worn by", which rarely repeat the brand in the caption.
  const editorialTitles = editorialCaptions(matches);

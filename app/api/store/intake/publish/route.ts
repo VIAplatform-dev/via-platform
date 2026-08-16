@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
  material: str(body.material, 120),
  condition: str(body.condition, 80),
  size: str(body.size, 40),
+ measurements: str(body.measurements, 300),
  category: str(body.category, 60),
  weightOz: dimUp(body.weightOz, 16),
  lengthIn: dimUp(body.lengthIn, 12),
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
  category: str(body.category, 60),
  marketCents: typeof body.marketCents === "number" ? Math.round(body.marketCents) : null,
  priceCents: price > 0 ? Math.round(price * 100) : null,
+ confidence: typeof body.aiConfidence === "number" ? body.aiConfidence : null,
  }).catch(() => {});
 
  // Golden training record: photo + AI guess + seller's final answer + trust/version,

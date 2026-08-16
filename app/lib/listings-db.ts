@@ -33,6 +33,7 @@ export type Listing = {
  currency: string;
  images: string[];
  size: string | null;
+ measurements: string | null;
  description: string | null;
  category: string | null;
  tags: string[];
@@ -46,6 +47,7 @@ export type ListingInput = {
  currency?: string;
  images: string[];
  size: string | null;
+ measurements: string | null;
  description: string | null;
  category: string | null;
  tags?: string[];
@@ -65,6 +67,7 @@ function itemToListing(it: Item, storeSlug: string): Listing {
  currency: it.currency || "USD",
  images: Array.isArray(it.images) ? it.images : [],
  size: it.size ?? null,
+ measurements: it.measurements ?? null,
  description: it.description ?? null,
  category: it.category ?? null,
  tags: [],
@@ -92,6 +95,7 @@ export async function createListing(storeSlug: string, l: ListingInput): Promise
  currency: l.currency || "USD",
  images: l.images || [],
  size: l.size,
+ measurements: l.measurements ?? null,
  description: l.description,
  category: l.category,
  status: l.status,
@@ -113,6 +117,7 @@ export async function updateListing(id: string, storeSlug: string, l: ListingInp
  currency: l.currency || "USD",
  images: l.images || [],
  size: l.size,
+ measurements: l.measurements ?? null,
  description: l.description,
  category: l.category,
  status: l.status,
@@ -135,6 +140,7 @@ export function sanitizeListingInput(body: any, defaultCurrency = "USD"): Listin
  currency: defaultCurrency,
  images: Array.isArray(body?.images) ? body.images.filter((x: any) => typeof x === "string" && x).slice(0, 8) : [],
  size: s(body?.size, 40),
+ measurements: s(body?.measurements, 300),
  description: s(body?.description, 2000),
  category: s(body?.category, 60),
  status,

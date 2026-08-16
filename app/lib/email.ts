@@ -753,7 +753,7 @@ export async function sendTrialNudge(p: { to: string; storeName: string; daysLef
     <a href="https://getvya.ai/admin/billing" style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:14px;font-weight:600;">Choose your plan →</a>
    </div>
   </div>
-  <p style="text-align:center;font-size:11px;color:#a8a29e;margin:16px 0 0;">getvya.ai · the operating system for resale</p>
+  <p style="text-align:center;font-size:11px;color:#a8a29e;margin:16px 0 0;">getvya.ai · the operating system for secondhand</p>
  </div></body></html>`);
  await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.to, subject: `${left <= 3 ? `${left} days left — ` : ""}Take ${p.storeName} live`, html });
 }

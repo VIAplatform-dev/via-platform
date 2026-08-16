@@ -170,6 +170,7 @@ async function ensureItemsTable() {
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS market_cents INTEGER`;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS price_cents INTEGER`;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS title TEXT`; // the confirmed descriptor — carries the specific model, so retrieval can teach it
+ await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS confidence NUMERIC`; // the AI's pricing confidence at intake — lets us CALIBRATE it against how far the seller re-priced
  await db()`CREATE INDEX IF NOT EXISTS idx_intake_mem_store ON intake_memory_items (store_slug, created_at DESC)`;
  itemsEnsured = true;
 }
@@ -181,6 +182,7 @@ export type MemoryItem = {
  brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; category?: string | null;
  marketCents?: number | null; // comp market value at intake (raw, before store adjustment)
  priceCents?: number | null;  // the seller's final list price
+ confidence?: number | null;  // the AI's pricing confidence (0..1) — for confidence calibration
 };
 
 /**
@@ -191,11 +193,32 @@ export type MemoryItem = {
 export async function rememberItem(storeSlug: string, item: MemoryItem): Promise<void> {
  await ensureItemsTable();
  await db()`
-  INSERT INTO intake_memory_items (store_slug, image_url, embedding, brand, era, material, condition, category, market_cents, price_cents, title)
+  INSERT INTO intake_memory_items (store_slug, image_url, embedding, brand, era, material, condition, category, market_cents, price_cents, title, confidence)
   VALUES (${storeSlug}, ${item.imageUrl ?? null}, ${JSON.stringify(item.embedding ?? [])},
    ${item.brand ?? null}, ${item.era ?? null}, ${item.material ?? null}, ${item.condition ?? null}, ${item.category ?? null},
-   ${item.marketCents ?? null}, ${item.priceCents ?? null}, ${item.title ?? null})
+   ${item.marketCents ?? null}, ${item.priceCents ?? null}, ${item.title ?? null}, ${item.confidence ?? null})
  `.catch(() => {});
+}
+
+export type PriceConfidenceBucket = { bucket: string; n: number; repricedPct: number | null; medianAbsErrorPct: number | null };
+
+/** Price-CONFIDENCE calibration: for published items grouped by the AI's pricing confidence, how
+ *  often did the seller re-price (>10% off the AI market read) and by how much? If confidence means
+ *  anything, high-confidence prices should be re-priced rarely and by little. */
+export async function getPriceConfidenceCalibration(days = 120): Promise<PriceConfidenceBucket[]> {
+ await ensureItemsTable();
+ const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+ const rows = (await db()`
+  SELECT confidence, market_cents, price_cents FROM intake_memory_items
+  WHERE created_at >= ${cutoff} AND confidence IS NOT NULL AND market_cents > 0 AND price_cents > 0
+ `.catch(() => [])) as { confidence: number; market_cents: number; price_cents: number }[];
+ const BUCKETS: Array<[number, number, string]> = [[0, 0.4, "low (<0.4)"], [0.4, 0.6, "0.4–0.6"], [0.6, 0.8, "0.6–0.8"], [0.8, 1.01, "high (≥0.8)"]];
+ const median = (a: number[]) => (a.length ? Math.round(a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] * 10) / 10 : null);
+ return BUCKETS.map(([lo, hi, bucket]) => {
+ const b = rows.filter((r) => { const c = Number(r.confidence); return c >= lo && c < hi; });
+ const errs = b.map((r) => Math.abs((r.price_cents - r.market_cents) / r.market_cents) * 100);
+ return { bucket, n: b.length, repricedPct: b.length ? Math.round((errs.filter((e) => e > 10).length / b.length) * 100) : null, medianAbsErrorPct: median(errs) };
+ });
 }
 
 /**

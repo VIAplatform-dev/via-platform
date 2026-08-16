@@ -59,8 +59,13 @@ export default function ConsignmentPage() {
     <TechEmpty
      icon={<Users size={28} strokeWidth={1.5} />}
      title="No consignors yet"
-     body="Add your consignors and mark their pieces sold — balances, payouts and sales volume all show up here."
-     action={<TechButtonLink href="/admin/consignment/consignors">Add a consignor</TechButtonLink>}
+     body="Add your consignors and mark their pieces sold — balances, payouts and sales volume all show up here. Already run consignment somewhere else? Bring your whole book over in one import."
+     action={
+      <>
+       <TechButtonLink href="/admin/consignment/consignors">Add a consignor</TechButtonLink>
+       <TechButtonLink variant="secondary" href="/admin/consignment/consignors#import">Import from another tool</TechButtonLink>
+      </>
+     }
     />
    ) : (
     <>

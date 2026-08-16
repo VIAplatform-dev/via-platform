@@ -2,7 +2,9 @@ import { fetchComps, rankComps, isCompsConfigured, type Comp } from "./comps";
 import { getCachedComps, saveComps, getVyaComps, newestCompAgeDays } from "./comp-cache-db";
 import { inferCategoryFromTitle } from "./loadStoreProducts";
 import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db";
+import { getUnbrandedBenchmark } from "./data-layer/unbranded-benchmark-db";
 import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config";
+import { materialTier } from "./material-tier";
 import { AI_MODELS } from "./ai-models";
 import { recordAnthropic } from "./cost-tracker";
 
@@ -43,7 +45,7 @@ export async function valueFromComps(
  query: string,
  photoUrl: string | undefined,
  comps: Comp[],
- ctx?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null },
+ ctx?: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null; unbrandedBenchmark?: { segment: string; medianCents: number; p25Cents: number; p75Cents: number; count: number; storeCount: number } | null },
 ) {
  const fallback = () => {
  const sold = comps.filter((c) => c.sold).map((c) => c.priceCents);
@@ -87,8 +89,30 @@ export async function valueFromComps(
  const benchLine = b
  ? `\n\nONE ADDITIONAL real-sold data point — this platform's own sales: "${b.segment}" has sold on VYA for a median of $${Math.round(b.medianCents / 100)}${b.p25Cents != null && b.p75Cents != null ? ` (typical range $${Math.round(b.p25Cents / 100)}–$${Math.round(b.p75Cents / 100)})` : ""}, across ${b.txnCount} sales on ${b.storeCount}+ stores. Weigh this ALONGSIDE the comps below as one more SOLD signal (similar standing to the eBay SOLD prices) — NOT an override. Triangulate the real market from ALL of them together: eBay sold, boutique/marketplace listings, and this benchmark. Do not anchor to this benchmark alone, and let strong comps for this exact piece win when they disagree with it.`
  : "";
+ // UNBRANDED pricing: with no brand and no exact comps to anchor to, value the piece from its
+ // INTRINSIC qualities — material first (the strongest, most seller-verifiable signal), then
+ // construction, then era (which photos CANNOT reliably read, so it's a widen-and-ask signal,
+ // never a silent multiplier). Only triggers when there's no brand, so branded pricing is untouched.
+ const isUnbranded = !ctx?.brand;
+ const mt = isUnbranded ? materialTier(ctx?.material) : { tier: null, label: null };
+ const materialGuide = mt.tier === "premium"
+ ? `The stated material ("${ctx?.material}") is a natural/luxury fiber — price toward the UPPER end of the unbranded band for this garment.`
+ : mt.tier === "base"
+ ? `The stated material ("${ctx?.material}") is synthetic — price toward the LOWER end of the unbranded band.`
+ : mt.tier === "mid"
+ ? `The stated material ("${ctx?.material}") is a mid-grade fiber — price mid-band.`
+ : `The material isn't confirmed — price conservatively and WIDEN the range until it is.`;
+ // The GOLDEN SET: how comparable unbranded pieces ACTUALLY price on VYA (category × material tier).
+ // For an unbranded item this is the real anchor — actual prices set by curated stores, not a guess.
+ const ub = ctx?.unbrandedBenchmark;
+ const goldenLine = isUnbranded && ub
+ ? `\n\nVYA GOLDEN SET (your strongest anchor for this unbranded piece): comparable unbranded VYA pieces — "${ub.segment}" — price at a median of $${Math.round(ub.medianCents / 100)} (typical $${Math.round(ub.p25Cents / 100)}–$${Math.round(ub.p75Cents / 100)}), across ${ub.count} listed/sold pieces from ${ub.storeCount}+ stores. These are real prices curated stores set for the SAME garment + material, so ANCHOR to this median — move off it only for clearly better/worse material or construction than the typical piece in that set.`
+ : "";
+ const unbrandedLine = isUnbranded
+ ? `\n\nUNBRANDED PIECE — no brand to anchor to, so value it from INTRINSIC qualities in this order:\n- MATERIAL (primary): for the SAME garment, natural/luxury fibers (silk, leather, suede, cashmere, wool, linen) resell WELL ABOVE synthetics (polyester, acrylic, nylon). ${materialGuide}\n- CONSTRUCTION/QUALITY: bias cut, French seams, full lining, hand-finishing, quality hardware read as a better piece — nudge up only when visibly present in the photo.\n- ERA: genuine age adds a MODEST rarity premium, but you CANNOT reliably date a garment from photos (a bias-cut silk slip could be 1930s OR a 1990s revival). Do NOT price up on a guessed decade — only apply an age premium when the era is genuinely corroborated (a datable union label / metal zipper, or a seller-stated era). When the era is uncertain, treat it as UNCERTAINTY: WIDEN the low–high band and keep confidence ≤ 0.45.\n- Anchor to what this GARMENT TYPE in this MATERIAL realistically resells for UNBRANDED — realistic, not a designer wish-price. In the rationale, name the material as the driver, and if the era would change the value, say it's worth confirming.`
+ : "";
  const list = comps.map((c, i) => `${i}. [${c.sold ? "SOLD" : "asking"}] $${(c.priceCents / 100).toFixed(0)} — ${c.title.slice(0, 90)} (${c.source})`).join("\n");
- const prompt = `Item being priced: "${query}".${idLine}${condLine}${benchLine}\n\nCandidate resale comps found online:\n${list}\n\nReturn ONLY JSON: {"marketCents": int, "lowCents": int, "highCents": int, "confidence": 0..1, "keptIndices": int[], "rationale": string}.\nRules:\n- Keep ONLY TRUE comparables: the SAME designer at a similar caliber, a similar garment and era, roughly the photographed condition. Discard fast-fashion, unrelated/diffusion brands, different garments, parts/accessories, wild outliers — never use them as an anchor, ceiling, or floor.\n- ANCHOR TO THE MEDIAN OF *SOLD* COMPS — real sold prices are the market. When 2+ true SOLD comparables exist, marketCents ≈ their MEDIAN. HIGH-SOLD OUTLIER: a single SOLD price far above the rest of the sold comps (≈1.8x+ the next-highest genuine sold) is a rare/lucky one-off — do NOT anchor, median, or ceiling to it; drop it and anchor to the remaining sold cluster. This is a curated marketplace, so don't fire-sale — but a common, findable piece with several comps is priced at what it REPEATEDLY sells for, NOT near its single highest-ever sale.\n- ASKING vs SOLD: don't anchor to the single HIGHEST aspirational ask (RealReal/Vestiaire/1stDibs asks can sit unsold) — but do NOT swing the other way and price BELOW the market either. Asking prices set the upper band; comparable shop/sold prices set the realistic level. Land AT market — the low-to-median of the true comps — NOT a quick-sale discount beneath the comp range. SOLD prices (eBay/Depop/VYA) are the true anchor; asking prices only cap the UPPER band. Land at the SOLD median — which, for a findable piece, can sit below the current asks and well below a single high sale.\n- ONLY IF there are essentially NO true comps (truly rare/archival, nothing comparable) may you price from expert knowledge of where this exact piece sells — realistic, not aspirational; don't lowball to fast-fashion, but don't invent a luxury wish-price either. Set confidence ≈0.4.\n- DEMAND / TREND: a sought-after designer/era earns only a MODEST premium — at most ~10-15%, and only when the comps support it. A demand-momentum percentage is NOT a price-increase percentage: NEVER multiply the price by it.${ctx?.trend ? ` Demand note: ${ctx.trend} — apply at most a small nudge, not a large one.` : ""}\n- UNCERTAIN VARIANT: if the exact material/variant can't be pinned down (e.g. a bag or piece that comes in several materials/versions at very different prices, and the comps span a wide range), WIDEN the low–high band to honestly reflect that spread and set confidence ≤ 0.5 — do NOT output a falsely precise number for a piece you can't fully identify.\n- marketCents = the MEDIAN of the true SOLD comps (a common/findable piece prices at what it repeatedly sells for — which may sit well below the single highest sale and below the current asks); lowCents = a competitive quick-sell within the sold cluster; highCents = a patient strong-demand ceiling near the top genuine comps; keptIndices = the true comps relied on; rationale = one brief sentence — describe the comps as "comparable", and NEVER call a comp "identical" or "the same piece" unless it is a verified exact match (a visual look-alike with the same logo is NOT identical).`;
+ const prompt = `Item being priced: "${query}".${idLine}${condLine}${benchLine}${goldenLine}${unbrandedLine}\n\nCandidate resale comps found online:\n${list}\n\nReturn ONLY JSON: {"marketCents": int, "lowCents": int, "highCents": int, "confidence": 0..1, "keptIndices": int[], "rationale": string}.\nRules:\n- Keep ONLY TRUE comparables: the SAME designer at a similar caliber, a similar garment and era, roughly the photographed condition. Discard fast-fashion, unrelated/diffusion brands, different garments, parts/accessories, wild outliers — never use them as an anchor, ceiling, or floor.\n- ANCHOR TO THE MEDIAN OF *SOLD* COMPS — real sold prices are the market. When 2+ true SOLD comparables exist, marketCents ≈ their MEDIAN. HIGH-SOLD OUTLIER: a single SOLD price far above the rest of the sold comps (≈1.8x+ the next-highest genuine sold) is a rare/lucky one-off — do NOT anchor, median, or ceiling to it; drop it and anchor to the remaining sold cluster. This is a curated marketplace, so don't fire-sale — but a common, findable piece with several comps is priced at what it REPEATEDLY sells for, NOT near its single highest-ever sale.\n- ASKING vs SOLD: don't anchor to the single HIGHEST aspirational ask (RealReal/Vestiaire/1stDibs asks can sit unsold) — but do NOT swing the other way and price BELOW the market either. Asking prices set the upper band; comparable shop/sold prices set the realistic level. Land AT market — the low-to-median of the true comps — NOT a quick-sale discount beneath the comp range. SOLD prices (eBay/Depop/VYA) are the true anchor; asking prices only cap the UPPER band. Land at the SOLD median — which, for a findable piece, can sit below the current asks and well below a single high sale.\n- ONLY IF there are essentially NO true comps (truly rare/archival, nothing comparable) may you price from expert knowledge of where this exact piece sells — realistic, not aspirational; don't lowball to fast-fashion, but don't invent a luxury wish-price either. Set confidence ≈0.4.\n- DEMAND / TREND: a sought-after designer/era earns only a MODEST premium — at most ~10-15%, and only when the comps support it. A demand-momentum percentage is NOT a price-increase percentage: NEVER multiply the price by it.${ctx?.trend ? ` Demand note: ${ctx.trend} — apply at most a small nudge, not a large one.` : ""}\n- UNCERTAIN VARIANT: if the exact material/variant can't be pinned down (e.g. a bag or piece that comes in several materials/versions at very different prices, and the comps span a wide range), WIDEN the low–high band to honestly reflect that spread and set confidence ≤ 0.5 — do NOT output a falsely precise number for a piece you can't fully identify.\n- marketCents = the MEDIAN of the true SOLD comps (a common/findable piece prices at what it repeatedly sells for — which may sit well below the single highest sale and below the current asks); lowCents = a competitive quick-sell within the sold cluster; highCents = a patient strong-demand ceiling near the top genuine comps; keptIndices = the true comps relied on; rationale = one brief sentence — describe the comps as "comparable", and NEVER call a comp "identical" or "the same piece" unless it is a verified exact match (a visual look-alike with the same logo is NOT identical).`;
  const content: any[] = [];
  if (photoUrl) content.push({ type: "image", source: { type: "url", url: photoUrl } });
  content.push({ type: "text", text: prompt });
@@ -189,13 +213,17 @@ export async function estimatePrice(opts: {
  minMarkupBps: number;
  knowledgeHintCents?: number | null;
  extraComps?: Comp[]; // reverse-image (visually-identical) matches — the strongest comps
- context?: { brand?: string | null; era?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
+ context?: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
 }): Promise<PriceEstimate> {
  // Fetch external comps and THIS platform's own realized-price benchmark together. The
  // internal benchmark (privacy-gated, from the nightly market_metrics) is the strongest
  // signal — actual sales on our marketplace for this brand/category.
  const category = inferCategoryFromTitle(opts.query) as string;
  const brand = opts.context?.brand ?? null;
+ const material = opts.context?.material ?? null;
+ // For an UNBRANDED piece, anchor to VYA's own golden set (how comparable unbranded pieces price,
+ // by category × material tier) instead of guessing — real prices from curated stores.
+ const unbrandedBenchmark = !brand ? await getUnbrandedBenchmark({ category, material }).catch(() => null) : null;
  // Owned-data-first: reuse recently-cached comps (from past PAID lookups) before spending on a
  // new SerpApi basket. Only hit the live full basket (reverse-image + eBay + Shopping + RealReal)
  // on a cold/thin cache, then write every fresh comp back so the next similar item is free.
@@ -224,8 +252,15 @@ export async function estimatePrice(opts: {
  let marketCents: number | null = null, low: number | null = null, high: number | null = null, confidence = 0, rationale = "", kept: Comp[] = [];
 
  if (comps.length) {
- const v = await valueFromComps(opts.query, opts.photoUrl, comps, { ...opts.context, knowledgeHintCents: opts.knowledgeHintCents, internalBenchmark: benchmark });
+ const v = await valueFromComps(opts.query, opts.photoUrl, comps, { ...opts.context, knowledgeHintCents: opts.knowledgeHintCents, internalBenchmark: benchmark, unbrandedBenchmark });
  marketCents = v.marketCents; low = v.low; high = v.high; confidence = v.confidence; rationale = v.rationale; kept = v.kept;
+ } else if (unbrandedBenchmark) {
+ // No external comps + unbranded → anchor to the golden set (comparable unbranded VYA pieces).
+ marketCents = unbrandedBenchmark.medianCents;
+ low = unbrandedBenchmark.p25Cents;
+ high = unbrandedBenchmark.p75Cents;
+ confidence = 0.5;
+ rationale = `Anchored to VYA's golden set — how comparable unbranded pieces (${unbrandedBenchmark.segment}) price across ${unbrandedBenchmark.count} listed/sold items from ${unbrandedBenchmark.storeCount}+ stores.`;
  } else if (benchmark) {
  // No external comps — anchor to our own realized sold prices for this brand/category.
  marketCents = benchmark.medianCents;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
-import { getConsignmentSettings, upsertConsignmentSettings, getSplitRules, setSplitRules } from "@/app/lib/consignment-db";
+import { getConsignmentSettings, upsertConsignmentSettings, getSplitRules, setSplitRules, getConsignmentSummary } from "@/app/lib/consignment-db";
 import type { SplitRule } from "@/app/lib/consignment-logic";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,18 @@ export async function PUT(request: NextRequest) {
  const body = await request.json().catch(() => null);
  if (body?.settings && typeof body.settings === "object") {
  const s = body.settings;
+ // Whether a sale's cut is held by VYA (direct-deposit) or left with the store (in-person) is
+ // decided at the sale. Don't let the store flip the DEFAULT between those two while consignors are
+ // still owed — it would mismatch what's actually held. (Switching among cash/check/credit is fine.)
+ if (typeof s.defaultPayoutMethod === "string") {
+ const cur = await getConsignmentSettings(slug);
+ if ((cur.defaultPayoutMethod === "stripe") !== (s.defaultPayoutMethod === "stripe")) {
+ const summary = await getConsignmentSummary(slug).catch(() => null);
+ if (summary && summary.owedCents !== 0) {
+  return NextResponse.json({ error: "Can’t switch the default between direct-deposit and in-person payout while consignors are owed money. Pay out balances first." }, { status: 409 });
+ }
+ }
+ }
  await upsertConsignmentSettings(slug, {
  payoutMethods: Array.isArray(s.payoutMethods) ? s.payoutMethods : undefined,
  defaultPayoutMethod: typeof s.defaultPayoutMethod === "string" ? s.defaultPayoutMethod : undefined,

@@ -4,6 +4,8 @@
 // "Buy now" runs through VYA's existing Stripe flow.
 import { getSellerBySlug } from "./db/sellers";
 import { createItem, listAvailableItems, deleteItemsBySource } from "./db/inventory";
+import { getImportedOrderTitleSet } from "./imported-orders-db";
+import { extractMeasurements } from "./measurements";
 import type { ImportedProduct } from "./store-import";
 
 const parseCents = (price?: string) => Math.round((parseFloat((price || "").replace(/[^0-9.]/g, "")) || 0) * 100);
@@ -20,11 +22,16 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  await deleteItemsBySource(seller.id, "captured").catch(() => 0);
  const existing = await listAvailableItems(seller.id);
  const have = new Set(existing.map((i) => i.title.toLowerCase().trim()));
+ // A sold-out piece still on the seller's page is the SAME sale that arrives (authoritatively)
+ // in their uploaded order history — importing it here as a phantom `sold` item would double-
+ // count it. Skip any sold-out product the order list already covers (matched by title).
+ const coveredByOrders = await getImportedOrderTitleSet(slug).catch(() => new Set<string>());
  let n = 0;
  for (const p of products) {
  const title = (p.name || "").trim();
  const cents = parseCents(p.price);
  if (!title || !cents || have.has(title.toLowerCase())) continue;
+ if (p.available === false && coveredByOrders.has(norm(title))) continue;
  // Store the source URLs now (fast import); the rehost-images cron copies them onto
  // OUR storage in the background so the interactive import doesn't wait on hundreds of
  // image uploads. Durability without the slow import.
@@ -37,6 +44,7 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  images,
  description: p.description ?? null,
  size: p.size ?? null,
+ measurements: extractMeasurements(p.description), // pull flat measurements out of the imported prose
  status: p.available === false ? "sold" : "active",
  source: "captured",
  });
@@ -82,6 +90,7 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  material: p.materials ?? null,
  condition: p.condition ?? null,
  size: p.size ?? null,
+ measurements: p.measurements || extractMeasurements(p.description), // structured field, else pull from the prose
  category: p.product_type ?? null,
  status: "active",
  source: "imported",

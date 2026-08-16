@@ -95,6 +95,40 @@ export async function importOrders(storeSlug: string, rows: ImportedOrderInput[]
  return { added, total: rows.length };
 }
 
+const normTitle = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/** Normalized set of item titles in a store's imported order history. Lets the catalog
+ *  import skip scraped sold-out products the order list already covers (no double-count). */
+export async function getImportedOrderTitleSet(storeSlug: string): Promise<Set<string>> {
+ await ensure();
+ const sql = db();
+ const rows = (await sql`
+  SELECT DISTINCT item_title FROM imported_orders
+  WHERE store_slug = ${storeSlug} AND item_title IS NOT NULL AND item_title <> ''
+ `) as { item_title: string }[];
+ return new Set(rows.map((r) => normTitle(r.item_title)));
+}
+
+/** Reconcile scraped sold-out items against the uploaded order history: a store that keeps
+ *  sold pieces on its page (then removes them ~30 days later) imports them as phantom `sold`
+ *  items — but the SAME sale also arrives, authoritatively (real date/buyer/amount), in the
+ *  order-list upload. Keeping both double-counts the sale, so we drop the redundant scraped
+ *  copies (matched by store + normalized title). The order rows are the source of truth.
+ *  Returns how many sold items were reconciled away. Idempotent. */
+export async function reconcileSoldItemsWithOrders(storeSlug: string): Promise<number> {
+ const set = await getImportedOrderTitleSet(storeSlug);
+ if (!set.size) return 0;
+ const sql = db();
+ const sold = (await sql`
+  SELECT i.id::text AS id, i.title AS title FROM items i JOIN sellers s ON s.id = i.seller_id
+  WHERE s.slug = ${storeSlug} AND i.status = 'sold' AND i.source IN ('captured', 'imported')
+ `) as { id: string; title: string }[];
+ const dupIds = sold.filter((r) => set.has(normTitle(r.title))).map((r) => r.id);
+ if (!dupIds.length) return 0;
+ await sql`DELETE FROM items WHERE id::text = ANY(${dupIds})`;
+ return dupIds.length;
+}
+
 /** List a store's imported historical orders (most recent first). */
 export async function getImportedOrders(storeSlug: string, limit = 500): Promise<ImportedOrderRow[]> {
  await ensure();

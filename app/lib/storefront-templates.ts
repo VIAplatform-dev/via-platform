@@ -141,6 +141,61 @@ export function templateBlocks(id: string): Block[] {
  });
 }
 
-// Curated fonts a store can swap to (Google Fonts — the storefront loads them by name).
-export const HEADING_FONTS = ["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces", "Outfit", "Space Grotesk", "Archivo", "Montserrat", "Jost"];
-export const BODY_FONTS = ["Inter", "Newsreader", "Poppins", "Montserrat", "Figtree", "Outfit", "Work Sans", "Nunito Sans", "Roboto"];
+// Curated fonts a store can swap to (Google Fonts — the storefront loads them by name). Kept to
+// families that carry the 400/500/600/700 weights the loader requests, so no combination 400-errors.
+export const HEADING_FONTS = [
+ // Serif & display-serif — the fashion-editorial voice
+ "Playfair Display", "Bodoni Moda", "Cormorant Garamond", "EB Garamond", "Newsreader", "Fraunces",
+ "Lora", "Spectral", "Crimson Pro", "Source Serif 4", "Bitter", "Literata", "Domine",
+ // Sans & grotesque — modern, clean
+ "Outfit", "Space Grotesk", "Archivo", "Montserrat", "Jost", "Syne", "Sora", "Bricolage Grotesque",
+ "Epilogue", "Unbounded", "Poppins", "DM Sans", "Manrope", "Raleway", "Libre Franklin", "Chivo",
+];
+export const BODY_FONTS = [
+ "Inter", "Newsreader", "Poppins", "Montserrat", "Figtree", "Outfit", "Work Sans", "Nunito Sans",
+ "Roboto", "DM Sans", "Manrope", "Hanken Grotesk", "Lexend", "Plus Jakarta Sans", "Public Sans",
+ "Karla", "Mulish", "Rubik", "Raleway", "IBM Plex Sans", "Libre Franklin", "Lora", "EB Garamond", "Source Serif 4",
+];
+
+// Which families are serifs — drives the fallback stack (Georgia vs system sans) everywhere fonts render.
+export const SERIF_FONTS = new Set([
+ "Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Cormorant", "EB Garamond", "Newsreader",
+ "Instrument Serif", "Fraunces", "Lora", "Spectral", "Crimson Pro", "Source Serif 4", "Bitter",
+ "Literata", "Domine", "PT Serif", "Cardo",
+]);
+
+// Every font the studio may show — loaded together so the live preview (and the font-picker labels)
+// render in their real faces, not a fallback.
+export const ALL_STOREFRONT_FONTS = Array.from(new Set([...HEADING_FONTS, ...BODY_FONTS]));
+
+/** Build a Google Fonts CSS2 stylesheet URL for the given families (each at 400–700). */
+export function storefrontFontsHref(families: string[]): string {
+ const q = Array.from(new Set(families.filter(Boolean))).map((f) => `family=${f.replace(/ /g, "+")}:wght@400;500;600;700`).join("&");
+ return `https://fonts.googleapis.com/css2?${q}&display=swap`;
+}
+
+// One-click colour palettes for the Design panel — a whole scheme (page / ink / accent) picked as one,
+// so a store restyles by clicking a swatch instead of fiddling with three hex fields. Kept intentionally
+// tasteful and vintage-leaning; the individual colour pickers are still there for fine-tuning after.
+export type StorefrontPalette = { id: string; name: string; colors: { bg: string; text: string; accent: string } };
+export const STOREFRONT_PALETTES: StorefrontPalette[] = [
+ { id: "cream-noir", name: "Cream & Noir", colors: { bg: "#FFFDF8", text: "#1a1a1a", accent: "#1a1a1a" } },
+ { id: "bone-oxblood", name: "Bone & Oxblood", colors: { bg: "#e9e3d8", text: "#17120e", accent: "#5a0e17" } },
+ { id: "paper-ink", name: "Paper & Ink", colors: { bg: "#ffffff", text: "#1c1c1c", accent: "#1c1c1c" } },
+ { id: "berry", name: "Berry", colors: { bg: "#f5f2ee", text: "#2a1a22", accent: "#8d2c5b" } },
+ { id: "sand-forest", name: "Sand & Forest", colors: { bg: "#f3efe6", text: "#20261f", accent: "#2f5d3a" } },
+ { id: "linen-cobalt", name: "Linen & Cobalt", colors: { bg: "#f7f5f0", text: "#171a24", accent: "#1e3a8a" } },
+ { id: "terracotta", name: "Terracotta", colors: { bg: "#f6ede4", text: "#3a241a", accent: "#b5502e" } },
+ { id: "espresso", name: "Espresso", colors: { bg: "#efe9e1", text: "#2b211a", accent: "#6f4a2f" } },
+ { id: "midnight", name: "Midnight", colors: { bg: "#14161d", text: "#ece9e2", accent: "#c9a24b" } },
+ { id: "blush-slate", name: "Blush & Slate", colors: { bg: "#f6eeec", text: "#2a2326", accent: "#7d5a68" } },
+ { id: "sage", name: "Sage", colors: { bg: "#eef0e9", text: "#232720", accent: "#5b6b4a" } },
+ { id: "punch", name: "Punch", colors: { bg: "#ffffff", text: "#111111", accent: "#ff1086" } },
+];
+
+// The three corner styles ("shapes") the Design panel offers — mirrors Blocks' Radius type.
+export const RADIUS_OPTIONS: { id: "sharp" | "soft" | "round"; name: string }[] = [
+ { id: "sharp", name: "Sharp" },
+ { id: "soft", name: "Soft" },
+ { id: "round", name: "Round" },
+];

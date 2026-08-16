@@ -23,6 +23,7 @@ type Data = {
  segments: SegmentStat[];
  brandSegments: BrandSegmentStat[];
  corrections: CorrectionRow[];
+ priceConfidence: { bucket: string; n: number; repricedPct: number | null; medianAbsErrorPct: number | null }[];
  betaReadiness: BetaReadiness | null;
 };
 
@@ -401,6 +402,22 @@ export default function IntakeAccuracyPage() {
  <div className="rounded-lg bg-stone-50 p-3"><p className="text-lg font-semibold tabular-nums text-stone-900">±{price.avgAbsErrorPct}%</p><p className="text-[11px] text-stone-500">avg error<br />vs. seller’s price</p></div>
  </div>
  <p className="mt-3 text-[11px] text-stone-400">Based on {price.samples} listings with both an AI market value and a final price. Some gap reflects a store’s own positioning, not model error.</p>
+ </div>
+ )}
+
+ {/* Confidence calibration — does a high AI pricing-confidence actually mean the seller keeps the price? */}
+ {data.priceConfidence?.some((b) => b.n > 0) && (
+ <div className="rounded-xl border border-stone-200 bg-white p-5">
+ <p className="mb-1 text-[13px] font-medium text-stone-700">Confidence calibration</p>
+ <p className="mb-3 text-[11px] text-stone-400">If confidence means anything, high-confidence prices should be re-priced rarely and by little. A flat curve means confidence isn’t informative yet.</p>
+ <table className="w-full text-[12px]">
+ <thead><tr className="text-left text-[11px] uppercase tracking-[0.06em] text-stone-400"><th className="pb-1.5">AI confidence</th><th className="pb-1.5">Listings</th><th className="pb-1.5 text-right">Re-priced &gt;10%</th><th className="pb-1.5 text-right">Median error</th></tr></thead>
+ <tbody>
+ {data.priceConfidence.map((b) => (
+ <tr key={b.bucket} className="border-t border-stone-100"><td className="py-1.5">{b.bucket}</td><td className="py-1.5 tabular-nums text-stone-500">{b.n}</td><td className="py-1.5 text-right tabular-nums font-medium text-stone-800">{b.repricedPct == null ? "—" : `${b.repricedPct}%`}</td><td className="py-1.5 text-right tabular-nums text-stone-500">{b.medianAbsErrorPct == null ? "—" : `±${b.medianAbsErrorPct}%`}</td></tr>
+ ))}
+ </tbody>
+ </table>
  </div>
  )}
 

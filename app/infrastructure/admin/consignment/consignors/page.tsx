@@ -19,6 +19,35 @@ export default function ConsignorsPage() {
  const [err, setErr] = useState<string | null>(null);
  const [copiedId, setCopiedId] = useState<number | null>(null);
 
+ // Migrate from another consignment platform (ConsignCloud/SimpleConsign/etc.) — paste or upload
+ // their consignor export; balances come over as a stated opening figure, never a replay of sales.
+ const [imp, setImp] = useState({ csv: "", source: "" });
+ const [importing, setImporting] = useState(false);
+ const [impResult, setImpResult] = useState<{ found: number; added: number; updated: number; balancesSet: number; openingBalanceCents: number } | null>(null);
+ const [impErr, setImpErr] = useState<string | null>(null);
+
+ function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+ const file = e.target.files?.[0];
+ if (!file) return;
+ const src = imp.source || file.name.replace(/\.[a-z]+$/i, "");
+ file.text().then((t) => setImp({ csv: t, source: src }));
+ }
+
+ async function runImport() {
+ if (!imp.csv.trim()) { setImpErr("Paste or upload your consignor export first."); return; }
+ setImporting(true); setImpErr(null); setImpResult(null);
+ const r = await fetch("/api/store/consignment/import", {
+ method: "POST", headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ csv: imp.csv, source: imp.source || "csv" }),
+ });
+ const d = await r.json().catch(() => null);
+ setImporting(false);
+ if (!r.ok || !d?.ok) { setImpErr(d?.error || "Couldn’t import that file."); return; }
+ setImpResult({ found: d.found, added: d.added, updated: d.updated, balancesSet: d.balancesSet, openingBalanceCents: d.openingBalanceCents });
+ setImp({ csv: "", source: "" });
+ reload();
+ }
+
  // Consignors connect their own bank in the consignor portal (Stripe Express, /api/consignor/connect) —
  // the store never touches bank details. This copies the portal link so the store can nudge someone
  // who hasn't set up direct deposit yet.
@@ -80,6 +109,31 @@ export default function ConsignorsPage() {
  <div className="mt-3"><TechButton type="submit" disabled={saving}>{saving ? "Adding…" : "Add consignor"}</TechButton></div>
  <p className="mt-2 text-[11px] text-stone-400">Leave the split blank to use your store rules. Set it here to override for this person.</p>
  </form>
+ </TechCard>
+
+ <TechCard id="import" className="mt-4 scroll-mt-6 p-4">
+ <SectionLabel className="mb-1">Switching from another consignment tool?</SectionLabel>
+ <p className="mb-3 text-[12px] text-stone-500">Move your consignor book over from <strong>ConsignCloud, SimpleConsign, Ricochet</strong>, or a spreadsheet — export your consignors there and drop the CSV here. (This is just your consignor list + balances, not your store or products.) We map the columns automatically. Balances come over as a stated opening figure — we never replay old sales, so nothing gets double-counted or double-paid.</p>
+ <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+ <div>
+ <label className={label}>Upload CSV</label>
+ <input type="file" accept=".csv,.tsv,text/csv,text/plain" onChange={onImportFile} className="w-full text-[12px] text-stone-600 file:mr-3 file:rounded-lg file:border file:border-stone-200 file:bg-stone-50 file:px-3 file:py-1.5 file:text-[12px] file:text-stone-700 hover:file:bg-stone-100" />
+ </div>
+ <div><label className={label}>From (platform)</label><input className={input} value={imp.source} onChange={(e) => setImp({ ...imp, source: e.target.value })} placeholder="e.g. ConsignCloud" /></div>
+ <div className="flex items-end"><TechButton type="button" onClick={runImport} disabled={importing || !imp.csv.trim()}>{importing ? "Importing…" : "Import consignors"}</TechButton></div>
+ </div>
+ <div className="mt-3">
+ <label className={label}>…or paste the CSV</label>
+ <textarea className={`${input} font-mono text-[11px]`} rows={imp.csv ? 4 : 2} value={imp.csv} onChange={(e) => setImp({ ...imp, csv: e.target.value })} placeholder="Name,Email,Split %,Balance Owed&#10;Jane Doe,jane@example.com,60,124.50" />
+ </div>
+ {impErr && <p className="mt-2 text-[12px] text-rose-600">{impErr}</p>}
+ {impResult && (
+ <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
+ Imported {impResult.found} row{impResult.found === 1 ? "" : "s"}: {impResult.added} added, {impResult.updated} updated
+ {impResult.balancesSet > 0 && <> · {impResult.balancesSet} opening balance{impResult.balancesSet === 1 ? "" : "s"} set ({money(impResult.openingBalanceCents)})</>}.
+ </div>
+ )}
+ <p className="mt-2 text-[11px] text-stone-400">Re-running is safe: consignors are matched by email then name, and each opening balance is written only once.</p>
  </TechCard>
 
  {loading ? (

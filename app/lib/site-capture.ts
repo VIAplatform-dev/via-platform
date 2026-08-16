@@ -28,6 +28,82 @@ function absCssUrls(css: string, cssUrl: string): string {
  .replace(/@import\s+(['"])([^"']+)\1/gi, (m, q, p) => `@import ${q}${abs(p, cssUrl)}${q}`);
 }
 
+// Same site even across the www/apex split (a store links between tousvintage.com and
+// www.tousvintage.com) — so those internal links get VYA-hosted, not opened as "external".
+function sameSite(a: string, base: string): boolean {
+ try { return new URL(a).host.replace(/^www\./i, "") === new URL(base).host.replace(/^www\./i, ""); }
+ catch { return false; }
+}
+
+// Strip Shopify-platform chrome so a captured page reads as the store's OWN site on VYA —
+// not "Powered by Shopify", the Shop Pay "Follow on shop" button, or the checkout card badges.
+// (These are Shopify features, not the seller's brand; they don't belong on a VYA-hosted mirror.)
+export function deShopify($: cheerio.CheerioAPI): void {
+ // Footer payment-method badges (Visa/Amex/Shop Pay/etc.) — a Shopify checkout artifact.
+ $('.list-payment, ul.list-payment, [class*="payment-icons"], [class*="payment_icons"], .footer__payment, [class*="footer-payment"], [class*="payment-list"]').remove();
+ // "Follow on shop" / Shop Pay follow / Shop login buttons.
+ $('shop-follow-button, [class*="follow-on-shop"], [class*="follow_on_shop"], .shopify-follow-on-shop, .shop-login-button, [class*="shop-follow"]').remove();
+ // "Powered by Shopify" link → "Powered by VYA" (drop the shopify.com link).
+ $('a[href*="shopify.com"]').each((_: number, el: any) => { const $el = $(el); if (/shopify/i.test($el.text() || "")) $el.replaceWith("VYA"); });
+ // Any remaining unlinked "Powered by Shopify" text in the footer/copyright line.
+ $('footer, [class*="footer"], [class*="copyright"], small').contents().each((_: number, node: any) => {
+ if (node.type === "text" && /powered by shopify/i.test(node.data || "")) node.data = node.data.replace(/powered by shopify/gi, "Powered by VYA");
+ });
+}
+
+// Make a captured page's images render WITHOUT the JS we stripped. Lazy themes (lazysizes et al.)
+// hide the real image behind script: a <noscript> fallback for backgrounds, a {width}-templated
+// data-src for responsive images, and a `.lazyload{opacity:0}` reveal-on-load. This undoes all
+// three so heroes and product photos actually show. Exported for unit testing.
+export function deLazy($: cheerio.CheerioAPI, sourceUrl: string): void {
+ // 1) Surface <noscript><img></noscript> fallbacks (what a no-JS client — us — is meant to get).
+ //    Skip when a lazy <img> counterpart already precedes it (promoted below), to avoid a dupe.
+ $("noscript").each((_: number, el: any) => {
+ const $el = $(el);
+ const inner = $el.html() || "";
+ if (!/<img/i.test(inner)) return; // leave "please enable JS" notices hidden
+ const prev = $el.prev();
+ if (prev.is("img") || prev.find("img").length > 0) { $el.remove(); return; }
+ $el.replaceWith(inner);
+ });
+
+ // 2) Images → eager + real source, filling lazysizes RIAS {width} templates with a concrete
+ //    size (data-widths is the ladder) so the src isn't literally "..._{width}x.jpg" (a 404).
+ $("img").each((_: number, el: any) => {
+ const $el = $(el);
+ // Pick a real rung from the theme's declared ladder (some CDNs only serve pre-generated sizes):
+ // the largest width ≤ 1200, else the smallest available, else a safe default.
+ const widths = ($el.attr("data-widths") || "").match(/\d+/g)?.map(Number) || [];
+ const under = widths.filter((x) => x <= 1200);
+ const w = under.length ? Math.max(...under) : widths.length ? Math.min(...widths) : 900;
+ const fill = (u?: string) => (u || "").replace(/\{width\}/gi, String(w));
+ const cur = $el.attr("src") || "";
+ const ds = $el.attr("data-src") || ($el.attr("data-srcset") || "").split(",").pop()?.trim().split(/\s+/)[0];
+ if ((!cur || /placeholder|blank|data:image|1x1|lazyload/i.test(cur)) && ds) $el.attr("src", ds);
+ $el.attr("src", abs(fill($el.attr("src")), sourceUrl));
+ const ss = $el.attr("srcset") || $el.attr("data-srcset"); if (ss) $el.attr("srcset", absSrcset(fill(ss), sourceUrl));
+ $el.removeAttr("loading").removeAttr("data-src").removeAttr("data-srcset").removeAttr("data-widths").removeAttr("data-sizes");
+ // Fade-in themes leave a promoted image at opacity:0 (the JS that adds `lazyloaded` never runs).
+ if (/lazyload/.test($el.attr("class") || "")) $el.removeClass("lazyload lazyloading").addClass("lazyloaded");
+ });
+
+ // 3) Lazy BACKGROUND images (bgset): a hero/promo <div data-bgset> painted by JS → apply the real
+ //    image as an inline background. Skip when an unwrapped <noscript> img already covers the slot.
+ $("[data-bgset], [data-bg], [data-background]").each((_: number, el: any) => {
+ const $el = $(el);
+ if ($el.next().is("img")) return;
+ const raw = ($el.attr("data-bgset") || $el.attr("data-bg") || $el.attr("data-background") || "").trim();
+ if (!raw) return;
+ const cand = raw.split(",").map((c) => c.trim().split(/\s+/)[0]).filter(Boolean);
+ const pick = (cand[cand.length - 1] || raw.split(/\s+/)[0] || "").replace(/\{width\}/gi, "1600");
+ const url = abs(pick, sourceUrl);
+ if (!url || /^data:/i.test(url)) return;
+ const style = $el.attr("style") || "";
+ if (!/background-image/i.test(style)) $el.attr("style", `${style}${style && !/;\s*$/.test(style) ? ";" : ""}background-image:url('${url}');background-size:cover;background-position:center;`);
+ $el.removeClass("lazyload lazyloading").addClass("lazyloaded");
+ });
+}
+
 export type CaptureOpts = { rewriteLink?: (sameOriginUrl: string) => string | null };
 export type Capture = { html: string; origin: string; sourceUrl: string; bytes: number; inlinedSheets: number; links: string[] };
 
@@ -76,16 +152,8 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  // Absolutize any inline <style> url()s too.
  $("style").each((_: number, el: any) => { const c = $(el).html(); if (c && /url\(/.test(c)) $(el).text(absCssUrls(c, sourceUrl)); });
 
- // Images → eager, real source.
- $("img").each((_: number, el: any) => {
- const $el = $(el);
- const cur = $el.attr("src") || "";
- const ds = $el.attr("data-src") || ($el.attr("data-srcset") || "").split(",").pop()?.trim().split(/\s+/)[0];
- if ((!cur || /placeholder|blank|data:image|1x1|lazyload/i.test(cur)) && ds) $el.attr("src", ds);
- $el.attr("src", abs($el.attr("src"), sourceUrl));
- const ss = $el.attr("srcset") || $el.attr("data-srcset"); if (ss) $el.attr("srcset", absSrcset(ss, sourceUrl));
- $el.removeAttr("loading").removeAttr("data-src").removeAttr("data-srcset");
- });
+ // Images → eager, real source; undo lazy-load (noscript fallbacks, {width} templates, opacity:0).
+ deLazy($, sourceUrl);
  $("source[srcset], source[data-srcset]").each((_: number, el: any) => { const ss = $(el).attr("srcset") || $(el).attr("data-srcset"); if (ss) $(el).attr("srcset", absSrcset(ss, sourceUrl)).removeAttr("data-srcset"); });
  // Other asset links (favicons, preloaded fonts/images).
  $('link[href]:not([rel="canonical"]):not([rel="alternate"])').each((_: number, el: any) => { const h = $(el).attr("href"); if (h) $(el).attr("href", abs(h, sourceUrl)); });
@@ -96,7 +164,7 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  const raw = $(el).attr("href"); if (!raw) return;
  const full = abs(raw, sourceUrl);
  if (!/^https?:/i.test(full)) return;
- if (new URL(full).origin === origin) {
+ if (sameSite(full, origin)) {
  links.add(full);
  const rewritten = opts.rewriteLink ? opts.rewriteLink(full) : null;
  $(el).attr("href", rewritten ?? full);
@@ -111,6 +179,13 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
 
  // Strip <base> if the theme set one (we've absolutized everything ourselves).
  $("base").remove();
+
+ // Safety net: lazy themes ship `.lazyload{opacity:0}` and reveal via JS we've stripped — force
+ // any element that never got flipped to visible so nothing stays invisibly transparent.
+ $("head").append('<style data-vya-lazy="1">.lazyload,.lazyloading,.js-lazy-image,[data-bgset]{opacity:1!important}</style>');
+
+ // Remove Shopify-platform chrome (payment badges, "Follow on shop", "Powered by Shopify").
+ deShopify($);
 
  const html = $.html();
  return { html, origin, sourceUrl, bytes: html.length, inlinedSheets, links: [...links] };
@@ -137,6 +212,9 @@ export async function crawlAndStore(slug: string, startUrl: string, maxPages = 8
  const rewriteLink = (full: string) => {
  const p = new URL(full).pathname;
  if (/^\/products\//.test(p)) return linkBase + p; // product pages stay on VYA, served on-demand
+ // Account/login/orders → VYA's saved-items page, never the seller's old Shopify account.
+ if (/^\/(account|login|orders|customer)(\/|$|\?)/.test(p)) return `${linkBase}/favorites`;
+ if (/^\/cart(\/|$|\?)/.test(p)) return `${linkBase}/cart`; // the injected cart drawer intercepts /cart links
  return includePath(p) ? linkBase + (p === "/" ? "" : p) : null;
  };
 
@@ -179,6 +257,8 @@ export async function crawlAndStore(slug: string, startUrl: string, maxPages = 8
 const linkRewriteFor = (slug: string) => (full: string) => {
  const p = new URL(full).pathname;
  if (/^\/products\//.test(p)) return `/site/${slug}${p}`;
+ if (/^\/(account|login|orders|customer)(\/|$|\?)/.test(p)) return `/site/${slug}/favorites`; // → VYA, not Shopify account
+ if (/^\/cart(\/|$|\?)/.test(p)) return `/site/${slug}/cart`; // injected cart drawer intercepts /cart links
  if (/\/(cart|account|search|checkout|login)\b/.test(p) || /\.(json|xml|css|js|jpe?g|png|webp|svg)$/i.test(p) || /\/cdn\//.test(p)) return null;
  return `/site/${slug}${p === "/" ? "" : p}`;
 };

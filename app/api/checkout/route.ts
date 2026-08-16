@@ -6,8 +6,7 @@ import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { recordCheckoutAttempt } from "@/app/lib/checkout-attempts-db";
 import { getRedeemableBindingOffer } from "@/app/lib/offers-db";
-import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
-import { consignorCutCents } from "@/app/lib/consignment-logic";
+import { consignorCutToHold } from "@/app/lib/consignment-db";
 import { validateDiscount, computeDiscount } from "@/app/lib/store-discounts-db";
 
 export const dynamic = "force-dynamic";
@@ -87,9 +86,9 @@ export async function POST(request: NextRequest) {
  const currency = (item.currency || "usd").toLowerCase();
  // Consignment (Model A): fold the consignor's cut into VYA's application fee so it lands in
  // VYA's balance to fund the payout. Computed on the SALE price (after discount), like the fee.
- let consignCents = 0;
- const ci = await getConsignmentItemByProduct(itemId).catch(() => null);
- if (ci && ci.status === "active") consignCents = consignorCutCents(salePriceCents, ci.splitPct);
+ // Route the consignor cut into VYA's balance only for Stripe-paid consignors (cash / store credit
+ // keep the full proceeds with the store, which pays the consignor directly).
+ const consignCents = await consignorCutToHold(itemId, salePriceCents).catch(() => 0);
  const appFee = applicationFeeCents(salePriceCents) + effShippingCents + consignCents;
  const meta: Record<string, string> = {
  itemId,

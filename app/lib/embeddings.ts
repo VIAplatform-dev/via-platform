@@ -60,6 +60,41 @@ export async function embedImage(imageUrl: string): Promise<number[] | null> {
  return (await embedImageResult(imageUrl)).embedding;
 }
 
+/** Embed several images in ONE Voyage call (far cheaper + faster than N calls) — used to
+ *  visually verify a batch of reverse-image comp thumbnails against the query photo. Returns a
+ *  vector per input URL in order, null where that image failed. Chunks large batches. */
+export async function embedImages(imageUrls: string[]): Promise<(number[] | null)[]> {
+ const key = process.env.VOYAGE_API_KEY;
+ const urls = (imageUrls || []).map((u) => (typeof u === "string" ? u : ""));
+ if (!key || !urls.length) return urls.map(() => null);
+ const CHUNK = 16; // keep each request comfortably within Voyage's batch limits
+ const out: (number[] | null)[] = [];
+ for (let start = 0; start < urls.length; start += CHUNK) {
+ const slice = urls.slice(start, start + CHUNK);
+ const inputs = slice.map((u) => ({ content: [{ type: "image_url", image_url: u }] }));
+ let filled: (number[] | null)[] | null = null;
+ for (let attempt = 0; attempt < 3 && !filled; attempt++) {
+ try {
+ const res = await fetch(VOYAGE_URL, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
+  body: JSON.stringify({ model: MODEL, inputs }),
+  signal: AbortSignal.timeout(20000),
+ });
+ if (res.status === 429 || res.status >= 500) { if (attempt < 2) { await sleep(800 * (attempt + 1)); continue; } filled = slice.map(() => null); break; }
+ if (!res.ok) { filled = slice.map(() => null); break; }
+ const data = (await res.json()) as { data?: Array<{ embedding?: number[]; index?: number }>; usage?: { total_tokens?: number } };
+ await recordVoyage(data);
+ const vecs: (number[] | null)[] = slice.map(() => null);
+ (data.data || []).forEach((d, j) => { const idx = typeof d.index === "number" ? d.index : j; if (idx >= 0 && idx < vecs.length && Array.isArray(d.embedding) && d.embedding.length) vecs[idx] = d.embedding; });
+ filled = vecs;
+ } catch { if (attempt < 2) { await sleep(800 * (attempt + 1)); continue; } filled = slice.map(() => null); }
+ }
+ out.push(...(filled || slice.map(() => null)));
+ }
+ return out;
+}
+
 /** Cosine similarity between two equal-length vectors (0..1 for normalized inputs). */
 export function cosine(a: number[], b: number[]): number {
  let dot = 0, na = 0, nb = 0;

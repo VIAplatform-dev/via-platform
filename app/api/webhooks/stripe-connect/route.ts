@@ -193,6 +193,17 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
   ? { line1: md2.ship_line1, line2: md2.ship_line2 || null, city: md2.ship_city || null, state: md2.ship_state || null, postal: md2.ship_zip || null, country: md2.ship_country || "US" }
   : addr2 ? { line1: addr2.line1, line2: addr2.line2, city: addr2.city, state: addr2.state, postal: addr2.postal_code, country: addr2.country } : null;
  await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null });
+ // Per-store discount redemption for a single-item embedded checkout (idempotent per store+code+order).
+ if (md2.discount_code && md2.discount_store) {
+  recordDiscountRedemption({
+  storeSlug: md2.discount_store,
+  code: md2.discount_code,
+  discountId: md2.discount_id ? parseInt(md2.discount_id, 10) || null : null,
+  orderRef: p.id,
+  amountOffCents: md2.discount_off_cents ? parseInt(md2.discount_off_cents, 10) || 0 : 0,
+  buyerEmail: p.receipt_email || md2.buyer_email || null,
+  }).catch(() => {});
+ }
 }
  } else if (event.type === "checkout.session.expired") {
  const s = event.data.object as Stripe.Checkout.Session;

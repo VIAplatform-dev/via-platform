@@ -5,10 +5,10 @@ import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { applicationFeeCents } from "@/app/lib/payments-config";
-import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
-import { consignorCutCents } from "@/app/lib/consignment-logic";
+import { consignorCutToHold } from "@/app/lib/consignment-db";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { flatRateCents } from "@/app/lib/shipping-tiers";
+import { getCheckoutMethods } from "@/app/lib/store-checkout-db";
 
 export const dynamic = "force-dynamic";
 const COOKIE = "via_cart";
@@ -76,12 +76,11 @@ export async function POST(request: NextRequest) {
  try {
  const subtotal = reserved.reduce((s, it) => s + it.priceCents, 0);
  const amount = subtotal + shippingCostCents;
- // Consignment (Model A): route consignor cuts into VYA's balance on top of the platform fee.
+ // Consignment: route each consignor's cut into VYA's balance ONLY when they're paid by Stripe
+ // direct-deposit. Cash / store-credit stores keep the full proceeds and settle with the
+ // consignor themselves — VYA holds nothing.
  let consignTotal = 0;
- for (const it of reserved) {
- const ci = await getConsignmentItemByProduct(it.id).catch(() => null);
- if (ci && ci.status === "active") consignTotal += consignorCutCents(it.priceCents, ci.splitPct);
- }
+ for (const it of reserved) consignTotal += await consignorCutToHold(it.id, it.priceCents).catch(() => 0);
  const appFee = applicationFeeCents(subtotal) + shippingCostCents + consignTotal;
  const cur = (reserved[0].currency || "usd").toLowerCase();
  const meta: Record<string, string> = {
@@ -90,18 +89,25 @@ export async function POST(request: NextRequest) {
  ship_city: String(ship.city), ship_state: String(ship.state), ship_zip: String(ship.zip), ship_country: String(ship.country || "US"),
  buyer_phone: String(buyer.phone || ""), buyer_email: buyerEmail, shipping_paid_cents: String(shippingCostCents),
  };
- const intent = await stripePost(
- "payment_intents",
- {
+ // Per-store methods: card (→ Apple Pay / Google Pay / Link) plus the store's opted-in extras.
+ const methods = await getCheckoutMethods(seller.slug);
+ // Stripe's form-encoder wants an indexed object (payment_method_types[0]=card), not a JS array.
+ const intentBody = (pmts: string[]) => ({
  amount, currency: cur,
- automatic_payment_methods: { enabled: true },
+ payment_method_types: Object.fromEntries(pmts.map((m, i) => [i, m])),
  receipt_email: buyerEmail,
  ...(appFee > 0 ? { application_fee_amount: appFee } : {}),
  shipping: { name: String(buyer.name || buyerEmail), phone: String(buyer.phone || ""), address: { line1: String(ship.line1), line2: String(ship.line2 || ""), city: String(ship.city), state: String(ship.state), postal_code: String(ship.zip), country: String(ship.country || "US") } },
  metadata: meta,
- },
- pay.stripeAccountId, // direct charge on the seller's connected account
- );
+ });
+ // Fall back to card-only if a store enabled a method its account hasn't activated.
+ let intent;
+ try {
+ intent = await stripePost("payment_intents", intentBody(methods), pay.stripeAccountId);
+ } catch (e) {
+ if (methods.length <= 1) throw e;
+ intent = await stripePost("payment_intents", intentBody(["card"]), pay.stripeAccountId);
+ }
  return NextResponse.json({
  clientSecret: intent.client_secret,
  publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim(),

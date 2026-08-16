@@ -2,16 +2,49 @@
 // Presentational renderer for the section-based storefront. No hooks / no client
 // APIs, so it renders identically in the live store (server component) and the
 // editor's live preview (client). Sections come from theme.blocks.
-import type { Block, BlockStyle } from "@/app/lib/storefront-blocks";
+import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
+import { SERIF_FONTS } from "@/app/lib/storefront-templates";
 import { GripVertical } from "lucide-react";
 import NewsletterForm from "./NewsletterForm";
 import SandboxEmbed from "./SandboxEmbed";
 
-const SERIFS = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces"]);
-const ff = (name?: string) => (name ? `'${name}', ${SERIFS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
+const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 
 export type BlockProduct = { key?: string; title: string; price: string; image: string; href?: string };
 type Colors = { bg: string; text: string; accent: string };
+export type Radius = "sharp" | "soft" | "round";
+
+// Corner style ("shapes") → CSS radius, in px. Images/cards get a moderate curve; buttons go fully
+// pill on "round". A single scoped <style> drives it so it's one control, applied everywhere at once.
+const IMG_RADIUS: Record<Radius, number> = { sharp: 0, soft: 14, round: 26 };
+const BTN_RADIUS: Record<Radius, number> = { sharp: 0, soft: 8, round: 999 };
+
+// ── Free-form overlay elements (a button / text / image dragged onto a section) ──
+// Rendered both live (interactive: real anchors/images) and in the editor (inert content, the wrapper
+// owns pointer events for drag/select). Positioned in % so it scales; the stacking on narrow screens is
+// handled by a container query in the root <style> (see below) — no per-element JS.
+const OVL_TEXT_SIZE: Record<string, string> = { sm: "text-sm", md: "text-xl", lg: "text-3xl @xl:text-4xl", xl: "text-5xl @xl:text-6xl" };
+type OverlayEdit = {
+ selectedId?: string | null;
+ onSelect: (blockId: string, overlayId: string) => void;
+ onDragStart: (blockId: string, overlayId: string, e: React.PointerEvent) => void;
+};
+function overlayContent(o: Overlay, shopHref: string, head: string | undefined, live: boolean) {
+ const p = o.props || {};
+ if (o.kind === "button") {
+ const cls = "vya-cta inline-block whitespace-nowrap px-7 py-3 text-[12px] font-medium uppercase tracking-[0.18em]";
+ const style = { background: p.bg || "#1a1a1a", color: p.color || "#ffffff" };
+ return live
+ ? <a href={p.href || shopHref} className={cls} style={style}>{p.label || "Button"}</a>
+ : <span className={cls} style={style}>{p.label || "Button"}</span>;
+ }
+ if (o.kind === "image") {
+ return p.src
+ ? <img src={p.src} alt={p.alt || ""} className="vya-round block h-auto w-full object-cover" />
+ : <div className="vya-round grid aspect-square w-full place-items-center bg-black/10 text-[10px] uppercase tracking-wide text-black/40">Image</div>;
+ }
+ return <div className={`${OVL_TEXT_SIZE[p.size || "md"]} leading-tight`} style={{ color: p.color || "#ffffff", fontFamily: p.size === "lg" || p.size === "xl" ? head : undefined, fontWeight: p.bold === "1" ? 700 : 500, fontStyle: p.italic === "1" ? "italic" : undefined }}>{p.text || "Text"}</div>;
+}
 
 function isDark(hex: string): boolean {
  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
@@ -155,7 +188,7 @@ function blockBody(b: Block, ctx: Ctx) {
  <div className="grid grid-cols-2 gap-x-5 gap-y-12 @lg:grid-cols-3 @2xl:grid-cols-4 @lg:gap-x-8">
  {shown.map((it, i) => (
  <a key={it.key || i} href={it.href || shopHref} className="group block">
- <div className="aspect-[4/5] w-full overflow-hidden" style={{ background: `${fg}0d` }}>
+ <div className="vya-round aspect-[4/5] w-full overflow-hidden" style={{ background: `${fg}0d` }}>
  {it.image && <img src={it.image} alt={it.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.045]" />}
  </div>
  <p className="mt-3.5 line-clamp-1 text-[11px] uppercase tracking-[0.1em] opacity-65">{it.title}</p>
@@ -191,7 +224,7 @@ function blockBody(b: Block, ctx: Ctx) {
  return imgs.length ? (
  <div className="grid grid-cols-2 gap-1 @lg:grid-cols-3">
  {imgs.slice(0, 9).map((src, i) => (
- <div key={i} className="aspect-square overflow-hidden"><img src={src} alt="" className="h-full w-full object-cover" /></div>
+ <div key={i} className="vya-round aspect-square overflow-hidden"><img src={src} alt="" className="h-full w-full object-cover" /></div>
  ))}
  </div>
  ) : null;
@@ -257,7 +290,7 @@ function blockBody(b: Block, ctx: Ctx) {
  const embed = yt ? `https://www.youtube.com/embed/${yt[1]}` : vimeo ? `https://player.vimeo.com/video/${vimeo[1]}` : null;
  return (
  <section className="mx-auto max-w-5xl px-5 @xl:px-8 py-16 @xl:py-20">
- <div className="relative w-full overflow-hidden bg-black" style={{ aspectRatio: "16 / 9" }}>
+ <div className="vya-round relative w-full overflow-hidden bg-black" style={{ aspectRatio: "16 / 9" }}>
  {embed ? (
  <iframe src={embed} className="absolute inset-0 h-full w-full" allow="autoplay; fullscreen; picture-in-picture; clipboard-write" allowFullScreen title={p.caption || "Video"} />
  ) : (
@@ -304,17 +337,21 @@ export default function Blocks({
  fonts,
  products,
  shopHref = "#",
+ radius = "sharp",
  onSelect,
  selectedId,
  edit,
  onEditField,
  reorder,
+ overlayEdit,
 }: {
  blocks: Block[];
  colors: Colors;
  fonts: { heading?: string; body?: string };
  products: BlockProduct[];
  shopHref?: string;
+ // Global corner style ("shapes") — rounds product cards, images, and buttons store-wide.
+ radius?: Radius;
  // Editor-only: click a section in the preview to select/edit it.
  onSelect?: (id: string) => void;
  selectedId?: string | null;
@@ -331,15 +368,29 @@ export default function Blocks({
  onEnd: () => void;
  onDrop: (i: number) => void;
  };
+ // Editor-only: drag free-form overlay elements around a section. Drag math (px→%) lives in the parent
+ // since it needs the section's rect; this renderer just reports select + drag-start.
+ overlayEdit?: OverlayEdit;
 }) {
  const head = ff(fonts.heading);
  const body = ff(fonts.body);
+ const ir = IMG_RADIUS[radius] ?? 0;
+ const br = BTN_RADIUS[radius] ?? 0;
+ // Corner style, scoped to this storefront's sections. `.vya-round` marks the image/card frames that
+ // should curve; the full-bleed hero, announcement bar, and marquee deliberately stay square.
+ const radiusCss = ir || br ? `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}` : "";
+ // Overlay elements are absolutely placed (% coords) on wide layouts; on a narrow container they stack
+ // into normal flow — centred, padded — so a button dragged over the hero never overlaps or runs off a
+ // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.
+ // z-index:20 so overlays float ABOVE section content that sets its own stacking (e.g. the hero's
+ // z-10 inner) instead of hiding behind it. Layer is click-through; only the elements catch pointers.
+ const overlayCss = ".vya-ovl-layer{position:absolute;inset:0;z-index:20;pointer-events:none}.vya-ovl{position:absolute;pointer-events:auto}@container (max-width:640px){.vya-ovl-layer{position:static;display:flex;flex-direction:column;align-items:center;gap:.85rem;padding:1.75rem 1.25rem}.vya-ovl{position:static!important;left:auto!important;top:auto!important;width:auto!important;max-width:100%}}";
  return (
  // `@container` makes the sections respond to THIS element's width, not the viewport — so the
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
  <div className="@container" style={{ fontFamily: body, color: colors.text }}>
- <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}" }} />
+ <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}" + radiusCss + overlayCss }} />
  {blocks.map((b, i) => {
  const { background, fg } = bgFor(b.style?.bg, colors);
  const inner = blockBody(b, { colors, head, body, products, shopHref, fg, edit, onEditField });
@@ -350,14 +401,22 @@ export default function Blocks({
  const dragging = reorder?.dragIndex ?? null;
  const showLine = editable && reorder && reorder.overIndex === i && dragging !== null && dragging !== i;
  const overrideCss = b.style ? sectionOverrideCss(b.id, b.style) : "";
+ // A section background photo (full-bleed, behind everything). Wins over a bg colour; a soft scrim
+ // keeps overlaid text legible without forcing the seller to fiddle. url() is quote-escaped.
+ // Hero/image sections render their OWN picture (props.image), so they ignore this layer — otherwise a
+ // stale bgImage would show a grey scrim behind them.
+ const bgImg = b.type === "hero" || b.type === "image" ? undefined : b.style?.bgImage;
+ const secStyle: React.CSSProperties = bgImg
+ ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.18),rgba(0,0,0,0.28)), url("${bgImg.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center", color: b.style?.textColor || "#ffffff" }
+ : background ? { background, color: fg } : {};
  return (
  <div
  key={b.id}
  onClick={editable ? (e) => { e.preventDefault(); e.stopPropagation(); onSelect!(b.id); } : undefined}
  onDragOver={editable && reorder ? (e) => { if (dragging !== null) { e.preventDefault(); reorder.onOver(i); } } : undefined}
  onDrop={editable && reorder ? (e) => { if (dragging !== null) { e.preventDefault(); reorder.onDrop(i); } } : undefined}
- className={editable ? `${secClass} group/sec relative cursor-pointer transition-shadow ${dragging === i ? "opacity-40" : ""} ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : secClass}
- style={background ? { background, color: fg } : undefined}
+ className={editable ? `${secClass} group/sec relative cursor-pointer transition-shadow ${dragging === i ? "opacity-40" : ""} ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : `${secClass} relative`}
+ style={Object.keys(secStyle).length ? secStyle : undefined}
  >
  {overrideCss && <style dangerouslySetInnerHTML={{ __html: overrideCss }} />}
  {showLine && <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-[3px] bg-[#5D0F17]" />}
@@ -378,6 +437,25 @@ export default function Blocks({
  </button>
  )}
  {inner}
+ {b.overlays?.length ? (
+ <div className="vya-ovl-layer">
+ {b.overlays.map((o) => {
+ const sel = editable && overlayEdit?.selectedId === o.id;
+ return (
+ <div
+ key={o.id}
+ data-ovl={o.id}
+ className={`vya-ovl ${editable ? `cursor-move touch-none transition-shadow ${sel ? "shadow-[0_0_0_2px_#5D0F17]" : "hover:shadow-[0_0_0_2px_rgba(93,15,23,0.5)]"}` : ""}`}
+ style={{ left: `${o.x}%`, top: `${o.y}%`, ...(o.w ? { width: `${o.w}%` } : {}) }}
+ onClick={editable ? (e) => { e.preventDefault(); e.stopPropagation(); overlayEdit?.onSelect(b.id, o.id); } : undefined}
+ onPointerDown={editable && overlayEdit ? (e) => { e.stopPropagation(); overlayEdit.onDragStart(b.id, o.id, e); } : undefined}
+ >
+ {overlayContent(o, shopHref, head, !editable)}
+ </div>
+ );
+ })}
+ </div>
+ ) : null}
  </div>
  );
  })}

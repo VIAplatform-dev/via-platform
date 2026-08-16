@@ -21,9 +21,9 @@ type Draft = {
  priceHint: number | null;
  parcel: { weightOz: number; lengthIn: number; widthIn: number; heightIn: number };
 };
-type Form = { title: string; brand: string; era: string; material: string; condition: string; size: string; category: string; price: string; cost: string; description: string; weightOz: string; lengthIn: string; widthIn: string; heightIn: string };
+type Form = { title: string; brand: string; era: string; material: string; condition: string; size: string; measurements: string; category: string; price: string; cost: string; description: string; weightOz: string; lengthIn: string; widthIn: string; heightIn: string };
 type Collection = { id: string; title: string; itemCount: number };
-const BLANK: Form = { title: "", brand: "", era: "", material: "", condition: "", size: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+const BLANK: Form = { title: "", brand: "", era: "", material: "", condition: "", size: "", measurements: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
 
 type Flag = { level: string; message: string; marketUsd: number; pct?: number };
 
@@ -137,10 +137,14 @@ export default function IntakePage() {
  const [embedding, setEmbedding] = useState<number[] | null>(null);
  const [marketPrice, setMarketPrice] = useState<number | null>(null);
  const [rawMarketCents, setRawMarketCents] = useState<number | null>(null);
+ // The AI's pricing confidence — logged with the item so we can calibrate confidence vs. how far
+ // the seller re-prices ("does 0.7 actually mean ~right?").
+ const [aiConfidence, setAiConfidence] = useState<number | null>(null);
  const [priceNote, setPriceNote] = useState<string>("");
  const [priceLow, setPriceLow] = useState<number | null>(null);
  const [priceHigh, setPriceHigh] = useState<number | null>(null);
  const [priceFlag, setPriceFlag] = useState<Flag | null>(null);
+ const [lowConf, setLowConf] = useState(false); // too few comps to flag over/under — show a rough range, not a verdict
  const [consigned, setConsigned] = useState(false);
  const [consignors, setConsignors] = useState<{ id: number; name: string; defaultSplitPct: number | null }[]>([]);
  const [consignCfg, setConsignCfg] = useState<{ storeDefaultSplitPct: number } | null>(null);
@@ -280,9 +284,11 @@ export default function IntakePage() {
  const est = d.estimate;
  if (typeof est?.marketCents === "number") setRawMarketCents(est.marketCents);
  if (est?.suggestedCents) setMarketPrice(Math.round(est.suggestedCents / 100));
+ if (typeof est?.confidence === "number") setAiConfidence(est.confidence);
  setPriceLow(typeof est?.lowCents === "number" ? Math.round(est.lowCents / 100) : null);
  setPriceHigh(typeof est?.highCents === "number" ? Math.round(est.highCents / 100) : null);
  setPriceFlag(d.priceFlag ?? null);
+ setLowConf(!!d.lowConfidence);
  } catch { /* best-effort nudge; stay silent */ }
  }
 
@@ -379,11 +385,13 @@ export default function IntakePage() {
  if (r2.ok && d2) {
  const est = d2.estimate;
  if (est?.suggestedCents) setMarketPrice(Math.round(est.suggestedCents / 100));
+ if (typeof est?.confidence === "number") setAiConfidence(est.confidence);
  if (typeof est?.marketCents === "number") setRawMarketCents(est.marketCents);
  if (typeof est?.rationale === "string") setPriceNote(est.rationale);
  setPriceLow(typeof est?.lowCents === "number" ? Math.round(est.lowCents / 100) : null);
  setPriceHigh(typeof est?.highCents === "number" ? Math.round(est.highCents / 100) : null);
  setPriceFlag(d2.priceFlag ?? null);
+ setLowConf(!!d2.lowConfidence); // full AI pricing is usually confident; honor it if not
  if (d2.runway) setRunway(d2.runway);
  if (d2.celebrity) setCelebrity(d2.celebrity);
  setForm((f) => {
@@ -400,6 +408,9 @@ export default function IntakePage() {
  }
 
  const allConfirmed = flagged.every((k) => confirmed[k]);
+ // Most pieces need flat measurements (fit is everything secondhand) — except small accessories
+ // where they don't apply. Drives a soft nudge, never a hard block.
+ const needsMeasurements = !/jewel|ring|earring|necklace|bracelet|brooch|\bhat\b|belt|scarf|sunglass|watch|gift ?card|\bhair\b/i.test(`${form.category} ${form.title}`);
 
  function toggleConsigned() {
  const next = !consigned;
@@ -439,7 +450,7 @@ export default function IntakePage() {
  const r = await fetch("/api/store/intake/publish", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ ...form, status, publishAt: publishAt || null, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
+ body: JSON.stringify({ ...form, status, publishAt: publishAt || null, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
@@ -458,7 +469,7 @@ export default function IntakePage() {
  draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
  setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null);
+ setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null);
  }
 
  // ── Done ──
@@ -504,6 +515,7 @@ export default function IntakePage() {
  eyebrow="Sell · Add listing"
  title="Add a listing"
  subtitle="Add photos and fill in what you know — then let AI complete the rest. Anything you type, it keeps."
+ actions={<a href="/admin/bulk-upload" className="text-[13px] font-medium text-stone-500 hover:text-stone-800">Bulk upload →</a>}
  />
 
  {autoSavedAt && phase === "form" && (
@@ -610,16 +622,26 @@ export default function IntakePage() {
  <div><label className={label}>Size</label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="M / US 8" /></div>
  <div><label className={label}>Category</label><input className={input} value={form.category} onChange={(e) => set("category", e.target.value)} /></div>
  </div>
+ <div>
+ <label className={label}>Measurements <span className="font-normal text-stone-400">— flat, in inches</span></label>
+ <input className={input} value={form.measurements} onChange={(e) => set("measurements", e.target.value)} placeholder={`Bust 34" · Waist 28" · Length 40"`} />
+ {!form.measurements.trim() && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on — listings with measurements sell faster. Add the key ones.</p>}
+ </div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents) setPriceFlag(flagFor(Number(v) || 0, marketPrice, priceLow, priceHigh)); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
+ <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, marketPrice, priceLow, priceHigh)); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
  <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="What you paid" /></div>
  </div>
  {priceLow != null && priceHigh != null && priceHigh > priceLow && (
  <PriceScale low={priceLow} high={priceHigh} market={marketPrice} value={Number(form.price) || 0} />
  )}
- {priceFlag && (
+ {priceFlag && !lowConf && (
  <div className={`mt-2 rounded-lg px-3 py-2 text-[11px] font-medium ${priceFlag.level === "under" ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200" : priceFlag.level === "over" ? "bg-rose-50 text-rose-800 ring-1 ring-rose-200" : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"}`}>
  {priceFlag.level === "under" ? "🔽 " : priceFlag.level === "over" ? "🔼 " : "✅ "}{priceFlag.message}
+ </div>
+ )}
+ {lowConf && rawMarketCents != null && (
+ <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-[11px] text-stone-500 ring-1 ring-stone-200">
+ Not enough comparable pieces to price this confidently — treat the range as a rough guide. Add more detail or “Fill with AI” for a firmer read.
  </div>
  )}
 

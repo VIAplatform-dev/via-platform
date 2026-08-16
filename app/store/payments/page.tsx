@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, Landmark, ShieldCheck } from "lucide-react";
 import { Card, PageHeader, Badge, Button } from "../ui";
+import EmbeddedPayments from "./EmbeddedPayments";
 
 type Status = {
  configured: boolean;
@@ -16,8 +17,11 @@ export default function PaymentsPage() {
  const [loading, setLoading] = useState(true);
  const [authErr, setAuthErr] = useState<string | null>(null);
  const [s, setS] = useState<Status | null>(null);
- const [busy, setBusy] = useState(false);
- const [err, setErr] = useState<string | null>(null);
+ // Which embedded surface (if any) is open — onboarding replaces the Stripe redirect; manage
+ // replaces the Stripe-hosted Express dashboard. Both render inside getvya.ai.
+ const [embed, setEmbed] = useState<null | "onboarding" | "manage">(null);
+ // Extra checkout methods the store offers (card + wallets are always on, not shown here).
+ const [methods, setMethods] = useState<{ cashapp: boolean; affirm: boolean; klarna: boolean } | null>(null);
 
  async function load() {
  try {
@@ -28,31 +32,28 @@ export default function PaymentsPage() {
  return;
  }
  setS(await r.json());
+ const m = await fetch("/api/store/payments/methods").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ if (m?.settings) setMethods(m.settings);
  } catch {
  setAuthErr("Couldn’t load payment status.");
  }
  setLoading(false);
  }
+
+ async function toggle(k: "cashapp" | "affirm" | "klarna") {
+ if (!methods) return;
+ const next = { ...methods, [k]: !methods[k] };
+ setMethods(next); // optimistic
+ await fetch("/api/store/payments/methods", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) }).catch(() => {});
+ }
  useEffect(() => {
  (async () => { await load(); })();
  }, []);
 
- async function connect() {
- setBusy(true);
- setErr(null);
- try {
- const r = await fetch("/api/store/payments/connect", { method: "POST" });
- const d = await r.json();
- if (!r.ok || !d.url) {
- setErr(d.error || "Couldn’t start onboarding.");
- setBusy(false);
- return;
- }
- window.location.href = d.url; // hand off to Stripe-hosted onboarding
- } catch {
- setErr("Couldn’t start onboarding.");
- setBusy(false);
- }
+ // When the seller finishes embedded onboarding, refresh status (charges/payouts may now be on).
+ function onOnboardingComplete() {
+ setEmbed(null);
+ load();
  }
 
  const active = s?.chargesEnabled && s?.payoutsEnabled;
@@ -92,18 +93,58 @@ export default function PaymentsPage() {
 
  <div className="mt-5">
  {active ? (
- <Button variant="secondary" onClick={connect} disabled={busy}>{busy ? "Opening…" : "Manage on Stripe"}</Button>
+ <Button variant="secondary" onClick={() => setEmbed((e) => (e === "manage" ? null : "manage"))}>{embed === "manage" ? "Hide payouts" : "Manage payouts"}</Button>
  ) : (
- <Button onClick={connect} disabled={busy}>{busy ? "Opening Stripe…" : s?.connected ? "Finish setup" : "Connect with Stripe"}</Button>
+ <Button onClick={() => setEmbed("onboarding")} disabled={embed === "onboarding"}>{s?.connected ? "Finish setup" : "Set up payments"}</Button>
  )}
- {err && <p className="mt-3 text-xs text-red-600">{err}</p>}
  </div>
  </div>
  </div>
+
+ {/* Embedded Connect surfaces — rendered right here inside getvya.ai, no redirect to Stripe. */}
+ {embed && (
+ <div className="mt-6 border-t border-stone-100 pt-6">
+ <EmbeddedPayments mode={embed} onComplete={embed === "onboarding" ? onOnboardingComplete : undefined} />
+ </div>
+ )}
+ </Card>
+ )}
+
+ {/* Which methods buyers see at checkout. Card + wallets always on; the rest are opt-in. */}
+ {s?.configured && active && methods && (
+ <Card className="mt-4 p-6">
+ <h3 className="text-[15px] font-semibold text-stone-900">Checkout payment methods</h3>
+ <p className="mt-1.5 text-[13px] leading-relaxed text-stone-500">Turn on the extras you want buyers to see at checkout. Everything else stays clean and card-first.</p>
+ <div className="mt-4 space-y-2">
+ <MethodRow label="Card · Apple Pay · Google Pay · Link" desc="Always on — wallets show automatically on supported devices." locked />
+ <MethodRow label="Cash App Pay" desc="Pay from a Cash App balance — popular with younger US buyers." on={methods.cashapp} onToggle={() => toggle("cashapp")} />
+ <MethodRow label="Affirm — buy now, pay later" desc="Buyer pays over time; you’re still paid in full up front." on={methods.affirm} onToggle={() => toggle("affirm")} />
+ <MethodRow label="Klarna — buy now, pay later" desc="Pay in 4 or financing, at no cost to you." on={methods.klarna} onToggle={() => toggle("klarna")} />
+ </div>
+ <p className="mt-3 text-[11px] text-stone-400">Each extra must also be activated on your Stripe account. If one isn’t, checkout quietly falls back to card.</p>
  </Card>
  )}
 
  <p className="mt-4 text-xs text-stone-400">Payments are processed securely by Stripe.</p>
+ </div>
+ );
+}
+
+// A method row with a toggle (or an "always on" lock for card + wallets).
+function MethodRow({ label, desc, on, onToggle, locked }: { label: string; desc: string; on?: boolean; onToggle?: () => void; locked?: boolean }) {
+ return (
+ <div className="flex items-center justify-between gap-4 rounded-lg border border-stone-200 bg-white px-3.5 py-3">
+ <div className="min-w-0">
+ <p className="text-[13px] font-medium text-stone-800">{label}</p>
+ <p className="mt-0.5 text-[12px] leading-snug text-stone-500">{desc}</p>
+ </div>
+ {locked ? (
+ <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Always on</span>
+ ) : (
+ <button type="button" onClick={onToggle} aria-pressed={!!on} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? "bg-emerald-500" : "bg-stone-300"}`}>
+ <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+ </button>
+ )}
  </div>
  );
 }

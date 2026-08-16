@@ -9,12 +9,26 @@ export type BlockScale = "sm" | "md" | "lg" | "xl";
 export type BlockAlign = "left" | "center" | "right";
 export type BlockStyle = {
  bg?: string; // "accent" | "dark" | a #hex (default = theme background)
+ bgImage?: string; // URL — a full-bleed background photo behind the whole section (wins over bg colour)
  textColor?: string; // #hex — overrides the section's text colour
  align?: BlockAlign; // text alignment
  headingSize?: BlockScale; // heading scale
  space?: BlockScale; // extra vertical breathing room around the section
 };
-export type Block = { id: string; type: BlockType; props: Record<string, string>; style?: BlockStyle };
+// Free-form overlay elements ("add a button/text/image anywhere on a section"). Each is anchored to a
+// section and positioned in PERCENT of that section's box (0–100), so it scales with the layout instead
+// of breaking at a fixed pixel. On narrow screens the overlay layer auto-stacks below the section content
+// (see Blocks) so nothing overlaps or runs off a phone.
+export type OverlayKind = "button" | "text" | "image";
+export type Overlay = {
+ id: string;
+ kind: OverlayKind;
+ x: number; // 0–100, % of section width (left edge of the element)
+ y: number; // 0–100, % of section height (top edge)
+ w?: number; // 0–100, % width (images size by this; text/buttons hug their content)
+ props: Record<string, string>; // button: {label, href, bg, color}; text: {text, color, size}; image: {src, alt}
+};
+export type Block = { id: string; type: BlockType; props: Record<string, string>; style?: BlockStyle; overlays?: Overlay[] };
 
 export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" };
 export type BlockDef = { type: BlockType; label: string; description: string; fields: BlockField[]; defaults: Record<string, string> };
@@ -53,6 +67,66 @@ export function newBlockId(): string {
 export function makeBlock(type: BlockType, props?: Record<string, string>): Block {
  const def = blockDef(type);
  return { id: newBlockId(), type, props: { ...(def?.defaults || {}), ...(props || {}) } };
+}
+
+// Default props + a sensible starting position (roughly centred) for a new overlay element.
+const OVERLAY_DEFAULTS: Record<OverlayKind, Record<string, string>> = {
+ button: { label: "Shop now", href: "", bg: "#1a1a1a", color: "#ffffff" },
+ text: { text: "Double-click to edit", color: "#ffffff", size: "md" },
+ image: { src: "", alt: "" },
+};
+export function makeOverlay(kind: OverlayKind): Overlay {
+ seq += 1;
+ return { id: `o_${Date.now().toString(36)}${seq}`, kind, x: 38, y: 42, ...(kind === "image" ? { w: 28 } : {}), props: { ...OVERLAY_DEFAULTS[kind] } };
+}
+
+const clampPct = (v: unknown, lo: number, hi: number, dflt: number): number => {
+ const n = Number(v);
+ return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+};
+// Only allow same-origin paths or http(s)/mailto links (no javascript:) for overlay button hrefs.
+const safeHref = (v: unknown): string => {
+ const s = String(v ?? "").trim().slice(0, 400);
+ if (!s) return "";
+ return /^(https?:\/\/|mailto:|\/)/i.test(s) ? s : "";
+};
+const safeSrc = (v: unknown): string => {
+ const s = String(v ?? "").trim().slice(0, 800);
+ return /^(https?:\/\/|\/)/i.test(s) ? s : "";
+};
+
+export function sanitizeOverlays(input: unknown): Overlay[] {
+ if (!Array.isArray(input)) return [];
+ const out: Overlay[] = [];
+ for (const raw of input.slice(0, 24)) {
+ const o = raw as Overlay;
+ if (o?.kind !== "button" && o?.kind !== "text" && o?.kind !== "image") continue;
+ const p: Record<string, string> = {};
+ if (o.kind === "button") {
+ p.label = String(o.props?.label ?? "").slice(0, 80);
+ p.href = safeHref(o.props?.href);
+ p.bg = /^#[0-9a-fA-F]{6}$/.test(String(o.props?.bg ?? "")) ? o.props!.bg : "#1a1a1a";
+ p.color = /^#[0-9a-fA-F]{6}$/.test(String(o.props?.color ?? "")) ? o.props!.color : "#ffffff";
+ } else if (o.kind === "text") {
+ p.text = String(o.props?.text ?? "").slice(0, 240);
+ p.color = /^#[0-9a-fA-F]{6}$/.test(String(o.props?.color ?? "")) ? o.props!.color : "#ffffff";
+ p.size = ["sm", "md", "lg", "xl"].includes(String(o.props?.size ?? "")) ? o.props!.size : "md";
+ if (o.props?.bold === "1") p.bold = "1";
+ if (o.props?.italic === "1") p.italic = "1";
+ } else {
+ p.src = safeSrc(o.props?.src);
+ p.alt = String(o.props?.alt ?? "").slice(0, 200);
+ }
+ out.push({
+ id: typeof o.id === "string" && o.id ? o.id.slice(0, 40) : `o_${newBlockId()}`,
+ kind: o.kind,
+ x: clampPct(o.x, 0, 100, 40),
+ y: clampPct(o.y, 0, 100, 42),
+ ...(o.w != null ? { w: clampPct(o.w, 5, 100, 28) } : {}),
+ props: p,
+ });
+ }
+ return out;
 }
 
 // A sensible starting page for a brand-new storefront.
@@ -98,12 +172,15 @@ export function sanitizeBlocks(input: unknown): Block[] {
  const scale = (v: unknown): BlockScale | undefined => (v === "sm" || v === "md" || v === "lg" || v === "xl" ? v : undefined);
  const style: BlockStyle = {};
  if (bg === "accent" || bg === "dark" || /^#[0-9a-fA-F]{6}$/.test(bg)) style.bg = bg;
+ const bgImg = safeSrc(s.bgImage);
+ if (bgImg) style.bgImage = bgImg;
  if (/^#[0-9a-fA-F]{6}$/.test(String(s.textColor ?? ""))) style.textColor = s.textColor;
  if (s.align === "left" || s.align === "center" || s.align === "right") style.align = s.align;
  if (scale(s.headingSize)) style.headingSize = s.headingSize;
  if (scale(s.space)) style.space = s.space;
  const hasStyle = Object.keys(style).length > 0;
- out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, props, ...(hasStyle ? { style } : {}) });
+ const overlays = sanitizeOverlays(b.overlays);
+ out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, props, ...(hasStyle ? { style } : {}), ...(overlays.length ? { overlays } : {}) });
  }
  return out;
 }

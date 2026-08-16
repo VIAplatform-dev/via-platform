@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getConsignorEmail, CONSIGNOR_COOKIE } from "@/app/lib/consignor-auth";
-import { getConsignorsByEmail, getConsignorStatement } from "@/app/lib/consignment-db";
+import { getConsignorsByEmail, getConsignorStatement, getConsignmentSettings, getPayableBalanceCents } from "@/app/lib/consignment-db";
+import { stores } from "@/app/lib/stores";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,12 +14,20 @@ export async function GET(request: Request) {
  const consignors = await getConsignorsByEmail(email);
  const consignments = await Promise.all(consignors.map(async (c) => {
  const s = await getConsignorStatement(c.id);
+ const settings = await getConsignmentSettings(c.storeSlug).catch(() => null);
+ // Effective payout method (the consignor's own, else the store's default) + what's cleared the
+ // return hold and is actually ready to collect/receive right now.
+ const payoutMethod = c.payoutMethod || settings?.defaultPayoutMethod || "store_credit";
+ const payableCents = await getPayableBalanceCents(c.id, settings?.holdDays ?? 14).catch(() => 0);
+ const storeName = stores.find((st) => st.slug === c.storeSlug)?.name || c.storeSlug;
  return {
  consignorId: c.id,
  store: c.storeSlug,
+ storeName,
  name: c.name,
  connected: !!c.stripeAccountId,
- payoutMethod: c.payoutMethod,
+ payoutMethod,
+ payableCents,
  balanceCents: s.balanceCents,
  items: s.items.map((i) => ({ status: i.status, splitPct: i.splitPct, listedPriceCents: i.listedPriceCents, soldPriceCents: i.soldPriceCents, intakeDate: i.intakeDate, soldAt: i.soldAt })),
  ledger: s.ledger,

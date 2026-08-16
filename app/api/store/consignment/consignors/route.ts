@@ -38,6 +38,15 @@ export async function PATCH(request: NextRequest) {
  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
  const cur = await getConsignor(id);
  if (!cur || cur.storeSlug !== slug) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+ // Lock the payout method once there's a balance: whether a sale's cut was routed into VYA's
+ // balance (Stripe) or left with the store (cash/credit) was decided AT the sale — switching now
+ // would mismatch what's actually held. Pay the consignor out first, then change it.
+ if ("payoutMethod" in body && (body.payoutMethod || null) !== (cur.payoutMethod || null)) {
+ const bal = await getConsignorBalanceCents(id).catch(() => 0);
+ if (bal !== 0) return NextResponse.json({ error: "Can’t change payout method while this consignor has a balance — pay it out first, then switch." }, { status: 409 });
+ }
+
  await updateConsignor(id, {
  name: typeof body?.name === "string" ? body.name.trim() : undefined,
  email: "email" in body ? (body.email || null) : undefined,

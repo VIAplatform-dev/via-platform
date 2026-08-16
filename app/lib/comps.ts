@@ -6,6 +6,7 @@
 import { unstable_cache } from "next/cache";
 import { getCachedLens, saveCachedLens } from "./lens-cache-db";
 import { recordSerp } from "./cost-tracker";
+import { embedImages, cosine } from "./embeddings";
 
 const SERPAPI_URL = "https://serpapi.com/search.json";
 
@@ -50,7 +51,7 @@ export function priceToCents(p: any): number | null {
  return v && v > 0 ? Math.round(v * 100) : null;
 }
 
-export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string };
+export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string; thumbnail?: string; similarity?: number };
 
 /** Reverse-image search (Google Lens) for the exact / visually-identical product.
  *  This is the single best signal for BRAND ID and true price — it finds the same
@@ -63,7 +64,7 @@ export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch
  const r = await serp({ engine: "google_lens", url: imageUrl, country: "us" });
  const matches = ((r?.visual_matches || []) as any[])
  .slice(0, 25)
- .map((m) => ({ title: String(m.title || ""), priceCents: priceToCents(m.price), source: String(m.source || ""), link: m.link as string | undefined }))
+ .map((m) => ({ title: String(m.title || ""), priceCents: priceToCents(m.price), source: String(m.source || ""), link: m.link as string | undefined, thumbnail: (typeof m.thumbnail === "string" && m.thumbnail) || undefined }))
  .filter((m) => m.title);
  // Cache only a genuine SerpApi response (r != null) — never persist a transient timeout/error as
  // "no matches", which would poison this photo's lookups for the whole TTL.
@@ -114,6 +115,46 @@ const EDITORIAL_SOURCE = /getty|gettyimages|wireimage|imaxtree|shutterstock|vogu
  *  on purpose: a red-carpet caption naming the wearer rarely repeats the brand. [] if none. */
 export function editorialCaptions(matches: VisualMatch[]): string[] {
  return matches.filter((m) => m.title && EDITORIAL_SOURCE.test(m.source || "")).map((m) => m.title).slice(0, 20);
+}
+
+// Similarity floor for "this web result is actually the SAME product as the photo". A seller's
+// raw photo vs a clean catalog thumbnail sits lower than photo-to-photo, so this is deliberately
+// below the same-physical-item bar used in bulk grouping. Tunable per real data via env + the log.
+const VISUAL_MATCH_MIN = Number(process.env.VYA_VISUAL_MATCH_MIN) || 0.68;
+
+/** Google Lens returns visually-APPROXIMATE results — a different model of the same brand, a
+ *  look-alike — and those wrong comps drag the price to the wrong number (the "$685 Gucci that
+ *  actually resells for $1,800" case: the matched bag wasn't the same bag). This embeds each
+ *  match's thumbnail and keeps only those that genuinely look like the query photo, tagging each
+ *  with its `similarity` (best first). It only ever FILTERS when it has the signal: with no query
+ *  embedding, no thumbnails, or a total embedding failure it returns the input unchanged, so we
+ *  never make pricing worse — we just remove the matches we can prove are a different item. */
+export async function verifyMatchesByImage(
+ queryEmbedding: number[] | null,
+ matches: VisualMatch[],
+ opts?: { min?: number; max?: number },
+): Promise<{ verified: VisualMatch[]; checked: number; filtered: boolean }> {
+ const min = opts?.min ?? VISUAL_MATCH_MIN;
+ const max = opts?.max ?? 16;
+ if (!queryEmbedding || !matches.length) return { verified: matches, checked: 0, filtered: false };
+ const candidates = matches.filter((m) => m.thumbnail).slice(0, max);
+ if (!candidates.length) return { verified: matches, checked: 0, filtered: false };
+
+ const embs = await embedImages(candidates.map((m) => m.thumbnail as string)).catch(() => candidates.map(() => null));
+ let embedded = 0;
+ const scored = candidates.map((m, i) => {
+ const e = embs[i];
+ if (e) { embedded++; return { ...m, similarity: cosine(queryEmbedding, e) }; }
+ return { ...m } as VisualMatch;
+ });
+ if (!embedded) return { verified: matches, checked: 0, filtered: false }; // couldn't verify → don't strip
+
+ const kept = scored
+ .filter((m) => m.similarity != null && m.similarity >= min)
+ .sort((a, b) => (b.similarity as number) - (a.similarity as number));
+ const sims = scored.filter((m) => m.similarity != null).map((m) => (m.similarity as number).toFixed(2)).sort().reverse();
+ console.log(`[comps] visual-verify: kept ${kept.length}/${embedded} at min=${min} · sims=[${sims.join(", ")}]`);
+ return { verified: kept, checked: embedded, filtered: true };
 }
 
 /** Reverse-image matches that carry a price → resale comps. Visually-identical items

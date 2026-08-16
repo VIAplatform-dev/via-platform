@@ -1,7 +1,13 @@
+import * as cheerio from "cheerio";
+import type { Element } from "domhandler";
 import { fetchShopifyProductsPublic } from "@/app/lib/shopifyClient";
 import { formatPrice } from "@/app/lib/formatPrice";
 import { assertPublicUrl, safeFetch } from "@/app/lib/safe-url";
+import { makeBlock, type BlockType } from "@/app/lib/storefront-blocks";
 import type { StoreProfile } from "@/app/lib/store-profile";
+
+/** One storefront section as an editable studio block (matches StorefrontTheme.blocks). */
+type HomeBlock = { id: string; type: string; props: Record<string, string>; style?: { bg?: string } };
 
 // ───────────────────────────────────────────────────────────────────────────
 // Pull a real storefront (Shopify / Squarespace) from a pasted URL — name, brand
@@ -24,6 +30,7 @@ export type ImportedProduct = {
 export type StorefrontTheme = {
  fonts?: { heading?: string; body?: string };
  colors?: { bg?: string; text?: string; accent?: string };
+ radius?: "sharp" | "soft" | "round"; // global corner style ("shapes") — rounds product cards, images, buttons
  customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
  blocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
@@ -61,6 +68,7 @@ export type ImportResult = {
  hero: string | null;
  theme: StorefrontTheme | null;
  products: ImportedProduct[];
+ blocks?: HomeBlock[]; // section-by-section replica of the source homepage, for the visual studio
  error?: string;
 };
 
@@ -170,14 +178,102 @@ export function extractTheme(head: string, origin: string, themeColor: string | 
 }
 
 /** Pull store name / brand color / platform hints from the homepage <head>. */
+/** Parse a homepage's real sections into editable studio blocks — an approximate
+ *  section-by-section replica the seller can then refine, instead of a generic
+ *  template. Best-effort: we classify each top-level section by what it CONTAINS
+ *  (hero / product grid / split / text / image / newsletter) rather than trying to
+ *  reproduce exact CSS. Platform-aware anchors: Shopify `#shopify-section-*`,
+ *  Squarespace `.page-section`/`[data-section-id]`, then generic `<section>`. */
+export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
+ let $: cheerio.CheerioAPI;
+ try { $ = cheerio.load(html); } catch { return []; }
+
+ const abs = (src?: string): string => {
+  let s = (src || "").trim();
+  if (!s) return "";
+  if (s.startsWith("//")) s = "https:" + s;
+  try { return new URL(s, origin).href; } catch { return /^https?:/i.test(s) ? s : ""; }
+ };
+ const clean = (t?: string | null): string => (t || "").replace(/\s+/g, " ").trim();
+
+ // Best image URL from an <img> — prefer the largest srcset candidate, skip data: URIs.
+ const bestImg = (el: Element): string => {
+  const $el = $(el);
+  const ss = $el.attr("srcset") || $el.attr("data-srcset") || "";
+  if (ss) {
+   const cands = ss.split(",").map((c) => c.trim().split(/\s+/)[0]).filter(Boolean);
+   if (cands.length && !/^data:/i.test(cands[cands.length - 1])) return abs(cands[cands.length - 1]);
+  }
+  const src = $el.attr("src") || $el.attr("data-src") || $el.attr("data-original") || "";
+  return src && !/^data:/i.test(src) ? abs(src) : "";
+ };
+
+ const blocks: HomeBlock[] = [];
+ const push = (type: BlockType, props: Record<string, string>) => { blocks.push(makeBlock(type, props)); };
+
+ // Announcement bar (Shopify/Squarespace common patterns), from the very top.
+ const ann = clean($("[class*='announcement'], [class*='promo-bar'], [class*='topbar']").first().text());
+ if (ann && ann.length <= 120) push("announcement", { text: ann });
+
+ // Candidate top-level sections, platform-aware, narrowing to the most specific match.
+ let secs = $("[id^='shopify-section']").toArray();
+ if (!secs.length) secs = $("section[data-section-id], .page-section").toArray();
+ if (!secs.length) secs = $("main section, body > section").toArray();
+ if (!secs.length) secs = $("section").toArray();
+ const secSet = new Set(secs);
+
+ const SKIP = /header|footer|nav|menu|cart|drawer|announcement|cookie|popup|modal|newsletter-popup|breadcrumb/i;
+ let heroDone = false;
+
+ for (const el of secs) {
+  if (blocks.length >= 11) break;
+  const $s = $(el);
+  const cls = (($s.attr("class") || "") + " " + ($s.attr("id") || "")).toLowerCase();
+  if (SKIP.test(cls)) continue;
+  // Skip a wrapper that merely contains other candidate sections — keep the leaf sections.
+  if ($s.find("*").toArray().some((d) => secSet.has(d))) continue;
+
+  const heading = clean($s.find("h1, h2, h3").first().text()).slice(0, 120);
+  const paras = $s.find("p").map((_, p) => clean($(p).text())).get().filter((t) => t.length > 2);
+  const body = paras.slice(0, 2).join("\n\n");
+  const productLinks = $s.find("a[href*='/products/'], a[href*='/product/'], a[href*='/shop/']").length;
+  const isNewsletter = $s.find("input[type='email']").length > 0 || /subscribe|newsletter|sign\s*up|join the/i.test(cls);
+
+  let image = "";
+  $s.find("img").each((_, im) => { if (!image) image = bestImg(im); });
+  if (!image) {
+   $s.find("[style*='background-image']").each((_, b) => {
+    if (image) return;
+    const m = /background-image\s*:\s*url\((['"]?)(.*?)\1\)/i.exec($(b).attr("style") || "");
+    if (m && m[2] && !/^data:/i.test(m[2])) image = abs(m[2]);
+   });
+  }
+  const cta = clean($s.find("a.button, a.btn, a[class*='button'], a[class*='btn'], a[role='button']").first().text()).slice(0, 24);
+
+  // Classify — order matters (most specific signal wins).
+  if (isNewsletter) { push("newsletter", { heading: heading || "Join the list", subtext: paras[0] || "" }); continue; }
+  if (productLinks >= 2) { push("featured", { heading: heading || "Shop" }); continue; }
+  if (!heroDone && image && heading) { push("hero", { heading, subtext: paras[0] || "", cta: cta || "", image }); heroDone = true; continue; }
+  if (image && (heading || body)) { push("split", { heading: heading || "", body, cta: cta || "", image, imageSide: blocks.length % 2 ? "right" : "left" }); continue; }
+  if (image) { push("image", { image, caption: heading || "" }); continue; }
+  if (heading && paras.length) { push("text", { heading, body }); continue; }
+  if (heading) { push("statement", { quote: heading, attribution: "" }); continue; }
+ }
+
+ // Always give the seller their catalog: ensure a product grid is present.
+ if (!blocks.some((b) => b.type === "featured")) push("featured", { heading: "Shop" });
+ return blocks;
+}
+
 async function readHomepage(origin: string) {
- const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string };
+ const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string, blocks: [] as HomeBlock[] };
  try {
  const res = await safeFetch(origin, {
  headers: { "User-Agent": "Mozilla/5.0 (compatible; VYA-Importer/1.0)" },
  signal: AbortSignal.timeout(8000),
  });
- const head = (await res.text()).slice(0, 80000);
+ const html = await res.text();
+ const head = html.slice(0, 80000);
  const pick = (re: RegExp) => head.match(re)?.[1]?.trim() || null;
  const ogSite =
  pick(/property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i) ||
@@ -203,7 +299,8 @@ async function readHomepage(origin: string) {
  : /bigcommerce/i.test(head)
  ? "bigcommerce"
  : "unknown";
- return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint };
+ const blocks = extractHomeBlocks(html, origin);
+ return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint, blocks };
  } catch {
  return empty;
  }
@@ -428,5 +525,15 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
  };
  }
 
- return { ok: true, storeName, platform, brandColor: meta.color, hero: meta.hero, theme: meta.theme, products };
+ return { ok: true, storeName, platform, brandColor: meta.color, hero: meta.hero, theme: meta.theme, products, blocks: meta.blocks };
+}
+
+/** Homepage-only: a section-by-section replica of the source home as studio blocks.
+ *  Cheap (one homepage fetch, no product crawl) — used to seed the visual builder on
+ *  capture without re-running the full product import. */
+export async function importStoreBlocks(raw: string): Promise<HomeBlock[]> {
+ const u = await assertPublicUrl(raw);
+ if (!u) return [];
+ const meta = await readHomepage(u.origin).catch(() => null);
+ return meta?.blocks || [];
 }

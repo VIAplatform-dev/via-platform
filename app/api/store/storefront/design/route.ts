@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
  template: theme.template ?? null,
  colors: { bg: theme.colors?.bg || "#FFFDF8", text: theme.colors?.text || "#1a1a1a", accent: theme.colors?.accent || "#5D0F17" },
  fonts: { heading: theme.fonts?.heading || "Playfair Display", body: theme.fonts?.body || "Inter" },
+ radius: theme.radius || "sharp",
  customCss: theme.customCss ?? "",
  blocks: theme.blocks ?? [],
  shopBlocks: theme.shopBlocks ?? [],
@@ -83,11 +84,13 @@ export async function POST(request: NextRequest) {
  };
  }
 
+ if (body?.radius === "sharp" || body?.radius === "soft" || body?.radius === "round") theme.radius = body.radius;
+
  if (Array.isArray(body?.blocks)) theme.blocks = sanitizeBlocks(body.blocks);
  if (Array.isArray(body?.shopBlocks)) theme.shopBlocks = sanitizeBlocks(body.shopBlocks);
  if (Array.isArray(body?.extraPages)) theme.extraPages = sanitizePages(body.extraPages);
  if (typeof body?.customCss === "string") theme.customCss = body.customCss.slice(0, 20000);
 
  await setStorefrontTheme(slug, theme);
- return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
+ return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
 }

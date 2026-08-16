@@ -128,7 +128,7 @@ export default function TrendsPage() {
  <AdminHeader
  eyebrow="Platform · Trends"
  title="Trends"
- subtitle="Your sourcing & pricing playbook — VYA demand, Google Search, and real eBay resale prices read together into clear calls. The signals behind each call are below."
+ subtitle="Your sourcing & pricing playbook — VYA demand, Google Search, and real eBay secondhand prices read together into clear calls. The signals behind each call are below."
  />
 
  {/* Source Now — the headline: what to buy right now, from VYA's own data (works before external signals are on). */}
@@ -178,7 +178,7 @@ export default function TrendsPage() {
  <p className="text-[13px] font-semibold text-stone-900">What tastemakers are calling</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Fashion Substack · weekly consensus</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">Where independent fashion writers converge this week — a leading signal that moves before resale demand. Ranked by how many writers agree, not one loud voice.{consensusScore && consensusScore.hitRate != null && consensusScore.evaluated > 0 ? <span className="font-medium text-[var(--accent-ink)]"> Track record: {consensusScore.hitRate}% of past calls led real VYA demand ({consensusScore.hits}/{consensusScore.evaluated}).</span> : null}</p>
+ <p className="mb-3 text-[12px] text-stone-400">Where independent fashion writers converge this week — a leading signal that moves before secondhand demand. Ranked by how many writers agree, not one loud voice.{consensusScore && consensusScore.hitRate != null && consensusScore.evaluated > 0 ? <span className="font-medium text-[var(--accent-ink)]"> Track record: {consensusScore.hitRate}% of past calls led real VYA demand ({consensusScore.hits}/{consensusScore.evaluated}).</span> : null}</p>
  <div className="space-y-2">
  {consensus.map((c) => {
  const mom = CMOMENTUM[c.momentum];
@@ -209,7 +209,7 @@ export default function TrendsPage() {
  <p className="text-[13px] font-semibold text-stone-900">Colour of the season</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Hottest colours · demand</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">The colours buyers want most right now. Resale tracks retail — when a colour takes over the season, it moves everywhere.</p>
+ <p className="mb-3 text-[12px] text-stone-400">The colours buyers want most right now. Secondhand tracks retail — when a colour takes over the season, it moves everywhere.</p>
  <div className="flex flex-wrap gap-2.5">
  {data.topColors.map((c, i) => {
  const sw = COLOR_SWATCH[c.color.toLowerCase()] || "#c9c2b6";
@@ -337,7 +337,7 @@ export default function TrendsPage() {
  <p className="text-[13px] font-semibold text-stone-900">Rising in culture</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Pinterest · fashion</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">Fastest-growing fashion searches on Pinterest — where taste forms before it hits resale.</p>
+ <p className="mb-3 text-[12px] text-stone-400">Fastest-growing fashion searches on Pinterest — where taste forms before it hits secondhand.</p>
  <div className="flex flex-wrap gap-2">
  {culture.trends.map((t) => (
  <span key={t.keyword} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[12px] capitalize text-stone-700">
@@ -359,7 +359,7 @@ export default function TrendsPage() {
  {data.playbook && data.playbook.length > 0 && (
  <TechCard className="p-5">
  <p className="mb-1 text-[13px] font-semibold text-stone-900">What to do this week</p>
- <p className="mb-3 text-[12px] text-stone-400">VYA demand, Google search, and eBay resale — read together into one call per brand.</p>
+ <p className="mb-3 text-[12px] text-stone-400">VYA demand, Google search, and eBay secondhand — read together into one call per brand.</p>
  <div className="space-y-2">
  {data.playbook.map((p) => {
  const s = PLAY_STYLE[p.action];
@@ -468,8 +468,8 @@ export default function TrendsPage() {
  {/* Resale market — real eBay SOLD listings */}
  {data.webConfigured && data.resaleMarket.length > 0 && (
  <TechCard className="p-5">
- <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] font-mono text-[9px] font-bold text-[var(--accent-ink,#0b7a5c)]">$</span> Resale market — eBay sold + web asking</p>
- <p className="mb-3 text-[12px] text-stone-400"><span className="font-medium">sold</span> = real eBay completed-sale median · <span className="font-medium">web</span> = median asking across resale sites (Google Shopping: Vestiaire, Grailed, RealReal…). Momentum = vs. a week ago.</p>
+ <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] font-mono text-[9px] font-bold text-[var(--accent-ink,#0b7a5c)]">$</span> Secondhand market — eBay sold + web asking</p>
+ <p className="mb-3 text-[12px] text-stone-400"><span className="font-medium">sold</span> = real eBay completed-sale median · <span className="font-medium">web</span> = median asking across secondhand sites (Google Shopping: Vestiaire, Grailed, RealReal…). Momentum = vs. a week ago.</p>
  <div className="divide-y divide-stone-100">
  {[...data.resaleMarket].sort((a, b) => b.soldCount - a.soldCount).slice(0, 12).map((r) => (
  <div key={r.brand} className="flex items-center justify-between py-2 text-[13px]">
@@ -488,7 +488,7 @@ export default function TrendsPage() {
  {data.socialConfigured && data.igBuzz && data.igBuzz.length > 0 && (
  <TechCard className="p-5">
  <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-fuchsia-100 font-mono text-[9px] font-bold text-fuchsia-700">IG</span> Social buzz — Instagram</p>
- <p className="mb-3 text-[12px] text-stone-400">Engagement on each brand&rsquo;s top hashtag posts — a <span className="font-medium">leading</span> signal (social heat runs ahead of resale). Momentum = vs. a week ago.</p>
+ <p className="mb-3 text-[12px] text-stone-400">Engagement on each brand&rsquo;s top hashtag posts — a <span className="font-medium">leading</span> signal (social heat runs ahead of secondhand). Momentum = vs. a week ago.</p>
  <div className="divide-y divide-stone-100">
  {[...data.igBuzz].sort((a, b) => (b.momentumPct ?? -999) - (a.momentumPct ?? -999) || b.buzzScore - a.buzzScore).slice(0, 12).map((b) => (
  <div key={b.brand} className="flex items-center justify-between py-2 text-[13px]">
@@ -505,12 +505,12 @@ export default function TrendsPage() {
 
  {!data.webConfigured && !data.socialConfigured && (
  <TechCard className="p-5">
- <p className="text-[13px] font-semibold text-stone-900">Add web signals — Google Search &amp; resale sites</p>
- <p className="mt-1 text-[12px] text-stone-500">Blend real Google Search momentum (and resale-market comps) into these trends. Turn on SerpApi (<span className="font-mono text-[11px]">SERPAPI_ENABLED=true</span>) to activate — it stays dormant, with no calls or spend, until then.</p>
+ <p className="text-[13px] font-semibold text-stone-900">Add web signals — Google Search &amp; secondhand sites</p>
+ <p className="mt-1 text-[12px] text-stone-500">Blend real Google Search momentum (and secondhand-market comps) into these trends. Turn on SerpApi (<span className="font-mono text-[11px]">SERPAPI_ENABLED=true</span>) to activate — it stays dormant, with no calls or spend, until then.</p>
  </TechCard>
  )}
 
- <p className="text-[11px] text-stone-400">VYA momentum = weighted views, favorites, searches, and sales vs. the prior 30 days. <span className="font-mono">G</span> = Google Search interest · eBay = real sold volume/price · web = resale-site asking · IG = Instagram buzz (leading). Signals to source toward, not guarantees.</p>
+ <p className="text-[11px] text-stone-400">VYA momentum = weighted views, favorites, searches, and sales vs. the prior 30 days. <span className="font-mono">G</span> = Google Search interest · eBay = real sold volume/price · web = secondhand-site asking · IG = Instagram buzz (leading). Signals to source toward, not guarantees.</p>
  </div>
  )}
  </AdminPage>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { parseOrders } from "@/app/lib/parse-orders";
-import { importOrders } from "@/app/lib/imported-orders-db";
+import { importOrders, reconcileSoldItemsWithOrders } from "@/app/lib/imported-orders-db";
 
 // POST { csv, source? } — bring over a store's historical orders (accounting/LTV/repeat-
 // customer history). Accepts a Shopify/Square/spreadsheet order export; Shopify's multi-row
@@ -22,5 +22,8 @@ export async function POST(request: NextRequest) {
  }
 
  const { added, total } = await importOrders(slug, parsed, source);
- return NextResponse.json({ ok: true, found: total, added });
+ // Drop any scraped sold-out items this order history already covers, so the same past sale
+ // isn't counted twice (once as a phantom `sold` item, once as an imported order).
+ const reconciled = await reconcileSoldItemsWithOrders(slug).catch(() => 0);
+ return NextResponse.json({ ok: true, found: total, added, reconciled });
 }

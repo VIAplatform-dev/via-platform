@@ -257,6 +257,80 @@ export async function deleteConsignor(id: number): Promise<void> {
  await sql`DELETE FROM consignors WHERE id = ${id}`;
 }
 
+// ── Migration import (from another consignment platform) ───────────────────────
+export type ConsignorImportRow = {
+ name: string;
+ email: string | null;
+ phone: string | null;
+ splitPct: number | null; // the consignor's share %, if the export carried it
+ payoutMethod: string | null; // normalized to VYA's vocabulary (store_credit | cash | check | stripe | …)
+ balanceCents: number; // opening balance owed to them, carried over as-is (0 if none)
+ externalId: string | null; // their id/number on the old platform (informational)
+};
+
+/** Bring a store's consignor roster over from another platform (ConsignCloud/SimpleConsign/etc.).
+ *  Idempotent by email → name within the store, so re-running updates in place instead of
+ *  duplicating, and only ever FILLS blank fields (never clobbers data the store already curated).
+ *
+ *  Balances are the delicate part: a carried-over balance is money the store ALREADY owes, so we
+ *  record it as a single `opening_balance` ledger entry — the stated figure — and never replay the
+ *  sales that produced it. Writing it once (guarded) means a re-import can't stack it, and a future
+ *  VYA sale credits on TOP of it. This is what keeps the same debt from being counted twice. */
+export async function importConsignors(
+ storeSlug: string,
+ rows: ConsignorImportRow[],
+ source: string,
+): Promise<{ added: number; updated: number; balancesSet: number; openingBalanceCents: number }> {
+ await ensureConsignmentTables();
+ const sql = db();
+ let added = 0, updated = 0, balancesSet = 0, openingBalanceCents = 0;
+ for (const r of rows) {
+ const name = (r.name || "").trim();
+ if (!name) continue;
+
+ // Match an existing consignor by email first (stable), then by name — scoped to this store.
+ let existing: Consignor | null = null;
+ if (r.email) {
+ const m = (await sql`SELECT * FROM consignors WHERE store_slug = ${storeSlug} AND LOWER(email) = LOWER(${r.email}) LIMIT 1`) as Array<Record<string, unknown>>;
+ if (m.length) existing = toConsignor(m[0]);
+ }
+ if (!existing) {
+ const m = (await sql`SELECT * FROM consignors WHERE store_slug = ${storeSlug} AND LOWER(name) = LOWER(${name}) LIMIT 1`) as Array<Record<string, unknown>>;
+ if (m.length) existing = toConsignor(m[0]);
+ }
+
+ let consignor: Consignor;
+ if (existing) {
+ // Fill-if-missing only — the import never overwrites contact/split data the store already has.
+ await updateConsignor(existing.id, {
+ email: existing.email ?? r.email ?? null,
+ phone: existing.phone ?? r.phone ?? null,
+ defaultSplitPct: existing.defaultSplitPct ?? r.splitPct ?? null,
+ payoutMethod: existing.payoutMethod ?? r.payoutMethod ?? null,
+ });
+ consignor = existing;
+ updated++;
+ } else {
+ consignor = await createConsignor(storeSlug, { name, email: r.email, phone: r.phone, defaultSplitPct: r.splitPct, payoutMethod: r.payoutMethod });
+ added++;
+ }
+
+ // Opening balance — recorded ONCE per consignor (guarded), never a replay of past sales.
+ if (r.balanceCents > 0) {
+ const has = (await sql`SELECT 1 FROM consignor_ledger WHERE consignor_id = ${consignor.id} AND type = 'opening_balance' LIMIT 1`) as unknown[];
+ if (!has.length) {
+ await sql`
+   INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, note)
+   VALUES (${storeSlug}, ${consignor.id}, 'opening_balance', ${r.balanceCents}, ${`Imported opening balance from ${source}`})
+  `;
+ balancesSet++;
+ openingBalanceCents += r.balanceCents;
+ }
+ }
+ }
+ return { added, updated, balancesSet, openingBalanceCents };
+}
+
 // ── Split rules ───────────────────────────────────────────────────────────────
 export async function getSplitRules(storeSlug: string): Promise<SplitRule[]> {
  await ensureConsignmentTables();
@@ -319,6 +393,23 @@ export async function getConsignmentItemByProduct(productId: string): Promise<Co
  const sql = db();
  const rows = (await sql`SELECT * FROM consignment_items WHERE product_id = ${productId}`) as Array<Record<string, unknown>>;
  return rows.length ? toItem(rows[0]) : null;
+}
+
+/** The consignor cut to ROUTE INTO VYA's balance at checkout (added to the Stripe application fee).
+ *  Nonzero ONLY when the consignor is paid by Stripe direct-deposit — then VYA holds the cut and
+ *  disburses it. For cash / check / store credit the store keeps the FULL proceeds and settles with
+ *  the consignor directly, so VYA holds nothing (returns 0) — which also keeps that path clear of
+ *  any money-transmission question. Either way the sale is ledgered for bookkeeping (creditConsignedSale). */
+export async function consignorCutToHold(productId: string, salePriceCents: number): Promise<number> {
+ const ci = await getConsignmentItemByProduct(productId).catch(() => null);
+ if (!ci || ci.status !== "active") return 0;
+ const [consignor, settings] = await Promise.all([
+ getConsignor(ci.consignorId).catch(() => null),
+ getConsignmentSettings(ci.storeSlug).catch(() => null),
+ ]);
+ const method = consignor?.payoutMethod || settings?.defaultPayoutMethod || "store_credit";
+ if (method !== "stripe") return 0; // paid out-of-band by the store → VYA never holds the money
+ return consignorCutCents(salePriceCents, ci.splitPct);
 }
 
 export async function listConsignmentItemsByConsignor(consignorId: number): Promise<ConsignmentItem[]> {

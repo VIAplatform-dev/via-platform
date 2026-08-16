@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { crawlAndStore } from "@/app/lib/site-capture";
 import { listCapturePaths, getCapturePage, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
-import { importStoreFromUrl, type ImportedProduct } from "@/app/lib/store-import";
+import { importStoreFromUrl, importStoreBlocks, type ImportedProduct } from "@/app/lib/store-import";
 import { importProductsAsItems } from "@/app/lib/capture-commerce";
 import { getConnection } from "@/app/lib/store-connections-db";
 import { getPlatform } from "@/app/lib/platforms";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { deleteAllItems } from "@/app/lib/db/inventory";
 import { ensureCollection } from "@/app/lib/db/collections";
-import { getStorefrontBySlug } from "@/app/lib/storefront-db";
+import { getStorefrontBySlug, setStorefrontTheme } from "@/app/lib/storefront-db";
 
 // The captured site is served by the MARKETPLACE app (vyaplatform.com/site/{slug}) or the
 // store's own connected domain — NOT the getvya.ai OS host the seller is viewing this from.
@@ -84,6 +84,17 @@ export async function POST(request: NextRequest) {
   for (const h of handles) await ensureCollection(seller.id, h, titleize(h)).catch(() => {});
  }
  } catch { /* non-fatal — assignment can create collections on demand too */ }
+
+ // Seed the visual studio with a section-by-section replica of the real homepage, so
+ // the builder mirrors the seller's actual layout instead of a generic starter template.
+ // Only when they haven't already built/edited a block design — never clobber real work.
+ try {
+ const sf = await getStorefrontBySlug(slug).catch(() => null);
+ if (!sf?.theme?.blocks?.length) {
+  const blocks = await importStoreBlocks(url).catch(() => []);
+  if (blocks.length) await setStorefrontTheme(slug, { ...(sf?.theme || {}), blocks }).catch(() => {});
+ }
+ } catch { /* non-fatal — studio falls back to the starter template */ }
 
  // Password-protected? The crawl either reads nothing or only grabs the lock
  // screen — don't host that. Import products (if a store is connected) and tell

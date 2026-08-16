@@ -157,7 +157,7 @@ export async function computeListingPricing(opts: {
  minMarkupBps,
  knowledgeHintCents: opts.knowledgeHintCents,
  extraComps: comps,
- context: { brand: brandVal || null, era: opts.era || null, condition: opts.condition || null, conditionGrade: opts.conditionGrade || opts.condition || null, runway: opts.runwaySoFar, celebrity, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
+ context: { brand: brandVal || null, era: opts.era || null, material: opts.material || null, condition: opts.condition || null, conditionGrade: opts.conditionGrade || opts.condition || null, runway: opts.runwaySoFar, celebrity, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
  })).catch(() => null);
  if (estimate && trend?.trending) estimate.rationale += ` · 🔥 ${brandVal} trending (${trend.note})`;
  if (estimate && estimate.marketCents) {

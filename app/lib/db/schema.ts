@@ -43,6 +43,9 @@ export const items = pgTable(
  material: text("material"),
  condition: text("condition"),
  size: text("size"),
+ // Garment/flat measurements (bust/waist/length, or a bag's dimensions) — the #1 thing a secondhand
+ // buyer needs since they can't try it on. Free text so it fits any category ("Bust 34\" · Waist 28\" · Length 40\"").
+ measurements: text("measurements"),
  category: text("category"),
  status: itemStatus("status").notNull().default("draft"),
  weightOz: integer("weight_oz"),

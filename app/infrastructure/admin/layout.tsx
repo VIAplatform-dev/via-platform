@@ -17,9 +17,10 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  items: [
  {
  href: `${B}/inventory`, label: "Inventory", icon: Package,
- match: [`${B}/add-listing`], // keep Inventory active/expanded while adding a listing
+ match: [`${B}/add-listing`, `${B}/bulk-upload`], // keep Inventory active/expanded while adding listings
  children: [
  { href: `${B}/add-listing`, label: "Add listing" },
+ { href: `${B}/bulk-upload`, label: "Bulk upload" },
  { href: `${B}/inventory/drafts`, label: "Drafts" },
  { href: `${B}/inventory/sold`, label: "Sold" },
  ],

@@ -42,8 +42,10 @@ export async function POST(request: NextRequest) {
 
  const method = typeof body?.method === "string" ? body.method : (consignor.payoutMethod ?? settings.defaultPayoutMethod);
 
- // Model B — the STORE pays the consignor: a Stripe transfer from the store's connected
- // account to the consignor's, funded by the store's balance. VYA never holds the money.
+ // Stripe direct-deposit (Model A): VYA pays the consignor from its OWN balance, which holds the
+ // cut that was routed off this sale at checkout. (Stripe won't let the store transfer directly to
+ // another connected account, so the platform disburses.) Cash / store credit never reach here —
+ // for those the cut stayed with the store and this is just a bookkeeping record below.
  if (method === "stripe") {
  if (!consignor.stripeAccountId) return NextResponse.json({ error: "This consignor hasn't connected a bank for direct deposit yet." }, { status: 400 });
  if (!stripeConfigured()) return NextResponse.json({ error: "Payments aren't enabled on the server yet." }, { status: 503 });

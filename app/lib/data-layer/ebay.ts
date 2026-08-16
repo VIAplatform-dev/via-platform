@@ -71,6 +71,51 @@ export async function searchListings(query: string, limit = 50): Promise<{ title
  } catch { return []; }
 }
 
+// A single active listing with the fields a sourcing / flip-finder needs (URL to buy, image,
+// condition, seller) — searchListings/searchComps drop these.
+export type DetailedListing = {
+ itemId: string;
+ title: string;
+ price: number;
+ currency: string;
+ image: string | null;
+ url: string;
+ condition: string | null;
+ seller: string | null;
+};
+type BrowseItem = {
+ itemId?: string; title?: string;
+ price?: { value?: string; currency?: string };
+ image?: { imageUrl?: string }; thumbnailImages?: Array<{ imageUrl?: string }>;
+ itemWebUrl?: string; condition?: string; seller?: { username?: string };
+};
+export async function searchListingsDetailed(query: string, limit = 50): Promise<DetailedListing[]> {
+ const token = await getEbayToken();
+ if (!token) return [];
+ try {
+ const url = `${BROWSE_URL}?q=${encodeURIComponent(query)}&limit=${Math.min(200, limit)}&filter=${encodeURIComponent("buyingOptions:{FIXED_PRICE}")}`;
+ const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_US" } });
+ if (!res.ok) return [];
+ const data = (await res.json()) as { itemSummaries?: BrowseItem[] };
+ const out: DetailedListing[] = [];
+ for (const it of data.itemSummaries ?? []) {
+  const v = it.price?.value ? parseFloat(it.price.value) : NaN;
+  if (!(Number.isFinite(v) && v > 0) || !it.title) continue;
+  out.push({
+   itemId: String(it.itemId ?? ""),
+   title: String(it.title),
+   price: v,
+   currency: String(it.price?.currency ?? "USD"),
+   image: it.image?.imageUrl ?? it.thumbnailImages?.[0]?.imageUrl ?? null,
+   url: String(it.itemWebUrl ?? ""),
+   condition: it.condition ? String(it.condition) : null,
+   seller: it.seller?.username ? String(it.seller.username) : null,
+  });
+ }
+ return out;
+ } catch { return []; }
+}
+
 // Active-listing comps for a query. Returns null if not configured or on error.
 export async function searchComps(query: string): Promise<EbayComps | null> {
  const token = await getEbayToken();
