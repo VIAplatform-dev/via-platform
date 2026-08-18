@@ -70,19 +70,35 @@ const nextConfig: NextConfig = {
       { type: "host" as const, value: "getvya.ai" },
       { type: "host" as const, value: "www.getvya.ai" },
     ];
+    // The LEGACY internal panel lives at app/admin/* (served on vyaplatform.com). These are its
+    // top-level segments — in local dev we DON'T rewrite them, so the owner's internal tools stay
+    // reachable at /admin/* on localhost alongside the workspace.
+    const LEGACY_ADMIN = "login|set-password|analytics|category-sweep|collabs-links|collections|conversions|data|editors-picks|emails|giveaway|intake-accuracy|key-metrics|listing-quality|market-data|removed-items|returns|search-analytics|session-flows|sourcing|stores|summary|sync|users|waitlist|webhooks";
+    const isDev = process.env.NODE_ENV !== "production";
     return {
-      beforeFiles: osHosts.flatMap((h) => [
-        { source: "/admin", has: [h], destination: "/infrastructure/admin" },
-        // Exclude the auth pages: /admin/login and /admin/set-password must serve the LEGACY
-        // app/admin/* pages, which render unauthenticated. The workspace routes are wrapped by
-        // a layout that redirects to /admin/login when logged out — so a login page mapped into
-        // the workspace tree would redirect to itself forever.
-        {
-          source: "/admin/:path((?!login|set-password).*)",
-          has: [h],
-          destination: "/infrastructure/admin/:path",
-        },
-      ]),
+      beforeFiles: [
+        ...osHosts.flatMap((h) => [
+          { source: "/admin", has: [h], destination: "/infrastructure/admin" },
+          // Exclude the auth pages: /admin/login and /admin/set-password must serve the LEGACY
+          // app/admin/* pages, which render unauthenticated. The workspace routes are wrapped by
+          // a layout that redirects to /admin/login when logged out — so a login page mapped into
+          // the workspace tree would redirect to itself forever.
+          {
+            source: "/admin/:path((?!login|set-password).*)",
+            has: [h],
+            destination: "/infrastructure/admin/:path",
+          },
+        ]),
+        // Local dev has a single host, so the getvya.ai-scoped rules above never match and the
+        // Owner Workspace nav (which points at /admin/*) 404s. Mirror the mapping in dev only, but
+        // skip the legacy panel's own segments so app/admin/* (conversions, data, …) still works.
+        ...(isDev
+          ? [
+              { source: "/admin", destination: "/infrastructure/admin" },
+              { source: `/admin/:path((?!(?:${LEGACY_ADMIN})(?:/|$)).*)`, destination: "/infrastructure/admin/:path" },
+            ]
+          : []),
+      ],
     };
   },
   images: {

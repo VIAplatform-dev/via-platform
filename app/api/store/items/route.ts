@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { listSellerItems, deleteAllItems, publishItems, removeItems } from "@/app/lib/db/inventory";
-import { getCollectionTitlesForItems } from "@/app/lib/db/collections";
+import { getCollectionTitlesForItems, addItemsToCollection, deleteAllCollections } from "@/app/lib/db/collections";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,12 @@ export async function POST(request: NextRequest) {
  let count = 0;
  if (action === "publish") count = await publishItems(seller.id, ids);
  else if (action === "remove") count = await removeItems(seller.id, ids);
- else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+ else if (action === "addToCollection") {
+ const title = String(body?.collection ?? "").trim();
+ if (!title) return NextResponse.json({ error: "Collection name required" }, { status: 400 });
+ const col = await addItemsToCollection(seller.id, title, ids);
+ return NextResponse.json({ ok: true, count: ids.length, collection: { id: col.id, title: col.title } });
+ } else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 
  return NextResponse.json({ ok: true, count });
 }
@@ -50,5 +55,7 @@ export async function DELETE(request: NextRequest) {
  if (!isOwner(request, slug)) return NextResponse.json({ error: "Owner only" }, { status: 403 });
  const seller = await getSellerBySlug(slug);
  const deleted = seller ? await deleteAllItems(seller.id).catch(() => 0) : 0;
+ // Clearing the whole inventory also clears the store's collections — otherwise they'd linger empty.
+ if (seller) await deleteAllCollections(seller.id).catch(() => 0);
  return NextResponse.json({ ok: true, deleted });
 }

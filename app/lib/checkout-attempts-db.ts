@@ -66,3 +66,30 @@ export async function markCartEmailed(id: number): Promise<void> {
  await ensureTable();
  await db()`UPDATE checkout_attempts SET status = 'emailed', emailed_at = now() WHERE id = ${id}`.catch(() => {});
 }
+
+export type CheckoutAttempt = AbandonedCart & { status: "pending" | "emailed" | "recovered"; createdAt: string; emailedAt: string | null };
+
+const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v) : null);
+
+/** Every checkout attempt for a store — the seller's recovery view (who abandoned, when, status). Newest first. */
+export async function getStoreCheckoutAttempts(storeSlug: string, limit = 200): Promise<CheckoutAttempt[]> {
+ await ensureTable();
+ const rows = (await db()`
+  SELECT id, store_slug, email, name, item_id, item_title, item_image, status, created_at, emailed_at
+  FROM checkout_attempts WHERE store_slug = ${storeSlug}
+  ORDER BY created_at DESC LIMIT ${limit}
+ `.catch(() => [])) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+ return rows.map((r) => ({ id: Number(r.id), storeSlug: r.store_slug, email: r.email, name: r.name ?? null, itemId: r.item_id, itemTitle: r.item_title ?? null, itemImage: r.item_image ?? null, status: r.status, createdAt: iso(r.created_at) || "", emailedAt: iso(r.emailed_at) }));
+}
+
+/** One attempt, scoped to the store — for sending a manual reminder. */
+export async function getCheckoutAttempt(id: number, storeSlug: string): Promise<AbandonedCart | null> {
+ await ensureTable();
+ const rows = (await db()`
+  SELECT id, store_slug, email, name, item_id, item_title, item_image
+  FROM checkout_attempts WHERE id = ${id} AND store_slug = ${storeSlug} LIMIT 1
+ `.catch(() => [])) as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+ if (!rows.length) return null;
+ const r = rows[0];
+ return { id: Number(r.id), storeSlug: r.store_slug, email: r.email, name: r.name ?? null, itemId: r.item_id, itemTitle: r.item_title ?? null, itemImage: r.item_image ?? null };
+}

@@ -9,9 +9,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Sidekick from "../../Sidekick";
 import Blocks from "@/app/s/Blocks";
-import { makeBlock, makeOverlay, newBlockId, pageSlugify, BLOCK_TYPES, type Block, type BlockType, type BlockStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
+import { StoreHeader, StoreFooter, type ChromeNav } from "@/app/s/StoreChrome";
+import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
+import { makeBlock, makeOverlay, newBlockId, pageSlugify, BLOCK_TYPES, blockDef, type Block, type BlockType, type BlockStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
 import { STOREFRONT_TEMPLATES, templateBlocks, STOREFRONT_PALETTES, RADIUS_OPTIONS, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
-import { ChevronLeft, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, MousePointerClick, Trash2, Copy } from "lucide-react";
+import { ChevronLeft, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search } from "lucide-react";
 
 type Colors = { bg: string; text: string; accent: string };
 type Fonts = { heading: string; body: string };
@@ -28,14 +30,87 @@ const money = (c: number | null, cur: string) => (c == null ? "" : new Intl.Numb
 // dropdowns below stay for anyone who wants to mix their own.
 const FONT_PAIRS: { name: string; heading: string; body: string }[] = [
  { name: "Editorial", heading: "Playfair Display", body: "Inter" },
- { name: "Modern", heading: "Outfit", body: "Inter" },
+ { name: "High Contrast", heading: "Bodoni Moda", body: "DM Sans" },
+ { name: "Contemporary", heading: "Bricolage Grotesque", body: "Inter" },
+ { name: "Warm Serif", heading: "Fraunces", body: "Source Serif 4" },
  { name: "Literary", heading: "Newsreader", body: "Newsreader" },
- { name: "Bold", heading: "Archivo", body: "Inter" },
  { name: "Romantic", heading: "Cormorant Garamond", body: "Poppins" },
- { name: "Clean", heading: "Space Grotesk", body: "Work Sans" },
+ { name: "Modern", heading: "Space Grotesk", body: "Inter" },
 ];
 // The corner-preview curve for each shape option, so the segmented control shows what it does.
 const RADIUS_PREVIEW: Record<Radius, string> = { sharp: "0px", soft: "6px", round: "12px" };
+
+// ── Snapping (Canva/Figma alignment guides) ───────────────────────────────────
+// At drag/resize start we gather every candidate line to snap to — the section's own edges + centre
+// (0/50/100%) plus each SIBLING element's left/centre/right (x) and top/centre/bottom (y), measured
+// live from the DOM and expressed in % of the section. During the move we snap the element's moving
+// points to the nearest candidate within a small threshold, and surface a guide line where it locked.
+type Guides = { v?: number; h?: number; top: number; left: number; width: number; height: number };
+function gatherSnap(sec: HTMLElement, rect: DOMRect, exceptId: string): { xc: number[]; yc: number[] } {
+ const xc = [0, 50, 100], yc = [0, 50, 100];
+ sec.querySelectorAll<HTMLElement>("[data-ovl]").forEach((el) => {
+ if (el.getAttribute("data-ovl") === exceptId) return;
+ const r = el.getBoundingClientRect();
+ const l = ((r.left - rect.left) / rect.width) * 100, rr = ((r.right - rect.left) / rect.width) * 100;
+ const t = ((r.top - rect.top) / rect.height) * 100, bb = ((r.bottom - rect.top) / rect.height) * 100;
+ xc.push(l, (l + rr) / 2, rr); yc.push(t, (t + bb) / 2, bb);
+ });
+ return { xc, yc };
+}
+// Best snap for a set of moving points against candidates. Returns the delta to apply and the guide %.
+function snapAxis(points: number[], cands: number[], thr: number): { delta: number; guide: number | null } {
+ let guide: number | null = null, delta = 0, dist = thr;
+ for (const p of points) for (const c of cands) {
+ const d = Math.abs(c - p);
+ if (d <= dist) { dist = d; delta = c - p; guide = c; }
+ }
+ return { delta, guide };
+}
+
+// A hex-code field so sellers can type/paste a colour (e.g. #5A0E17) instead of only using the OS
+// colour picker (which shows R/G/B sliders). Applies only when the value is a valid 6-digit hex.
+function HexInput({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+ const [txt, setTxt] = useState(value);
+ const [lastValue, setLastValue] = useState(value);
+ if (value !== lastValue) { setLastValue(value); setTxt(value); } // resync when the colour changes elsewhere
+ return (
+ <input
+ value={txt}
+ spellCheck={false}
+ onClick={(e) => e.stopPropagation()}
+ onChange={(e) => { let v = e.target.value.trim(); if (v && !v.startsWith("#")) v = "#" + v; setTxt(v); if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v); }}
+ onBlur={() => { if (!/^#[0-9a-fA-F]{6}$/.test(txt)) setTxt(value); }}
+ className={className}
+ />
+ );
+}
+
+// FAQ rows are stored as q0/a0, q1/a1… pairs in a block's props. These read them out (also migrating a
+// legacy "items" blob) and write them back cleanly — shared by add/remove and drag-reorder.
+type FaqPair = { q: string; a: string };
+function readFaqPairs(props: Record<string, string>): FaqPair[] {
+ const out: FaqPair[] = [];
+ for (let i = 0; props[`q${i}`] !== undefined; i++) out.push({ q: props[`q${i}`] || "", a: props[`a${i}`] || "" });
+ if (!out.length && props.items) String(props.items).split(/\n\s*\n/).forEach((blk) => { const ls = blk.split("\n"); const q = (ls.shift() || "").trim(); const a = ls.join("\n").trim(); if (q) out.push({ q, a }); });
+ return out;
+}
+function writeFaqPairs(props: Record<string, string>, pairs: FaqPair[]): Record<string, string> {
+ const p2 = { ...props };
+ Object.keys(p2).forEach((k) => { if (/^[qa]\d+$/.test(k)) delete p2[k]; });
+ delete p2.items;
+ pairs.forEach((pr, i) => { p2[`q${i}`] = pr.q; p2[`a${i}`] = pr.a; });
+ return p2;
+}
+
+// A static email-signup shown in the footer preview (the live storefront uses the real NewsletterForm).
+function FooterEmailPreview({ accent }: { accent: string }) {
+ return (
+ <div className="mx-auto flex max-w-sm items-center gap-2">
+ <input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" />
+ <span className="grid h-10 shrink-0 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: accent }}>Subscribe</span>
+ </div>
+ );
+}
 
 export default function StorefrontStudio() {
  const [settings, setSettings] = useState<Settings | null>(null);
@@ -49,11 +124,17 @@ export default function StorefrontStudio() {
  const [shopBlocks, setShopBlocks] = useState<Block[]>([]);
  const [extraPages, setExtraPages] = useState<StorePage[]>([]);
  const [customCss, setCustomCss] = useState("");
+ const [socials, setSocials] = useState<Record<string, string>>({}); // footer social links
+ const [footerAbout, setFooterAbout] = useState("");
  const [activeSlug, setActiveSlug] = useState("home");
  const [selBlock, setSelBlock] = useState<string | null>(null);
  const [selOverlay, setSelOverlay] = useState<{ blockId: string; overlayId: string } | null>(null);
  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null); // where the floating toolbar sits (above the selection)
  const [ovlDragging, setOvlDragging] = useState(false); // hide the toolbar while dragging an element
+ const [guides, setGuides] = useState<Guides | null>(null); // live alignment guide lines while dragging/resizing
+ const [editingId, setEditingId] = useState<string | null>(null); // text element being typed into (inline edit)
+ const [faqDrag, setFaqDrag] = useState<{ blockId: string; index: number } | null>(null); // FAQ row being dragged
+ const [faqOver, setFaqOver] = useState<{ blockId: string; index: number } | null>(null); // where it will drop
  const [fileDrag, setFileDrag] = useState(false); // an image file is being dragged over the canvas
  const [uploading, setUploading] = useState(false);
  const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -82,6 +163,8 @@ export default function StorefrontStudio() {
  setShopBlocks(d.shopBlocks || []);
  setExtraPages(d.extraPages || []);
  setCustomCss(d.customCss || "");
+ setSocials(d.socials || {});
+ setFooterAbout(d.footerAbout || "");
  }, []);
 
  useEffect(() => {
@@ -136,6 +219,78 @@ export default function StorefrontStudio() {
  function editField(id: string, key: string, value: string) {
  updateCur((bs) => bs.map((b) => (b.id === id ? { ...b, props: { ...(b.props || {}), [key]: value } } : b)));
  }
+ // Add / remove a FAQ accordion row. Rebuilds the q0/a0…qN/aN pairs cleanly (and migrates any legacy
+ // "items" blob to pairs), so the accordion stays editable and consistent.
+ function faqOp(id: string, op: "add" | { remove: number }) {
+ updateCur((bs) => bs.map((b) => {
+ if (b.id !== id) return b;
+ let pairs = readFaqPairs(b.props || {});
+ if (op === "add") pairs.push({ q: "New question?", a: "Answer." });
+ else pairs = pairs.filter((_, i) => i !== op.remove);
+ return { ...b, props: writeFaqPairs(b.props || {}, pairs) };
+ }));
+ }
+ // Move a FAQ row (drag-and-drop): reorder within its section, or move it into another FAQ section at
+ // the drop index. Rewrites both sections' pairs so the accordion stays consistent.
+ function moveFaqRow(fromBlock: string, fromIdx: number, toBlock: string, toIdx: number) {
+ updateCur((bs) => {
+ if (fromBlock === toBlock) {
+ return bs.map((b) => {
+ if (b.id !== fromBlock) return b;
+ const pairs = readFaqPairs(b.props || {});
+ if (fromIdx < 0 || fromIdx >= pairs.length) return b;
+ const [moved] = pairs.splice(fromIdx, 1);
+ let ins = fromIdx < toIdx ? toIdx - 1 : toIdx; // removal shifts later indices down by one
+ ins = Math.max(0, Math.min(pairs.length, ins));
+ pairs.splice(ins, 0, moved);
+ return { ...b, props: writeFaqPairs(b.props || {}, pairs) };
+ });
+ }
+ const src = bs.find((b) => b.id === fromBlock), dst = bs.find((b) => b.id === toBlock);
+ if (!src || !dst) return bs;
+ const srcPairs = readFaqPairs(src.props || {});
+ if (fromIdx < 0 || fromIdx >= srcPairs.length) return bs;
+ const [moved] = srcPairs.splice(fromIdx, 1);
+ const dstPairs = readFaqPairs(dst.props || {});
+ dstPairs.splice(Math.max(0, Math.min(dstPairs.length, toIdx)), 0, moved);
+ return bs.map((b) => b.id === fromBlock ? { ...b, props: writeFaqPairs(b.props || {}, srcPairs) } : b.id === toBlock ? { ...b, props: writeFaqPairs(b.props || {}, dstPairs) } : b);
+ });
+ }
+ // Pointer-based row drag: reliable (no HTML5 dataTransfer, works over the editable text). We hit-test
+ // the row under the cursor with elementFromPoint, snapping before/after by its midpoint, and move on release.
+ const faqDnd = {
+ dragBlock: faqDrag?.blockId ?? null,
+ dragIndex: faqDrag?.index ?? null,
+ overBlock: faqOver?.blockId ?? null,
+ overIndex: faqOver?.index ?? null,
+ onGripDown: (blockId: string, index: number) => {
+ const from = { blockId, index };
+ setFaqDrag(from); setFaqOver({ blockId, index });
+ let over: { blockId: string; index: number } | null = { blockId, index };
+ const move = (ev: PointerEvent) => {
+ const el = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+ const row = el?.closest("[data-faq-row]") as HTMLElement | null;
+ if (row) {
+ const blk = row.getAttribute("data-faq-block") || "";
+ const idx = Number(row.getAttribute("data-faq-index"));
+ const r = row.getBoundingClientRect();
+ over = { blockId: blk, index: ev.clientY > r.top + r.height / 2 ? idx + 1 : idx };
+ } else {
+ const cont = el?.closest("[data-faq-container]") as HTMLElement | null;
+ over = cont ? { blockId: cont.getAttribute("data-faq-block") || "", index: cont.querySelectorAll("[data-faq-row]").length } : null;
+ }
+ setFaqOver(over);
+ };
+ const up = () => {
+ window.removeEventListener("pointermove", move);
+ window.removeEventListener("pointerup", up);
+ if (over) moveFaqRow(from.blockId, from.index, over.blockId, over.index);
+ setFaqDrag(null); setFaqOver(null);
+ };
+ window.addEventListener("pointermove", move);
+ window.addEventListener("pointerup", up);
+ },
+ };
  function reorderTo(to: number) {
  if (dragIdx === null || dragIdx === to) { setDragIdx(null); return; }
  const from = dragIdx;
@@ -205,7 +360,7 @@ export default function StorefrontStudio() {
  // blocks autosave effect only handles sections). Colour pickers fire rapidly while dragging, hence the
  // debounce; palette / font / corner clicks are discrete but ride the same path.
  const designTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
- const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius }) => {
+ const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; customCss?: string; socials?: Record<string, string>; footerAbout?: string }) => {
  if (designTimer.current) clearTimeout(designTimer.current);
  setSave("saving");
  designTimer.current = setTimeout(async () => {
@@ -281,6 +436,24 @@ export default function StorefrontStudio() {
  updateCur((bs) => bs.map((b) => (b.id === blockId ? { ...b, overlays: (b.overlays || []).filter((o) => o.id !== overlayId) } : b)));
  setSelOverlay(null);
  }
+ // Layer order: overlays render in array order (later = on top), so reordering the array is the z-order.
+ function reorderOverlay(blockId: string, overlayId: string, dir: "front" | "back" | "forward" | "backward") {
+ updateCur((bs) => bs.map((b) => {
+ if (b.id !== blockId) return b;
+ const ovs = [...(b.overlays || [])];
+ const i = ovs.findIndex((o) => o.id === overlayId);
+ if (i < 0) return b;
+ const [o] = ovs.splice(i, 1);
+ if (dir === "front") ovs.push(o);
+ else if (dir === "back") ovs.unshift(o);
+ else if (dir === "forward") ovs.splice(Math.min(ovs.length, i + 1), 0, o);
+ else ovs.splice(Math.max(0, i - 1), 0, o);
+ return { ...b, overlays: ovs };
+ }));
+ }
+ // Human label + icon for an element, for the Layers panel.
+ const overlayLabel = (o: Overlay) => o.kind === "text" ? (o.props?.text || "Text") : o.kind === "button" ? (o.props?.label || "Button") : o.kind === "image" ? "Image" : o.kind === "rect" ? "Rectangle" : o.kind === "circle" ? "Circle" : "Line";
+ const OverlayIcon = (o: Overlay) => o.kind === "text" ? Type : o.kind === "button" ? MousePointerClick : o.kind === "image" ? ImageIcon : o.kind === "rect" ? Square : o.kind === "circle" ? Circle : Minus;
  // Add an element to the SELECTED section (fallback: the last section on the page), then select it.
  function addElement(kind: OverlayKind) {
  const targetId = selBlock && curBlocks.some((b) => b.id === selBlock) ? selBlock : curBlocks[curBlocks.length - 1]?.id;
@@ -294,7 +467,10 @@ export default function StorefrontStudio() {
  // current page state at drag-start — a drag is short-lived, so this stays correct without refs.
  const overlayEdit = {
  selectedId: selOverlay?.overlayId ?? null,
- onSelect: (blockId: string, overlayId: string) => { setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); },
+ editingId,
+ onSelect: (blockId: string, overlayId: string) => { setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); setEditingId(null); },
+ onStartEdit: (blockId: string, overlayId: string) => { setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); setEditingId(overlayId); },
+ onText: (blockId: string, overlayId: string, value: string) => { patchOverlayProps(blockId, overlayId, { text: value }); setEditingId(null); },
  onDragStart: (blockId: string, overlayId: string, e: React.PointerEvent) => {
  const el = e.currentTarget as HTMLElement;
  const sec = el.closest(".vya-sec") as HTMLElement | null;
@@ -303,18 +479,114 @@ export default function StorefrontStudio() {
  if (!rect.width || !rect.height) return;
  const cur = curBlocks.find((b) => b.id === blockId)?.overlays?.find((o) => o.id === overlayId);
  const ox = cur?.x ?? 0, oy = cur?.y ?? 0, sx = e.clientX, sy = e.clientY;
+ const ew = (el.getBoundingClientRect().width / rect.width) * 100, eh = (el.getBoundingClientRect().height / rect.height) * 100;
+ const { xc, yc } = gatherSnap(sec, rect, overlayId);
+ const thrX = (6 / rect.width) * 100, thrY = (6 / rect.height) * 100;
  setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); setOvlDragging(true);
  el.setPointerCapture?.(e.pointerId);
  const move = (ev: PointerEvent) => {
- const nx = Math.min(100, Math.max(0, ox + ((ev.clientX - sx) / rect.width) * 100));
- const ny = Math.min(100, Math.max(0, oy + ((ev.clientY - sy) / rect.height) * 100));
+ let nx = Math.min(100, Math.max(0, ox + ((ev.clientX - sx) / rect.width) * 100));
+ let ny = Math.min(100, Math.max(0, oy + ((ev.clientY - sy) / rect.height) * 100));
+ // snap the element's left/centre/right (and top/centre/bottom) to the nearest guide
+ const sX = snapAxis([nx, nx + ew / 2, nx + ew], xc, thrX);
+ const sY = snapAxis([ny, ny + eh / 2, ny + eh], yc, thrY);
+ nx = Math.min(100, Math.max(0, nx + sX.delta)); ny = Math.min(100, Math.max(0, ny + sY.delta));
  patchOverlay(blockId, overlayId, { x: Math.round(nx * 10) / 10, y: Math.round(ny * 10) / 10 });
+ setGuides({
+ v: sX.guide == null ? undefined : rect.left + (sX.guide / 100) * rect.width,
+ h: sY.guide == null ? undefined : rect.top + (sY.guide / 100) * rect.height,
+ top: rect.top, left: rect.left, width: rect.width, height: rect.height,
+ });
  };
- const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); };
+ const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); setGuides(null); };
+ window.addEventListener("pointermove", move);
+ window.addEventListener("pointerup", up);
+ },
+ // Drag a corner/side handle to resize. Corners resize both axes (shapes/images); side handles widen
+ // only (text/buttons/lines keep flowing height). The opposite edge stays anchored, so top/left handles
+ // move x/y as the box shrinks — same feel as Canva/Figma.
+ onResizeStart: (blockId: string, overlayId: string, handle: "nw" | "ne" | "sw" | "se" | "e" | "w", e: React.PointerEvent) => {
+ const handleEl = e.currentTarget as HTMLElement;
+ const wrapper = handleEl.closest(".vya-ovl") as HTMLElement | null;
+ const sec = wrapper?.closest(".vya-sec") as HTMLElement | null;
+ if (!wrapper || !sec) return;
+ const rect = sec.getBoundingClientRect();
+ if (!rect.width || !rect.height) return;
+ const cur = curBlocks.find((b) => b.id === blockId)?.overlays?.find((o) => o.id === overlayId);
+ if (!cur) return;
+ const wr = wrapper.getBoundingClientRect();
+ const startW = cur.w ?? (wr.width / rect.width) * 100; // seed from rendered size for auto-sized text/buttons
+ const startH = cur.h ?? (wr.height / rect.height) * 100;
+ const startX = cur.x, startY = cur.y, sx = e.clientX, sy = e.clientY;
+ const left = handle === "w" || handle === "nw" || handle === "sw";
+ const right = handle === "e" || handle === "ne" || handle === "se";
+ const top = handle === "nw" || handle === "ne";
+ const bottom = handle === "sw" || handle === "se";
+ const twoAxis = top || bottom; // corner handle → also resize height
+ const r1 = (n: number) => Math.round(n * 10) / 10;
+ const { xc, yc } = gatherSnap(sec, rect, overlayId);
+ const thrX = (6 / rect.width) * 100, thrY = (6 / rect.height) * 100;
+ setSelBlock(blockId); setSelOverlay({ blockId, overlayId }); setOvlDragging(true);
+ handleEl.setPointerCapture?.(e.pointerId);
+ const move = (ev: PointerEvent) => {
+ const dx = ((ev.clientX - sx) / rect.width) * 100, dy = ((ev.clientY - sy) / rect.height) * 100;
+ let x = startX, y = startY, w = startW, h = startH;
+ if (right) w = Math.max(2, Math.min(100, startW + dx));
+ if (left) { w = Math.max(2, Math.min(100, startW - dx)); x = Math.max(0, startX + (startW - w)); }
+ if (bottom) h = Math.max(2, Math.min(100, startH + dy));
+ if (top) { h = Math.max(2, Math.min(100, startH - dy)); y = Math.max(0, startY + (startH - h)); }
+ // Snap the moving edge to a guide, adjusting the size (opposite edge stays put).
+ let gv: number | null = null, gh: number | null = null;
+ if (right) { const s = snapAxis([x + w], xc, thrX); if (s.guide != null) { w = Math.max(2, w + s.delta); gv = s.guide; } }
+ else if (left) { const s = snapAxis([x], xc, thrX); if (s.guide != null) { x = Math.max(0, x + s.delta); w = Math.max(2, w - s.delta); gv = s.guide; } }
+ if (bottom) { const s = snapAxis([y + h], yc, thrY); if (s.guide != null) { h = Math.max(2, h + s.delta); gh = s.guide; } }
+ else if (top) { const s = snapAxis([y], yc, thrY); if (s.guide != null) { y = Math.max(0, y + s.delta); h = Math.max(2, h - s.delta); gh = s.guide; } }
+ const patch: Partial<Overlay> = { x: r1(x), y: r1(y), w: r1(w) };
+ if (twoAxis) patch.h = r1(h);
+ patchOverlay(blockId, overlayId, patch);
+ setGuides({
+ v: gv == null ? undefined : rect.left + (gv / 100) * rect.width,
+ h: gh == null ? undefined : rect.top + (gh / 100) * rect.height,
+ top: rect.top, left: rect.left, width: rect.width, height: rect.height,
+ });
+ };
+ const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); setGuides(null); };
  window.addEventListener("pointermove", move);
  window.addEventListener("pointerup", up);
  },
  };
+ // Drag the selected hero's content group (heading/subtext/button) anywhere in the banner. Stores its
+ // centre as cx/cy % of the frame; snaps to the banner's edges + centre with guides, recenters on mobile.
+ function onHeroContentDragStart(blockId: string, e: React.PointerEvent) {
+ const grip = e.currentTarget as HTMLElement;
+ const inner = grip.closest(".vya-hero-inner") as HTMLElement | null;
+ const frame = grip.closest(".vya-hero-frame") as HTMLElement | null;
+ if (!inner || !frame) return;
+ const rect = frame.getBoundingClientRect();
+ if (!rect.width || !rect.height) return;
+ const pr = curBlocks.find((b) => b.id === blockId)?.props || {};
+ let ox: number, oy: number;
+ if (pr.cx && pr.cy) { ox = Number(pr.cx); oy = Number(pr.cy); }
+ else { const ir = inner.getBoundingClientRect(); ox = ((ir.left + ir.width / 2 - rect.left) / rect.width) * 100; oy = ((ir.top + ir.height / 2 - rect.top) / rect.height) * 100; }
+ const sx = e.clientX, sy = e.clientY, cands = [0, 50, 100], thrX = (7 / rect.width) * 100, thrY = (7 / rect.height) * 100, r1 = (n: number) => Math.round(n * 10) / 10;
+ setSelBlock(blockId); setSelOverlay(null); setOvlDragging(true);
+ grip.setPointerCapture?.(e.pointerId);
+ const move = (ev: PointerEvent) => {
+ let nx = Math.min(100, Math.max(0, ox + ((ev.clientX - sx) / rect.width) * 100));
+ let ny = Math.min(100, Math.max(0, oy + ((ev.clientY - sy) / rect.height) * 100));
+ const sX = snapAxis([nx], cands, thrX), sY = snapAxis([ny], cands, thrY);
+ nx = Math.min(100, Math.max(0, nx + sX.delta)); ny = Math.min(100, Math.max(0, ny + sY.delta));
+ updateCur((bs) => bs.map((b) => (b.id === blockId ? { ...b, props: { ...(b.props || {}), cx: String(r1(nx)), cy: String(r1(ny)) } } : b)));
+ setGuides({
+ v: sX.guide == null ? undefined : rect.left + (sX.guide / 100) * rect.width,
+ h: sY.guide == null ? undefined : rect.top + (sY.guide / 100) * rect.height,
+ top: rect.top, left: rect.left, width: rect.width, height: rect.height,
+ });
+ };
+ const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); setGuides(null); };
+ window.addEventListener("pointermove", move);
+ window.addEventListener("pointerup", up);
+ }
  const selOverlayObj = selOverlay ? curBlocks.find((b) => b.id === selOverlay.blockId)?.overlays?.find((o) => o.id === selOverlay.overlayId) ?? null : null;
  // A section is "inspected" when it's selected and no overlay on it is selected.
  const selBlockObj = selBlock && !selOverlay ? curBlocks.find((b) => b.id === selBlock) ?? null : null;
@@ -408,6 +680,8 @@ export default function StorefrontStudio() {
  const deviceMax = device === "phone" ? "390px" : device === "tablet" ? "834px" : "100%";
  const pageList = [{ slug: "home", title: "Home", n: blocks.length }, { slug: "shop", title: "Shop", n: shopBlocks.length }, ...extraPages.map((p) => ({ slug: p.slug, title: p.title, n: p.blocks.length }))];
  const activeTitle = pageList.find((p) => p.slug === activeSlug)?.title || "Home";
+ // The site nav shown in the persistent header/footer — one entry per page, current page marked active.
+ const chromeNav: ChromeNav[] = pageList.map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
 
  const dbtn = (d: Device, label: string, Icon: typeof Monitor) => (
  <button type="button" onClick={() => setDevice(d)} aria-label={label} className={`grid h-7 w-9 place-items-center rounded-md transition ${device === d ? "bg-white text-stone-800 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}><Icon size={15} strokeWidth={1.9} /></button>
@@ -447,7 +721,7 @@ export default function StorefrontStudio() {
  {/* Tab strip — direct-manipulation panels, with the AI assistant as one tab (not the whole side) */}
  <div className="flex shrink-0 gap-1 border-b border-black/10 p-1.5">
  {([["design", "Design", Palette], ["add", "Add section", Layers], ["assist", "Assist", Sparkles]] as const).map(([id, label, Icon]) => (
- <button key={id} type="button" onClick={() => setRailTab(id)} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition ${railTab === id ? "bg-[#5D0F17] text-white shadow-sm" : "text-stone-600 hover:bg-stone-100"}`}>
+ <button key={id} type="button" onClick={() => { setRailTab(id); setSelBlock(null); setSelOverlay(null); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition ${!selBlockObj && railTab === id ? "bg-[#5D0F17] text-white shadow-sm" : "text-stone-600 hover:bg-stone-100"}`}>
  <Icon size={14} strokeWidth={2} /> <span className="hidden md:inline">{label}</span>
  </button>
  ))}
@@ -455,7 +729,43 @@ export default function StorefrontStudio() {
 
  {/* Assist keeps the full-height chat; Design & Add are scrollable control panels */}
  <div className="min-h-0 flex-1 overflow-hidden">
- {railTab === "assist" ? (
+ {selBlockObj ? (
+ // Select a section → edit ALL its content here (not just the inline text). This is what makes
+ // list/URL fields — marquee names, gallery photos, a video link — actually editable.
+ (() => {
+ const def = blockDef(selBlockObj.type);
+ const fields = def?.fields || [];
+ const bp = selBlockObj.props || {};
+ const inp = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
+ return (
+ <div className="h-full overflow-y-auto px-4 py-4">
+ <div className="mb-4 flex items-center justify-between">
+ <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Edit {def?.label || selBlockObj.type}</p>
+ <button type="button" onClick={() => { setSelBlock(null); setSelOverlay(null); }} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
+ </div>
+ {fields.length ? fields.map((f) => (
+ <div key={f.key} className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">{f.label}</label>
+ {f.kind === "textarea" ? (
+ <textarea value={bp[f.key] || ""} onChange={(e) => editField(selBlockObj.id, f.key, e.target.value)} rows={5} className={`${inp} resize-y leading-relaxed`} placeholder={def?.defaults?.[f.key] || ""} />
+ ) : f.kind === "image" ? (
+ <div className="flex items-center gap-2">
+ {bp[f.key]
+ ? <span className="h-10 w-10 shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url("${bp[f.key].replace(/"/g, "%22")}")` }} />
+ : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-400"><ImageIcon size={15} /></span>}
+ <button type="button" disabled={uploading} onClick={() => pickAndUpload((url) => editField(selBlockObj.id, f.key, url))} className="rounded-md bg-[#5D0F17] px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "Uploading…" : bp[f.key] ? "Replace" : "Upload"}</button>
+ {bp[f.key] && <button type="button" onClick={() => editField(selBlockObj.id, f.key, "")} className="rounded-md px-2 py-1.5 text-[12px] text-stone-500 hover:bg-stone-100">Remove</button>}
+ </div>
+ ) : (
+ <input value={bp[f.key] || ""} onChange={(e) => editField(selBlockObj.id, f.key, e.target.value)} className={inp} placeholder={def?.defaults?.[f.key] || ""} />
+ )}
+ </div>
+ )) : <p className="text-[13px] leading-relaxed text-stone-400">This section has no text fields — its content comes from your products. Style it from the toolbar on the canvas.</p>}
+ <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">You can also click text directly on the canvas to edit it. Background, colours, alignment & spacing are on the toolbar above the section.</p>
+ </div>
+ );
+ })()
+ ) : railTab === "assist" ? (
  <Sidekick docked />
  ) : railTab === "design" ? (
  <div className="h-full overflow-y-auto px-4 py-4">
@@ -482,13 +792,11 @@ export default function StorefrontStudio() {
  <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Colours</p>
  <div className="space-y-1.5">
  {([["bg", "Background"], ["text", "Text"], ["accent", "Accent"]] as const).map(([key, label]) => (
- <label key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
- <span className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md ring-1 ring-black/15" style={{ background: colors[key] }}>
- <input type="color" value={colors[key]} onChange={(e) => changeColor(key, e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
- </span>
+ <div key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
+ <span className="h-6 w-6 shrink-0 rounded-md ring-1 ring-black/15" style={{ background: colors[key] }} />
  <span className="flex-1 text-[13px] text-stone-700">{label}</span>
- <span className="font-mono text-[11px] uppercase text-stone-400">{colors[key]}</span>
- </label>
+ <HexInput value={colors[key]} onChange={(v) => changeColor(key, v)} className="w-[96px] rounded-md border border-black/10 bg-white px-2 py-1 text-right font-mono text-[12px] uppercase text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ </div>
  ))}
  </div>
 
@@ -531,6 +839,16 @@ export default function StorefrontStudio() {
  </label>
  </div>
 
+ {/* Footer — social links (shown as icons in the footer, site-wide) + a short about blurb */}
+ <p className="mb-1 mt-7 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Footer & social links</p>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">Add your socials — they show as icons in the footer on every page. A short blurb sits beside them.</p>
+ <div className="space-y-2">
+ {([["instagram", "Instagram URL"], ["tiktok", "TikTok URL"], ["facebook", "Facebook URL"], ["youtube", "YouTube URL"], ["pinterest", "Pinterest URL"], ["email", "Contact email"]] as const).map(([key, label]) => (
+ <input key={key} value={socials[key] || ""} onChange={(e) => { const next = { ...socials, [key]: e.target.value }; setSocials(next); pushDesign({ socials: next }); }} placeholder={label} className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ ))}
+ <textarea value={footerAbout} onChange={(e) => { setFooterAbout(e.target.value); pushDesign({ footerAbout: e.target.value }); }} rows={2} placeholder="A short line about your store (footer)" className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ </div>
+
  <button type="button" onClick={() => setShowTemplates(true)} className="mt-6 flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 py-2.5 text-[12px] font-semibold text-stone-600 transition hover:bg-stone-100"><LayoutTemplate size={13} /> Start from a full template</button>
  <p className="mt-2 text-center text-[11px] leading-snug text-stone-400">Change anything here, or switch to <button type="button" onClick={() => setRailTab("assist")} className="font-semibold text-[#5D0F17] underline">Assist</button> and just describe it.</p>
  </div>
@@ -539,8 +857,17 @@ export default function StorefrontStudio() {
  {/* Free-form elements — drop onto a section, then drag anywhere */}
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
  <p className="mb-2.5 text-[12px] leading-snug text-stone-400">Drop onto {selBlock ? "the selected section" : "the last section"}, then drag it anywhere. It scales with the layout and stacks neatly on mobile.</p>
- <div className="mb-6 grid grid-cols-3 gap-2">
+ <div className="mb-3 grid grid-cols-3 gap-2">
  {([["button", "Button", MousePointerClick], ["text", "Text", Type], ["image", "Image", ImageIcon]] as const).map(([kind, label, Icon]) => (
+ <button key={kind} type="button" onClick={() => addElement(kind)} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03] hover:text-[#5D0F17]">
+ <Icon size={17} strokeWidth={1.8} />
+ <span className="text-[11px] font-medium">{label}</span>
+ </button>
+ ))}
+ </div>
+ <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Shapes</p>
+ <div className="mb-6 grid grid-cols-3 gap-2">
+ {([["rect", "Rectangle", Square], ["circle", "Circle", Circle], ["line", "Line", Minus]] as const).map(([kind, label, Icon]) => (
  <button key={kind} type="button" onClick={() => addElement(kind)} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03] hover:text-[#5D0F17]">
  <Icon size={17} strokeWidth={1.8} />
  <span className="text-[11px] font-medium">{label}</span>
@@ -587,8 +914,8 @@ export default function StorefrontStudio() {
  </button>
  {ddOpen && (
  <>
- <button type="button" aria-label="Close" className="fixed inset-0 z-10 cursor-default" onClick={() => setDdOpen(false)} />
- <div className="absolute left-0 top-8 z-20 w-52 rounded-xl border border-black/10 bg-white p-1 shadow-[0_18px_44px_-12px_rgba(43,36,29,0.45)]">
+ <button type="button" aria-label="Close" className="fixed inset-0 z-[68] cursor-default" onClick={() => setDdOpen(false)} />
+ <div className="absolute left-0 top-8 z-[70] w-52 rounded-xl border border-black/10 bg-white p-1 shadow-[0_18px_44px_-12px_rgba(43,36,29,0.45)]">
  {pageList.map((p) => (
  <div key={p.slug} className="group/pg flex items-center">
  <button type="button" onClick={() => switchPage(p.slug)} className={`flex flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-stone-100 ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-700"}`}>
@@ -617,15 +944,39 @@ export default function StorefrontStudio() {
  <span className="rounded-full bg-[#5D0F17] px-4 py-1.5 text-[12px] font-semibold text-white shadow">Drop a photo onto a section to set its background</span>
  </div>
  )}
- {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
+ {customCss && <style dangerouslySetInnerHTML={{ __html: stripThemeBackgroundOverrides(customCss) }} />}
+ {/* Persistent site chrome — the header + footer wrap every page (same as the live storefront). */}
+ <div style={{ fontFamily: ff(fonts.body), color: colors.text }}>
+ <StoreHeader storeName={storeName} logo={null} nav={chromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug && switchPage(item.slug)} search={<Search size={16} strokeWidth={1.8} />} />
  {curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); }} selectedId={selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} />
- ) : (
- <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 px-8 text-center">
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} />
+ ) : activeSlug === "shop" ? null : (
+ <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-8 py-20 text-center">
  <p className="text-[14px] text-stone-400" style={{ fontFamily: ff(fonts.body) }}>This page is empty.</p>
- <p className="text-[13px] text-stone-400">Ask VYA to build it — “design my {activeTitle.toLowerCase()} page” — and it appears here.</p>
+ <p className="text-[13px] text-stone-400">Add sections from the <button type="button" onClick={() => setRailTab("add")} className="font-semibold text-[#5D0F17] underline">Add</button> panel, or ask VYA to build it.</p>
  </div>
  )}
+ {/* Shop page: the product grid auto-lists your live inventory (same as the storefront) — shown here so the page reads true. */}
+ {activeSlug === "shop" && (
+ <section className="mx-auto max-w-6xl px-6 py-16 sm:px-8">
+ <p className="mb-8 text-center text-[10px] uppercase tracking-[0.28em] text-stone-400">Your products · auto-listed from live inventory</p>
+ {products.length > 0 ? (
+ <div className="grid grid-cols-2 gap-x-6 gap-y-10 md:grid-cols-4">
+ {products.slice(0, 8).map((p, i) => (
+ <div key={i}>
+ <div className="aspect-[3/4] w-full bg-stone-100 bg-cover bg-center" style={{ backgroundImage: p.image ? `url("${p.image.replace(/"/g, "%22")}")` : undefined }} />
+ <p className="mt-3 text-[12px] leading-snug" style={{ fontFamily: ff(fonts.body) }}>{p.title}</p>
+ <p className="text-[12px] text-stone-500">{money(p.price, p.currency)}</p>
+ </div>
+ ))}
+ </div>
+ ) : (
+ <p className="text-center text-[13px] text-stone-400">Your products appear here once you have live listings.</p>
+ )}
+ </section>
+ )}
+ <StoreFooter storeName={storeName} logo={null} nav={chromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} />
+ </div>
  </div>
  </div>
  </div>
@@ -648,6 +999,14 @@ export default function StorefrontStudio() {
  </div>
  )}
 
+ {/* Alignment guides — thin accent lines that appear where a dragged/resized element snaps */}
+ {guides && (
+ <>
+ {guides.v != null && <div style={{ position: "fixed", left: guides.v, top: guides.top, height: guides.height, width: 1, background: "#5D0F17", zIndex: 70, pointerEvents: "none" }} />}
+ {guides.h != null && <div style={{ position: "fixed", top: guides.h, left: guides.left, width: guides.width, height: 1, background: "#5D0F17", zIndex: 70, pointerEvents: "none" }} />}
+ </>
+ )}
+
  {/* Selected free-form element — contextual toolbar, floating just above it (Canva-style) */}
  {selOverlayObj && selOverlay && anchor && !ovlDragging && (() => {
  const { blockId, overlayId } = selOverlay;
@@ -658,6 +1017,12 @@ export default function StorefrontStudio() {
  </label>
  );
  const inp = "rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
+ const fontSel = (val: string, onChange: (v: string) => void) => (
+ <select value={val} title="Font" onChange={(e) => onChange(e.target.value)} className={`shrink-0 max-w-[9rem] ${inp}`} style={{ fontFamily: val ? ff(val) : undefined }}>
+ <option value="">Default font</option>
+ {ALL_STOREFRONT_FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: ff(f) }}>{f}</option>)}
+ </select>
+ );
  return (
  <div style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[92vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 capitalize">{selOverlayObj.kind}</span>
@@ -666,13 +1031,15 @@ export default function StorefrontStudio() {
  <>
  <input value={p.label || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { label: e.target.value })} placeholder="Label" className={`w-28 ${inp}`} />
  <input value={p.href || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { href: e.target.value })} placeholder="/shop or https://…" className={`w-40 ${inp}`} />
+ {fontSel(p.font || "", (v) => patchOverlayProps(blockId, overlayId, { font: v }))}
  {swatch(p.bg || "#1a1a1a", (v) => patchOverlayProps(blockId, overlayId, { bg: v }), "Fill")}
  {swatch(p.color || "#ffffff", (v) => patchOverlayProps(blockId, overlayId, { color: v }), "Text colour")}
  </>
  )}
  {selOverlayObj.kind === "text" && (
  <>
- <input value={p.text || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { text: e.target.value })} placeholder="Text" className={`w-44 ${inp}`} />
+ <input value={p.text || ""} onChange={(e) => patchOverlayProps(blockId, overlayId, { text: e.target.value })} placeholder="Text" className={`w-40 ${inp}`} />
+ {fontSel(p.font || "", (v) => patchOverlayProps(blockId, overlayId, { font: v }))}
  <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
  <button type="button" onClick={() => patchOverlayProps(blockId, overlayId, { bold: p.bold === "1" ? "" : "1" })} title="Bold" className={`w-7 py-1 text-[13px] font-bold transition ${p.bold === "1" ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`}>B</button>
  <button type="button" onClick={() => patchOverlayProps(blockId, overlayId, { italic: p.italic === "1" ? "" : "1" })} title="Italic" className={`w-7 py-1 font-serif text-[13px] italic transition ${p.italic === "1" ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`}>I</button>
@@ -691,20 +1058,43 @@ export default function StorefrontStudio() {
  ? <span className="h-7 w-7 shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url("${p.src.replace(/"/g, "%22")}")` }} />
  : <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-400"><ImageIcon size={13} /></span>}
  <button type="button" disabled={uploading} onClick={() => pickAndUpload((url) => patchOverlayProps(blockId, overlayId, { src: url }))} className="shrink-0 rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "Uploading…" : p.src ? "Replace" : "Upload"}</button>
+ <span className="shrink-0 text-[10px] italic text-stone-400">drag corners to resize</span>
+ </>
+ )}
+ {(selOverlayObj.kind === "rect" || selOverlayObj.kind === "circle") && (
+ <>
+ {swatch(p.fill || "#1a1a1a", (v) => patchOverlayProps(blockId, overlayId, { fill: v }), "Fill")}
+ {selOverlayObj.kind === "rect" && (
  <div className="flex shrink-0 items-center gap-1.5">
- <span className="text-[10px] uppercase tracking-wide text-stone-400">Size</span>
- <input type="range" min={8} max={100} value={selOverlayObj.w ?? 28} onChange={(e) => patchOverlay(blockId, overlayId, { w: Number(e.target.value) })} className="w-24 accent-[#5D0F17]" />
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Round</span>
+ <input type="range" min={0} max={80} value={Number(p.radius ?? 10)} onChange={(e) => patchOverlayProps(blockId, overlayId, { radius: e.target.value })} className="w-20 accent-[#5D0F17]" />
+ </div>
+ )}
+ <div className="flex shrink-0 items-center gap-1.5">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Opacity</span>
+ <input type="range" min={10} max={100} value={Number(p.opacity ?? 100)} onChange={(e) => patchOverlayProps(blockId, overlayId, { opacity: e.target.value })} className="w-20 accent-[#5D0F17]" />
+ </div>
+ </>
+ )}
+ {selOverlayObj.kind === "line" && (
+ <>
+ {swatch(p.color || "#1a1a1a", (v) => patchOverlayProps(blockId, overlayId, { color: v }), "Colour")}
+ <div className="flex shrink-0 items-center gap-1.5">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Weight</span>
+ <input type="range" min={1} max={30} value={Number(p.thickness ?? 2)} onChange={(e) => patchOverlayProps(blockId, overlayId, { thickness: e.target.value })} className="w-24 accent-[#5D0F17]" />
  </div>
  </>
  )}
  <span className="h-5 w-px shrink-0 bg-black/10" />
+ <button type="button" onClick={() => reorderOverlay(blockId, overlayId, "front")} title="Bring to front" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><BringToFront size={14} /></button>
+ <button type="button" onClick={() => reorderOverlay(blockId, overlayId, "back")} title="Send to back" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><SendToBack size={14} /></button>
  <button type="button" onClick={() => removeOverlay(blockId, overlayId)} title="Delete element" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
  </div>
  );
  })()}
 
  {/* Selected section — contextual toolbar floating just above it (background incl. photo, text, align, spacing) */}
- {selBlockObj && anchor && (() => {
+ {selBlockObj && anchor && !ovlDragging && (() => {
  const b = selBlockObj, st = b.style || {};
  const bid = b.id;
  const bgUrl = sectionBgUrl(b);
@@ -751,9 +1141,38 @@ export default function StorefrontStudio() {
  ))}
  </div>
  </div>
+ {b.type === "hero" && b.props?.image && (b.props?.cx || b.props?.cy) && (
+ <button type="button" onClick={() => updateCur((bs) => bs.map((x) => (x.id === bid ? { ...x, props: { ...(x.props || {}), cx: "", cy: "" } } : x)))} title="Recenter the content" className="shrink-0 rounded-md border border-black/10 px-2.5 py-1 text-[11px] font-medium text-stone-600 transition hover:bg-stone-100">Recenter</button>
+ )}
  <span className="h-5 w-px shrink-0 bg-black/10" />
  <button type="button" onClick={() => duplicateBlock(bid)} title="Duplicate section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"><Copy size={14} /></button>
  <button type="button" onClick={() => removeBlock(bid)} title="Delete section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ </div>
+ );
+ })()}
+
+ {/* Layers panel (Figma/Canva-style) — the selected section's elements, front→back, click to select + reorder */}
+ {(() => {
+ const layerSec = selBlock ? curBlocks.find((b) => b.id === selBlock) : null;
+ const layerOverlays = layerSec?.overlays || [];
+ if (!selBlock || layerOverlays.length === 0 || ovlDragging || editingId) return null;
+ return (
+ <div style={{ position: "fixed", right: 20, top: 148, zIndex: 60 }} className="w-56 overflow-hidden rounded-xl border border-black/10 bg-white/95 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)] backdrop-blur">
+ <div className="flex items-center gap-1.5 border-b border-black/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500"><Layers size={12} /> Layers <span className="ml-auto font-normal normal-case text-stone-400">front → back</span></div>
+ <div className="max-h-[50vh] overflow-y-auto p-1.5">
+ {[...layerOverlays].reverse().map((o) => {
+ const Ic = OverlayIcon(o);
+ const isSel = selOverlay?.overlayId === o.id;
+ return (
+ <div key={o.id} onClick={() => { setSelBlock(selBlock); setSelOverlay({ blockId: selBlock, overlayId: o.id }); setEditingId(null); }} className={`group flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer transition ${isSel ? "bg-[#5D0F17]/10 text-[#5D0F17]" : "text-stone-600 hover:bg-stone-100"}`}>
+ <Ic size={13} className="shrink-0" strokeWidth={1.8} />
+ <span className="flex-1 truncate text-[12px]">{overlayLabel(o)}</span>
+ <button type="button" title="Bring forward" onClick={(e) => { e.stopPropagation(); reorderOverlay(selBlock, o.id, "forward"); }} className="grid h-5 w-5 place-items-center rounded text-stone-400 opacity-0 transition hover:bg-black/5 hover:text-stone-700 group-hover:opacity-100"><ChevronUp size={13} /></button>
+ <button type="button" title="Send backward" onClick={(e) => { e.stopPropagation(); reorderOverlay(selBlock, o.id, "backward"); }} className="grid h-5 w-5 place-items-center rounded text-stone-400 opacity-0 transition hover:bg-black/5 hover:text-stone-700 group-hover:opacity-100"><ChevronDown size={13} /></button>
+ </div>
+ );
+ })}
+ </div>
  </div>
  );
  })()}

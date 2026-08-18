@@ -109,6 +109,64 @@ extension for Depop/Poshmark.
 
 ---
 
+## In-person payments (Tap to Pay) — build spec
+
+**Why:** capture the *offline half* of every seller's GMV (markets, pop-ups, physical shop) — the sales that
+today leak to Venmo/cash. Every in-person sale then runs the **same 1% commission** as online. Offered on **all
+tiers** (§8) — it costs VYA ~$0 and is the biggest lever on commission capture-rate. **No hardware** — the
+seller's phone IS the reader (Tap to Pay on iPhone / Android).
+
+**Home:** the existing **`../via-app` (Expo/RN)**, behind the store-partner sign-in it already has (the mobile
+JWT `storeAuth` falls back to). New "Sell in person" screen in seller mode. **No separate app.**
+
+**Reuses the entire direct-charge stack** — an in-person charge is just a **card-present PaymentIntent on the
+seller's connected account** with `application_fee_amount` = our 1% (`applicationFeeCents`, `payments-config.ts`),
+identical to `item-intent`/`cart-intent`. Same `markSold` → `createPaidOrder` → webhook → receipt path.
+
+### Flow
+1. Seller opens the app (signed in as their store) → **Sell in person** → picks an item (or enters a custom amount).
+2. App fetches a **connection token** from our backend (scoped to the store's connected account).
+3. SDK discovers + connects the **Tap to Pay reader** (the phone) against the store's Stripe **Location**.
+4. Backend creates a **card-present PaymentIntent** on the connected account (`application_fee_amount` = 1%).
+5. `collectPaymentMethod(clientSecret)` → customer taps card / Apple-Google Pay → `confirmPaymentIntent`.
+6. Success → existing webhook fulfils: `markSold`, `createPaidOrder`, 1% captured, buyer receipt (the new
+   store-branded order/tracking page + email — reuse `sendBuyerOrderConfirmation`).
+
+### Backend to build (thin — mostly reuse)
+- `POST /api/store/terminal/connection-token` — `stripe.terminal.connectionTokens.create()` **on the store's
+  connected account** (`stripeAccount` header). Store-authed.
+- `POST /api/store/terminal/payment-intent` — card-present PaymentIntent on the connected account:
+  `payment_method_types:['card_present']`, `capture_method:'automatic'`, `application_fee_amount: applicationFeeCents(amt)`,
+  `metadata:{ itemId, storeSlug, channel:'in_person' }`. Returns `client_secret`.
+- Ensure a Stripe **Location** per store (`stripe.terminal.locations.create()` on the connected account) — create
+  lazily on first in-person sale, cache the id on the store's payments record.
+- Webhook: `payment_intent.succeeded` already fulfils — add nothing except read `metadata.channel` so in-person
+  vs online is distinguishable in analytics (feeds the §8.1 capture-rate story).
+
+### Client (via-app)
+- Add `@stripe/stripe-terminal-react-native`; wrap seller mode in `StripeTerminalProvider` with a `tokenProvider`
+  that calls the connection-token endpoint.
+- `discoverReaders({ discoveryMethod: 'tapToPay' })` → `connectReader(reader, { locationId })`.
+- "Sell in person" screen: item picker / amount pad → collect → confirm → success (mark sold, show receipt).
+
+### Prerequisites / gotchas (the real work is setup, not logic)
+1. **Native build required** — Terminal needs native code + entitlements, so **EAS dev/prod build, not Expo Go.**
+   Confirm via-app is on EAS.
+2. **Apple entitlement** — request `com.apple.developer.proximity-reader.payment.acceptance` from Apple; requires
+   **iOS 16.4+**, **iPhone XS or newer**, supported region (US ✅). Android Tap to Pay on supported devices.
+3. **Connect capability** — enable **`card_present` / Terminal** on connected accounts (small add to onboarding);
+   each store needs a **Location** record.
+4. **Card-present fees** are the seller's (direct charge) and *lower* than online (~2.6% + 10¢) — an easy yes.
+
+### Test
+- Stripe Terminal **simulated reader** for logic; then a real device with the entitlement in a Stripe **test**
+  connected account before requesting Apple prod entitlement.
+
+**Scope:** a few weeks — most of it is Apple entitlement + EAS config + Connect capability; the payment logic is a
+thin reuse of the existing direct-charge PaymentIntent + fulfilment.
+
+---
+
 ## MEDIUM PRIORITY
 
 ## Live selling

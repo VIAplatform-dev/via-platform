@@ -6,6 +6,7 @@ import { getSellerBySlug } from "./db/sellers";
 import { createItem, listAvailableItems, deleteItemsBySource } from "./db/inventory";
 import { getImportedOrderTitleSet } from "./imported-orders-db";
 import { extractMeasurements } from "./measurements";
+import { inferItemFields } from "./infer-item-fields";
 import type { ImportedProduct } from "./store-import";
 
 const parseCents = (price?: string) => Math.round((parseFloat((price || "").replace(/[^0-9.]/g, "")) || 0) * 100);
@@ -36,6 +37,8 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  // OUR storage in the background so the interactive import doesn't wait on hundreds of
  // image uploads. Durability without the slow import.
  const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, 8);
+ // Sort the unstructured signal (title + description) into brand/era/condition/category/material.
+ const inf = inferItemFields(title, p.description);
  await createItem({
  sellerId: seller.id,
  title,
@@ -43,6 +46,11 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  currency: detectCur(p.price),
  images,
  description: p.description ?? null,
+ brand: inf.brand,
+ era: inf.era,
+ material: inf.material,
+ condition: inf.condition,
+ category: inf.category,
  size: p.size ?? null,
  measurements: extractMeasurements(p.description), // pull flat measurements out of the imported prose
  status: p.available === false ? "sold" : "active",
@@ -78,6 +86,8 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  if (p.images) { try { const a = JSON.parse(p.images); if (Array.isArray(a)) raw = a; } catch {} }
  if (!raw.length && p.image) raw = [p.image];
  const images = raw.slice(0, 8); // rehost-images cron copies these to our storage in the background
+ // Carry over what the source had; fill any blanks by inferring from title + description.
+ const inf = inferItemFields(title, p.description, { brand: p.brand, era: p.era, material: p.materials, condition: p.condition, category: p.product_type });
  await createItem({
  sellerId: seller.id,
  title,
@@ -85,13 +95,13 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  currency: p.currency || "USD",
  images,
  description: p.description ?? null,
- brand: p.brand ?? null,
- era: p.era ?? null,
- material: p.materials ?? null,
- condition: p.condition ?? null,
+ brand: inf.brand,
+ era: inf.era,
+ material: inf.material,
+ condition: inf.condition,
  size: p.size ?? null,
  measurements: p.measurements || extractMeasurements(p.description), // structured field, else pull from the prose
- category: p.product_type ?? null,
+ category: inf.category,
  status: "active",
  source: "imported",
  });

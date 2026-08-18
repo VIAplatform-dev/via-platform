@@ -182,7 +182,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // Email the buyer their tracking if we have a label's tracking number (skip if they shipped their own way).
  if (order.buyerEmail && order.trackingNumber) {
  try {
- await sendBuyerTrackingEmail({ storeSlug: slug, buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, replyTo: seller.email });
+ await sendBuyerTrackingEmail({ storeSlug: slug, buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, orderId: id, replyTo: seller.email });
  await markTrackingEmailSent(id);
  } catch (e) { await logError("tracking-email", e, { context: { orderId: id } }); }
  }

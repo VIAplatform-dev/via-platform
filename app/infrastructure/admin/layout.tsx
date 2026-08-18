@@ -21,6 +21,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  children: [
  { href: `${B}/add-listing`, label: "Add listing" },
  { href: `${B}/bulk-upload`, label: "Bulk upload" },
+ { href: `${B}/inventory/collections`, label: "Collections" },
  { href: `${B}/inventory/drafts`, label: "Drafts" },
  { href: `${B}/inventory/sold`, label: "Sold" },
  ],
@@ -38,7 +39,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { href: `${B}/import`, label: "Bring your site", icon: Plug },
  {
  href: `${B}/customers`, label: "Customers", icon: Users,
- children: [{ href: `${B}/customers/buyers`, label: "Buyers" }],
+ children: [{ href: `${B}/customers/buyers`, label: "Buyers" }, { href: `${B}/recovery`, label: "Cart recovery" }],
  },
  {
  href: `${B}/marketing`, label: "Marketing", icon: Megaphone,

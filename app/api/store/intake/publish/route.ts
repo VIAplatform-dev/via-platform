@@ -3,7 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { createConsignmentItem, resolveSplitForIntake } from "@/app/lib/consignment-db";
 import { stores, storeContactEmails } from "@/app/lib/stores";
 import { getOrCreateSeller } from "@/app/lib/db/sellers";
-import { createItem, ensurePublishAtColumn } from "@/app/lib/db/inventory";
+import { createItem, updateItem, getItem, ensurePublishAtColumn } from "@/app/lib/db/inventory";
 import { createCrossListingsForItem, syncItemToApiPlatforms } from "@/app/lib/cross-listing-db";
 import { maybeAutoPostStory } from "@/app/lib/instagram-publish";
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
@@ -57,8 +57,8 @@ export async function POST(request: NextRequest) {
  const cost = Math.max(0, Math.min(1_000_000, Number(body.cost) || 0));
  const images = Array.isArray(body.images) ? body.images.filter((x: unknown) => typeof x === "string" && x).slice(0, 8) : [];
 
- const item = await createItem({
- sellerId: seller.id,
+ // The fields to write. Shared between "promote the autosaved draft" and "create fresh".
+ const fields = {
  title,
  description: str(body.description, 2000),
  priceCents: Math.round(price * 100),
@@ -76,12 +76,25 @@ export async function POST(request: NextRequest) {
  lengthIn: dimUp(body.lengthIn, 12),
  widthIn: dimUp(body.widthIn, 9),
  heightIn: dimUp(body.heightIn, 3),
- source: "ai",
+ source: "ai" as const,
  // Stores doing a drop stage pieces as drafts, then publish the batch at once. A scheduled
  // listing stays a draft (invisible) with publish_at set — the cron flips it live at that time.
- status: goLiveNow ? "active" : "draft",
+ status: (goLiveNow ? "active" : "draft") as "active" | "draft",
  publishAt,
- });
+ };
+
+ // If this listing was autosaved as a draft while editing, PROMOTE that same row in place. Creating
+ // a new item and deleting the draft (the old behavior) left a duplicate + a stray "removed" ghost.
+ const draftId = typeof body.draftId === "string" && body.draftId ? body.draftId : null;
+ let item: Awaited<ReturnType<typeof createItem>> | null = null;
+ if (draftId) {
+ const existing = await getItem(draftId).catch(() => null);
+ // Only reuse it if it's THIS store's own still-unpublished draft (never touch a live/sold row).
+ if (existing && existing.sellerId === seller.id && existing.status === "draft") {
+ item = await updateItem(draftId, fields);
+ }
+ }
+ if (!item) item = await createItem({ sellerId: seller.id, ...fields });
 
  // Consignment: if this piece belongs to a consignor, record its terms and FREEZE the split
  // (the seller's override if they set one, else resolved from consignor/store rules).

@@ -74,8 +74,11 @@ export default function OnboardingWizard() {
     setImporting(true);
     const cap = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: data.websiteUrl }) }).catch(() => null);
     if (!cap || !cap.ok) { router.replace("/admin/import?from=onboarding"); return; }
+    router.replace("/admin/home");
+    return;
    }
-   router.replace("/admin/home");
+   // Build from scratch → the guided design wizard (vibe → template → pages → colours → fonts).
+   router.replace("/admin/onboarding/build");
   } catch {
    setError("Network error — try again."); setBusy(false); setImporting(false);
   }

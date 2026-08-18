@@ -82,8 +82,8 @@ export function inferEra(text: string | null | undefined, buckets: EraBucket[]):
 // matters: "very good" must be checked before "good" (substring).
 const CONDITION_PATTERNS: { label: Condition; re: RegExp }[] = [
  { label: "Deadstock/NWT", re: /\bdeadstock\b|\bnwt\b|\bbnwt\b|new with tags?|brand[- ]new|\bunworn\b|never (?:been )?worn/ },
- { label: "Excellent", re: /excellent condition|\bmint\b|mint condition|like[- ]new|pristine|immaculate|flawless/ },
- { label: "Very Good", re: /very good condition|\bvgc\b|great condition|barely worn|hardly worn/ },
+ { label: "Excellent", re: /excellent(?:[\w\s]{0,16})?condition|\bmint\b|mint condition|like[- ]new|pristine|immaculate|flawless/ },
+ { label: "Very Good", re: /very good(?:[\w\s]{0,16})?condition|\bvgc\b|great condition|barely worn|hardly worn/ },
  { label: "Good", re: /good condition|gently (?:used|worn)|minor wear|light wear|minimal wear|well[- ]maintained/ },
  { label: "Fair", re: /fair condition|well[- ]loved|heavily worn|visible wear|noticeable wear|some (?:flaws|damage|staining|stains|wear)|\bas[- ]is\b/ },
 ];

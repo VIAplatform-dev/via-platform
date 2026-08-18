@@ -76,19 +76,21 @@ export async function getStoreFunnel(storeSlug: string, sinceISO: string): Promi
  return out;
 }
 
-/** Per-item funnel — top pieces by views, with their favorites + purchases. Joins cleanly on item_id. */
-export async function getItemFunnel(storeSlug: string, sinceISO: string, limit = 20): Promise<Array<{ itemId: string; views: number; favorites: number; purchases: number }>> {
+/** Per-item funnel — top pieces by views, with favorites, checkout-starts + purchases. Joins on item_id.
+ * `checkouts` = times a shopper began checkout; abandonments = checkouts a buyer never completed. */
+export async function getItemFunnel(storeSlug: string, sinceISO: string, limit = 20): Promise<Array<{ itemId: string; views: number; favorites: number; checkouts: number; purchases: number }>> {
  try {
   await ensure();
   const rows = await db()`
    SELECT item_id,
     COUNT(*) FILTER (WHERE event_type = 'view')::int AS views,
     COUNT(*) FILTER (WHERE event_type = 'favorite')::int AS favorites,
+    COUNT(*) FILTER (WHERE event_type = 'checkout_start')::int AS checkouts,
     COUNT(*) FILTER (WHERE event_type = 'purchase')::int AS purchases
    FROM analytics_events
    WHERE store_slug = ${storeSlug} AND item_id IS NOT NULL AND ts >= ${sinceISO}
-   GROUP BY item_id ORDER BY views DESC LIMIT ${limit}` as Array<Record<string, unknown>>;
-  return rows.map((r) => ({ itemId: String(r.item_id), views: Number(r.views), favorites: Number(r.favorites), purchases: Number(r.purchases) }));
+   GROUP BY item_id ORDER BY views DESC, checkouts DESC LIMIT ${limit}` as Array<Record<string, unknown>>;
+  return rows.map((r) => ({ itemId: String(r.item_id), views: Number(r.views), favorites: Number(r.favorites), checkouts: Number(r.checkouts), purchases: Number(r.purchases) }));
  } catch {
   return [];
  }

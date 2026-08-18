@@ -50,7 +50,7 @@ export async function publishDueScheduledItems(now: Date): Promise<Item[]> {
  * touch availability locks (use reserve/markSold for those). */
 export async function updateItem(
  itemId: string,
- patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn">>,
+ patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn" | "publishAt" | "source">>,
 ): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
@@ -180,6 +180,27 @@ export async function releaseReservation(itemId: string): Promise<void> {
  const now = new Date();
  await db.update(reservations).set({ releasedAt: now }).where(and(eq(reservations.itemId, itemId), isNull(reservations.releasedAt)));
  await db.update(items).set({ status: "active", updatedAt: now }).where(and(eq(items.id, itemId), eq(items.status, "reserved")));
+}
+
+/**
+ * Sweep: return to sale any item stuck 'reserved' past its checkout hold. The 10-min TTL is stamped on
+ * the reservation at reserve time, but only Stripe events (success/fail/refund) and cart reclaims release
+ * it — an abandoned checkout that never fires a Stripe cancel would otherwise strand the piece as
+ * 'reserved' forever. This enforces the expiry. Only touches items still 'reserved' whose live reservation
+ * has expired (never a sold piece, and never a reservation that's still within its window). Returns count.
+ */
+export async function releaseExpiredReservations(now: Date = new Date()): Promise<number> {
+ const db = getDb();
+ const stale = await db
+ .select({ itemId: reservations.itemId })
+ .from(reservations)
+ .innerJoin(items, eq(items.id, reservations.itemId))
+ .where(and(isNull(reservations.releasedAt), lt(reservations.expiresAt, now), eq(items.status, "reserved")));
+ const ids = [...new Set(stale.map((r) => r.itemId))];
+ if (!ids.length) return 0;
+ await db.update(reservations).set({ releasedAt: now }).where(and(inArray(reservations.itemId, ids), isNull(reservations.releasedAt)));
+ await db.update(items).set({ status: "active", updatedAt: now }).where(and(inArray(items.id, ids), eq(items.status, "reserved")));
+ return ids.length;
 }
 
 /**

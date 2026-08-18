@@ -450,14 +450,15 @@ export default function IntakePage() {
  const r = await fetch("/api/store/intake/publish", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ ...form, status, publishAt: publishAt || null, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
+ body: JSON.stringify({ ...form, status, publishAt: publishAt || null, draftId: draftIdRef.current, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
  setScheduledAt(d.scheduled ? d.publishAt : null);
  setSavedDraft(status === "draft" && !d.scheduled);
- // Publishing supersedes any autosaved draft — remove it so we don't leave a duplicate behind.
- if (draftIdRef.current) { fetch(`/api/store/listings/${draftIdRef.current}`, { method: "DELETE" }).catch(() => {}); draftIdRef.current = null; }
+ // The autosaved draft is promoted in place by the publish endpoint (via draftId), so there's no
+ // separate row to clean up — just forget the id so "List another" starts a fresh draft.
+ draftIdRef.current = null;
  setPhase("done");
  } catch (e) {
  setErr(e instanceof Error ? e.message : "Publish failed");

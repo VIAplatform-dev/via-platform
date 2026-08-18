@@ -11,6 +11,8 @@ import type { StorefrontSettings } from "@/app/lib/storefront-db";
 import NewsletterForm from "./NewsletterForm";
 import Blocks from "./Blocks";
 import { sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
+import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
+import { StoreFooter } from "@/app/s/StoreChrome";
 
 /** Render the raw price string sensibly (loadStoreProducts may or may not prefix a symbol). */
 function fmtPrice(price: string): string {
@@ -187,7 +189,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <main style={rootStyle} className="min-h-screen">
  {fontsHref && <link rel="stylesheet" href={fontsHref} />}
  {/* Store's own custom CSS — layered over the theme (targets .vya-* classes). Trusted: only the owner/AI set it. */}
- {theme.customCss && <style dangerouslySetInnerHTML={{ __html: theme.customCss }} />}
+ {theme.customCss && <style dangerouslySetInnerHTML={{ __html: stripThemeBackgroundOverrides(theme.customCss) }} />}
 
  {/* Announcement bar */}
  {header.announcement && (
@@ -239,7 +241,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} storeSlug={sf.handle} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -340,7 +342,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} storeSlug={sf.handle} />
  )}
 
  {showGrid && !hasBlocks && (
@@ -402,30 +404,18 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </section>
  )}
 
- <footer className="mt-10 border-t border-black/[0.08]">
- <div className="mx-auto max-w-6xl px-6 sm:px-8 py-16">
- <div className="flex flex-col items-center gap-7 text-center sm:flex-row sm:items-start sm:justify-between sm:text-left">
- <div className="max-w-xs">
- {logo ? (
- <img src={logo} alt={storeName} className="mx-auto h-7 w-auto object-contain sm:mx-0" />
- ) : (
- <p className="text-lg tracking-[0.14em]" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{storeName}</p>
- )}
- {sf.tagline && <p className="mt-3 text-xs leading-relaxed opacity-55">{sf.tagline}</p>}
- {location && <p className="mt-2 text-[10px] uppercase tracking-[0.25em] opacity-40">{location}</p>}
- </div>
- {finalNav.length > 0 && (
- <nav className="flex flex-col items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] opacity-60 sm:items-end">
- {finalNav.map((n, i) => <a key={i} href={n.href} className="hover:opacity-100">{n.label}</a>)}
- </nav>
- )}
- </div>
- <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-black/[0.06] pt-6 text-[10px] uppercase tracking-[0.22em] opacity-35 sm:flex-row">
- <span>© {new Date().getFullYear()} {storeName}</span>
- <span>Powered by <span style={{ color: "var(--accent)" }}>VYA</span></span>
- </div>
- </div>
- </footer>
+ <StoreFooter
+ storeName={storeName}
+ logo={logo}
+ nav={finalNav.map((n) => ({ label: n.label, href: n.href }))}
+ colors={{ bg, text, accent }}
+ headingFontFamily={headingFont ? `'${headingFont}', Georgia, serif` : undefined}
+ year={new Date().getFullYear()}
+ tagline={[sf.tagline, location].filter(Boolean).join(" · ") || undefined}
+ footerAbout={theme.footerAbout || undefined}
+ socials={theme.socials}
+ newsletter={<NewsletterForm accent={accent} />}
+ />
  </main>
  );
 }

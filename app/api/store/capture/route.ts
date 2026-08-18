@@ -9,6 +9,7 @@ import { getPlatform } from "@/app/lib/platforms";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { deleteAllItems } from "@/app/lib/db/inventory";
 import { ensureCollection } from "@/app/lib/db/collections";
+import { isJunkCollection } from "@/app/lib/collections-sync";
 import { getStorefrontBySlug, setStorefrontTheme } from "@/app/lib/storefront-db";
 
 // The captured site is served by the MARKETPLACE app (vyaplatform.com/site/{slug}) or the
@@ -81,7 +82,9 @@ export async function POST(request: NextRequest) {
   const handles = new Set<string>();
   for (const p of r.paths) { const m = p.match(/^\/collections\/([^/]+)\/?$/); if (m && m[1] !== "all") handles.add(m[1]); }
   const titleize = (h: string) => h.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  for (const h of handles) await ensureCollection(seller.id, h, titleize(h)).catch(() => {});
+  // Skip the store's operational collections (price bands, presales/drops, demo data, catch-alls) —
+  // importing 100+ junk collections just floods the seller's picker. Real ones (brands, eras, categories) stay.
+  for (const h of handles) { const title = titleize(h); if (!isJunkCollection(title)) await ensureCollection(seller.id, h, title).catch(() => {}); }
  }
  } catch { /* non-fatal — assignment can create collections on demand too */ }
 

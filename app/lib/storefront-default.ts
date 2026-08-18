@@ -27,7 +27,7 @@ export function defaultStarterTheme(storeName: string): StorefrontTheme {
  ],
  extraPages: [
  { slug: "about", title: "About", blocks: [makeBlock("text", { heading: `About ${name}`, body: `${name} began with a love of pieces that last — vintage and secondhand fashion with provenance and soul. We curate each edit by hand, championing craft, sustainability, and individual style.` })] },
- { slug: "faq", title: "FAQ", blocks: [makeBlock("text", { heading: "Frequently asked", body: "How are pieces sourced?\nEvery piece is hand-selected for quality and authenticity.\n\nWhat condition are items in?\nCondition is noted on each listing; most pieces are pre-loved or vintage.\n\nDo you accept returns?\nSee our Shipping & Returns page for the details." })] },
+ { slug: "faq", title: "FAQ", blocks: [makeBlock("faq", { heading: "Frequently asked", q0: "How are pieces sourced?", a0: "Every piece is hand-selected for quality and authenticity.", q1: "What condition are items in?", a1: "Condition is noted on each listing; most pieces are pre-loved or vintage.", q2: "Do you accept returns?", a2: "See our Shipping & Returns page for the details." })] },
  { slug: "shipping-returns", title: "Shipping & Returns", blocks: [makeBlock("text", { heading: "Shipping & Returns", body: "Orders are carefully packed and shipped with tracking. Complimentary shipping on orders over $150.\n\nReturns are accepted within 14 days of delivery for store credit, unless otherwise noted. One-of-one vintage pieces may be final sale — check the listing." })] },
  ],
  };

@@ -6,6 +6,8 @@ import { BLOCK_TYPES, sanitizeBlocks, sanitizePages } from "@/app/lib/storefront
 import { getListingsByStore } from "@/app/lib/listings-db";
 import { defaultStarterTheme } from "@/app/lib/storefront-default";
 import { stores } from "@/app/lib/stores";
+import { importStoreBlocks } from "@/app/lib/store-import";
+import { getCaptureOrigin } from "@/app/lib/site-capture-db";
 import type { StorefrontTheme } from "@/app/lib/store-import";
 
 export const dynamic = "force-dynamic";
@@ -18,12 +20,20 @@ export async function GET(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const sf = await getStorefrontBySlug(slug);
  let theme: StorefrontTheme = sf?.theme ?? {};
- // Every store starts with the polished base — seed it the first time the storefront
- // is opened with no sections yet, keeping any template the seller already picked.
+ // First time the builder opens with no sections yet, seed it. A store that IMPORTED from a URL
+ // should see THEIR site pulled one-for-one — so if we captured their site, replicate its homepage
+ // sections; only a build-from-scratch store (no capture) gets the polished starter template. This
+ // also closes a race where the capture's block import and this seeding could otherwise collide.
  if (!theme.blocks?.length) {
  const name = stores.find((s) => s.slug === slug)?.name || slug.replace(/-/g, " ");
+ const origin = await getCaptureOrigin(slug).catch(() => null);
+ const imported = origin ? await importStoreBlocks(origin).catch(() => []) : [];
+ if (imported.length) {
+ theme = { ...theme, blocks: imported };
+ } else {
  const d = defaultStarterTheme(name);
  theme = theme.template ? { ...d, template: theme.template, colors: theme.colors, fonts: theme.fonts } : d;
+ }
  await setStorefrontTheme(slug, theme).catch(() => {});
  }
  const listings = await getListingsByStore(slug, true).catch(() => []);
@@ -40,6 +50,8 @@ export async function GET(request: NextRequest) {
  blocks: theme.blocks ?? [],
  shopBlocks: theme.shopBlocks ?? [],
  extraPages: theme.extraPages ?? [],
+ socials: theme.socials ?? {},
+ footerAbout: theme.footerAbout ?? "",
  storeName: sf?.theme?.storeName || sf?.tagline || null,
  tagline: sf?.tagline || null,
  templates: STOREFRONT_TEMPLATES,
@@ -90,6 +102,14 @@ export async function POST(request: NextRequest) {
  if (Array.isArray(body?.shopBlocks)) theme.shopBlocks = sanitizeBlocks(body.shopBlocks);
  if (Array.isArray(body?.extraPages)) theme.extraPages = sanitizePages(body.extraPages);
  if (typeof body?.customCss === "string") theme.customCss = body.customCss.slice(0, 20000);
+ // Footer: social links (only http(s)/mailto or a bare handle) + a short about blurb.
+ if (body?.socials && typeof body.socials === "object") {
+ const keys = ["instagram", "tiktok", "facebook", "youtube", "pinterest", "email"] as const;
+ const out: Record<string, string> = {};
+ for (const k of keys) { const v = String(body.socials[k] ?? "").trim().slice(0, 300); if (v) out[k] = v; }
+ theme.socials = out;
+ }
+ if (typeof body?.footerAbout === "string") theme.footerAbout = body.footerAbout.slice(0, 300);
 
  await setStorefrontTheme(slug, theme);
  return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });

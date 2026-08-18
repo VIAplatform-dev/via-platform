@@ -3113,7 +3113,13 @@ export async function sendBuyerOrderConfirmation(p: {
  const storeName = sender.fromName || p.storeName;
  const t = txnTokens(brand);
  const totalCents = p.subtotalCents + p.shippingCents;
- const orderNo = p.orderId.replace(/-/g, "").slice(-6).toUpperCase();
+ const { makeOrderToken } = await import("./orderToken");
+ const { getOrderDetail } = await import("./db/orders");
+ // Use the SAME friendly per-store order number the status page shows (#1026), so the email and the
+ // page never disagree; fall back to a short hash only if the lookup fails.
+ const detail = await getOrderDetail(p.orderId).catch(() => null);
+ const orderNo = detail?.orderNo != null ? String(detail.orderNo) : p.orderId.replace(/-/g, "").slice(-6).toUpperCase();
+ const orderUrl = `${BASE_URL}/order/${makeOrderToken(p.orderId)}`; // store-branded status + tracking page
  const addr = p.ship ? [p.ship.line1, p.ship.line2, [p.ship.city, p.ship.state, p.ship.postal].filter(Boolean).join(", "), p.ship.country].filter(Boolean).join("<br>") : "";
  const row = (label: string, val: string, bold = false) => `<tr><td style="padding:5px 0;font-size:14px;color:${t.muted};">${label}</td><td align="right" style="padding:5px 0;font-size:14px;color:${t.text};${bold ? "font-weight:700;font-size:15px;" : ""}">${val}</td></tr>`;
  const content = `
@@ -3138,7 +3144,8 @@ export async function sendBuyerOrderConfirmation(p: {
  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 6px;">Shipping to</p>
  <p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${addr}</p>
  </div>` : ""}
- <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0;">${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 22px;">${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.</p>
+ <div style="text-align:center;margin:4px 0;"><a href="${orderUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 34px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;">View your order →</a></div>
  `;
  const html = storeTransactionalShell(brand, storeName, "Order confirmed", content);
  // From the STORE the buyer ordered from (their verified domain when set, else VYA's shared
@@ -3198,6 +3205,7 @@ export async function sendBuyerTrackingEmail(p: {
  itemTitle: string;
  trackingNumber: string;
  trackingUrl?: string | null;
+ orderId?: string | null;
  replyTo?: string | null;
 }): Promise<void> {
  if (!p.buyerEmail) return;
@@ -3209,6 +3217,8 @@ export async function sendBuyerTrackingEmail(p: {
  const track = p.trackingUrl
  ? `<a href="${p.trackingUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Track your package →</a>`
  : "";
+ const { makeOrderToken } = await import("./orderToken");
+ const orderLink = p.orderId ? `<p style="margin:18px 0 0;"><a href="${BASE_URL}/order/${makeOrderToken(p.orderId)}" style="color:${t.accent};font-size:13px;text-decoration:underline;">View your order →</a></p>` : "";
  const content = `
  <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">Your order from ${escapeHtml(storeName)} is on its way. 📦</p>
  <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:20px 24px;margin:0 0 24px;">
@@ -3216,6 +3226,7 @@ export async function sendBuyerTrackingEmail(p: {
  <p style="font-size:13px;color:${t.muted};margin:0;">Tracking: ${p.trackingNumber}</p>
  </div>
  ${track}
+ ${orderLink}
  `;
  const html = storeTransactionalShell(brand, storeName, "Your order shipped", content);
  await resend.emails.send({

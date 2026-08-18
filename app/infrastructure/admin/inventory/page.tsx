@@ -65,6 +65,8 @@ export default function ItemsPage() {
  const [isAdmin, setIsAdmin] = useState(false);
  const [selected, setSelected] = useState<Set<string>>(new Set());
  const [bulkBusy, setBulkBusy] = useState(false);
+ const [bulkColOpen, setBulkColOpen] = useState(false); // bulk "add to collection" popover
+ const [bulkColName, setBulkColName] = useState("");
  const [editing, setEditing] = useState<Item | null>(null);
  const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: "", description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
@@ -166,6 +168,18 @@ export default function ItemsPage() {
  await load();
  setBulkBusy(false);
  }
+ // Build a collection from the inventory: add all selected items to a collection (creating it if new).
+ async function bulkAddToCollection(title: string) {
+ const name = title.trim();
+ const ids = [...selected];
+ if (!name || !ids.length) return;
+ setBulkBusy(true);
+ await fetch("/api/store/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "addToCollection", ids, collection: name }) }).catch(() => {});
+ setBulkColOpen(false); setBulkColName(""); setSelected(new Set());
+ await load();
+ fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ setBulkBusy(false);
+ }
 
  // ── Edit a single item (any status, including drafts) — full listing edit ──
  const cents2str = (c: number | null) => (c == null ? "" : (c / 100).toFixed(0));
@@ -217,9 +231,10 @@ export default function ItemsPage() {
 
  async function clearAll() {
  const n = items.length;
- if (!confirm(`OWNER RESET: permanently delete ALL ${n} items — including sold — plus their orders from this store? This can’t be undone.`)) return;
+ if (!confirm(`OWNER RESET: permanently delete ALL ${n} items — including sold — plus their orders and collections from this store? This can’t be undone.`)) return;
  setLoading(true);
  await fetch("/api/store/items", { method: "DELETE" }).catch(() => {});
+ setCols([]);
  await load();
  }
 
@@ -315,9 +330,34 @@ export default function ItemsPage() {
 
  {/* Bulk action bar — appears when items are selected (e.g. publish a whole drop). */}
  {selected.size > 0 && (
- <div className="mb-3 flex items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-[13px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+ <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-[13px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
  <span className="font-medium text-stone-700">{selected.size} selected</span>
  <div className="ml-auto flex items-center gap-2">
+ <div className="relative">
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => setBulkColOpen((o) => !o)}>Add to collection ▾</TechButton>
+ {bulkColOpen && (
+ <div className="absolute right-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-stone-200 bg-white p-2.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]">
+ <p className="mb-1.5 px-1 text-[11px] font-medium text-stone-500">Add {selected.size} item{selected.size > 1 ? "s" : ""} to a collection</p>
+ <input
+ autoFocus value={bulkColName} onChange={(e) => setBulkColName(e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter" && bulkColName.trim()) bulkAddToCollection(bulkColName); if (e.key === "Escape") setBulkColOpen(false); }}
+ list="bulk-col-list" placeholder="Type a name (new or existing)…"
+ className={cn(inputCls, "w-full text-[13px]")} />
+ <datalist id="bulk-col-list">{cols.map((c) => <option key={c.id} value={c.title} />)}</datalist>
+ {cols.length > 0 && (
+ <div className="mt-2 flex flex-wrap gap-1">
+ {cols.slice(0, 8).map((c) => (
+ <button key={c.id} type="button" onClick={() => bulkAddToCollection(c.title)} disabled={bulkBusy} className="rounded-full border border-stone-200 px-2.5 py-1 text-[11px] text-stone-600 transition hover:border-[var(--accent,#0e9f76)] hover:text-stone-900 disabled:opacity-50">{c.title}</button>
+ ))}
+ </div>
+ )}
+ <div className="mt-2.5 flex justify-end gap-1.5">
+ <TechButton variant="ghost" className="px-2.5 py-1 text-[12px]" onClick={() => setBulkColOpen(false)}>Cancel</TechButton>
+ <TechButton className="px-2.5 py-1 text-[12px]" disabled={bulkBusy || !bulkColName.trim()} onClick={() => bulkAddToCollection(bulkColName)}>{bulkBusy ? "Adding…" : "Add"}</TechButton>
+ </div>
+ </div>
+ )}
+ </div>
  <TechButton className="px-3 py-1.5 text-[12px]" disabled={bulkBusy || draftsSelected === 0} onClick={() => bulk("publish")}>
  {bulkBusy ? "Working…" : `Publish now${draftsSelected ? ` (${draftsSelected})` : ""}`}
  </TechButton>

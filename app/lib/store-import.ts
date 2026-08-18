@@ -37,6 +37,9 @@ export type StorefrontTheme = {
  shopBlocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
  extraPages?: { slug: string; title: string; blocks: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
  logo?: string | null;
+ // Footer: the store's social links + a short about blurb, shown site-wide in the footer.
+ socials?: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string; pinterest?: string; email?: string };
+ footerAbout?: string;
  // cloned design (from site-clone): the original's name, nav, hero, and pages.
  storeName?: string | null;
  nav?: string[];

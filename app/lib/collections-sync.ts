@@ -19,13 +19,24 @@ function db() {
 // Collections that carry no product meaning — navigation, catch-alls, price bands,
 // internal drop codes. We never want these as era/brand/category signal.
 const JUNK_COLLECTION_RE =
- /^(home\s*page|frontpage|shop\s*all|all|all\s*products|latest\s*drop|new\s*(arrivals?|in)|featured|best\s*sellers?|sale|on\s*sale|tier\s*\d+|coming\s*soon)$/i;
-function isJunkCollection(title: string): boolean {
+ /^(home\s*page|frontpage|shop\s*all|all|all\s*products|latest\s*drop|new\s*(arrivals?|in)|new\s*releases?|featured|best\s*sellers?|sale|on\s*sale|tier\s*\d+|coming\s*soon|available|sold|sold\s*archive|permanent\s*collection|sourcing|special\s*pricing|rental|frontpage)$/i;
+const MONTHS_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/i;
+// Collections that carry no product meaning — navigation, catch-alls, price bands, presale/drop batches,
+// Shopify demo data, and numbered dupes. Never a real era/brand/category, and never worth importing.
+export function isJunkCollection(title: string): boolean {
  const t = (title || "").trim();
  if (!t || t.length > 60) return true;
- if (JUNK_COLLECTION_RE.test(t)) return true;
+ const l = t.toLowerCase();
+ if (JUNK_COLLECTION_RE.test(l)) return true;
  if (t.startsWith("#")) return true; // internal batch/drop codes like "#SBS-July20"
- if (/\$\s*\d|under\s*\$?\d|\bunder\b/i.test(t)) return true; // price bands ("$50 and under")
+ if (/asset\s*pack|example\s*products?|sample\s*data/.test(l)) return true; // Shopify demo/starter data
+ if (/\bpre-?sale\b|\bdrop\s*\d/.test(l)) return true; // "August Presale", "Drop 001"
+ if (MONTHS_RE.test(l) && /\d/.test(l)) return true; // dated batches: "Gf Oct 25 26 Bags"
+ // Price-band / numeric-range collections: "$50 and under", "Above 5000", "Items 1 000 To 5000", "1000 5000".
+ if (/\$\s*\d|\b(under|over|above|below|greater\s*than|less\s*than)\b|\bitems?\b[\s\w]*\d|\bto\b[\s\d,]*\d/.test(l)) return true;
+ if (/^[\d\s,–-]+$/.test(l)) return true; // pure number ranges like "1 000 5 000"
+ if (/\(test\)|\btest\b/.test(l)) return true; // "Y2K (test)"
+ if (/\s\d{1,3}$/.test(t) && !/(19|20)\d0s?$/i.test(t)) return true; // dupe/drop suffixes: "Dresses 1", "Drop 002" (keep "1990s")
  return false;
 }
 

@@ -163,50 +163,87 @@ protect against whales on lower tiers.
 - **Immediate action:** SerpApi Starter is capping (~901/1,000) → move to **Production $150** (Legal Shield).
 - **Pricing implication:** cost is a rounding error vs. value; subscription is the PRIMARY line (1% commission + shipping are thin adds). Price on **value/positioning**; margins 85–95%.
 
-## 8. FINAL model — 2 tiers, gate on consignment + cross-listing (chosen 2026-07-26)
+## 8. FINAL model — 4 tiers, gate on operator tools + meter listings (updated 2026-08-17)
 
-**Why this gate:** consignment + cross-listing are the tools stores **already pay other vendors for**
-(ConsignCloud ~$129/mo, Vendoo/List Perfectly ~$30–70/mo) → proven willingness-to-pay. They cost VYA ~$0
-(consignment = DB/logic; cross-listing = free eBay/Etsy APIs + the seller-run browser extension). So gating
-them is pure value-capture, not cost recovery — textbook-correct. Unlimited listings + AI everywhere.
+Supersedes the earlier 2-tier draft. Differentiate on **listings + seats** (the self-serve upgrade trigger) and
+gate the **operator tools** stores already pay other vendors for. **Commission-capture features (in-person
+payments, Entrupy) are on every tier** — they cost VYA ~$0 and grow the 1% engine, so gating them is self-defeating.
 
-| Tier | $/mo | Everything operational\* | + Consignment | + Cross-listing | + Text-to-list | Commission |
-|---|--:|:--:|:--:|:--:|:--:|--:|
-| **Starter** | **$49** | ✅ (AI listing via app/web) | — | — | — | 1% |
-| **Pro** | **$99** | ✅ | ✅ | ✅ | ✅ (iMessage) | 1% |
-\* Operational = AI listing/autofill (unlimited, via app/web upload), storefront, marketplace, orders + labels,
-inbox, offers, email marketing, CRM, discounts, per-item AI pricing.
+| | **Starter** | **Growth** | **Pro** | **Enterprise** |
+|---|---|---|---|---|
+| Price | **$49/mo** | **$99/mo** | **$159/mo** | **Custom** |
+| For | Solo / casual | Scaling reseller | A full store | Warehouse / multi-store |
+| Seats | 1 | 2 | 3 | Custom |
+| AI listings / mo | ~50 | ~250 | ~500 (fair-use) | Custom |
+| Core\* | ✅ | ✅ | ✅ | ✅ |
+| In-person payments (Tap to Pay) | ✅ | ✅ | ✅ | ✅ |
+| Entrupy Verified badge + 25% off | ✅ | ✅ | ✅ | ✅ |
+| Cross-listing (eBay/Etsy/Depop) | — | ✅ | ✅ | ✅ |
+| Consignment module | — | ✅ | ✅ | ✅ |
+| Marketing automations | — | ✅ | ✅ | ✅ |
+| Text-to-list | — | capped ~150/mo | uncapped | ✅ |
+| Support | Standard | Standard | Priority | Dedicated + SLA |
+| Commission | 1% | 1% | 1% | Custom |
+| ~Gross margin | ~85% | ~70% | ~55–65% | Negotiated |
 
-**Text-to-list is the ONE cost-justified gate** ($289/mo line) — Starter still gets the same AI autofill via
-app/web upload; Pro adds the text-from-anywhere iMessage channel. Concentrating the line cost on the fewer,
-higher-paying Pro stores is correct. One line (~1,000 stores) covers you for a long time.
+\* Core = AI listing (photo→listing), storefront builder + import, marketplace, branded checkout + post-order/
+tracking, inbox + offers, CRM + cart recovery + product analytics, email marketing, discounts, per-item AI pricing.
+Overage ~$1/listing past each cap (~90% margin → no tier goes negative). 30-day trial, no free tier;
+founding-member discount to onboard the existing ~60 stores.
 
-**Unit economics:**
-| | Cost to serve/mo | Price | **Gross margin** |
-|---|--:|--:|--:|
-| Starter | ~$6–8 | $49 | **~85%** |
-| Pro (yr 1, ~27 Pro stores) | ~$20 | $99 | **~79%** → ~87% at scale |
-- Base cost both tiers = ~$3.85 fixed-amortized (~$231/mo stack ÷ 60) + ~$2.80 AI autofill (28 × ~$0.10).
-- Consignment (DB) + cross-listing (free APIs + extension) add ≈ $0.
-- **Pro also carries the iMessage line:** $289/mo ÷ ~27 Pro stores ≈ $10.70 + ~$3 setup (yr 1) → +~$13/Pro
-  store now, diluting to ~$0.30 as Pro count grows (one line ≈ 1,000 stores).
-- Both tiers ~pure margin, **plus 1% of GMV on top.**
+**Four design moves:**
+1. **Upgrade ladder = listings + seats** — "I hit a limit" / "my partner needs a login" is the strongest, most
+   honest conversion trigger (listings are the real variable cost).
+2. **Operator tools gate at Growth+** (consignment, cross-listing, automations) — proven willingness-to-pay
+   ($160–200/mo at ConsignCloud + a cross-lister), ~$0 cost to VYA.
+3. **Commission-capture features on all tiers** (in-person payments, Entrupy) — ~$0 cost, every enabled sale is
+   1% to VYA. Gating them would suppress the second engine.
+4. **Text-to-list gated by *volume*, not access** — the one expensive per-listing feature (~$0.18 vs $0.12 + the
+   $289 line) → capped on Growth, uncapped on Pro; the 500 fair-use ceiling backstops whales.
 
-**Pro is underpriced vs. what it displaces** — a store today pays **$160–200/mo** for ConsignCloud + a
-cross-lister *alone*; VYA Pro at $99 gives both **plus** storefront + marketplace + AI + CRM + email. Room to
-price Pro at **$129–149** and still be a bargain; $99 is the aggressive land-grab number.
+**Cost to serve (from §9 detail):** Starter (28 photo listings) **~$8/mo → ~85%**; Growth (~200) **~$30–35 → ~70%**;
+a text-heavy Pro store (~350 via text) **~$78 → ~55%**. Overage + the 500 cap backstop the extremes. Payroll
+(~$50k/mo) is 99% of fixed cost — break-even is a headcount question, not an infra one.
 
-**Revenue at ~60 stores (say 55% Starter / 45% Pro — many vintage stores cross-list):**
-- Subscription: 33 × $49 + 27 × $99 = **~$4,290/mo MRR**
-- Commission: 1% × total GMV ≈ **~$4,500/mo** (~$100/store × 45 active; est. from 28 sell-through × $375 AOV)
-- less ~$330–430/mo cost → **~90%+ margin**; ~**$8.8k/mo** total today, ~**two equal engines**, both scaling
-  as you add stores and capture more of each store's checkout (commission has the most upside).
+**Data Layer** (market insights / demand / sourcing) → still **not in launch tiers**; ship later as a Pro add-on
+or premium module once proven.
 
-**Data Layer** (market insights / demand index / sourcing) → **not in the launch tiers.** Ship it later as a
-**Pro add-on or a Tier 3** once it's fully built + proven, rather than gating an unproven feature now.
+**Commission = 1% of VYA-processed GMV** (storefront checkout + marketplace + **in-person**). Scaling — a
+per-order cap + volume-regressive rate — is designed in **§8.1**.
 
-**Onboarding:** $49 floor adds friction vs. free — offset with a **founding-member deal** (e.g. 50% off 6 mo
-or first month free) so you onboard your ~60 existing + 20 interested stores now, then $49/$99 is standard.
+### 8.1 Commission scaling — 1% flat, per-order cap, capture-rate is the real lever
+
+**What's captured:** **1% of every sale VYA is the payment rail for** — storefront checkout, **in-person
+(Tap to Pay)**, and the marketplace. Any channel where the money moves through VYA.
+
+**What's NOT captured:** off-platform payments — **Venmo / cash / friends-and-family**, and sales that settle on
+**another marketplace's checkout** (eBay/Etsy/Depop/Poshmark). VYA facilitates cross-listing but doesn't process
+those payments, so there's no 1%. → the strategic pull is to make VYA the **default rail everywhere** so the only
+leakage is the low-value cash/Venmo tail. (Corollary: a cross-listed sale that closes on eBay earns VYA $0 — so
+the incentive is to make VYA's own storefront + marketplace the channel the sale actually happens on.)
+
+**Rate = flat 1% (self-serve).** It's a *platform fee*, not a 6–20% marketplace take, so it rarely triggers
+resistance. No regressive formula for self-serve — **Enterprise negotiates** a lower rate as a volume perk.
+
+**Per-order cap ~$40 — the one real lever.** Keeps high-value grails on-platform (a seller with their own site
+*will* route a $10k sale off to dodge a $100 fee — and those are your highest-value transactions):
+| Item | 1% flat | Capped ~$40 |
+|---|--:|--:|
+| $200 top | $2 | $2 |
+| $2,000 bag | $20 | $20 |
+| $10,000 Birkin | $100 | ~$40 |
+| $20,000 Kelly | $200 | ~$40 |
+
+The cap only bites above ~$4k/item (rare), so **aggregate impact is ≈ nil** — but it removes the incentive to
+take a grail off-platform. Tunable ($30–50).
+
+**Scaling is capture rate, not the %.** The rate stays 1%; the engine grows by capturing **more of each store's
+GMV** onto VYA. In-person (Tap to Pay) is the big unlock — it grabs the offline half that's otherwise cash/Venmo.
+| Stage | stores × GMV/store × 1% | Commission/mo |
+|---|---|--:|
+| Today | ~45 × ~$10.5k | ~$4.5k (≈ MRR) |
+| 300 stores | 300 × ~$12k | ~$36k |
+| 1,000 stores | 1,000 × ~$12k | ~$120k |
 
 ---
 
@@ -273,3 +310,94 @@ Contribution/store = $176.50 − $3.20 = **$173.30**.
   ~$430k/yr profit at 500 stores, ~$1.5M/yr at 1,000. Infra step-ups add only ~$1–2k/mo even at 1,000 stores.
 - **Biggest lever on break-even = commission realization** — capturing 1% of *total* GMV (not just marketplace)
   moves break-even from ~740 → ~300 stores. Getting stores onto VYA checkout matters more than any cost cut.
+
+---
+
+## 10. Entrupy authentication — 5% rev-share (trust/retention play, thin margin)
+
+**Deal — CONFIRMED 2026-08-16.** Store buys authentications at **25% off list**; VYA takes a **5% rev-share**.
+**Entrupy is the merchant** — they bill the store directly (VYA is *not* the reseller). So VYA books **only the
+net 5% as revenue, no COGS, no ARPU gross-up.** This mirrors how **Whatnot** runs Entrupy (negotiated seller
+discount + the platform is not the merchant). *(An earlier reseller framing — VYA buys at 30% off, resells at
+25%, keeps the spread — was dropped: as the card merchant VYA would eat ~2.9% of the gross, which on a 5% spread
+halves the margin. Rev-share keeps the full 5% net and offloads all billing/refund/tax/liability to Entrupy.)*
+
+**No hardware** — Entrupy is now app/photo-based (the device is gone), so it embeds fully in VYA intake.
+
+**Pricing is token-based, and scales with the item** (confirm exact rate + whether our 25%/5% applies to tokens):
+| Item (tier) | Tokens | List (~$5.60/tok) | **Store pays (−25%)** | VYA rev-share (5%) |
+|---|--:|--:|--:|--:|
+| Coach bag / Nike sneaker (Contemporary) | 2 | $11.20 | **$8.40** | $0.56 |
+| Off-White sneaker (Designer) | 3 | $16.80 | **$12.60** | $0.84 |
+| Gucci / LV bag (Designer) | 5 | $28.00 | **$21.00** | $1.40 |
+| Chanel bag (Prestige) | 8 | $44.80 | **$33.60** | $2.24 |
+| Hermès Birkin (Ultra Prestige) | 20 | $112.00 | **$84.00** | $5.60 |
+
+Per-token retail is **$3.78–$5.60** by plan; at platform rates it's lower. So an everyday $200–$2k piece is
+**~$8–28** to authenticate; the scary $84 tier is only Birkins/Kellys (~0.4% of a $20k bag — trivial insurance).
+
+**Why it matters (the margin is NOT the point):**
+1. **Thin rev-share.** 5% net, zero cost to serve — e.g. 4 auths/store/mo × ~$20 list × 5% ≈ **$4/store/mo**
+   (~$180/mo at 45 stores). A nice add, never an engine. In the lab it's booked net (no gross-up).
+2. **The real value = trust + retention.** The **"Entrupy Verified"** badge (99.86% accuracy + a financial
+   guarantee — Entrupy buys the item back if a certified piece is fake) lifts buyer confidence → conversion + AOV
+   on the exact items where authenticity fear kills the sale. And stores get it **25% off + with no $139–$1,049/mo
+   Entrupy subscription** — a sticky reason to route listings through VYA. Reinforces the §8 bundle at $0 to us.
+
+**Competitive context:** $10 services (LegitApp, Authenticate Plus) are a human *photo opinion, no guarantee*;
+Entrupy at ~$8–28 is a **guaranteed certificate**, and it's cheaper than eBay ($40 mid-value) or Fashionphile
+($75/$125). Positioned right, it's the mid-market "trusted cert," not the cheapest glance.
+
+**Positioning:** offer the **Entrupy Verified** badge + 25% discount to **all tiers** (it's rev-share, costs us
+$0, and platform-wide authentication builds buyer trust → GMV). Use it on **high-value pieces** ($500+), where
+the fee is trivial vs. the sale and the guarantee matters most.
+
+### 10.1 API integration map — grounded in Entrupy API v2 (developer.entrupy.com)
+
+**Capture is SDK/app-based; results come back over API/webhook.** The actual scan (bag microscopy / sneaker
+photos) happens in Entrupy's **iOS/Android SDK or app** — there is **no REST photo-upload**. So VYA signs the
+seller into Entrupy *under our org*, the seller scans, and VYA **pulls the result + certificate via API/webhook.**
+
+**Account model — multi-merchant via one org + per-seller users.** VYA = one Entrupy **organization** (partner
+**Bearer token**, server-side only). Each seller = a `unique_user_id` (their store slug) — mirrors our per-store
+sub-account plan for shipping ([[shipping-provider-decision]]).
+- `POST /v2/integrations/authorize-user` — sign a per-seller auth (`unique_user_id`, `email`) → returns a
+  `signed_authorization_request` the seller's Entrupy SDK exchanges for a session token. (Legacy:
+  `/v2/integrations/app-login-voucher`.) Results carry `owner.user_id` → attributable per store for billing.
+
+**Flow:**
+1. On a high-value VYA item, seller taps **"Authenticate with Entrupy."**
+2. VYA server calls `authorize-user` → hands the signed request to the Entrupy SDK (embed in via-app, or
+   deep-link the Entrupy app). **Set `customer_item_id` = our item id.**
+3. Seller scans the piece (device/phone) in the SDK.
+4. Entrupy processes → fires our **webhook** (registered via `POST /v2/webhooks` with a `secret_key`, channel =
+   authentications; verified domain via `/v2/search/domains`) → `POST /api/webhooks/entrupy` with the `entrupy_id`.
+5. VYA fetches `GET /v2/authentications/{entrupy_id}` → `status.result.id` (authentic / not / indeterminate),
+   `certificate.url`, images, `timestamp`. (Fallback/poll: `GET /v2/lookup/authentications/{customer_item_id}`.)
+6. VYA stores it + sets `entrupy_verified` on the item + the certificate link.
+7. **Storefront + cross-listings render an "Entrupy Verified" badge → links to `certificate.url`.**
+8. *(Optional, resale-grade anti-swap):* register the item's **fingerprint** (`/v2/fingerprints`,
+   `/v2/search/fingerprints`) so at ship/sale we can verify the physical item matches the one authenticated.
+
+**Form prefill:** `POST /v2/config/authentications` + `POST /v2/catalog/brands` return supported brand / material /
+category options → prefill the auth form from the item's inferred brand + category.
+
+**Data model — new `authentications` table:** id, store_slug, item_id, provider ('entrupy'), entrupy_id,
+customer_item_id, category, brand, status (pending/authentic/not/indeterminate), certificate_id, certificate_url,
+result_json, list_cents, wholesale_cents (70%), seller_charge_cents (75%), created_at, resolved_at.
+
+**VYA endpoints to build:**
+- `POST /api/store/authenticate` — start an auth (calls authorize-user, writes a pending row, sets customer_item_id).
+- `POST /api/webhooks/entrupy` — signature-verified (secret_key) async results → fetch + store + flag the item.
+- Badge rendering in `app/s/[handle]/p/[id]` + storefront blocks + cross-listing payloads.
+
+**Billing:** Entrupy invoices VYA at wholesale (70%); VYA charges the seller 75% — cleanest as a **per-auth Stripe
+charge** at scan time (card on file), else accrue to the monthly VYA invoice. VYA remits wholesale, keeps the
+5-point spread. Reconcile per `owner.user_id`.
+
+**Unknowns that gate the build:**
+- Exact **list prices + plan structure** (per-auth vs. monthly bundle) → margin math + billing model.
+- Whether the SDK **embeds in our RN app** (via-app) or the flow is a **deep-link to the Entrupy app** (UX only;
+  both pull the same result via API).
+- **Category coverage** (bags ✅ device; sneakers ✅ photos; watches/apparel?) → map to our inferred categories.
+- Certificate `url` is **publicly viewable** (needed for the badge link on public listings) — expected, confirm.

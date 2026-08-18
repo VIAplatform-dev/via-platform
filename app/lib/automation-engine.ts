@@ -86,8 +86,9 @@ const CHECKOUT_BASE = "https://vyaplatform.com";
  * only if the store's "abandoned cart" flow is on. A custom "order_placed"-style
  * automation could layer on later; this covers the built-in flow.
  */
-export async function sendAbandonedCartEmail(cart: AbandonedCart): Promise<boolean> {
- if (!(await isAutomationEnabled(cart.storeSlug, "abandoned_cart").catch(() => true))) return false;
+export async function sendAbandonedCartEmail(cart: AbandonedCart, opts: { force?: boolean } = {}): Promise<boolean> {
+ // Manual sends (the seller clicking "Send reminder") bypass the automation toggle; the cron respects it.
+ if (!opts.force && !(await isAutomationEnabled(cart.storeSlug, "abandoned_cart").catch(() => true))) return false;
  if (!cart.email.includes("@")) return false;
  const { fromName, fromAddress, replyTo } = await resolveStoreSender(cart.storeSlug);
  if (!replyTo) return false;

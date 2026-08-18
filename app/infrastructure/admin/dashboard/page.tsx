@@ -31,6 +31,7 @@ type Overview = {
 type ChannelRow = { channel: string; clicks: number; orders: number; sales: number; convPct: number; aov: number };
 type Traffic = { total: number; byType: { type: string; sessions: number }[]; topSources: { source: string; type: string; sessions: number }[] };
 type TopPages = { total: number; byType: { type: string; views: number }[]; pages: { path: string; type: string; title: string | null; views: number; visitors: number }[] };
+type FunnelItem = { itemId: string; title: string; image: string | null; price: number | null; currency: string; status: string | null; views: number; favorites: number; checkouts: number; purchases: number; abandoned: number };
 type Trend = { days: string[]; series: { channel: string; counts: number[] }[] };
 type Perf = { rows: ChannelRow[]; attributedSales: number; totalSales: number; traffic: Traffic; topPages?: TopPages; trend?: Trend; newCustomers?: number; returningCustomers?: number };
 
@@ -156,6 +157,7 @@ export default function AnalyticsPage() {
  }, []);
  const [data, setData] = useState<Overview | null>(null);
  const [perf, setPerf] = useState<Perf | null>(null);
+ const [funnelItems, setFunnelItems] = useState<FunnelItem[]>([]);
  const [loading, setLoading] = useState(true);
 
  useEffect(() => {
@@ -163,11 +165,12 @@ export default function AnalyticsPage() {
  (async () => {
  setLoading(true);
  try {
- const [ov, pf] = await Promise.all([
+ const [ov, pf, fn] = await Promise.all([
  fetch(`/api/store/analytics/overview?days=${range}`).then((r) => (r.ok ? r.json() : null)),
  fetch(`/api/store/performance?days=${range}`).then((r) => (r.ok ? r.json() : null)),
+ fetch(`/api/store/analytics/funnel?days=${range === "all" ? 365 : range}`).then((r) => (r.ok ? r.json() : null)),
  ]);
- if (active) { if (ov) setData(ov); setPerf(pf); }
+ if (active) { if (ov) setData(ov); setPerf(pf); setFunnelItems(fn?.items || []); }
  } catch { /* keep prior */ }
  if (active) setLoading(false);
  })();
@@ -252,6 +255,38 @@ export default function AnalyticsPage() {
  <TechCard className="p-5">
  <CardTitle>Demand funnel</CardTitle>
  <Funnel steps={[{ label: "Product views", value: data.productViews }, { label: "Favorites", value: data.favorites }, { label: "Orders", value: data.orders }]} />
+ </TechCard>
+ )}
+
+ {/* Per-piece performance — which items get looked at, saved, and where shoppers drop off. */}
+ {funnelItems.length > 0 && (
+ <TechCard className="p-5">
+ <CardTitle>Product performance</CardTitle>
+ <p className="-mt-1 mb-3 text-[12px] text-stone-500">What shoppers view, save, and where they drop off — per piece{data.periodDays === "all" ? "" : `, last ${data.periodDays} days`}. A high <span className="font-medium text-amber-600">abandoned</span> count means people reach checkout but don’t finish — often a price or shipping nudge away.</p>
+ <div className="overflow-x-auto">
+ <table className="w-full">
+ <thead><tr><TH>Item</TH><TH right>Views</TH><TH right>Saves</TH><TH right>Checkouts</TH><TH right>Abandoned</TH></tr></thead>
+ <tbody>
+ {funnelItems.slice(0, 15).map((it) => (
+ <tr key={it.itemId}>
+ <TD>
+ <div className="flex items-center gap-2.5">
+ <span className="h-9 w-9 shrink-0 rounded bg-stone-100 bg-cover bg-center ring-1 ring-black/5" style={it.image ? { backgroundImage: `url("${it.image.replace(/"/g, "%22")}")` } : undefined} />
+ <span className="min-w-0">
+ <span className="block max-w-[240px] truncate font-medium text-stone-800">{it.title}</span>
+ <span className="block text-[11px] text-stone-400">{it.price != null ? money(Math.round(it.price * 100)) : ""}{it.status === "sold" ? " · sold" : ""}</span>
+ </span>
+ </div>
+ </TD>
+ <TD right>{it.views.toLocaleString()}</TD>
+ <TD right>{it.favorites.toLocaleString()}</TD>
+ <TD right>{it.checkouts.toLocaleString()}</TD>
+ <TD right><span className={it.abandoned > 0 ? "font-semibold text-amber-600" : "text-stone-300"}>{it.abandoned.toLocaleString()}</span></TD>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
  </TechCard>
  )}
 
