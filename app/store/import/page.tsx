@@ -18,6 +18,11 @@ export default function BringYourSitePage() {
  const [status, setStatus] = useState<{ loaded: boolean; captured: number; isAdmin: boolean; url: string | null }>({ loaded: false, captured: 0, isAdmin: false, url: null });
 
  useEffect(() => {
+ // Arriving from onboarding after a failed import? Show why + prefill the URL so they can retry.
+ const sp = new URLSearchParams(window.location.search);
+ const err = sp.get("err"); const url = sp.get("url");
+ if (err) setCapErr(err);
+ if (url) setCapUrl(url);
  fetch("/api/store/capture")
  .then((r) => (r.ok ? r.json() : null))
  .then((d) => setStatus({ loaded: true, captured: d?.captured || 0, isAdmin: !!d?.isAdmin, url: d?.url || null }))

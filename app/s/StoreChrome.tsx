@@ -16,9 +16,16 @@ const SOCIAL_ICON: Record<keyof Socials, React.ReactNode> = {
  pinterest: <path d="M12 3.5a8.5 8.5 0 0 0-3.1 16.4c-.1-.7-.2-1.8 0-2.6l1-4.3s-.3-.5-.3-1.3c0-1.2.7-2.1 1.6-2.1.7 0 1.1.6 1.1 1.3 0 .8-.5 2-.8 3.1-.2.9.5 1.6 1.4 1.6 1.6 0 2.8-1.7 2.8-4.1 0-2.2-1.5-3.7-3.7-3.7a3.9 3.9 0 0 0-4 3.9c0 .8.3 1.6.7 2 .1.1.1.2.1.3l-.3 1c0 .2-.2.2-.3.1-1.1-.5-1.8-2.1-1.8-3.4 0-2.8 2-5.3 5.9-5.3 3.1 0 5.5 2.2 5.5 5.1 0 3.1-1.9 5.6-4.6 5.6-.9 0-1.7-.5-2-1l-.6 2.1c-.2.7-.7 1.7-1 2.2A8.5 8.5 0 1 0 12 3.5Z" strokeWidth="0" fill="currentColor" />,
  email: <><rect x="2.5" y="4.5" width="19" height="15" rx="2.5" /><path d="m3.5 6 8.5 6 8.5-6" /></>,
 };
+// A seller can enter a full URL OR just a handle — normalise handles into real profile links so the
+// footer icons always work (a bare "@store" shouldn't 404).
+const handle = (base: string) => (v: string) => (/^https?:\/\//i.test(v) ? v : `https://${base}/${v.replace(/^@|^\/+/g, "")}`);
 const SOCIAL_HREF: Record<keyof Socials, (v: string) => string> = {
- instagram: (v) => v, tiktok: (v) => v, facebook: (v) => v, youtube: (v) => v, pinterest: (v) => v,
- email: (v) => (v.includes("@") ? `mailto:${v}` : v),
+ instagram: handle("instagram.com"),
+ tiktok: (v) => (/^https?:\/\//i.test(v) ? v : `https://www.tiktok.com/@${v.replace(/^@|^\/+/g, "")}`),
+ facebook: handle("facebook.com"),
+ youtube: handle("youtube.com"),
+ pinterest: handle("pinterest.com"),
+ email: (v) => (/^https?:\/\//i.test(v) ? v : v.includes("@") ? `mailto:${v}` : v),
 };
 function socialList(socials?: Socials): { key: keyof Socials; href: string }[] {
  if (!socials) return [];
@@ -70,7 +77,7 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
  );
 }
 
-export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFontFamily, year, socials, footerAbout, newsletter }: ChromeProps & { tagline?: string | null; socials?: Socials; footerAbout?: string; newsletter?: React.ReactNode }) {
+export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFontFamily, year, socials, footerAbout, newsletter, onNav }: ChromeProps & { tagline?: string | null; socials?: Socials; footerAbout?: string; newsletter?: React.ReactNode }) {
  const links = socialList(socials);
  return (
  <footer className="mt-10 border-t border-black/[0.08]" style={{ color: colors.text }}>
@@ -103,7 +110,7 @@ export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFont
  </div>
  {nav.length > 0 && (
  <nav className="flex flex-col items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] opacity-60 sm:items-end">
- {nav.map((n, i) => <a key={i} href={n.href || "#"} className="hover:opacity-100">{n.label}</a>)}
+ {nav.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className="hover:opacity-100" />)}
  </nav>
  )}
  </div>

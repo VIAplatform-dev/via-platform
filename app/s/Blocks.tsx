@@ -4,9 +4,10 @@
 // editor's live preview (client). Sections come from theme.blocks.
 import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
 import { SERIF_FONTS } from "@/app/lib/storefront-templates";
-import { GripVertical } from "lucide-react";
+import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import NewsletterForm from "./NewsletterForm";
 import ContactForm from "./ContactForm";
+import Countdown from "./Countdown";
 import SandboxEmbed from "./SandboxEmbed";
 
 const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
@@ -113,6 +114,17 @@ function bgFor(bg: string | undefined, colors: Colors): { background?: string; f
 const PAD_SCALE: Record<string, string> = { sm: "1rem", md: "2.5rem", lg: "4.5rem", xl: "7rem" };
 const HEAD_SCALE: Record<string, string> = { sm: "1.6rem", md: "2.3rem", lg: "3.2rem", xl: "4.3rem" };
 const ALIGN_FLEX: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+const SHADOW_CSS: Record<string, string> = { sm: "0 1px 3px rgba(20,16,12,.12)", md: "0 8px 24px -6px rgba(20,16,12,.18)", lg: "0 20px 44px -12px rgba(20,16,12,.28)", xl: "0 30px 70px -18px rgba(20,16,12,.38)" };
+// Resolve a section's background to a CSS `background` value (solid / gradient), or undefined.
+function sectionBg(st: BlockStyle, colors: Colors): string | undefined {
+ if (st.bgGradient) { const [c1, c2, a] = st.bgGradient.split("|"); return `linear-gradient(${a || 180}deg, ${c1}, ${c2})`; }
+ const b = st.bg;
+ if (!b) return undefined;
+ if (b === "dark") return bgFor("dark", colors).background;
+ if (b === "accent") return colors.accent;
+ if (/^#[0-9a-fA-F]{6}$/.test(b)) return b;
+ return undefined;
+}
 function sectionOverrideCss(id: string, st: BlockStyle): string {
  const sel = `.vya-b-${id}`;
  const out: string[] = [];
@@ -122,7 +134,20 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  }
  if (st.textColor) out.push(`${sel},${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{color:${st.textColor}!important}`);
  if (st.headingSize) out.push(`${sel} .vya-heading{font-size:${HEAD_SCALE[st.headingSize]}!important;line-height:1.12!important}`);
- if (st.space) out.push(`${sel}{padding-top:${PAD_SCALE[st.space]}!important;padding-bottom:${PAD_SCALE[st.space]}!important}`);
+ if (st.headingFont) out.push(`${sel} .vya-heading{font-family:'${st.headingFont}',Georgia,serif!important}`);
+ if (st.tracking != null) out.push(`${sel} .vya-heading{letter-spacing:${(st.tracking / 100).toFixed(3)}em!important}`);
+ // Padding: explicit px wins over the preset.
+ if (st.padY != null || st.padX != null) {
+ const py = st.padY != null ? `${st.padY}px` : (st.space ? PAD_SCALE[st.space] : null);
+ const parts = [py != null ? `padding-top:${py}!important;padding-bottom:${py}!important` : "", st.padX != null ? `padding-left:${st.padX}px!important;padding-right:${st.padX}px!important` : ""].filter(Boolean).join(";");
+ if (parts) out.push(`${sel}{${parts}}`);
+ } else if (st.space) out.push(`${sel}{padding-top:${PAD_SCALE[st.space]}!important;padding-bottom:${PAD_SCALE[st.space]}!important}`);
+ // Border · radius · shadow — the section reads as a styled card.
+ const box: string[] = [];
+ if (st.radius) box.push(`border-radius:${st.radius}px`, "overflow:hidden");
+ if (st.border) box.push(`border:${st.border}px solid ${st.borderColor || "currentColor"}`);
+ if (st.shadow) box.push(`box-shadow:${SHADOW_CSS[st.shadow]}`);
+ if (box.length) out.push(`${sel}{${box.join(";")}}`);
  return out.join("");
 }
 
@@ -171,6 +196,11 @@ function inlineHtml(v?: string): { __html: string } | null {
  if (!v || v.indexOf("<") === -1) return null;
  return { __html: v.replace(/<\s*script/gi, "").replace(/\son\w+\s*=/gi, " ").replace(/javascript:/gi, "") };
 }
+// Decode HTML entities for plain-text rendering — so a stored "Shipping &amp; Returns" shows "Shipping &
+// Returns", not the literal entity. (Only used on the no-markup branch; React re-escapes on output, so safe.)
+export function decodeEntities(s: string): string {
+ return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&#0?38;/g, "&");
+}
 
 // Drag-to-reorder for FAQ rows — within a section and between two FAQ sections, with a snap/drop line.
 // State lives in the parent (studio) so a row can travel across sections; this renderer just reports the
@@ -204,9 +234,12 @@ function blockBody(b: Block, ctx: Ctx) {
  // Rich text: keeps inline formatting (bold/italic/underline/colour) the floating toolbar applies.
  // On blur we serialize the DOM into a tight safe subset, so what we store is already clean.
  const txt = (v: string | undefined, key: string) => {
- const content = inlineHtml(v) ? { dangerouslySetInnerHTML: inlineHtml(v)! } : { children: v ?? "" };
+ const content = inlineHtml(v) ? { dangerouslySetInnerHTML: inlineHtml(v)! } : { children: decodeEntities(v ?? "") };
  if (!ctx.edit) return content;
- return { ...editBase, onBlur: (e: React.FocusEvent<HTMLElement>) => ctx.onEditField?.(b.id, key, serializeInline(e.currentTarget)), ...content };
+ // On blur: serialize to safe inline HTML, but if the result carries NO markup, store the raw text
+ // instead — else "Shipping & Returns" saves as the escaped entity and renders literally. Rich
+ // formatting (bold/italic/spans) still round-trips as HTML.
+ return { ...editBase, onBlur: (e: React.FocusEvent<HTMLElement>) => { const html = serializeInline(e.currentTarget); ctx.onEditField?.(b.id, key, html.indexOf("<") === -1 ? (e.currentTarget.textContent || "").trim() : html); }, ...content };
  };
  // Plain text: for multi-line copy (the text-block body), where preserving line breaks matters more
  // than inline styling. Syncs the raw text content.
@@ -281,8 +314,8 @@ function blockBody(b: Block, ctx: Ctx) {
  return (
  <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
  {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" style={{ fontFamily: head }} />}
- <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3 @xl:gap-4">
- {tiles.slice(0, 9).map((t, i) => (
+ <div className={`grid grid-cols-2 gap-3 @xl:gap-4 ${p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3"}`}>
+ {tiles.slice(0, 12).map((t, i) => (
  <a key={i} href={shopHref} className="vya-round group relative block aspect-[4/5] overflow-hidden" style={{ background: t.img ? undefined : `${fg}12` }}>
  {t.img && <img src={t.img} alt={t.label} className="absolute inset-0 h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.05]" />}
  {t.img && <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />}
@@ -307,6 +340,66 @@ function blockBody(b: Block, ctx: Ctx) {
  <div className="mb-3 text-[13px] tracking-[0.25em]" style={{ color: colors.accent }}>★★★★★</div>
  <p className="text-[15px] leading-relaxed @xl:text-[16px]">{`“${t.quote}”`}</p>
  {t.name && <p className="mt-4 text-[11px] uppercase tracking-[0.18em] opacity-55">{t.name}</p>}
+ </div>
+ ))}
+ </div>
+ </section>
+ );
+ }
+
+ case "countdown": {
+ const target = (p.date || "").trim();
+ if (!target && !ctx.edit) return null; // no date set → don't show a placeholder on the live site
+ return (
+ <section className="mx-auto max-w-3xl px-6 py-16 @xl:py-24 text-center">
+ {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading text-2xl @xl:text-3xl leading-tight" style={{ fontFamily: head }} />}
+ {(p.subtext || ctx.edit) && <p {...txt(p.subtext, "subtext")} className="vya-sub mx-auto mt-2 max-w-md text-sm opacity-65" />}
+ <div className="mt-10">
+ {target ? <Countdown target={target} accent={colors.accent} headingFontFamily={head} paused={ctx.edit} /> : <p className="text-[11px] uppercase tracking-[0.25em] opacity-40">Set a drop date & time</p>}
+ </div>
+ {p.cta && <a href={p.ctaHref || shopHref} className="vya-cta mt-10 inline-block px-9 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }}>{p.cta}</a>}
+ </section>
+ );
+ }
+
+ case "blog": {
+ // Each line: "Title | excerpt | image URL | link".
+ const arts = (p.items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [title, excerpt, img, link] = l.split("|").map((s) => (s || "").trim()); return { title, excerpt, img, link }; }).filter((a) => a.title);
+ if (!arts.length) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Blog — add posts</div> : null;
+ return (
+ <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+ {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" style={{ fontFamily: head }} />}
+ <div className="grid gap-8 @lg:grid-cols-3 @lg:gap-10">
+ {arts.slice(0, 3).map((a, i) => (
+ <a key={i} href={a.link || "#"} className="group block">
+ <div className="vya-round aspect-[3/2] w-full overflow-hidden" style={{ background: `${fg}0d` }}>
+ {a.img && <img src={a.img} alt={a.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.04]" />}
+ </div>
+ <h3 className="mt-4 text-lg leading-snug @xl:text-xl" style={{ fontFamily: head }}>{a.title}</h3>
+ {a.excerpt && <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed opacity-65">{a.excerpt}</p>}
+ <span className="mt-3 inline-block text-[11px] uppercase tracking-[0.16em]" style={{ color: colors.accent }}>Read more →</span>
+ </a>
+ ))}
+ </div>
+ </section>
+ );
+ }
+
+ case "columns": {
+ // Each line: "Heading | Text | image URL | button label | button link". Any field may be blank.
+ const cols = (p.items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [heading, body, img, btn, href] = l.split("|").map((s) => (s || "").trim()); return { heading, body, img, btn, href }; }).filter((c) => c.heading || c.body || c.img);
+ if (!cols.length) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Columns — add content</div> : null;
+ const gridCls = p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3";
+ return (
+ <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+ {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-12 text-center text-3xl @xl:text-[2.4rem] leading-tight" style={{ fontFamily: head }} />}
+ <div className={`grid grid-cols-1 gap-8 @sm:grid-cols-2 @lg:gap-10 ${gridCls}`}>
+ {cols.slice(0, 8).map((c, i) => (
+ <div key={i} className="flex flex-col">
+ {c.img && <div className="vya-round mb-5 aspect-[4/3] w-full overflow-hidden" style={{ background: `${fg}0d` }}><img src={c.img} alt={c.heading || ""} loading="lazy" className="h-full w-full object-cover" /></div>}
+ {c.heading && <h3 className="text-xl leading-snug @xl:text-2xl" style={{ fontFamily: head }}>{c.heading}</h3>}
+ {c.body && <p className="mt-2 text-[14px] leading-relaxed opacity-70 whitespace-pre-wrap">{c.body}</p>}
+ {c.btn && <a href={c.href || shopHref} className="vya-cta mt-4 inline-block self-start px-6 py-2.5 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }}>{c.btn}</a>}
  </div>
  ))}
  </div>
@@ -558,6 +651,7 @@ export default function Blocks({
  onOver: (i: number) => void;
  onEnd: () => void;
  onDrop: (i: number) => void;
+ onMove?: (i: number, dir: "up" | "down") => void; // one-click nudge, next to the drag grip
  };
  // Editor-only: drag free-form overlay elements around a section. Drag math (px→%) lives in the parent
  // since it needs the section's rect; this renderer just reports select + drag-start.
@@ -591,7 +685,8 @@ export default function Blocks({
  <div className="@container" style={{ fontFamily: body, color: colors.text }}>
  <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + overlayCss }} />
  {blocks.map((b, i) => {
- const { background, fg } = bgFor(b.style?.bg, colors);
+ const { fg } = bgFor(b.style?.bg, colors);
+ const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
  const inner = blockBody(b, { colors, head, body, products, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug });
  const editable = typeof onSelect === "function";
  // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
@@ -605,15 +700,16 @@ export default function Blocks({
  // Hero/image sections render their OWN picture (props.image), so they ignore this layer — otherwise a
  // stale bgImage would show a grey scrim behind them.
  const bgImg = b.type === "hero" || b.type === "image" ? undefined : b.style?.bgImage;
+ const ov = (b.style?.bgOverlay ?? 24) / 100; // scrim strength over a photo (default keeps text legible)
  const secStyle: React.CSSProperties = bgImg
- ? { backgroundImage: `linear-gradient(rgba(0,0,0,0.18),rgba(0,0,0,0.28)), url("${bgImg.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center", color: b.style?.textColor || "#ffffff" }
- : background ? { background, color: fg } : {};
+ ? { backgroundImage: `linear-gradient(rgba(0,0,0,${(ov * 0.75).toFixed(2)}),rgba(0,0,0,${ov.toFixed(2)})), url("${bgImg.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center", color: b.style?.textColor || "#ffffff" }
+ : background ? { background, color: b.style?.textColor || fg } : {};
  return (
  <div
  key={b.id}
  onClick={editable ? (e) => { e.preventDefault(); e.stopPropagation(); onSelect!(b.id); } : undefined}
- onDragOver={editable && reorder ? (e) => { if (dragging !== null) { e.preventDefault(); reorder.onOver(i); } } : undefined}
- onDrop={editable && reorder ? (e) => { if (dragging !== null) { e.preventDefault(); reorder.onDrop(i); } } : undefined}
+ onDragOver={editable && reorder ? (e) => { if (Array.from(e.dataTransfer.types).includes("Files")) return; e.preventDefault(); reorder.onOver(i); } : undefined}
+ onDrop={editable && reorder ? (e) => { if (Array.from(e.dataTransfer.types).includes("Files")) return; e.preventDefault(); reorder.onDrop(i); } : undefined}
  className={editable ? `${secClass} group/sec relative cursor-pointer transition-shadow ${dragging === i ? "opacity-40" : ""} ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : `${secClass} relative`}
  style={Object.keys(secStyle).length ? secStyle : undefined}
  >
@@ -623,6 +719,13 @@ export default function Blocks({
  <span className={`pointer-events-none absolute left-2 top-2 z-20 rounded bg-[#5D0F17] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white transition-opacity ${selectedId === b.id ? "opacity-100" : "opacity-0 group-hover/sec:opacity-100"}`}>{b.type.replace(/[-_]/g, " ")}</span>
  )}
  {editable && reorder && (
+ <div className={`absolute right-2 top-2 z-20 flex items-center gap-0.5 rounded-md bg-white/90 p-0.5 shadow-sm backdrop-blur transition-opacity ${selectedId === b.id ? "opacity-100" : "opacity-0 group-hover/sec:opacity-100"}`}>
+ {reorder.onMove && (
+ <>
+ <button type="button" title="Move up" disabled={i === 0} onClick={(e) => { e.stopPropagation(); reorder.onMove!(i, "up"); }} className="grid h-6 w-6 place-items-center rounded text-[#5D0F17] transition hover:bg-[#5D0F17]/10 disabled:opacity-25"><ChevronUp size={14} /></button>
+ <button type="button" title="Move down" disabled={i === blocks.length - 1} onClick={(e) => { e.stopPropagation(); reorder.onMove!(i, "down"); }} className="grid h-6 w-6 place-items-center rounded text-[#5D0F17] transition hover:bg-[#5D0F17]/10 disabled:opacity-25"><ChevronDown size={14} /></button>
+ </>
+ )}
  <button
  type="button"
  draggable
@@ -630,10 +733,11 @@ export default function Blocks({
  onClick={(e) => e.stopPropagation()}
  onDragStart={(e) => { reorder.onStart(i); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", ""); const sec = (e.currentTarget as HTMLElement).closest(".vya-sec"); if (sec) e.dataTransfer.setDragImage(sec as Element, 30, 20); }}
  onDragEnd={() => reorder.onEnd()}
- className={`absolute right-2 top-2 z-20 grid h-6 w-6 cursor-grab place-items-center rounded bg-white/85 text-[#5D0F17] shadow-sm backdrop-blur transition-opacity active:cursor-grabbing ${selectedId === b.id ? "opacity-100" : "opacity-0 group-hover/sec:opacity-100"}`}
+ className="grid h-6 w-6 cursor-grab place-items-center rounded text-[#5D0F17] transition hover:bg-[#5D0F17]/10 active:cursor-grabbing"
  >
  <GripVertical size={14} />
  </button>
+ </div>
  )}
  {inner}
  {b.overlays?.length ? (

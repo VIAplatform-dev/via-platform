@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
  extraPages: theme.extraPages ?? [],
  socials: theme.socials ?? {},
  footerAbout: theme.footerAbout ?? "",
+ navLinks: theme.navLinks ?? [],
  storeName: sf?.theme?.storeName || sf?.tagline || null,
  tagline: sf?.tagline || null,
  templates: STOREFRONT_TEMPLATES,
@@ -110,6 +111,16 @@ export async function POST(request: NextRequest) {
  theme.socials = out;
  }
  if (typeof body?.footerAbout === "string") theme.footerAbout = body.footerAbout.slice(0, 300);
+ // Custom header/footer links (label + href + where to show).
+ if (Array.isArray(body?.navLinks)) {
+ theme.navLinks = (body.navLinks as unknown[]).map((l) => {
+ const o = l as { label?: unknown; href?: unknown; place?: unknown };
+ const label = String(o?.label ?? "").trim().slice(0, 40);
+ const href = String(o?.href ?? "").trim().slice(0, 400);
+ const place = o?.place === "header" || o?.place === "footer" || o?.place === "both" ? o.place : "both";
+ return label && href ? { label, href, place } : null;
+ }).filter(Boolean).slice(0, 12) as { label: string; href: string; place: "header" | "footer" | "both" }[];
+ }
 
  await setStorefrontTheme(slug, theme);
  return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
-import { getCapturePage, updateCapturePageHtml } from "@/app/lib/site-capture-db";
-import { applyEdits, type PageEdits, type NewBlock } from "@/app/lib/site-capture";
+import { getCapturePage, updateCapturePageHtml, listCapturePaths } from "@/app/lib/site-capture-db";
+import { applyEdits, extractChromeEdits, applyChromeEditsToPage, hasChromeEdits, NEW_BLOCK_TYPES, type PageEdits, type NewBlock } from "@/app/lib/site-capture";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +19,12 @@ export async function POST(request: NextRequest) {
  const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
  // `sections` is the full desired section order (reorder/duplicate/delete in one array);
  // when present it supersedes the legacy per-index deleteSecs/dupSecs.
- const VALID_NEW = new Set(["text", "image", "button", "divider"]);
+ const VALID_NEW = new Set<string>(NEW_BLOCK_TYPES);
  const sections = Array.isArray(body?.sections)
  ? (body.sections as unknown[]).map((e): number | NewBlock | null => {
    if (typeof e === "number" && e >= 0) return e;
-   const o = e as { new?: unknown; text?: unknown; href?: unknown } | null;
-   if (o && typeof o.new === "string" && VALID_NEW.has(o.new)) return { new: o.new as NewBlock["new"], text: typeof o.text === "string" ? o.text : undefined, href: typeof o.href === "string" ? o.href : undefined };
+   const o = e as { new?: unknown; text?: unknown; href?: unknown; html?: unknown } | null;
+   if (o && typeof o.new === "string" && VALID_NEW.has(o.new)) return { new: o.new as NewBlock["new"], text: typeof o.text === "string" ? o.text : undefined, href: typeof o.href === "string" ? o.href : undefined, html: typeof o.html === "string" ? o.html : undefined };
    return null;
    }).filter((e): e is number | NewBlock => e !== null)
  : undefined;
@@ -45,5 +45,24 @@ export async function POST(request: NextRequest) {
  if (html == null) return NextResponse.json({ error: "Page not found." }, { status: 404 });
 
  const ok = await updateCapturePageHtml(slug, path, applyEdits(html, p));
- return ok ? NextResponse.json({ ok: true, applied: total }) : NextResponse.json({ error: "Save failed." }, { status: 500 });
+ if (!ok) return NextResponse.json({ error: "Save failed." }, { status: 500 });
+
+ // Shared header/footer/nav edits → propagate to every other captured page so the whole site stays in
+ // sync (each page has its own copy of the chrome). Best-effort; never fails the primary save.
+ let propagated = 0;
+ try {
+ const chrome = extractChromeEdits(html, p);
+ if (hasChromeEdits(chrome)) {
+ const paths = await listCapturePaths(slug).catch(() => [] as string[]);
+ for (const other of paths) {
+ if (other === path) continue;
+ const oh = await getCapturePage(slug, other).catch(() => null);
+ if (!oh) continue;
+ const res = applyChromeEditsToPage(oh, chrome);
+ if (res.changed && await updateCapturePageHtml(slug, other, res.html).catch(() => false)) propagated++;
+ }
+ }
+ } catch { /* propagation is best-effort */ }
+
+ return NextResponse.json({ ok: true, applied: total, propagated });
 }

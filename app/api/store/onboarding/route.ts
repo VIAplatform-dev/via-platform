@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // store can't be created for someone else. Idempotent: a refresh/double-submit returns the
 // store already made rather than creating a duplicate. Does its own auth (in PUBLIC_ROUTES).
 
-const CATEGORIES = new Set(["vintage", "designer", "streetwear", "y2k", "denim", "mixed"]);
+const CATEGORIES = new Set(["vintage", "designer", "streetwear", "y2k", "denim", "workwear", "contemporary", "menswear", "womenswear", "accessories", "mixed"]);
 const CHANNELS = new Set(["shopify", "square", "depop", "instagram", "in-person", "none"]);
 
 export async function POST(request: NextRequest) {
@@ -39,12 +39,14 @@ export async function POST(request: NextRequest) {
   try { websiteUrl = new URL(withScheme).toString(); } catch { websiteUrl = null; }
  }
  const sellsCategory = CATEGORIES.has(body?.sellsCategory) ? String(body.sellsCategory) : null;
+ // The full multi-select (preset keys + any free-typed categories) — kept for pricing/category tuning.
+ const sellsCategories = Array.isArray(body?.sellsCategories) ? body.sellsCategories.map((c: unknown) => String(c).slice(0, 40)).filter(Boolean).slice(0, 12) : [];
  const sellsChannel = CHANNELS.has(body?.sellsChannel) ? String(body.sellsChannel) : null;
 
  const slug = await generateUniqueSlug(name);
  await createStoreAccount({
   slug, name, ownerEmail: email, hasWebsite, websiteUrl, sellsCategory, sellsChannel,
-  onboarding: { hasWebsite, websiteUrl, sellsCategory, sellsChannel },
+  onboarding: { hasWebsite, websiteUrl, sellsCategory, sellsCategories, sellsChannel },
  });
  await addStoreUser(slug, email, "owner");
 

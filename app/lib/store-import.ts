@@ -40,6 +40,8 @@ export type StorefrontTheme = {
  // Footer: the store's social links + a short about blurb, shown site-wide in the footer.
  socials?: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string; pinterest?: string; email?: string };
  footerAbout?: string;
+ // Custom links the seller adds to the header and/or footer nav (beyond the auto page/collection links).
+ navLinks?: { label: string; href: string; place?: "header" | "footer" | "both" }[];
  // cloned design (from site-clone): the original's name, nav, hero, and pages.
  storeName?: string | null;
  nav?: string[];
@@ -539,4 +541,13 @@ export async function importStoreBlocks(raw: string): Promise<HomeBlock[]> {
  if (!u) return [];
  const meta = await readHomepage(u.origin).catch(() => null);
  return meta?.blocks || [];
+}
+
+// Like importStoreBlocks, but also returns the store's OWN theme (real colours, fonts, logo) and brand
+// name — so an import can look like their site, not our starter theme. One homepage read, both outputs.
+export async function importStoreThemeAndBlocks(raw: string): Promise<{ theme: StorefrontTheme | null; blocks: HomeBlock[]; name: string | null }> {
+ const u = await assertPublicUrl(raw);
+ if (!u) return { theme: null, blocks: [], name: null };
+ const meta = await readHomepage(u.origin).catch(() => null);
+ return { theme: meta?.theme || null, blocks: meta?.blocks || [], name: meta?.name || null };
 }

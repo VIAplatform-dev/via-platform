@@ -4,9 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import Blocks from "@/app/s/Blocks";
 import Sidekick from "../Sidekick";
 import { useStoreBase } from "../nav-base";
-import { RotateCw, Globe, ChevronDown, Home as HomeIcon, Copy, Check, ExternalLink, SlidersHorizontal, GripVertical, ChevronUp, X as XIcon, Plus, Monitor, Tablet, Smartphone, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { RotateCw, Globe, ChevronDown, ChevronLeft, ChevronRight, Home as HomeIcon, Copy, Check, ExternalLink, SlidersHorizontal, GripVertical, ChevronUp, X as XIcon, Plus, Monitor, Tablet, Smartphone, AlignLeft, AlignCenter, AlignRight, Palette, Sparkles, Undo2, Redo2, Trash2, Layers, Shapes, Type, Upload as UploadIcon, Image as ImageIcon, Minus, MousePointerClick } from "lucide-react";
 import { makeBlock, pageSlugify, type Block, type BlockDef, type BlockType, type BlockStyle, type BlockScale, type StorePage } from "@/app/lib/storefront-blocks";
-import { parseDesign, buildDesignCss, HEADING_FONTS, BODY_FONTS, type DesignSettings } from "@/app/lib/captured-design";
+import { parseDesign, buildDesignCss, type DesignSettings, type Radius } from "@/app/lib/captured-design";
+import { STOREFRONT_PALETTES, RADIUS_OPTIONS } from "@/app/lib/storefront-templates";
+import { ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
+import SectionThumb from "@/app/store/storefront/SectionThumb";
 
 type Template = { id: string; name: string; description: string; colors: { bg: string; text: string; accent: string }; fonts: { heading: string; body: string }; heroStyle: string };
 type Colors = { bg: string; text: string; accent: string };
@@ -20,8 +23,19 @@ type PanelField =
  | { kind: "image"; id: number; src: string }
  | { kind: "link"; id: number; href: string; label: string };
 
-const SERIFS = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces"]);
+const SERIFS = new Set(["Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces", "Source Serif 4"]);
 const ff = (name: string) => `'${name}', ${SERIFS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}`;
+// Same curated pairings + corner previews as the studio, so the captured Design tab is 1:1.
+const FONT_PAIRS: { name: string; heading: string; body: string }[] = [
+ { name: "Editorial", heading: "Playfair Display", body: "Inter" },
+ { name: "High Contrast", heading: "Bodoni Moda", body: "DM Sans" },
+ { name: "Contemporary", heading: "Bricolage Grotesque", body: "Inter" },
+ { name: "Warm Serif", heading: "Fraunces", body: "Source Serif 4" },
+ { name: "Literary", heading: "Newsreader", body: "Newsreader" },
+ { name: "Romantic", heading: "Cormorant Garamond", body: "Poppins" },
+ { name: "Modern", heading: "Space Grotesk", body: "Inter" },
+];
+const RADIUS_PREVIEW: Record<string, string> = { sharp: "0", soft: "6px", round: "9999px" };
 const money = (c: number | null, cur: string) => (c == null ? "" : new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(c / 100));
 
 export default function StorefrontEditor() {
@@ -29,10 +43,11 @@ export default function StorefrontEditor() {
  const [loading, setLoading] = useState(true);
  const [tab, setTab] = useState<"design" | "sections" | "assets" | "details" | "domain">("sections");
  const [storeName, setStoreName] = useState("Your Store");
- const [showDesign, setShowDesign] = useState(false); // captured-mode: design popover in the preview chrome
+ const [capTab, setCapTab] = useState<"design" | "sections" | "elements" | "text" | "uploads" | "assist">("design"); // captured-mode left rail — 1:1 with the from-scratch studio
+ const [capPanelOpen, setCapPanelOpen] = useState(true); // collapse the side panel (Canva-style), keeping the icon rail
  const [showControls, setShowControls] = useState(true); // block-mode: the Customize slide-over
  const [copiedUrl, setCopiedUrl] = useState(false);
- const liveUrl = (sub: string) => `vyaplatform.com/s/${handle || "your-store"}${sub}`;
+ const liveUrl = (sub: string) => `${handle || "your-store"}.getvya.ai${sub}`;
  const [selBlock, setSelBlock] = useState<string | null>(null); // block-mode: section selected from the preview
  // Click a section in the live preview → open its editor in the Customize panel.
  function selectBlock(id: string) {
@@ -94,7 +109,7 @@ export default function StorefrontEditor() {
  const [err, setErr] = useState<string | null>(null);
 
  // Captured site (a seller who brought their own site over): they edit THAT, not blocks.
- const [captured, setCaptured] = useState<{ count: number; url: string | null; origin: string | null; pages: string[] } | null>(null);
+ const [captured, setCaptured] = useState<{ count: number; url: string | null; slug: string | null; origin: string | null; pages: string[] } | null>(null);
  const [isAdmin, setIsAdmin] = useState(false); // owner-only: the reset/wipe action
  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false); // platform admin login only: delete storefront
  const [selPath, setSelPath] = useState("/");
@@ -109,14 +124,22 @@ export default function StorefrontEditor() {
  const [panelDirty, setPanelDirty] = useState(false);
  const [panelSaving, setPanelSaving] = useState(false);
  const editIframe = useRef<HTMLIFrameElement>(null);
+ // Click an image on the captured site → select it here, then swap it from the asset library (Canva-style).
+ const [selImg, setSelImg] = useState<{ id: number; src: string } | null>(null);
+ const [assetsBusy, setAssetsBusy] = useState(false);
+ const [capStatus, setCapStatus] = useState<"saved" | "unsaved" | "saving">("saved"); // captured-editor save state (from the iframe)
+ const [secStyle, setSecStyle] = useState<{ bg?: string; color?: string; align?: string }>({}); // selected captured section's style
+ const [secRect, setSecRect] = useState<{ top: number; cx: number } | null>(null); // selected section position (iframe coords) → floating bar
+ const capturedRef = useRef<typeof captured>(null);
+ capturedRef.current = captured; // live ref for the (deps:[]) postMessage handler
 
  // Global design for a captured site: accent + fonts, layered over the theme via custom CSS.
- const [design, setDesign] = useState<DesignSettings>({ accent: null, heading: null, body: null });
+ const [design, setDesign] = useState<DesignSettings>({ accent: null, heading: null, body: null, bg: null, text: null, radius: null });
  const [designRest, setDesignRest] = useState(""); // any other custom CSS (e.g. VYA-assistant-added) to preserve
+ const [designLoaded, setDesignLoaded] = useState(false); // guard: don't auto-save until the server design is in
  const [customCss, setCustomCss] = useState(""); // block-mode: raw custom CSS (AI- or hand-written), layered over the theme
  const [cssBusy, setCssBusy] = useState(false);
  const [cssSaved, setCssSaved] = useState(false);
- const [designBusy, setDesignBusy] = useState(false);
  const [designSaved, setDesignSaved] = useState(false);
 
  useEffect(() => {
@@ -133,8 +156,9 @@ export default function StorefrontEditor() {
  fetch("/api/store/capture/css"),
  ]);
  if (cancelled) return;
- if (capR.ok) { const c = await capR.json(); setIsAdmin(!!c.isAdmin); if (c.captured > 0) setCaptured({ count: c.captured, url: c.url, origin: c.origin, pages: c.pages || [] }); }
+ if (capR.ok) { const c = await capR.json(); setIsAdmin(!!c.isAdmin); if (c.captured > 0) setCaptured({ count: c.captured, url: c.url, slug: c.slug || null, origin: c.origin, pages: c.pages || [] }); }
  if (cssR.ok) { const { css } = await cssR.json(); const { settings, rest } = parseDesign(css || ""); setDesign(settings); setDesignRest(rest); }
+ setDesignLoaded(true);
  if (asR.ok) { const a = await asR.json(); setAssets(a.assets || []); }
  if (meR.ok) { const m = await meR.json(); setStoreName(m.storeName || "Your Store"); }
  if (sfR.ok) {
@@ -205,30 +229,104 @@ export default function StorefrontEditor() {
 
  // Apply the global design (accent + fonts) to the captured site's custom-CSS layer,
  // preserving any other custom CSS, then reload the preview to show it.
- async function saveDesignCss() {
- setDesignBusy(true); setDesignSaved(false);
- try {
+ // Live design like the studio: the moment a colour/font/corner changes, inject it into the preview
+ // instantly (postMessage → a <style> in the iframe) AND auto-save (debounced) — no Apply button, no reload.
+ const designSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+ useEffect(() => {
+ if (!captured || !designLoaded) return; // never auto-save the empty mount state over the server's design
  const css = buildDesignCss(design, designRest);
- const r = await fetch("/api/store/capture/css", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ css }) });
- if (r.ok) { setDesignSaved(true); setPreviewKey((k) => k + 1); }
- } catch { /* leave unsaved */ }
- setDesignBusy(false);
- }
+ postToPreview({ vya: "css", css });
+ setDesignSaved(false);
+ if (designSaveTimer.current) clearTimeout(designSaveTimer.current);
+ designSaveTimer.current = setTimeout(() => {
+ fetch("/api/store/capture/css", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ css }) }).then(() => setDesignSaved(true)).catch(() => {});
+ }, 650);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [design, designRest, captured, designLoaded]);
+ // Undo/redo shortcuts for the captured editor — forwarded into the preview iframe. (When you're typing
+ // in the iframe the browser handles ⌘Z natively; this covers the rest + the top-bar buttons.)
+ useEffect(() => {
+ if (!captured) return;
+ const onKey = (e: KeyboardEvent) => {
+ if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+ const t = e.target as HTMLElement | null;
+ if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+ e.preventDefault();
+ postToPreview({ vya: e.shiftKey ? "redo" : "undo" });
+ };
+ window.addEventListener("keydown", onKey);
+ return () => window.removeEventListener("keydown", onKey);
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [captured]);
+ // Studio-parity Design handlers, wired to the captured CSS layer.
+ const setDesignField = (patch: Partial<DesignSettings>) => { setDesign((d) => ({ ...d, ...patch })); setDesignSaved(false); };
+ const applyCapPalette = (c: { bg: string; text: string; accent: string }) => setDesignField({ bg: c.bg, text: c.text, accent: c.accent });
+ const capPaletteActive = (c: { bg: string; text: string; accent: string }) => design.bg === c.bg && design.text === c.text && design.accent === c.accent;
 
  // Live bridge to the preview iframe: it reports a clicked section's fields; we send edits back.
  useEffect(() => {
  function onMsg(e: MessageEvent) {
- const d = e.data as { vya?: string; index?: number; fields?: PanelField[] };
+ const d = e.data as { vya?: string; index?: number; fields?: PanelField[]; path?: string; id?: number; src?: string; style?: { bg?: string; color?: string; align?: string }; rect?: { top: number; cx: number } };
  if (!d || !d.vya) return;
- if (d.vya === "section") { setPanel({ index: d.index ?? -1, fields: d.fields || [] }); setPanelDirty(false); setPanelSaving(false); }
- else if (d.vya === "unsaved") setPanelDirty(true);
- else if (d.vya === "saved") { setPanel(null); setPanelDirty(false); setPanelSaving(false); }
+ if (d.vya === "section") { setPanel({ index: d.index ?? -1, fields: d.fields || [] }); setSelImg(null); setSecStyle(d.style || {}); setSecRect(d.rect || null); setPanelDirty(false); setPanelSaving(false); }
+ else if (d.vya === "secrect") setSecRect({ top: (d as { top: number }).top, cx: (d as { cx: number }).cx });
+ else if (d.vya === "imgsel" && typeof d.id === "number") { setSelImg({ id: d.id, src: d.src || "" }); setPanel(null); }
+ else if (d.vya === "navigate" && typeof d.path === "string") {
+ // Clicked an internal link on the site → switch the editor to that page.
+ const pages = capturedRef.current?.pages || [];
+ const p = d.path;
+ const match = pages.find((x) => x === p || x.replace(/\/$/, "") === p.replace(/\/$/, "")) || (p === "/" ? "/" : null);
+ if (match) { setSelPath(match); setPanel(null); setSelImg(null); setPreviewKey((k) => k + 1); }
+ }
+ else if (d.vya === "unsaved") { setPanelDirty(true); setCapStatus("unsaved"); }
+ else if (d.vya === "saved") { setPanelDirty(false); setPanelSaving(false); setCapStatus("saved"); }
+ else if (d.vya === "status") { const s = (d as { text?: string }).text; setCapStatus(s === "Saving…" ? "saving" : s === "Unsaved changes" ? "unsaved" : "saved"); }
  }
  window.addEventListener("message", onMsg);
  return () => window.removeEventListener("message", onMsg);
  }, []);
 
  const postToPreview = (msg: unknown) => editIframe.current?.contentWindow?.postMessage(msg, "*");
+ // Asset library (Canva-style uploads) — the store's own photos, reusable across the whole site.
+ async function loadAssets() {
+ setAssetsBusy(true);
+ const r = await fetch("/api/store/assets").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ setAssets(r?.assets || []);
+ setAssetsBusy(false);
+ }
+ async function uploadAsset(file: File): Promise<string | null> {
+ setAssetsBusy(true);
+ const fd = new FormData(); fd.append("file", file);
+ const r = await fetch("/api/store/assets", { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ setAssetsBusy(false);
+ if (r?.url) { const url = r.url as string; setAssets((a) => [{ url }, ...a.filter((x) => x.url !== url)]); return url; }
+ return null;
+ }
+ // Swap the selected image on the canvas for a library asset (live) + mark it for save.
+ function applyImage(src: string) {
+ if (!selImg) return;
+ postToPreview({ vya: "set", kind: "image", id: selImg.id, src });
+ setSelImg((s) => (s ? { ...s, src } : s));
+ setPanelDirty(true);
+ }
+ // Style the selected captured section (background / text colour / alignment) — live + tracked for save.
+ function setSec(prop: "bg" | "color" | "align", value: string) {
+ const css = prop === "bg" ? "background-color" : prop === "color" ? "color" : "text-align";
+ postToPreview({ vya: "secstyle", prop: css, value });
+ setSecStyle((s) => ({ ...s, [prop]: value }));
+ }
+ function setSecPhoto(url: string) {
+ postToPreview({ vya: "secstyle", prop: "background-image", value: `url("${url}")` });
+ postToPreview({ vya: "secstyle", prop: "background-size", value: "cover" });
+ postToPreview({ vya: "secstyle", prop: "background-position", value: "center" });
+ setSecStyle((s) => ({ ...s, bg: "" }));
+ }
+ function setSecSpace(px: string) {
+ postToPreview({ vya: "secstyle", prop: "padding-top", value: px });
+ postToPreview({ vya: "secstyle", prop: "padding-bottom", value: px });
+ }
+ // eslint-disable-next-line react-hooks/rules-of-hooks
+ useEffect(() => { if (captured) loadAssets(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [!!captured]);
  function updatePanelField(i: number, patch: Record<string, unknown>) {
  setPanel((p) => (p ? { ...p, fields: p.fields.map((f, idx) => (idx === i ? ({ ...f, ...patch } as PanelField) : f)) } : p));
  setPanelDirty(true);
@@ -426,87 +524,112 @@ export default function StorefrontEditor() {
  const seg = p.split("/").filter(Boolean).pop() || p;
  return seg.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
  };
- const editSrc = `${captured.url || ""}${selPath === "/" ? "" : selPath}?edit=1`;
- let siteHost = "your site";
- try { siteHost = new URL(captured.url || captured.origin || "").host || siteHost; } catch { /* ignore */ }
+ // Edit preview must be SAME-ORIGIN so it loads the captured pages on whatever host the editor is on
+ // (localhost, getvya.ai). captured.url is an absolute public URL (prod / custom domain) — wrong for the
+ // iframe. Build a relative /site/{slug} path from the slug (falling back to the url's pathname).
+ const sitePath = captured.slug ? `/site/${captured.slug}` : (() => { try { return new URL(captured.url || "").pathname; } catch { return ""; } })();
+ const editSrc = `${sitePath}${selPath === "/" ? "" : selPath}?edit=1`;
+ // Show the store's VYA address (matches the from-scratch studio), not the original captured host.
+ const siteHost = `${handle || captured.slug || "your-store"}.getvya.ai`;
+ const deviceMax = device === "phone" ? "390px" : device === "tablet" ? "834px" : "100%";
+ const capDbtn = (d: "desktop" | "tablet" | "phone", Icon: typeof Monitor) => (
+ <button type="button" onClick={() => setDevice(d)} aria-label={d} className={`grid h-7 w-9 place-items-center rounded-md transition ${device === d ? "bg-white text-stone-800 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}><Icon size={15} strokeWidth={1.9} /></button>
+ );
  return (
- <div className="fixed inset-0 z-[60] flex flex-col bg-[#f4f4f5] text-stone-900">
+ <div className="fixed inset-0 z-[60] flex flex-col bg-[#fbf9f5] text-stone-900">
  <HideGlobalChat />
- {/* Top bar */}
- <header className="flex items-center justify-between gap-3 border-b border-stone-200/80 bg-white px-3 py-2">
- <div className="flex min-w-0 items-center gap-2">
- <a href={`${base}/home`} className="flex items-center gap-2 rounded-lg border border-stone-200 px-2 py-1 text-[13px] font-semibold text-stone-800 transition hover:bg-stone-50" title="Back to your store">
- <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-[#5D0F17] text-[11px] font-bold text-white">{(storeName || "V").slice(0, 1).toUpperCase()}</span>
- <span className="truncate">{storeName}</span>
- <span className="hidden text-[10px] font-normal uppercase tracking-[0.14em] text-stone-400 sm:inline">/ Builder</span>
- </a>
+ {/* Top bar — matches the studio */}
+ <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
+ <div className="flex min-w-0 items-center gap-2.5">
+ <a href={`${base}/home`} title="Back to admin" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronDown size={16} className="rotate-90" /></a>
+ <span className="truncate text-[15px] font-semibold tracking-tight">{storeName}</span>
+ <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
+ <span className="hidden shrink-0 rounded-full bg-[#5D0F17]/[0.07] px-2 py-0.5 text-[10px] font-semibold text-[#5D0F17] sm:inline">Imported site</span>
+ <span className="mx-0.5 h-5 w-px bg-black/10" />
+ <div className="flex overflow-hidden rounded-lg border border-black/10 bg-[#f4f1ec]">
+ <button type="button" onClick={() => postToPreview({ vya: "undo" })} title="Undo (⌘Z)" aria-label="Undo" className="grid h-7 w-8 place-items-center text-stone-500 transition hover:bg-white hover:text-stone-800"><Undo2 size={15} strokeWidth={1.9} /></button>
+ <span className="w-px bg-black/10" />
+ <button type="button" onClick={() => postToPreview({ vya: "redo" })} title="Redo (⌘⇧Z)" aria-label="Redo" className="grid h-7 w-8 place-items-center text-stone-500 transition hover:bg-white hover:text-stone-800"><Redo2 size={15} strokeWidth={1.9} /></button>
  </div>
- <div className="flex shrink-0 items-center gap-1.5">
- <button type="button" onClick={toggleLive} className="flex items-center gap-2 rounded-lg border border-stone-200 px-2.5 py-1.5 transition hover:bg-stone-50" aria-pressed={enabled} title={enabled ? "Your store is live — click to unpublish" : "Your store is off — click to publish"}>
- <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-emerald-500" : "bg-stone-300"}`} />
+ </div>
+ <div className="hidden rounded-lg border border-black/10 bg-[#f4f1ec] p-0.5 md:flex">{capDbtn("desktop", Monitor)}{capDbtn("tablet", Tablet)}{capDbtn("phone", Smartphone)}</div>
+ <div className="flex shrink-0 items-center gap-2">
+ {capStatus === "unsaved"
+ ? <button type="button" onClick={() => postToPreview({ vya: "save" })} className="rounded-lg bg-[#5D0F17] px-3.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">Save</button>
+ : <span className="hidden text-[11px] text-stone-400 sm:inline">{capStatus === "saving" ? "Saving…" : "All changes saved"}</span>}
+ <button type="button" onClick={toggleLive} className="flex items-center gap-2 rounded-lg border border-black/15 px-3 py-1.5 transition hover:bg-stone-100" aria-pressed={enabled} title={enabled ? "Your store is live — click to unpublish" : "Your store is off — click to publish"}>
  <span className="text-[12px] font-medium text-stone-600">{enabled ? "Live" : "Off"}</span>
  <span className="relative h-4 w-7 rounded-full transition" style={{ background: enabled ? "#10b981" : "#d6d3d1" }}><span className="absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all" style={{ left: enabled ? "14px" : "2px" }} /></span>
  </button>
- <button onClick={() => { setShowDesign((v) => !v); setPanel(null); }} className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[13px] font-medium transition ${showDesign ? "border-[#5D0F17]/30 bg-[#5D0F17]/[0.04] text-[#5D0F17]" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}><SlidersHorizontal size={14} strokeWidth={2} /><span className="hidden sm:inline">Customize</span></button>
- {captured.url && <a href={captured.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg bg-[#5D0F17] px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]"><ExternalLink size={14} strokeWidth={2.25} /><span className="hidden sm:inline">View live</span></a>}
+ {captured.url && <a href={captured.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg bg-[#5D0F17] px-4 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]"><ExternalLink size={13} /><span className="hidden sm:inline">View live</span></a>}
  </div>
- </header>
+ </div>
 
- {/* Split: chat + framed preview */}
  <div className="flex min-h-0 flex-1">
- {/* Chat dock */}
- <aside className="hidden w-[340px] shrink-0 border-r border-stone-200 sm:block">
- <Sidekick docked />
- </aside>
-
- {/* Preview */}
- <section className="flex min-w-0 flex-1 flex-col">
- {/* Browser chrome toolbar */}
- <div className="flex items-center gap-2 border-b border-stone-200 bg-white px-3 py-2">
- <span className="hidden gap-1.5 pr-1 md:flex"><i className="h-3 w-3 rounded-full bg-stone-200" /><i className="h-3 w-3 rounded-full bg-stone-200" /><i className="h-3 w-3 rounded-full bg-stone-200" /></span>
- <button onClick={() => setPreviewKey((k) => k + 1)} title="Reload preview" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"><RotateCw size={14} strokeWidth={2} /></button>
- <div className="relative shrink-0">
- <HomeIcon size={13} strokeWidth={2} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
- <select value={selPath} onChange={(e) => { setSelPath(e.target.value); setPanel(null); setPreviewKey((k) => k + 1); }} className="cursor-pointer appearance-none rounded-lg border border-stone-200 bg-white py-1.5 pl-8 pr-7 text-[12.5px] font-medium text-stone-700 transition hover:border-stone-300 focus:outline-none">
- {captured.pages.map((p) => <option key={p} value={p}>{pageLabel(p)}</option>)}
- </select>
- <ChevronDown size={13} strokeWidth={2.25} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-400" />
+ {/* Canva-style shell: a vertical icon rail (always visible) + a collapsible content panel — 1:1 with the from-scratch studio */}
+ <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-white transition-[width] duration-200 ${capPanelOpen ? "w-[430px]" : "w-[70px]"}`}>
+ <button type="button" onClick={() => setCapPanelOpen((o) => !o)} title={capPanelOpen ? "Collapse panel" : "Expand panel"} className="absolute -right-3 top-1/2 z-30 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-black/10 bg-white text-stone-500 shadow-sm transition hover:text-[#5D0F17]">{capPanelOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}</button>
+ {/* Vertical icon rail */}
+ <div className="flex w-[70px] shrink-0 flex-col items-center gap-1 overflow-y-auto py-3">
+ {([["design", "Design", Palette], ["sections", "Sections", Layers], ["elements", "Elements", Shapes], ["text", "Text", Type], ["uploads", "Uploads", UploadIcon], ["assist", "VYA", Sparkles]] as const).map(([id, label, Icon]) => (
+ <button key={id} type="button" onClick={() => { if (!(selImg || panel) && capTab === id && capPanelOpen) { setCapPanelOpen(false); } else { setCapTab(id); setCapPanelOpen(true); } }} className={`flex w-[58px] flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-medium transition ${!(selImg || panel) && capTab === id && capPanelOpen ? "bg-[#5D0F17]/[0.08] text-[#5D0F17]" : "text-stone-500 hover:bg-stone-100"}`}>
+ <Icon size={19} strokeWidth={1.8} />{label}
+ </button>
+ ))}
  </div>
- <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5">
- <Globe size={12} strokeWidth={2} className="shrink-0 text-stone-400" />
- <span className="truncate text-[12px] text-stone-500">{siteHost}{selPath === "/" ? "" : selPath}</span>
- <span className="ml-auto shrink-0 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-600">Live</span>
+ {/* Active panel — hidden when the side bar is collapsed */}
+ {capPanelOpen && (
+ <div className="flex min-h-0 flex-1 flex-col border-l border-black/10 bg-white">
+ {(selImg || panel) ? (
+ /* ── Contextual editor — selecting an image/section replaces the rail (like the studio) ── */
+ <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+ {selImg ? (
+ <>
+ <div className="mb-3 flex items-center justify-between">
+ <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Replace image</p>
+ <button onClick={() => setSelImg(null)} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
  </div>
+ {/* eslint-disable-next-line @next/next/no-img-element */}
+ <img src={selImg.src} alt="" className="mb-3 aspect-[4/3] w-full rounded-lg border border-black/10 object-cover" />
+ <label className="mb-3 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#5D0F17] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">
+ <Plus size={14} /> Upload a photo
+ <input type="file" accept="image/*" className="hidden" disabled={assetsBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const url = await uploadAsset(f); if (url) applyImage(url); }} />
+ </label>
+ <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Your uploads</p>
+ {assets.length === 0 ? (
+ <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet — add photos and they'll live here, reusable across your whole site."}</p>
+ ) : (
+ <div className="grid grid-cols-3 gap-1.5">
+ {assets.map(({ url }) => (
+ // eslint-disable-next-line @next/next/no-img-element
+ <button key={url} type="button" onClick={() => applyImage(url)} className={`aspect-square overflow-hidden rounded-md border transition hover:ring-2 hover:ring-[#5D0F17]/40 ${selImg.src === url ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/40" : "border-black/10"}`}><img src={url} alt="" className="h-full w-full object-cover" /></button>
+ ))}
  </div>
-
- {/* Preview surface */}
- <div className="relative min-h-0 flex-1 bg-[#f4f4f5] p-3">
- <iframe ref={editIframe} key={`${selPath}-${previewKey}`} src={editSrc} className="h-full w-full rounded-lg border border-stone-200 bg-white shadow-sm" title="Page editor" />
-
- {!panel && !showDesign && (
- <div className="pointer-events-none absolute inset-x-0 top-6 mx-auto w-fit rounded-full bg-black/65 px-3 py-1 text-[11px] text-white/90 backdrop-blur-sm">Click any text or image to edit · or ask VYA on the left</div>
  )}
-
- {/* Section edit panel — floating */}
- {panel && (
- <div className="absolute right-6 top-6 z-10 w-80 max-w-[calc(100%-3rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl">
- <div className="flex items-center justify-between border-b border-stone-100 px-4 py-2.5">
- <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500">Edit section</p>
- <button onClick={() => setPanel(null)} className="text-[13px] text-stone-400 hover:text-[#5D0F17]">✕</button>
+ </>
+ ) : panel ? (
+ <>
+ <div className="mb-3 flex items-center justify-between">
+ <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Edit section</p>
+ <button onClick={() => setPanel(null)} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
  </div>
- <div className="max-h-[65vh] space-y-4 overflow-y-auto px-4 py-4">
- {panel.fields.length === 0 && <p className="text-xs text-stone-400">Nothing text/image to edit here — use the section toolbar (move, duplicate, delete) in the preview, or ask VYA.</p>}
+ <div className="mb-4 flex gap-2">
+ <button onClick={() => postToPreview({ vya: "dupsec" })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Copy size={13} /> Duplicate</button>
+ <button onClick={() => { postToPreview({ vya: "delsec" }); setPanel(null); }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Delete</button>
+ </div>
+ {panel.fields.length === 0 && <p className="text-[12px] leading-relaxed text-stone-400">This section has no editable text or images — move, duplicate, or delete it, or ask VYA.</p>}
+ <div className="space-y-4">
  {panel.fields.map((f, i) => (
  <div key={(f.kind === "text" ? "t" + f.eid : f.kind === "image" ? "i" + f.id : "l" + f.id) + "-" + i}>
  {f.kind === "text" && (
  <>
- <label className="block text-[11px] text-stone-500 mb-1">{fieldLabel(f.tag)}</label>
- <textarea value={f.value} onChange={(e) => { updatePanelField(i, { value: e.target.value }); postToPreview({ vya: "set", kind: "text", eid: f.eid, value: e.target.value }); }} className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-2 text-[13px] resize-y min-h-[42px] outline-none focus:border-[#5D0F17]/50" />
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">{fieldLabel(f.tag)}</label>
+ <textarea value={f.value} onChange={(e) => { updatePanelField(i, { value: e.target.value }); postToPreview({ vya: "set", kind: "text", eid: f.eid, value: e.target.value }); }} className="min-h-[42px] w-full resize-y rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50" />
  </>
  )}
  {f.kind === "image" && (
  <>
- <label className="block text-[11px] text-stone-500 mb-1">Image</label>
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Image</label>
  <div className="flex items-center gap-2.5">
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={f.src} alt="" className="h-12 w-12 rounded border border-stone-200 object-cover" />
@@ -516,67 +639,266 @@ export default function StorefrontEditor() {
  )}
  {f.kind === "link" && (
  <>
- <label className="block text-[11px] text-stone-500 mb-1">Link{f.label ? ` — “${f.label}”` : ""}</label>
- <input value={f.href} onChange={(e) => { updatePanelField(i, { href: e.target.value }); postToPreview({ vya: "set", kind: "link", id: f.id, href: e.target.value }); }} placeholder="https://…  or  /page" className="w-full rounded-md border border-stone-300 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50" />
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{f.label ? ` — “${f.label}”` : ""}</label>
+ <input value={f.href} onChange={(e) => { updatePanelField(i, { href: e.target.value }); postToPreview({ vya: "set", kind: "link", id: f.id, href: e.target.value }); }} placeholder="https://…  or  /page" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50" />
  </>
  )}
  </div>
  ))}
- {panel.fields.length > 0 && (
- <button onClick={savePanel} disabled={panelSaving || !panelDirty} className="w-full rounded-md bg-[#5D0F17] px-3 py-2 text-[12px] font-medium text-white hover:bg-[#4a0c12] disabled:opacity-50">{panelSaving ? "Saving…" : panelDirty ? "Save changes" : "Saved"}</button>
- )}
+ </div>
+ <div className="mt-5 border-t border-black/10 pt-4">
+ <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Section style</p>
+ <div className="space-y-2">
+ <div className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2">
+ <span className="flex-1 text-[13px] text-stone-700">Background</span>
+ {secStyle.bg && <button onClick={() => setSec("bg", "")} title="Clear" className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">reset</button>}
+ <ColorSwatch value={secStyle.bg || "#ffffff"} onChange={(v) => setSec("bg", v)} />
+ </div>
+ <div className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2">
+ <span className="flex-1 text-[13px] text-stone-700">Text</span>
+ {secStyle.color && <button onClick={() => setSec("color", "")} title="Clear" className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">reset</button>}
+ <ColorSwatch value={secStyle.color || "#1a1a1a"} onChange={(v) => setSec("color", v)} />
+ </div>
+ <div className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2">
+ <span className="flex-1 text-[13px] text-stone-700">Align</span>
+ <div className="flex overflow-hidden rounded-md border border-black/10">
+ {(["left", "center", "right"] as const).map((a) => (
+ <button key={a} onClick={() => setSec("align", a)} className={`grid h-7 w-8 place-items-center transition ${secStyle.align === a ? "bg-[#5D0F17] text-white" : "text-stone-500 hover:bg-stone-100"}`}>{a === "left" ? <AlignLeft size={14} /> : a === "center" ? <AlignCenter size={14} /> : <AlignRight size={14} />}</button>
+ ))}
  </div>
  </div>
+ </div>
+ </div>
+ </>
+ ) : null}
+ </div>
+ ) : (
+ <>
+ {capTab === "assist" ? (
+ <div className="min-h-0 flex-1"><Sidekick docked /></div>
+ ) : capTab === "sections" ? (
+ /* ── Sections — drop a whole section onto the captured page (same gallery as the studio) ── */
+ <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add a section</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Drops it at the bottom of your page — then click its text or images to edit, or drag it into place.</p>
+ <div className="grid grid-cols-2 gap-2">
+ {([["hero", "Hero"], ["announcement", "Announcement"], ["faq", "FAQ"], ["gallery", "Gallery"], ["split", "Split"], ["columns", "Columns"], ["testimonials", "Reviews"], ["blog", "Blog"], ["contact", "Contact"], ["statement", "Statement"], ["newsletter", "Newsletter"]] as const).map(([type, label]) => (
+ <button key={type} type="button" onClick={() => postToPreview({ vya: "addblock", type })} title={label} className="group flex flex-col overflow-hidden rounded-xl border border-black/10 bg-white text-left transition hover:-translate-y-px hover:border-[#5D0F17]/40 hover:shadow-[0_10px_26px_-14px_rgba(43,36,29,0.5)]">
+ <div className="h-[58px] w-full border-b border-black/5 bg-gradient-to-b from-white to-stone-50"><SectionThumb type={type} /></div>
+ <span className="flex items-center gap-1 px-2.5 py-1.5"><span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-stone-800">{label}</span><Plus size={12} className="shrink-0 text-stone-300 transition group-hover:text-[#5D0F17]" /></span>
+ </button>
+ ))}
+ </div>
+ <p className="mt-5 rounded-xl bg-stone-50 px-4 py-3 text-[12px] leading-relaxed text-stone-500">Want a live drop countdown or something custom? Ask <button type="button" onClick={() => setCapTab("assist")} className="font-semibold text-[#5D0F17] underline">VYA</button> to build it into your site.</p>
+ </div>
+ ) : capTab === "elements" ? (
+ /* ── Elements — small building blocks dropped onto the page ── */
+ <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Adds a block at the bottom of the page — then click it to edit, or drag it into place.</p>
+ <div className="grid grid-cols-3 gap-2">
+ {([["image", "Image", ImageIcon], ["button", "Button", MousePointerClick], ["divider", "Line", Minus]] as const).map(([type, label, Icon]) => (
+ <button key={type} type="button" onClick={() => postToPreview({ vya: "addblock", type })} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">
+ <Icon size={17} strokeWidth={1.8} />
+ <span className="text-[10px] font-semibold">{label}</span>
+ </button>
+ ))}
+ </div>
+ </div>
+ ) : capTab === "text" ? (
+ /* ── Text — drop a text block onto the page ── */
+ <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Text</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Adds a text block to the page — click it to edit, and use the floating toolbar to size, colour, and align it.</p>
+ <div className="flex flex-col gap-2">
+ {([["Heading", "text-[20px] font-semibold"], ["Paragraph", "text-[13px]"]] as const).map(([label, cls]) => (
+ <button key={label} type="button" onClick={() => postToPreview({ vya: "addblock", type: "text" })} className="flex items-center justify-between rounded-lg border border-black/10 bg-white px-3.5 py-3 text-stone-700 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">
+ <span className={cls}>{label}</span><Plus size={14} className="text-stone-300" />
+ </button>
+ ))}
+ </div>
+ </div>
+ ) : capTab === "uploads" ? (
+ /* ── Uploads — the media library; click a photo to drop it onto the page ── */
+ <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+ <label className="mb-4 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#5D0F17] px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">{assetsBusy ? "Uploading…" : (<><UploadIcon size={14} /> Upload a photo</>)}<input type="file" accept="image/*" className="hidden" disabled={assetsBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) await uploadAsset(f); }} /></label>
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Your uploads</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Click a photo to drop it onto your page as an image, reusable across your whole site.</p>
+ {assets.length === 0 ? (
+ <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet — add photos and they'll live here."}</p>
+ ) : (
+ <div className="grid grid-cols-3 gap-1.5">
+ {assets.map(({ url }) => (
+ // eslint-disable-next-line @next/next/no-img-element
+ <button key={url} type="button" onClick={() => postToPreview({ vya: "addblock", type: "image", src: url })} className="aspect-square overflow-hidden rounded-md border border-black/10 transition hover:ring-2 hover:ring-[#5D0F17]/40"><img src={url} alt="" className="h-full w-full object-cover" /></button>
+ ))}
+ </div>
  )}
+ </div>
+ ) : (
+ /* ── Design tab — 1:1 with the studio: palettes / colours / corners / fonts ── */
+ <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+ <p className="mb-2 rounded-lg bg-[#5D0F17]/[0.05] px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">Your imported site keeps its own layout — these set its palette, fonts and corners on top. <b>Apply</b> to preview.</p>
 
- {/* Customize — accent + fonts + custom CSS, layered site-wide (right slide-over) */}
- {showDesign && (
- <div className="absolute bottom-0 right-0 top-0 z-20 flex w-[340px] max-w-[88%] flex-col overflow-hidden border-l border-stone-200 bg-white shadow-[0_0_40px_-10px_rgba(0,0,0,0.25)]">
- <div className="flex items-center justify-between border-b border-stone-100 px-4 py-2.5">
- <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">Customize</p>
- <button onClick={() => setShowDesign(false)} className="text-stone-400 hover:text-[#5D0F17]"><XIcon size={15} /></button>
+ <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Colour palette</p>
+ <div className="grid grid-cols-3 gap-2">
+ {STOREFRONT_PALETTES.map((p) => (
+ <button key={p.id} type="button" onClick={() => applyCapPalette(p.colors)} title={p.name} className={`overflow-hidden rounded-lg border text-left transition ${capPaletteActive(p.colors) ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <div className="flex h-11" style={{ background: p.colors.bg }}>
+ <span className="m-auto flex gap-1">
+ <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: p.colors.text }} />
+ <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ background: p.colors.accent }} />
+ </span>
  </div>
- <div className="flex-1 overflow-y-auto px-4 py-4">
- <label className="block text-[11px] text-stone-500 mb-1">Accent color</label>
- <div className="flex items-center gap-2 mb-3">
- <input type="color" value={design.accent && /^#[0-9a-fA-F]{6}$/.test(design.accent) ? design.accent : "#5D0F17"} onChange={(e) => { setDesign((d) => ({ ...d, accent: e.target.value })); setDesignSaved(false); }} className="h-8 w-10 cursor-pointer border border-stone-200 bg-white p-0.5 shrink-0" title="Recolor buttons & links" />
- {design.accent
-  ? <button onClick={() => { setDesign((d) => ({ ...d, accent: null })); setDesignSaved(false); }} className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Keep theme</button>
-  : <span className="text-[11px] text-stone-400 leading-tight">Pick to recolor buttons &amp; links</span>}
+ <p className="truncate px-1.5 py-1 text-[9px] font-medium text-stone-500">{p.name}</p>
+ </button>
+ ))}
  </div>
- <label className="block text-[11px] text-stone-500 mb-1">Headings</label>
- <select value={design.heading || ""} onChange={(e) => { setDesign((d) => ({ ...d, heading: e.target.value || null })); setDesignSaved(false); }} className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[12px] mb-3">
- <option value="">Keep theme font</option>
- {HEADING_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
- </select>
- <label className="block text-[11px] text-stone-500 mb-1">Body</label>
- <select value={design.body || ""} onChange={(e) => { setDesign((d) => ({ ...d, body: e.target.value || null })); setDesignSaved(false); }} className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-[12px] mb-3">
- <option value="">Keep theme font</option>
- {BODY_FONTS.map((f) => <option key={f} value={f}>{f}</option>)}
- </select>
- <label className="mb-1 block text-[11px] font-medium text-stone-500">Custom CSS</label>
- <p className="mb-1.5 text-[10px] leading-tight text-stone-400">Advanced — layered over your site. Or just ask VYA to make the change.</p>
- <textarea value={designRest} onChange={(e) => { setDesignRest(e.target.value); setDesignSaved(false); }} spellCheck={false} placeholder=".site-header { background: #111; }" className="mb-3 min-h-[120px] w-full resize-y rounded-md border border-stone-300 bg-white px-2.5 py-2 font-mono text-[11px] leading-relaxed outline-none focus:border-[#5D0F17]/50" />
- <button onClick={saveDesignCss} disabled={designBusy} className="w-full rounded-md bg-[#5D0F17] px-3 py-2 text-[12px] font-medium text-white hover:bg-[#4a0c12] disabled:opacity-50">{designBusy ? "Applying…" : "Apply to my site"}</button>
- {designSaved && <p className="mt-2 text-[11px] text-green-700">Applied ✓ — preview updated</p>}
+
+ <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Colours</p>
+ <div className="space-y-1.5">
+ {([["bg", "Background", "#FFFFFF"], ["text", "Text", "#1A1A1A"], ["accent", "Accent", "#5D0F17"]] as const).map(([key, label, fallback]) => (
+ <div key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
+ <span className="flex-1 text-[13px] text-stone-700">{label}</span>
+ {design[key] && <button onClick={() => setDesignField({ [key]: null })} title="Keep original" className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">reset</button>}
+ <ColorSwatch value={design[key] || fallback} onChange={(v) => setDesignField({ [key]: v })} />
+ </div>
+ ))}
+ </div>
+
+ <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Corners</p>
+ <div className="grid grid-cols-3 gap-2">
+ {RADIUS_OPTIONS.map((r) => (
+ <button key={r.id} type="button" onClick={() => setDesignField({ radius: r.id as Radius })} className={`flex flex-col items-center gap-2 rounded-lg border py-3 transition ${design.radius === r.id ? "border-[#5D0F17] bg-[#5D0F17]/[0.05] ring-1 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <span className="h-7 w-7 border-2 border-stone-500" style={{ borderRadius: RADIUS_PREVIEW[r.id] }} />
+ <span className="text-[11px] font-medium text-stone-600">{r.name}</span>
+ </button>
+ ))}
+ </div>
+
+ <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Fonts</p>
+ <div className="grid grid-cols-2 gap-2">
+ {FONT_PAIRS.map((fp) => (
+ <button key={fp.name} type="button" onClick={() => setDesignField({ heading: fp.heading, body: fp.body })} className={`rounded-lg border px-3 py-2 text-left transition ${design.heading === fp.heading && design.body === fp.body ? "border-[#5D0F17] ring-1 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <span className="block truncate text-[15px] leading-tight text-stone-800" style={{ fontFamily: ff(fp.heading) }}>{fp.name}</span>
+ <span className="block truncate text-[10px] text-stone-400" style={{ fontFamily: ff(fp.body) }}>{fp.heading} · {fp.body}</span>
+ </button>
+ ))}
+ </div>
+ {(design.heading || design.body) && <button onClick={() => setDesignField({ heading: null, body: null })} className="mt-2 text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Keep original fonts</button>}
+
+ <p className="mt-4 text-[11px] text-stone-400">{designSaved ? "All changes saved ✓ — live on your site" : "Changes apply live as you edit."}</p>
+
+ <details className="mt-4">
+ <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Custom CSS</summary>
+ <p className="mb-1.5 mt-2 text-[12px] leading-snug text-stone-400">Advanced — layered over your site. Or just ask VYA.</p>
+ <textarea value={designRest} onChange={(e) => { setDesignRest(e.target.value); setDesignSaved(false); }} spellCheck={false} placeholder=".site-header { background: #111; }" className="min-h-[100px] w-full resize-y rounded-lg border border-black/10 bg-white px-2.5 py-2 font-mono text-[11px] leading-relaxed outline-none focus:border-[#5D0F17]/50" />
+ </details>
+
  {isAdmin && (
- <div className="mt-4 space-y-2 border-t border-stone-100 pt-3">
- <button onClick={reSync} disabled={syncBusy} className="w-full rounded-md border border-stone-300 px-3 py-1.5 text-[11px] font-medium text-stone-600 hover:border-[#5D0F17] disabled:opacity-50">{syncBusy ? "Syncing…" : "Re-sync from live site (admin)"}</button>
+ <div className="mt-5 space-y-2 border-t border-black/10 pt-4">
+ <button onClick={reSync} disabled={syncBusy} className="w-full rounded-lg border border-black/15 px-3 py-1.5 text-[12px] font-medium text-stone-600 hover:border-[#5D0F17] disabled:opacity-50">{syncBusy ? "Syncing…" : "Re-sync from live site (admin)"}</button>
  {(syncBusy || syncMsg) && <p className={`text-[11px] ${syncBusy ? "text-stone-400" : syncMsg!.startsWith("✓") ? "text-green-700" : "text-amber-700"}`}>{syncBusy ? "Re-crawling — a minute or two…" : syncMsg}</p>}
  <button onClick={async () => { if (!confirm("OWNER RESET: discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone — continue?")) return; await fetch("/api/store/capture", { method: "DELETE" }).catch(() => {}); setCaptured(null); }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
  </div>
  )}
  {isPlatformAdmin && (
- <div className="mt-4 space-y-1.5 border-t border-stone-100 pt-3">
- <button onClick={removeStorefront} disabled={delBusy} className="w-full rounded-md border border-red-200 px-3 py-1.5 text-[11px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">{delBusy ? "Deleting…" : "Delete storefront"}</button>
+ <div className="mt-4 space-y-1.5 border-t border-black/10 pt-4">
+ <button onClick={removeStorefront} disabled={delBusy} className="w-full rounded-lg border border-red-200 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">{delBusy ? "Deleting…" : "Delete storefront"}</button>
  <p className="text-[10px] leading-tight text-stone-400">Platform admin only — wipes this storefront entirely.</p>
  </div>
  )}
  </div>
+ )}
+ </>
+ )}
  </div>
  )}
  </div>
- </section>
+
+ {/* Canvas */}
+ <div className="flex min-w-0 flex-1 flex-col">
+ {/* Page selector chrome */}
+ <div className="flex items-center gap-2 border-b border-black/10 bg-white px-3 py-2">
+ <button onClick={() => setPreviewKey((k) => k + 1)} title="Reload preview" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"><RotateCw size={14} strokeWidth={2} /></button>
+ <div className="relative shrink-0">
+ <HomeIcon size={13} strokeWidth={2} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
+ <select value={selPath} onChange={(e) => { setSelPath(e.target.value); setPanel(null); setPreviewKey((k) => k + 1); }} className="cursor-pointer appearance-none rounded-lg border border-black/10 bg-white py-1.5 pl-8 pr-7 text-[12.5px] font-medium text-stone-700 transition hover:border-stone-300 focus:outline-none">
+ {captured.pages.map((p) => <option key={p} value={p}>{pageLabel(p)}</option>)}
+ </select>
+ <ChevronDown size={13} strokeWidth={2.25} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-400" />
+ </div>
+ <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-black/10 bg-stone-50 px-2.5 py-1.5">
+ <Globe size={12} strokeWidth={2} className="shrink-0 text-stone-400" />
+ <span className="truncate text-[12px] text-stone-500">{siteHost}{selPath === "/" ? "" : selPath}</span>
+ </div>
+ </div>
+
+ {/* Preview surface — the pixel-perfect captured site */}
+ <div className="relative flex min-h-0 flex-1 justify-center bg-[#eeece7] p-4">
+ <div className="h-full w-full transition-[max-width] duration-300" style={{ maxWidth: deviceMax }}>
+ <iframe ref={editIframe} key={`${selPath}-${previewKey}-${device}`} src={editSrc} onLoad={() => { setPanel(null); setSelImg(null); setSecRect(null); }} className="h-full w-full rounded-lg border border-black/10 bg-white shadow-sm" title="Page editor" />
+ </div>
+ {/* Floating section bar — the SAME bar as the from-scratch builder, positioned over the selected section */}
+ {panel && secRect && editIframe.current && (() => {
+ const ir = editIframe.current.getBoundingClientRect();
+ const top = Math.max(ir.top + 6, Math.min(ir.top + secRect.top + 6, ir.bottom - 54));
+ const left = Math.min(Math.max(ir.left + secRect.cx, ir.left + 200), ir.right - 200);
+ const accent = design.accent && /^#[0-9a-fA-F]{6}$/.test(design.accent) ? design.accent : "#5D0F17";
+ const chip = (on: boolean) => `shrink-0 rounded-md px-2 py-1 text-[11px] font-medium transition ${on ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`;
+ return (
+ <div style={{ position: "fixed", top, left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
+ <span className="shrink-0 text-[10px] uppercase tracking-wide text-stone-400">Bg</span>
+ <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
+ <button type="button" onClick={() => setSec("bg", "")} className={chip(!secStyle.bg)}>Page</button>
+ <button type="button" onClick={() => setSec("bg", accent)} className={chip(secStyle.bg === accent)}>Accent</button>
+ <button type="button" onClick={() => setSec("bg", "#1a1a1a")} className={chip(secStyle.bg === "#1a1a1a")}>Dark</button>
+ </div>
+ <ColorDot value={secStyle.bg && /^#/.test(secStyle.bg) ? secStyle.bg : "#ffffff"} onChange={(v) => setSec("bg", v)} title="Custom colour" />
+ <label className="shrink-0 cursor-pointer rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12]">{assetsBusy ? "Uploading…" : "Photo"}<input type="file" accept="image/*" className="hidden" disabled={assetsBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const url = await uploadAsset(f); if (url) setSecPhoto(url); }} /></label>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ <ColorDot value={secStyle.color && /^#/.test(secStyle.color) ? secStyle.color : "#111111"} onChange={(v) => setSec("color", v)} title="Text colour" />
+ <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
+ {(["left", "center", "right"] as const).map((a) => (
+ <button key={a} type="button" onClick={() => setSec("align", secStyle.align === a ? "" : a)} className={chip(secStyle.align === a)}>{a[0].toUpperCase()}</button>
+ ))}
+ </div>
+ <div className="flex shrink-0 items-center gap-1">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Space</span>
+ <div className="flex overflow-hidden rounded-md border border-black/10">
+ {([["sm", "24px"], ["md", "48px"], ["lg", "72px"], ["xl", "112px"]] as const).map(([lab, px]) => (
+ <button key={lab} type="button" onClick={() => setSecSpace(px)} className={chip(false)}>{lab.toUpperCase()}</button>
+ ))}
+ </div>
+ </div>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ <button type="button" onClick={() => postToPreview({ vya: "movesec", dir: "up" })} title="Move up" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"><ChevronUp size={15} /></button>
+ <button type="button" onClick={() => postToPreview({ vya: "movesec", dir: "down" })} title="Move down" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"><ChevronDown size={15} /></button>
+ <button type="button" onClick={() => postToPreview({ vya: "dupsec" })} title="Duplicate" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><Copy size={14} /></button>
+ <button type="button" onClick={() => { postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); }} title="Delete" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ </div>
+ );
+ })()}
+ </div>
+ {/* Canva-style Pages strip — the captured site's pages as thumbnails (click to switch) */}
+ {captured.pages.length > 1 && (
+ <div className="flex shrink-0 items-end gap-3 overflow-x-auto border-t border-black/10 bg-white px-4 py-3">
+ {captured.pages.map((p) => (
+ <div key={p} className="flex shrink-0 flex-col items-center gap-1.5">
+ <button type="button" onClick={() => { setSelPath(p); setPanel(null); setSelImg(null); setPreviewKey((k) => k + 1); }} title={pageLabel(p)} className={`relative grid h-[68px] w-[52px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${selPath === p ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <div className="absolute inset-0 flex flex-col gap-1 p-1.5">
+ <div className="h-1.5 w-3/4 rounded-full bg-stone-200" />
+ <div className="h-1 w-full rounded-full bg-stone-100" />
+ <div className="h-1 w-5/6 rounded-full bg-stone-100" />
+ <div className="mt-auto h-3 w-full rounded-sm bg-stone-100" />
+ </div>
+ </button>
+ <span className={`max-w-[60px] truncate text-[10px] ${selPath === p ? "font-semibold text-[#5D0F17]" : "text-stone-500"}`}>{pageLabel(p)}</span>
+ </div>
+ ))}
+ </div>
+ )}
+ </div>
  </div>
  </div>
  );
@@ -905,8 +1227,8 @@ export default function StorefrontEditor() {
  <div className="mb-5">
  <label className={label}>Storefront URL</label>
  <div className="flex items-stretch">
- <span className="inline-flex items-center bg-stone-100 border border-r-0 border-stone-200 px-3 text-sm text-stone-400">vyaplatform.com/s/</span>
  <input className={`${input} rounded-none`} value={handle} onChange={(e) => { setHandle(e.target.value); setSaved(false); }} placeholder="your-store" />
+ <span className="inline-flex items-center bg-stone-100 border border-l-0 border-stone-200 px-3 text-sm text-stone-400">.getvya.ai</span>
  </div>
  </div>
  <div className="mb-5">
@@ -937,7 +1259,7 @@ export default function StorefrontEditor() {
  <div className="mb-6 border border-stone-200 bg-white p-4">
  <p className="text-[12px] font-medium text-stone-400 mb-1.5">Your store is already live</p>
  <div className="flex items-center justify-between gap-3">
- <p className="font-mono text-sm truncate">vyaplatform.com/s/{handle || "your-store"}</p>
+ <p className="font-mono text-sm truncate">{handle || "your-store"}.getvya.ai</p>
  {handle && <a href={`/s/${handle}?preview=1`} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[11px] uppercase tracking-[0.14em] text-stone-500 hover:text-[#5D0F17]">View ↗</a>}
  </div>
  <p className="mt-2 text-xs text-stone-400">No domain needed — share this link to start selling today.</p>

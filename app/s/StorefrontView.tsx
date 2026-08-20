@@ -101,7 +101,13 @@ export default async function StorefrontView({ settings, view = "home", preview 
  if (bodyFont) vars["--font-body"] = `'${bodyFont}', system-ui, sans-serif`;
  const rootStyle = { ...vars, background: bg, color: text, ...(bodyFont ? { fontFamily: "var(--font-body)" } : {}) } as CSSProperties;
  const headingStyle: CSSProperties = headingFont ? { fontFamily: "var(--font-heading)", color: accent } : { color: accent };
- const fontsHref = googleFontsHref([headingFont, bodyFont].filter(Boolean) as string[]);
+ // Per-section heading-font overrides (deep style inspector) must be loaded too, or they'd fall back.
+ const blockHeadingFonts = [
+ ...(theme.blocks ?? []),
+ ...(theme.shopBlocks ?? []),
+ ...((theme.extraPages ?? []).flatMap((p) => p.blocks ?? [])),
+ ].map((b) => (b?.style as { headingFont?: string } | undefined)?.headingFont).filter(Boolean) as string[];
+ const fontsHref = googleFontsHref([headingFont, bodyFont, ...blockHeadingFonts].filter(Boolean) as string[]);
  const nav = theme.nav ?? [];
  const pages = theme.pages ?? [];
  const sections = theme.sections ?? [];
@@ -147,6 +153,11 @@ export default async function StorefrontView({ settings, view = "home", preview 
  ? [{ label: "Home", href: withPreview(`/s/${sf.handle}`) }, { label: "Shop", href: shopHref }, ...collectionNav, ...extraPages.map((p) => ({ label: p.title, href: withPreview(`/s/${sf.handle}/${p.slug}`) }))]
  : null;
  const finalNav = blockNav ?? navItems;
+ // Custom seller-added links merge into the header and/or footer nav (external URLs pass through; internal ones keep the ?preview flag).
+ const linkHref = (h: string) => (h.startsWith("/") ? withPreview(h) : h);
+ const customLinks = (theme.navLinks ?? []).filter((l) => l.label && l.href);
+ const headerNav = [...finalNav, ...customLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: linkHref(l.href) }))];
+ const footerNav = [...finalNav, ...customLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: linkHref(l.href) }))];
  const gridHeading = isShop ? collectionTitle || categoryLabel || (query ? `Search: ${query}` : "Shop") : productsSection?.headline || "New Arrivals";
  const heroHeadline = theme.hero?.headline ?? null;
  const heroSub = theme.hero?.subheadline ?? null;
@@ -196,7 +207,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <div className="px-4 py-2 text-center text-[11px] tracking-wide text-white" style={{ background: accent }}>{header.announcement}</div>
  )}
  {/* Header: logo · nav · utility icons */}
- {(finalNav.length > 0 || logo) && (
+ {(headerNav.length > 0 || logo) && (
  <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 border-b border-black/[0.07] px-6 sm:px-8 py-5" style={{ background: bg }}>
  <a href={withPreview(`/s/${sf.handle}`)} className="shrink-0">
  {logo ? (
@@ -206,7 +217,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
  </a>
  <div className="hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex">
- {finalNav.map((n, i) =>
+ {headerNav.map((n, i) =>
  /^shop/i.test(n.label) && categories.length ? (
  <div key={i} className="group relative">
  <a href={n.href} className="hover:opacity-100">{n.label} ⌄</a>
@@ -232,9 +243,9 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </nav>
  )}
  {/* Mobile nav row */}
- {finalNav.length > 0 && (
+ {headerNav.length > 0 && (
  <div className="flex items-center gap-5 overflow-x-auto border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden">
- {finalNav.map((n, i) => (
+ {headerNav.map((n, i) => (
  <a key={i} href={n.href} className="whitespace-nowrap">{n.label}</a>
  ))}
  </div>
@@ -407,7 +418,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <StoreFooter
  storeName={storeName}
  logo={logo}
- nav={finalNav.map((n) => ({ label: n.label, href: n.href }))}
+ nav={footerNav.map((n) => ({ label: n.label, href: n.href }))}
  colors={{ bg, text, accent }}
  headingFontFamily={headingFont ? `'${headingFont}', Georgia, serif` : undefined}
  year={new Date().getFullYear()}

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getCapturePage, getSiteCss } from "@/app/lib/site-capture-db";
-import { injectCart, injectCss, injectCollectionItems, injectSeo, prepareEditMode } from "@/app/lib/site-capture";
+import { injectCart, injectCss, injectCollectionItems, injectSeo, injectPoweredBy, prepareEditMode, cleanShopifyChrome } from "@/app/lib/site-capture";
 import { captureStorefrontEntry, recordStorePageview } from "@/app/lib/store-visits-db";
 import { recordSearch } from "@/app/lib/store-favorites-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
@@ -71,5 +71,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  const isVyaHost = !host || host === "vyaplatform.com" || host === "www.vyaplatform.com" || host.endsWith(".vercel.app") || host === "localhost";
  const cleanPath = pathname === "/" || pathname === "" ? "" : pathname;
  const canonicalUrl = isVyaHost ? `https://vyaplatform.com/site/${slug}${cleanPath}` : `https://${host}${cleanPath}`;
- return new Response(injectSeo(injectCss(injectCart(html), css), { canonicalUrl }), { headers });
+ return new Response(injectPoweredBy(injectSeo(injectCss(injectCart(cleanShopifyChrome(html)), css), { canonicalUrl })), { headers });
 }

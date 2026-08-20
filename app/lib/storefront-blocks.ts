@@ -3,17 +3,28 @@
 // small, curated set of section types (simpler than Shopify's nested tree), each with
 // a flat props bag so VYA can build them conversationally.
 
-export type BlockType = "announcement" | "hero" | "featured" | "collections" | "testimonials" | "split" | "text" | "image" | "gallery" | "marquee" | "statement" | "spotlight" | "video" | "newsletter" | "contact" | "faq" | "custom";
+export type BlockType = "announcement" | "hero" | "featured" | "collections" | "testimonials" | "countdown" | "blog" | "split" | "columns" | "text" | "image" | "gallery" | "marquee" | "statement" | "spotlight" | "video" | "newsletter" | "contact" | "faq" | "custom";
 // Per-section visual overrides set from the Design panel (all optional; unset = theme default).
 export type BlockScale = "sm" | "md" | "lg" | "xl";
 export type BlockAlign = "left" | "center" | "right";
+export type BlockShadow = "sm" | "md" | "lg" | "xl";
 export type BlockStyle = {
  bg?: string; // "accent" | "dark" | a #hex (default = theme background)
- bgImage?: string; // URL — a full-bleed background photo behind the whole section (wins over bg colour)
+ bgGradient?: string; // "#hex|#hex|angleDeg" — a two-stop linear gradient (wins over bg colour)
+ bgImage?: string; // URL — a full-bleed background photo behind the whole section (wins over gradient/colour)
+ bgOverlay?: number; // 0–80 — dark scrim strength over a background photo (for legible text)
  textColor?: string; // #hex — overrides the section's text colour
  align?: BlockAlign; // text alignment
  headingSize?: BlockScale; // heading scale
- space?: BlockScale; // extra vertical breathing room around the section
+ headingFont?: string; // per-section heading font override
+ tracking?: number; // heading letter-spacing, in hundredths of an em (2 = 0.02em; negatives allowed)
+ space?: BlockScale; // vertical breathing-room preset (used when padY isn't set)
+ padY?: number; // px — explicit vertical padding (overrides `space`)
+ padX?: number; // px — explicit horizontal padding
+ radius?: number; // px — section corner radius
+ border?: number; // px — section border width
+ borderColor?: string; // #hex — section border colour
+ shadow?: BlockShadow; // preset drop shadow
 };
 // Free-form overlay elements ("add a button/text/image anywhere on a section"). Each is anchored to a
 // section and positioned in PERCENT of that section's box (0–100), so it scales with the layout instead
@@ -31,7 +42,7 @@ export type Overlay = {
 };
 export type Block = { id: string; type: BlockType; props: Record<string, string>; style?: BlockStyle; overlays?: Overlay[] };
 
-export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" };
+export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" | "datetime" };
 export type BlockDef = { type: BlockType; label: string; description: string; fields: BlockField[]; defaults: Record<string, string> };
 
 export const BLOCK_TYPES: BlockDef[] = [
@@ -40,10 +51,17 @@ export const BLOCK_TYPES: BlockDef[] = [
  { type: "featured", label: "Featured products", description: "A grid of your products.", fields: [{ key: "heading", label: "Heading", kind: "text" }], defaults: { heading: "The Edit" } },
  // Shop-by-category tiles — the single most common section on real vintage/fashion stores. Gets a shopper
  // to what they want in one click; each tile deep-links a category, which is strong internal-linking SEO.
- { type: "collections", label: "Shop by category", description: "A grid of category/collection tiles — the fastest way for shoppers to find what they want.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Tiles — one per line, 'Label | image URL' (image optional)", kind: "textarea" }], defaults: { heading: "Shop by category", items: "Dresses\nOuterwear\nHandbags\nShoes\nDenim\nAccessories" } },
+ { type: "collections", label: "Shop by category", description: "A grid of category/collection tiles — the fastest way for shoppers to find what they want.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Tiles — one per line, 'Label | image URL' (image optional)", kind: "textarea" }], defaults: { heading: "Shop by category", items: "Dresses\nOuterwear\nHandbags\nShoes\nDenim\nAccessories", cols: "3" } },
  // Social proof — customer reviews. Present on nearly every store that converts; builds trust before the buy.
  { type: "testimonials", label: "Reviews", description: "Customer quotes with names and stars — social proof that lifts trust and conversion.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Reviews — one per line, 'Quote | Name'", kind: "textarea" }], defaults: { heading: "Loved by our customers", items: "Exactly as described and the quality is incredible. | Maya R.\nMy new favourite shop — everything is one of one. | Priya S.\nShipped fast and beautifully packaged. | Jordan T." } },
+ // Live drop countdown — urgency for the next release, and it brings shoppers back at drop time.
+ { type: "countdown", label: "Drop countdown", description: "A live countdown to your next drop — builds urgency and pulls shoppers back when it goes live.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "date", label: "Drop date & time", kind: "datetime" }, { key: "cta", label: "Button label (optional)", kind: "text" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "The next drop lands in", subtext: "Set your alarm — one-of-ones, gone when they’re gone.", date: "", cta: "", ctaHref: "" } },
+ // Blog / journal — editorial content (care guides, lookbooks, icons). Brand-building and strong for SEO.
+ { type: "blog", label: "Blog / journal", description: "A row of articles or lookbook posts — editorial content that builds the brand and helps SEO.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Posts — one per line, 'Title | excerpt | image URL | link'", kind: "textarea" }], defaults: { heading: "The Journal", items: "Caring for vintage leather | Keep your finds looking their best. | | \nVintage icons: the Lady bag | The story behind a classic. | | \nStyling denim three ways | From day to night. | | " } },
  { type: "split", label: "Split — image & text", description: "A photo beside a heading, paragraph, and button — the editorial workhorse for a story or a category.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "body", label: "Body", kind: "textarea" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }, { key: "imageSide", label: "Image side (left or right)", kind: "text" }], defaults: { heading: "Every piece, one of one", body: "Tell the story behind your edit — what you source, how you find it, why it matters.", cta: "", image: "", imageSide: "left" } },
+ // Flexible multi-column content — 2/3/4 columns, each an optional image + heading + text + button.
+ // The general-purpose "put content side by side" layout: feature rows, values, how-it-works, categories.
+ { type: "columns", label: "Columns", description: "Content side by side — 2, 3, or 4 columns, each with an optional image, heading, text, and button.", fields: [{ key: "heading", label: "Heading (optional)", kind: "text" }, { key: "items", label: "Columns — one per line, 'Heading | Text | image URL | button label | button link'", kind: "textarea" }], defaults: { heading: "", items: "Sourced with care | Every piece is hand-selected for quality and authenticity. | | | \nOne of one | No restocks — when it’s gone, it’s gone. | | | \nShipped fast | Carefully packaged and on its way within a day. | | | ", cols: "3" } },
  { type: "text", label: "Text", description: "A heading and a paragraph — your story, shipping info, anything.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "body", label: "Body", kind: "textarea" }], defaults: { heading: "About", body: "Tell your story here." } },
  { type: "image", label: "Image", description: "A full-width photo from your library.", fields: [{ key: "image", label: "Image", kind: "image" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { image: "", caption: "" } },
  { type: "gallery", label: "Gallery", description: "A row of photos from your library.", fields: [{ key: "images", label: "Image URLs (one per line)", kind: "textarea" }], defaults: { images: "" } },
@@ -216,6 +234,20 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (s.align === "left" || s.align === "center" || s.align === "right") style.align = s.align;
  if (scale(s.headingSize)) style.headingSize = s.headingSize;
  if (scale(s.space)) style.space = s.space;
+ // Deep style inspector props — validate colours, clamp numbers, whitelist enums.
+ const hex = (v: unknown) => /^#[0-9a-fA-F]{6}$/.test(String(v ?? ""));
+ const num = (v: unknown, lo: number, hi: number): number | undefined => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : undefined; };
+ // gradient: "#hex|#hex|angle"
+ if (typeof s.bgGradient === "string") { const parts = s.bgGradient.split("|"); if (parts.length === 3 && hex(parts[0]) && hex(parts[1])) { const a = num(parts[2], 0, 360) ?? 180; style.bgGradient = `${parts[0]}|${parts[1]}|${a}`; } }
+ { const o = num(s.bgOverlay, 0, 80); if (o !== undefined) style.bgOverlay = o; }
+ if (hex(s.headingFont) ? false : typeof s.headingFont === "string" && s.headingFont.trim()) style.headingFont = String(s.headingFont).slice(0, 50).replace(/[^\w \-]/g, "");
+ { const t = num(s.tracking, -10, 40); if (t !== undefined) style.tracking = t; }
+ { const p = num(s.padY, 0, 240); if (p !== undefined) style.padY = p; }
+ { const p = num(s.padX, 0, 160); if (p !== undefined) style.padX = p; }
+ { const r = num(s.radius, 0, 80); if (r !== undefined) style.radius = r; }
+ { const bw = num(s.border, 0, 12); if (bw !== undefined) style.border = bw; }
+ if (hex(s.borderColor)) style.borderColor = s.borderColor;
+ if (s.shadow === "sm" || s.shadow === "md" || s.shadow === "lg" || s.shadow === "xl") style.shadow = s.shadow;
  const hasStyle = Object.keys(style).length > 0;
  const overlays = sanitizeOverlays(b.overlays);
  out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, props, ...(hasStyle ? { style } : {}), ...(overlays.length ? { overlays } : {}) });

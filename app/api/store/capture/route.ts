@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { crawlAndStore } from "@/app/lib/site-capture";
 import { listCapturePaths, getCapturePage, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
-import { importStoreFromUrl, importStoreBlocks, type ImportedProduct } from "@/app/lib/store-import";
+import { importStoreFromUrl, importStoreBlocks, importStoreThemeAndBlocks, type ImportedProduct } from "@/app/lib/store-import";
 import { importProductsAsItems } from "@/app/lib/capture-commerce";
 import { getConnection } from "@/app/lib/store-connections-db";
 import { getPlatform } from "@/app/lib/platforms";
@@ -57,7 +57,9 @@ export async function GET(request: NextRequest) {
  const paths = await listCapturePaths(slug).catch(() => []);
  const origin = paths.length ? await getCaptureOrigin(slug).catch(() => null) : null;
  // isAdmin gates the owner-only "reset to simple design + wipe inventory" action.
- return NextResponse.json({ captured: paths.length, url: paths.length ? await siteViewUrl(slug) : null, origin, pages: paths, isAdmin: isOwner(request, slug) });
+ // `url` is the ABSOLUTE public view URL (for "View your site"); `slug` lets the editor build a
+ // SAME-ORIGIN /site/{slug} preview so it works on localhost / getvya.ai, not just prod.
+ return NextResponse.json({ captured: paths.length, url: paths.length ? await siteViewUrl(slug) : null, slug, origin, pages: paths, isAdmin: isOwner(request, slug) });
 }
 
 // POST { url } — capture the seller's entire existing site and host every page on VYA.
@@ -66,6 +68,9 @@ export async function POST(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => null);
  const url = body?.url ? String(body.url).trim() : "";
+ // When the seller explicitly (re)imports their site — e.g. from onboarding — the block storefront
+ // should BECOME that site, replacing any stale/starter blocks. Otherwise we only seed empty ones.
+ const replaceBlocks = body?.replaceBlocks === true;
  if (!url) return NextResponse.json({ error: "Paste your site URL." }, { status: 400 });
 
  try {
@@ -93,9 +98,21 @@ export async function POST(request: NextRequest) {
  // Only when they haven't already built/edited a block design — never clobber real work.
  try {
  const sf = await getStorefrontBySlug(slug).catch(() => null);
- if (!sf?.theme?.blocks?.length) {
-  const blocks = await importStoreBlocks(url).catch(() => []);
-  if (blocks.length) await setStorefrontTheme(slug, { ...(sf?.theme || {}), blocks }).catch(() => {});
+ if (replaceBlocks || !sf?.theme?.blocks?.length) {
+  // Pull their homepage as blocks AND their real theme (colours, fonts, logo, brand name) so the
+  // studio mirrors THEIR store — not our starter palette/type wrapped around their content.
+  const imported = await importStoreThemeAndBlocks(url).catch(() => ({ theme: null, blocks: [] as Awaited<ReturnType<typeof importStoreBlocks>>, name: null }));
+  if (imported.blocks.length) {
+   const prev = sf?.theme || {};
+   await setStorefrontTheme(slug, {
+    ...prev,
+    blocks: imported.blocks,
+    colors: { ...prev.colors, ...(imported.theme?.colors || {}) }, // their palette wins, ours fills gaps
+    fonts: { ...prev.fonts, ...(imported.theme?.fonts || {}) },
+    ...(imported.theme?.logo ? { logo: imported.theme.logo } : {}),
+    ...(imported.name ? { storeName: imported.name } : {}), // their brand name in the header wordmark
+   }).catch(() => {});
+  }
  }
  } catch { /* non-fatal — studio falls back to the starter template */ }
 

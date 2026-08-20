@@ -8,21 +8,24 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Sidekick from "../../Sidekick";
-import Blocks from "@/app/s/Blocks";
+import Blocks, { decodeEntities } from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, type ChromeNav } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, BLOCK_TYPES, blockDef, type Block, type BlockType, type BlockStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
 import { STOREFRONT_TEMPLATES, templateBlocks, STOREFRONT_PALETTES, RADIUS_OPTIONS, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
-import { ChevronLeft, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search } from "lucide-react";
+import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
+import SectionThumb from "@/app/store/storefront/SectionThumb";
+import { ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search, Undo2, Redo2, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, Shapes, Upload as UploadIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 
 type Colors = { bg: string; text: string; accent: string };
 type Fonts = { heading: string; body: string };
 type Radius = "sharp" | "soft" | "round";
-type RailTab = "design" | "add" | "assist";
+type RailTab = "design" | "sections" | "elements" | "text" | "uploads" | "assist";
 type Product = { title: string; price: number | null; currency: string; image: string };
 type Device = "desktop" | "tablet" | "phone";
 type Settings = { handle: string; enabled: boolean; tagline: string | null; accentColor: string | null; heroImage: string | null; about: string | null };
 
+const cn = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 const money = (c: number | null, cur: string) => (c == null ? "" : new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(c));
 
@@ -67,23 +70,9 @@ function snapAxis(points: number[], cands: number[], thr: number): { delta: numb
  return { delta, guide };
 }
 
-// A hex-code field so sellers can type/paste a colour (e.g. #5A0E17) instead of only using the OS
-// colour picker (which shows R/G/B sliders). Applies only when the value is a valid 6-digit hex.
-function HexInput({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
- const [txt, setTxt] = useState(value);
- const [lastValue, setLastValue] = useState(value);
- if (value !== lastValue) { setLastValue(value); setTxt(value); } // resync when the colour changes elsewhere
- return (
- <input
- value={txt}
- spellCheck={false}
- onClick={(e) => e.stopPropagation()}
- onChange={(e) => { let v = e.target.value.trim(); if (v && !v.startsWith("#")) v = "#" + v; setTxt(v); if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v); }}
- onBlur={() => { if (!/^#[0-9a-fA-F]{6}$/.test(txt)) setTxt(value); }}
- className={className}
- />
- );
-}
+// The colour controls (draggable picker + swatches) live in a shared module so the captured-site editor
+// uses the exact same ones. HexInput is used directly here too.
+
 
 // FAQ rows are stored as q0/a0, q1/a1… pairs in a block's props. These read them out (also migrating a
 // legacy "items" blob) and write them back cleanly — shared by add/remove and drag-reorder.
@@ -100,6 +89,164 @@ function writeFaqPairs(props: Record<string, string>, pairs: FaqPair[]): Record<
  delete p2.items;
  pairs.forEach((pr, i) => { p2[`q${i}`] = pr.q; p2[`a${i}`] = pr.a; });
  return p2;
+}
+
+// Rich editor for the "Shop by category" section — pick from the store's real collections, add a photo
+// per tile, reorder, and choose the grid width. Tiles are stored back as "Label | image URL" lines.
+type Tile = { label: string; img: string };
+const parseTiles = (items?: string): Tile[] => (items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, img] = l.split("|").map((s) => (s || "").trim()); return { label, img: img || "" }; });
+const serializeTiles = (t: Tile[]) => t.map((x) => (x.img ? `${x.label} | ${x.img}` : x.label)).join("\n");
+function CollectionsEditor({ block, onField, pick, uploading }: { block: Block; onField: (key: string, value: string) => void; pick: (cb: (url: string) => void) => void; uploading: boolean }) {
+ const tiles = parseTiles(block.props?.items);
+ const cols = block.props?.cols || "3";
+ const [available, setAvailable] = useState<string[]>([]);
+ useEffect(() => { (async () => { const r = await fetch("/api/store/collections?all=1").then((x) => (x.ok ? x.json() : null)).catch(() => null); setAvailable((r?.collections || []).map((c: { title: string }) => c.title)); })(); }, []);
+ const set = (next: Tile[]) => onField("items", serializeTiles(next));
+ const used = new Set(tiles.map((t) => t.label.toLowerCase()));
+ const suggestions = available.filter((t) => !used.has(t.toLowerCase()));
+ const inp = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
+ return (
+ <div>
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Heading</label>
+ <input value={decodeEntities(block.props?.heading || "")} onChange={(e) => onField("heading", e.target.value)} className={`${inp} mb-4`} />
+
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-600">Columns</label>
+ <div className="mb-4 flex overflow-hidden rounded-lg border border-black/10">
+ {(["2", "3", "4"] as const).map((c) => (
+ <button key={c} type="button" onClick={() => onField("cols", c)} className={`flex-1 py-1.5 text-[12px] font-medium transition ${cols === c ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`}>{c}</button>
+ ))}
+ </div>
+
+ {suggestions.length > 0 && (
+ <>
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-600">Add from your collections</label>
+ <div className="mb-4 flex flex-wrap gap-1.5">
+ {suggestions.map((t) => (
+ <button key={t} type="button" onClick={() => set([...tiles, { label: t, img: "" }])} className="rounded-full border border-black/10 px-2.5 py-1 text-[12px] text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">+ {t}</button>
+ ))}
+ </div>
+ </>
+ )}
+
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-600">Tiles</label>
+ <div className="space-y-2">
+ {tiles.map((t, i) => (
+ <div key={i} className="flex items-center gap-2 rounded-lg border border-black/10 bg-white p-1.5">
+ <button type="button" disabled={uploading} onClick={() => pick((url) => set(tiles.map((x, k) => (k === i ? { ...x, img: url } : x))))} title={t.img ? "Replace photo" : "Add photo"} className="h-9 w-9 shrink-0 overflow-hidden rounded-md ring-1 ring-black/10" style={t.img ? { backgroundImage: `url("${t.img.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}>{!t.img && <span className="grid h-full w-full place-items-center bg-stone-100 text-stone-400"><ImageIcon size={14} /></span>}</button>
+ <input value={t.label} onChange={(e) => set(tiles.map((x, k) => (k === i ? { ...x, label: e.target.value } : x)))} className="min-w-0 flex-1 bg-transparent text-[13px] text-stone-700 outline-none" placeholder="Category name" />
+ <button type="button" disabled={i === 0} onClick={() => { const n = [...tiles]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; set(n); }} className="grid h-6 w-6 shrink-0 place-items-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-25"><ChevronUp size={13} /></button>
+ <button type="button" disabled={i === tiles.length - 1} onClick={() => { const n = [...tiles]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; set(n); }} className="grid h-6 w-6 shrink-0 place-items-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-25"><ChevronDown size={13} /></button>
+ <button type="button" onClick={() => set(tiles.filter((_, k) => k !== i))} className="grid h-6 w-6 shrink-0 place-items-center rounded text-stone-400 hover:bg-red-50 hover:text-red-600"><X size={13} /></button>
+ </div>
+ ))}
+ </div>
+ <button type="button" onClick={() => set([...tiles, { label: "New category", img: "" }])} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-black/15 py-2 text-[12px] font-medium text-stone-500 transition hover:bg-stone-50"><Plus size={13} /> Add tile</button>
+ </div>
+ );
+}
+
+// ── Deep style inspector — full visual control over any section ──────────────────────────────────
+function StyleGroup({ label, children }: { label: string; children: React.ReactNode }) {
+ return (
+ <div className="border-t border-black/[0.06] py-4 first:border-t-0 first:pt-0">
+ <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400">{label}</p>
+ <div className="space-y-3">{children}</div>
+ </div>
+ );
+}
+function StyleRow({ label, children }: { label: string; children: React.ReactNode }) {
+ return (
+ <div className="flex items-center gap-3">
+ <span className="w-[70px] shrink-0 text-[12px] text-stone-500">{label}</span>
+ <div className="flex min-w-0 flex-1 items-center justify-end gap-2">{children}</div>
+ </div>
+ );
+}
+function Seg<T extends string>({ options, value, onPick, className }: { options: readonly (readonly [T, string])[]; value: T | null; onPick: (v: T) => void; className?: string }) {
+ return (
+ <div className={cn("flex overflow-hidden rounded-lg border border-black/10", className)}>
+ {options.map(([v, label]) => (
+ <button key={v} type="button" onClick={() => onPick(v)} className={cn("flex-1 whitespace-nowrap px-2 py-1.5 text-[11px] font-medium transition", value === v ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100")}>{label}</button>
+ ))}
+ </div>
+ );
+}
+function StyleSlider({ value, min, max, step = 1, suffix, onChange, onClear }: { value: number | undefined; min: number; max: number; step?: number; suffix?: string; onChange: (v: number) => void; onClear?: () => void }) {
+ return (
+ <div className="flex flex-1 items-center gap-2">
+ <input type="range" min={min} max={max} step={step} value={value ?? min} onChange={(e) => onChange(Number(e.target.value))} className="min-w-0 flex-1 accent-[#5D0F17]" />
+ <span className="w-11 shrink-0 text-right font-mono text-[11px] tabular-nums text-stone-500">{value == null ? "—" : `${value}${suffix || ""}`}</span>
+ {onClear && value != null && <button type="button" onClick={onClear} className="text-stone-300 hover:text-stone-500"><X size={12} /></button>}
+ </div>
+ );
+}
+function SectionStyleInspector({ block, one, multi, pick, uploading }: { block: Block; one: (key: keyof BlockStyle, v: string | undefined) => void; multi: (patch: Partial<Record<keyof BlockStyle, string | undefined>>) => void; pick: (cb: (url: string) => void) => void; uploading: boolean }) {
+ const st = (block.style || {}) as Record<string, string>;
+ const n = (k: string) => (st[k] != null && st[k] !== "" ? Number(st[k]) : undefined);
+ const swatch = (val: string, onChange: (v: string) => void) => <ColorSwatch value={val} onChange={onChange} />;
+ const bgType: "theme" | "solid" | "gradient" | "photo" | "accent" | "dark" = st.bgImage ? "photo" : st.bgGradient ? "gradient" : st.bg === "dark" ? "dark" : st.bg === "accent" ? "accent" : /^#/.test(st.bg || "") ? "solid" : "theme";
+ const grad = (st.bgGradient || "#F4F0E8|#E9E0CE|180").split("|");
+ return (
+ <div className="mt-1">
+ <StyleGroup label="Background">
+ <Seg options={[["theme", "Theme"], ["solid", "Solid"], ["gradient", "Gradient"], ["photo", "Photo"], ["accent", "Accent"], ["dark", "Dark"]] as const} value={bgType} onPick={(v) => {
+ if (v === "theme") multi({ bg: undefined, bgGradient: undefined, bgImage: undefined });
+ else if (v === "solid") multi({ bg: /^#/.test(st.bg || "") ? st.bg : "#F4F0E8", bgGradient: undefined, bgImage: undefined });
+ else if (v === "gradient") multi({ bgGradient: st.bgGradient || "#F4F0E8|#E9E0CE|180", bg: undefined, bgImage: undefined });
+ else if (v === "photo") multi({ bgGradient: undefined, bg: undefined });
+ else multi({ bg: v, bgGradient: undefined, bgImage: undefined });
+ }} />
+ {bgType === "solid" && <StyleRow label="Colour">{swatch(/^#/.test(st.bg || "") ? st.bg : "#F4F0E8", (v) => one("bg", v))}</StyleRow>}
+ {bgType === "gradient" && (
+ <>
+ <StyleRow label="From">{swatch(grad[0], (v) => one("bgGradient", `${v}|${grad[1]}|${grad[2] || 180}`))}</StyleRow>
+ <StyleRow label="To">{swatch(grad[1], (v) => one("bgGradient", `${grad[0]}|${v}|${grad[2] || 180}`))}</StyleRow>
+ <StyleRow label="Angle"><StyleSlider value={Number(grad[2] || 180)} min={0} max={360} suffix="°" onChange={(x) => one("bgGradient", `${grad[0]}|${grad[1]}|${x}`)} /></StyleRow>
+ </>
+ )}
+ {bgType === "photo" && (
+ <>
+ <StyleRow label="Photo">
+ <div className="flex items-center gap-2">
+ {st.bgImage ? <span className="h-7 w-7 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url("${st.bgImage.replace(/"/g, "%22")}")` }} /> : <span className="grid h-7 w-7 place-items-center rounded-md bg-stone-100 text-stone-400"><ImageIcon size={13} /></span>}
+ <button type="button" disabled={uploading} onClick={() => pick((url) => one("bgImage", url))} className="rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "…" : st.bgImage ? "Replace" : "Upload"}</button>
+ {st.bgImage && <button type="button" onClick={() => one("bgImage", "")} className="text-stone-400 hover:text-stone-600"><X size={13} /></button>}
+ </div>
+ </StyleRow>
+ {st.bgImage && <StyleRow label="Overlay"><StyleSlider value={n("bgOverlay") ?? 24} min={0} max={80} suffix="%" onChange={(x) => one("bgOverlay", String(x))} /></StyleRow>}
+ </>
+ )}
+ </StyleGroup>
+
+ <StyleGroup label="Text">
+ <StyleRow label="Colour">{swatch(st.textColor || "#1a1a1a", (v) => one("textColor", v))}{st.textColor && <button type="button" onClick={() => one("textColor", "")} className="text-stone-300 hover:text-stone-500"><X size={12} /></button>}</StyleRow>
+ <StyleRow label="Align"><Seg options={[["left", "L"], ["center", "C"], ["right", "R"]] as const} value={(st.align as "left") || null} onPick={(v) => one("align", st.align === v ? undefined : v)} className="w-28" /></StyleRow>
+ </StyleGroup>
+
+ <StyleGroup label="Headings">
+ <StyleRow label="Font">
+ <select value={st.headingFont || ""} onChange={(e) => one("headingFont", e.target.value || undefined)} className="w-[140px] rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] text-stone-700 outline-none focus:border-[#5D0F17]/50" style={{ fontFamily: st.headingFont ? ff(st.headingFont) : undefined }}>
+ <option value="">Theme font</option>
+ {ALL_STOREFRONT_FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: ff(f) }}>{f}</option>)}
+ </select>
+ </StyleRow>
+ <StyleRow label="Size"><Seg options={[["sm", "S"], ["md", "M"], ["lg", "L"], ["xl", "XL"]] as const} value={(st.headingSize as "md") || null} onPick={(v) => one("headingSize", st.headingSize === v ? undefined : v)} className="w-32" /></StyleRow>
+ <StyleRow label="Spacing"><StyleSlider value={n("tracking") ?? 0} min={-8} max={30} suffix="" onChange={(x) => one("tracking", String(x))} onClear={() => one("tracking", "")} /></StyleRow>
+ </StyleGroup>
+
+ <StyleGroup label="Spacing">
+ <StyleRow label="Vertical"><StyleSlider value={n("padY")} min={0} max={200} step={4} suffix="px" onChange={(x) => one("padY", String(x))} onClear={() => one("padY", "")} /></StyleRow>
+ <StyleRow label="Sides"><StyleSlider value={n("padX")} min={0} max={140} step={4} suffix="px" onChange={(x) => one("padX", String(x))} onClear={() => one("padX", "")} /></StyleRow>
+ </StyleGroup>
+
+ <StyleGroup label="Border & shadow">
+ <StyleRow label="Radius"><StyleSlider value={n("radius")} min={0} max={72} step={2} suffix="px" onChange={(x) => one("radius", String(x))} onClear={() => one("radius", "")} /></StyleRow>
+ <StyleRow label="Border"><StyleSlider value={n("border")} min={0} max={10} suffix="px" onChange={(x) => one("border", String(x))} onClear={() => one("border", "")} /></StyleRow>
+ {n("border") != null && n("border")! > 0 && <StyleRow label="Colour">{swatch(st.borderColor || "#1a1a1a", (v) => one("borderColor", v))}</StyleRow>}
+ <StyleRow label="Shadow"><Seg options={[["", "None"], ["sm", "S"], ["md", "M"], ["lg", "L"], ["xl", "XL"]] as const} value={(st.shadow as "md") || ""} onPick={(v) => one("shadow", v || undefined)} className="w-40" /></StyleRow>
+ </StyleGroup>
+ </div>
+ );
 }
 
 // A static email-signup shown in the footer preview (the live storefront uses the real NewsletterForm).
@@ -119,13 +266,18 @@ export default function StorefrontStudio() {
  const [fonts, setFonts] = useState<Fonts>({ heading: "Playfair Display", body: "Inter" });
  const [radius, setRadius] = useState<Radius>("sharp");
  const [railTab, setRailTab] = useState<RailTab>("design");
+ const [panelOpen, setPanelOpen] = useState(true); // Canva-style: collapse the side panel to free up canvas space
  const [products, setProducts] = useState<Product[]>([]);
+ const [assets, setAssets] = useState<{ url: string }[]>([]); // Canva-style Uploads library (the store's photos)
+ const [assetsBusy, setAssetsBusy] = useState(false);
  const [blocks, setBlocks] = useState<Block[]>([]);
  const [shopBlocks, setShopBlocks] = useState<Block[]>([]);
  const [extraPages, setExtraPages] = useState<StorePage[]>([]);
  const [customCss, setCustomCss] = useState("");
  const [socials, setSocials] = useState<Record<string, string>>({}); // footer social links
  const [footerAbout, setFooterAbout] = useState("");
+ type NavLink = { label: string; href: string; place: "header" | "footer" | "both" };
+ const [navLinks, setNavLinks] = useState<NavLink[]>([]); // custom links the seller adds to header/footer
  const [activeSlug, setActiveSlug] = useState("home");
  const [selBlock, setSelBlock] = useState<string | null>(null);
  const [selOverlay, setSelOverlay] = useState<{ blockId: string; overlayId: string } | null>(null);
@@ -149,12 +301,14 @@ export default function StorefrontStudio() {
  const [showTemplates, setShowTemplates] = useState(false);
  const canvasRef = useRef<HTMLDivElement>(null);
  const loadedRef = useRef(false);
+ const importedNameRef = useRef<string | null>(null); // brand name pulled from an imported site (wins over account name)
  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
  const loadDesign = useCallback(async () => {
  const r = await fetch("/api/store/storefront/design").catch(() => null);
  if (!r || !r.ok) return;
  const d = await r.json();
+ if (d.storeName) { importedNameRef.current = d.storeName; setStoreName(d.storeName); }
  if (d.colors) setColors(d.colors);
  if (d.fonts) setFonts(d.fonts);
  if (d.radius === "sharp" || d.radius === "soft" || d.radius === "round") setRadius(d.radius);
@@ -165,6 +319,7 @@ export default function StorefrontStudio() {
  setCustomCss(d.customCss || "");
  setSocials(d.socials || {});
  setFooterAbout(d.footerAbout || "");
+ setNavLinks(Array.isArray(d.navLinks) ? d.navLinks : []);
  }, []);
 
  useEffect(() => {
@@ -174,7 +329,7 @@ export default function StorefrontStudio() {
  loadDesign(),
  ]);
  if (sf?.settings) setSettings(sf.settings as Settings);
- if (sf?.store?.name) setStoreName(sf.store.name as string);
+ if (sf?.store?.name && !importedNameRef.current) setStoreName(sf.store.name as string);
  loadedRef.current = true;
  setLoading(false);
  })();
@@ -189,6 +344,18 @@ export default function StorefrontStudio() {
  link.id = id; link.rel = "stylesheet"; link.href = storefrontFontsHref(ALL_STOREFRONT_FONTS);
  document.head.appendChild(link);
  }, []);
+
+ // Also load the store's ACTUAL chosen fonts — an imported store's own typeface may be outside the
+ // curated list, so without this the preview would fall back instead of rendering their real face.
+ useEffect(() => {
+ const extra = [fonts.heading, fonts.body].filter(Boolean);
+ if (!extra.length) return;
+ const id = "vya-theme-fonts";
+ const href = storefrontFontsHref(extra);
+ let link = document.getElementById(id) as HTMLLinkElement | null;
+ if (!link) { link = document.createElement("link"); link.id = id; link.rel = "stylesheet"; document.head.appendChild(link); }
+ if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+ }, [fonts]);
 
  // VYA changed the store from chat → pull the new design in.
  useEffect(() => {
@@ -211,6 +378,8 @@ export default function StorefrontStudio() {
 
  // ── page + block helpers (ported from the classic editor) ──
  const curBlocks = activeSlug === "home" ? blocks : activeSlug === "shop" ? shopBlocks : extraPages.find((p) => p.slug === activeSlug)?.blocks ?? [];
+ const curBlocksRef = useRef<Block[]>(curBlocks);
+ curBlocksRef.current = curBlocks; // always the live current-page blocks, for keyboard handlers that read them
  function updateCur(fn: (bs: Block[]) => Block[]) {
  if (activeSlug === "home") setBlocks(fn);
  else if (activeSlug === "shop") setShopBlocks(fn);
@@ -304,6 +473,7 @@ export default function StorefrontStudio() {
  onOver: (i: number) => setCanvasOver((c) => (c === i ? c : i)),
  onEnd: () => { setDragIdx(null); setCanvasOver(null); },
  onDrop: (i: number) => { reorderTo(i); setCanvasOver(null); },
+ onMove: (i: number, dir: "up" | "down") => updateCur((bs) => { const j = dir === "up" ? i - 1 : i + 1; if (j < 0 || j >= bs.length) return bs; const n = [...bs]; [n[i], n[j]] = [n[j], n[i]]; return n; }),
  };
  function switchPage(slug: string) { setActiveSlug(slug); setSelBlock(null); setSelOverlay(null); setFmtBar(null); setDdOpen(false); }
  function addPage() {
@@ -360,7 +530,7 @@ export default function StorefrontStudio() {
  // blocks autosave effect only handles sections). Colour pickers fire rapidly while dragging, hence the
  // debounce; palette / font / corner clicks are discrete but ride the same path.
  const designTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
- const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; customCss?: string; socials?: Record<string, string>; footerAbout?: string }) => {
+ const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; customCss?: string; socials?: Record<string, string>; footerAbout?: string; navLinks?: NavLink[] }) => {
  if (designTimer.current) clearTimeout(designTimer.current);
  setSave("saving");
  designTimer.current = setTimeout(async () => {
@@ -373,6 +543,90 @@ export default function StorefrontStudio() {
  function changeFont(which: keyof Fonts, val: string) { const next = { ...fonts, [which]: val }; setFonts(next); pushDesign({ fonts: next }); }
  function changeFont2(heading: string, body: string) { const next = { heading, body }; setFonts(next); pushDesign({ fonts: next }); }
  function changeRadius(r: Radius) { setRadius(r); pushDesign({ radius: r }); }
+
+ // ── Undo / redo ─────────────────────────────────────────────────────────────────────────────────
+ // A snapshot of everything editable. We diff the serialized state on every change: a real edit pushes
+ // the *previous* snapshot onto the undo stack; an undo/redo restore is flagged so it doesn't self-record.
+ const pastRef = useRef<string[]>([]);
+ const futureRef = useRef<string[]>([]);
+ const lastSnapRef = useRef<string>("");
+ const applyingRef = useRef(false);
+ const [hist, setHist] = useState({ u: 0, r: 0 });
+ // Copy/cut/paste clipboard (in-memory) — an element or a whole section, reusable across sections & pages.
+ const clipboardRef = useRef<{ kind: "overlay"; data: Overlay } | { kind: "block"; data: Block } | null>(null);
+ useEffect(() => {
+ if (loading) return;
+ const json = JSON.stringify({ blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout });
+ if (lastSnapRef.current === "") { lastSnapRef.current = json; return; } // seed on first settled state
+ if (applyingRef.current) { applyingRef.current = false; lastSnapRef.current = json; return; } // this change WAS an undo/redo
+ if (json === lastSnapRef.current) return;
+ pastRef.current.push(lastSnapRef.current);
+ if (pastRef.current.length > 200) pastRef.current.shift();
+ futureRef.current = [];
+ lastSnapRef.current = json;
+ setHist({ u: pastRef.current.length, r: 0 });
+ }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, loading]);
+ const restoreSnap = useCallback((json: string) => {
+ const s = JSON.parse(json);
+ applyingRef.current = true;
+ setBlocks(s.blocks || []); setShopBlocks(s.shopBlocks || []); setExtraPages(s.extraPages || []);
+ setColors(s.colors); setFonts(s.fonts); setRadius(s.radius); setCustomCss(s.customCss || "");
+ setSocials(s.socials || {}); setFooterAbout(s.footerAbout || "");
+ setSelBlock(null); setSelOverlay(null); setEditingId(null);
+ pushDesign({ colors: s.colors, fonts: s.fonts, radius: s.radius, customCss: s.customCss || "", socials: s.socials || {}, footerAbout: s.footerAbout || "" });
+ }, [pushDesign]);
+ const undo = useCallback(() => {
+ if (!pastRef.current.length) return;
+ futureRef.current.push(lastSnapRef.current);
+ restoreSnap(pastRef.current.pop()!);
+ setHist({ u: pastRef.current.length, r: futureRef.current.length });
+ }, [restoreSnap]);
+ const redo = useCallback(() => {
+ if (!futureRef.current.length) return;
+ pastRef.current.push(lastSnapRef.current);
+ restoreSnap(futureRef.current.pop()!);
+ setHist({ u: pastRef.current.length, r: futureRef.current.length });
+ }, [restoreSnap]);
+ useEffect(() => {
+ const onKey = (e: KeyboardEvent) => {
+ const t = e.target as HTMLElement | null;
+ const inField = !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+ const mod = e.metaKey || e.ctrlKey;
+ const k = e.key.toLowerCase();
+ if (mod && (k === "z" || k === "y")) {
+ if (inField) return; // let fields keep native text-undo
+ e.preventDefault();
+ if (k === "y" || (k === "z" && e.shiftKey)) redo(); else undo();
+ return;
+ }
+ if (inField) return; // the rest are canvas shortcuts — never hijack typing
+ if (mod && k === "c") { if (selOverlay || selBlock) { e.preventDefault(); copySel(); } return; }
+ if (mod && k === "x") { if (selOverlay || selBlock) { e.preventDefault(); cutSel(); } return; }
+ if (mod && k === "v") { if (clipboardRef.current) { e.preventDefault(); pasteClip(); } return; }
+ if (selOverlay && (k === "arrowup" || k === "arrowdown" || k === "arrowleft" || k === "arrowright")) { // nudge element
+ e.preventDefault();
+ const step = e.shiftKey ? 2 : 0.5;
+ const dx = k === "arrowleft" ? -step : k === "arrowright" ? step : 0;
+ const dy = k === "arrowup" ? -step : k === "arrowdown" ? step : 0;
+ updateCur((bs) => bs.map((b) => (b.id !== selOverlay.blockId ? b : { ...b, overlays: (b.overlays || []).map((ov) => (ov.id !== selOverlay.overlayId ? ov : { ...ov, x: Math.max(0, Math.min(98, (ov.x ?? 10) + dx)), y: Math.max(0, Math.min(98, (ov.y ?? 10) + dy)) })) })));
+ return;
+ }
+ if (mod && k === "d") { // duplicate selection
+ if (selOverlay) { e.preventDefault(); duplicateOverlay(selOverlay.blockId, selOverlay.overlayId); }
+ else if (selBlock) { e.preventDefault(); duplicateBlock(selBlock); }
+ return;
+ }
+ if (k === "delete" || k === "backspace") { // remove selection
+ if (selOverlay) { e.preventDefault(); removeOverlay(selOverlay.blockId, selOverlay.overlayId); }
+ else if (selBlock) { e.preventDefault(); removeBlock(selBlock); }
+ return;
+ }
+ if (k === "escape") { setSelOverlay(null); setSelBlock(null); setEditingId(null); }
+ };
+ window.addEventListener("keydown", onKey);
+ return () => window.removeEventListener("keydown", onKey);
+ }, [undo, redo, selBlock, selOverlay]); // eslint-disable-line react-hooks/exhaustive-deps
+
  // Add a section to the current page (Canva's "Elements" analog for a section-based builder) and
  // select it so the seller can immediately edit it on the canvas.
  function addSection(type: BlockType) {
@@ -384,6 +638,14 @@ export default function StorefrontStudio() {
 
  // ── Section styling (the inspector that appears when a section is selected) ──
  // Setting a value to "" / undefined clears that override, so a section drops back to the theme default.
+ function setBlockStyleMulti(id: string, patch: Partial<Record<keyof BlockStyle, string | undefined>>) {
+ updateCur((bs) => bs.map((b) => {
+ if (b.id !== id) return b;
+ const style = { ...(b.style || {}) } as Record<string, string>;
+ for (const [k, v] of Object.entries(patch)) { if (v == null || v === "") delete style[k]; else style[k] = v; }
+ return { ...b, style: Object.keys(style).length ? (style as BlockStyle) : undefined };
+ }));
+ }
  function setBlockStyle(id: string, key: keyof BlockStyle, value: string | undefined) {
  updateCur((bs) => bs.map((b) => {
  if (b.id !== id) return b;
@@ -396,6 +658,17 @@ export default function StorefrontStudio() {
  function removeBlock(id: string) {
  updateCur((bs) => bs.filter((b) => b.id !== id));
  setSelBlock(null); setSelOverlay(null);
+ }
+ // Reliable reorder without dragging — move a section one slot up or down.
+ function moveBlock(id: string, dir: "up" | "down") {
+ updateCur((bs) => {
+ const i = bs.findIndex((b) => b.id === id);
+ const j = dir === "up" ? i - 1 : i + 1;
+ if (i < 0 || j < 0 || j >= bs.length) return bs;
+ const next = [...bs];
+ [next[i], next[j]] = [next[j], next[i]];
+ return next;
+ });
  }
  // A hero (and a plain image section) render props.image as their OWN visible picture — so a "background
  // photo" there must set props.image, or it hides behind the section's own render. Every other section
@@ -436,6 +709,73 @@ export default function StorefrontStudio() {
  updateCur((bs) => bs.map((b) => (b.id === blockId ? { ...b, overlays: (b.overlays || []).filter((o) => o.id !== overlayId) } : b)));
  setSelOverlay(null);
  }
+ function duplicateOverlay(blockId: string, overlayId: string) {
+ const nid = `o_${newBlockId()}`;
+ updateCur((bs) => bs.map((b) => {
+ if (b.id !== blockId) return b;
+ const src = (b.overlays || []).find((o) => o.id === overlayId);
+ if (!src) return b;
+ // Nudge the copy down-right a touch (in %) so it doesn't sit exactly on the original.
+ const copy: Overlay = { ...src, id: nid, x: Math.min(90, (src.x ?? 10) + 3), y: Math.min(90, (src.y ?? 10) + 3), props: { ...src.props } };
+ return { ...b, overlays: [...(b.overlays || []), copy] };
+ }));
+ setSelOverlay({ blockId, overlayId: nid });
+ }
+ // Align the selected element within its section. We measure its live size (%) from the DOM — text/buttons
+ // are auto-sized and have no stored w/h — then set x/y so the chosen edge/centre meets the section's.
+ function alignOverlay(edge: "left" | "hcenter" | "right" | "top" | "vmiddle" | "bottom") {
+ if (!selOverlay) return;
+ const { blockId, overlayId } = selOverlay;
+ const el = document.querySelector<HTMLElement>(`[data-ovl="${overlayId}"]`);
+ const layer = el?.closest<HTMLElement>(".vya-ovl-layer");
+ if (!el || !layer) return;
+ const lr = layer.getBoundingClientRect(), r = el.getBoundingClientRect();
+ const w = (r.width / lr.width) * 100, h = (r.height / lr.height) * 100;
+ const patch: Partial<Overlay> =
+ edge === "left" ? { x: 0 } :
+ edge === "hcenter" ? { x: Math.max(0, 50 - w / 2) } :
+ edge === "right" ? { x: Math.max(0, 100 - w) } :
+ edge === "top" ? { y: 0 } :
+ edge === "vmiddle" ? { y: Math.max(0, 50 - h / 2) } :
+ { y: Math.max(0, 100 - h) };
+ patchOverlay(blockId, overlayId, patch);
+ }
+ // ── Copy / cut / paste (in-memory clipboard) ──────────────────────────────────────────────────────
+ function copySel() {
+ if (selOverlay) {
+ const o = curBlocksRef.current.find((b) => b.id === selOverlay.blockId)?.overlays?.find((o) => o.id === selOverlay.overlayId);
+ if (o) clipboardRef.current = { kind: "overlay", data: JSON.parse(JSON.stringify(o)) };
+ } else if (selBlock) {
+ const b = curBlocksRef.current.find((b) => b.id === selBlock);
+ if (b) clipboardRef.current = { kind: "block", data: JSON.parse(JSON.stringify(b)) };
+ }
+ }
+ function cutSel() {
+ copySel();
+ if (selOverlay) removeOverlay(selOverlay.blockId, selOverlay.overlayId);
+ else if (selBlock) removeBlock(selBlock);
+ }
+ function pasteClip() {
+ const clip = clipboardRef.current;
+ if (!clip) return;
+ if (clip.kind === "overlay") {
+ const nid = `o_${newBlockId()}`;
+ const copy: Overlay = { ...clip.data, id: nid, x: Math.min(90, (clip.data.x ?? 10) + 3), y: Math.min(90, (clip.data.y ?? 10) + 3), props: { ...clip.data.props } };
+ let target = selBlock;
+ updateCur((bs) => {
+ target = target && bs.some((b) => b.id === target) ? target : bs[bs.length - 1]?.id ?? null;
+ return target ? bs.map((b) => (b.id === target ? { ...b, overlays: [...(b.overlays || []), copy] } : b)) : bs;
+ });
+ if (target) { setSelBlock(target); setSelOverlay({ blockId: target, overlayId: nid }); }
+ } else {
+ const copy: Block = { ...clip.data, id: newBlockId(), overlays: clip.data.overlays?.map((o) => ({ ...o, id: `o_${newBlockId()}` })) };
+ updateCur((bs) => {
+ const i = bs.findIndex((b) => b.id === selBlock);
+ return i < 0 ? [...bs, copy] : [...bs.slice(0, i + 1), copy, ...bs.slice(i + 1)];
+ });
+ setSelBlock(copy.id); setSelOverlay(null);
+ }
+ }
  // Layer order: overlays render in array order (later = on top), so reordering the array is the z-order.
  function reorderOverlay(blockId: string, overlayId: string, dir: "front" | "back" | "forward" | "backward") {
  updateCur((bs) => bs.map((b) => {
@@ -455,10 +795,11 @@ export default function StorefrontStudio() {
  const overlayLabel = (o: Overlay) => o.kind === "text" ? (o.props?.text || "Text") : o.kind === "button" ? (o.props?.label || "Button") : o.kind === "image" ? "Image" : o.kind === "rect" ? "Rectangle" : o.kind === "circle" ? "Circle" : "Line";
  const OverlayIcon = (o: Overlay) => o.kind === "text" ? Type : o.kind === "button" ? MousePointerClick : o.kind === "image" ? ImageIcon : o.kind === "rect" ? Square : o.kind === "circle" ? Circle : Minus;
  // Add an element to the SELECTED section (fallback: the last section on the page), then select it.
- function addElement(kind: OverlayKind) {
+ function addElement(kind: OverlayKind, extraProps?: Record<string, string>) {
  const targetId = selBlock && curBlocks.some((b) => b.id === selBlock) ? selBlock : curBlocks[curBlocks.length - 1]?.id;
- if (!targetId) { setRailTab("add"); window.alert("Add a section first, then drop elements onto it."); return; }
+ if (!targetId) { setRailTab("sections"); window.alert("Add a section first, then drop elements onto it."); return; }
  const o = makeOverlay(kind);
+ if (extraProps) o.props = { ...(o.props || {}), ...extraProps };
  updateCur((bs) => bs.map((b) => (b.id === targetId ? { ...b, overlays: [...(b.overlays || []), o] } : b)));
  setSelBlock(targetId);
  setSelOverlay({ blockId: targetId, overlayId: o.id });
@@ -632,6 +973,20 @@ export default function StorefrontStudio() {
  inp.onchange = async () => { const f = inp.files?.[0]; if (f) { const url = await uploadImage(f); if (url) onUrl(url); } };
  inp.click();
  }
+ // Uploads library (Canva-style) — the store's photos, reusable across the site. uploadImage already
+ // POSTs to the same library, so every upload lands here too.
+ const loadAssets = useCallback(async () => {
+ setAssetsBusy(true);
+ const r = await fetch("/api/store/assets").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ setAssets(r?.assets || []);
+ setAssetsBusy(false);
+ }, []);
+ useEffect(() => { loadAssets(); }, [loadAssets]);
+ async function uploadToLibrary(file: File): Promise<string | null> {
+ const url = await uploadImage(file);
+ if (url) setAssets((a) => [{ url }, ...a.filter((x) => x.url !== url)]);
+ return url;
+ }
  // Resolve which section (and overlay, if any) a drop landed on, from the drop point.
  function targetFromPoint(x: number, y: number): { blockId?: string; overlayId?: string } {
  const el = document.elementFromPoint(x, y) as HTMLElement | null;
@@ -682,6 +1037,8 @@ export default function StorefrontStudio() {
  const activeTitle = pageList.find((p) => p.slug === activeSlug)?.title || "Home";
  // The site nav shown in the persistent header/footer — one entry per page, current page marked active.
  const chromeNav: ChromeNav[] = pageList.map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
+ const headerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: l.href }))];
+ const footerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: l.href }))];
 
  const dbtn = (d: Device, label: string, Icon: typeof Monitor) => (
  <button type="button" onClick={() => setDevice(d)} aria-label={label} className={`grid h-7 w-9 place-items-center rounded-md transition ${device === d ? "bg-white text-stone-800 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}><Icon size={15} strokeWidth={1.9} /></button>
@@ -696,6 +1053,12 @@ export default function StorefrontStudio() {
  <a href="/admin" title="Back to admin" className="grid h-7 w-7 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronLeft size={16} /></a>
  <span className="text-[15px] font-semibold tracking-tight">{storeName}</span>
  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
+ <span className="mx-0.5 h-5 w-px bg-black/10" />
+ <div className="flex overflow-hidden rounded-lg border border-black/10 bg-[#f4f1ec]">
+ <button type="button" onClick={undo} disabled={!hist.u} title="Undo (⌘Z)" aria-label="Undo" className="grid h-7 w-8 place-items-center text-stone-500 transition enabled:hover:bg-white enabled:hover:text-stone-800 disabled:opacity-35"><Undo2 size={15} strokeWidth={1.9} /></button>
+ <span className="w-px bg-black/10" />
+ <button type="button" onClick={redo} disabled={!hist.r} title="Redo (⌘⇧Z)" aria-label="Redo" className="grid h-7 w-8 place-items-center text-stone-500 transition enabled:hover:bg-white enabled:hover:text-stone-800 disabled:opacity-35"><Redo2 size={15} strokeWidth={1.9} /></button>
+ </div>
  <span className="text-[11px] text-stone-400">{save === "saving" ? "Saving…" : save === "saved" ? "All changes saved" : ""}</span>
  </div>
 
@@ -717,18 +1080,21 @@ export default function StorefrontStudio() {
 
  {/* Body: editing rail (Design / Add / Assist) + editable live preview */}
  <div className="flex min-h-0 flex-1">
- <div className="flex w-[380px] max-w-[42vw] shrink-0 flex-col overflow-hidden border-r border-black/10 bg-[#fbf9f5]">
- {/* Tab strip — direct-manipulation panels, with the AI assistant as one tab (not the whole side) */}
- <div className="flex shrink-0 gap-1 border-b border-black/10 p-1.5">
- {([["design", "Design", Palette], ["add", "Add section", Layers], ["assist", "Assist", Sparkles]] as const).map(([id, label, Icon]) => (
- <button key={id} type="button" onClick={() => { setRailTab(id); setSelBlock(null); setSelOverlay(null); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-[12px] font-semibold transition ${!selBlockObj && railTab === id ? "bg-[#5D0F17] text-white shadow-sm" : "text-stone-600 hover:bg-stone-100"}`}>
- <Icon size={14} strokeWidth={2} /> <span className="hidden md:inline">{label}</span>
+ <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-[#fbf9f5] transition-[width] duration-200 ${panelOpen ? "w-[404px] max-w-[46vw]" : "w-[70px]"}`}>
+ {/* Collapse / expand the side panel (Canva-style) — the icon rail always stays visible */}
+ <button type="button" onClick={() => setPanelOpen((o) => !o)} title={panelOpen ? "Collapse panel" : "Expand panel"} className="absolute -right-3 top-1/2 z-30 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-black/10 bg-white text-stone-500 shadow-sm transition hover:text-[#5D0F17]">{panelOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}</button>
+ {/* Canva-style vertical icon rail */}
+ <div className="flex w-[70px] shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-black/10 bg-white py-3">
+ {([["design", "Design", Palette], ["sections", "Sections", Layers], ["elements", "Elements", Shapes], ["text", "Text", Type], ["uploads", "Uploads", UploadIcon], ["assist", "VYA", Sparkles]] as const).map(([id, label, Icon]) => (
+ <button key={id} type="button" onClick={() => { if (!selBlockObj && railTab === id && panelOpen) { setPanelOpen(false); } else { setRailTab(id); setPanelOpen(true); setSelBlock(null); setSelOverlay(null); } }} className={`flex w-[58px] flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-medium transition ${!selBlockObj && railTab === id && panelOpen ? "bg-[#5D0F17]/[0.08] text-[#5D0F17]" : "text-stone-500 hover:bg-stone-100"}`}>
+ <Icon size={19} strokeWidth={1.8} />{label}
  </button>
  ))}
  </div>
 
- {/* Assist keeps the full-height chat; Design & Add are scrollable control panels */}
- <div className="min-h-0 flex-1 overflow-hidden">
+ {/* Active panel — hidden when the side bar is collapsed */}
+ {panelOpen && (
+ <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
  {selBlockObj ? (
  // Select a section → edit ALL its content here (not just the inline text). This is what makes
  // list/URL fields — marquee names, gallery photos, a video link — actually editable.
@@ -743,7 +1109,9 @@ export default function StorefrontStudio() {
  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Edit {def?.label || selBlockObj.type}</p>
  <button type="button" onClick={() => { setSelBlock(null); setSelOverlay(null); }} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
  </div>
- {fields.length ? fields.map((f) => (
+ {selBlockObj.type === "collections" ? (
+ <CollectionsEditor block={selBlockObj} onField={(key, value) => editField(selBlockObj.id, key, value)} pick={pickAndUpload} uploading={uploading} />
+ ) : fields.length ? fields.map((f) => (
  <div key={f.key} className="mb-3.5">
  <label className="mb-1 block text-[12px] font-medium text-stone-600">{f.label}</label>
  {f.kind === "textarea" ? (
@@ -756,12 +1124,31 @@ export default function StorefrontStudio() {
  <button type="button" disabled={uploading} onClick={() => pickAndUpload((url) => editField(selBlockObj.id, f.key, url))} className="rounded-md bg-[#5D0F17] px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "Uploading…" : bp[f.key] ? "Replace" : "Upload"}</button>
  {bp[f.key] && <button type="button" onClick={() => editField(selBlockObj.id, f.key, "")} className="rounded-md px-2 py-1.5 text-[12px] text-stone-500 hover:bg-stone-100">Remove</button>}
  </div>
+ ) : f.kind === "datetime" ? (
+ <input type="datetime-local" value={bp[f.key] || ""} onChange={(e) => editField(selBlockObj.id, f.key, e.target.value)} className={inp} />
  ) : (
  <input value={bp[f.key] || ""} onChange={(e) => editField(selBlockObj.id, f.key, e.target.value)} className={inp} placeholder={def?.defaults?.[f.key] || ""} />
  )}
  </div>
- )) : <p className="text-[13px] leading-relaxed text-stone-400">This section has no text fields — its content comes from your products. Style it from the toolbar on the canvas.</p>}
- <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">You can also click text directly on the canvas to edit it. Background, colours, alignment & spacing are on the toolbar above the section.</p>
+ )) : <p className="text-[13px] leading-relaxed text-stone-400">This section has no text fields — its content comes from your products.</p>}
+
+ {selBlockObj.type === "columns" && (
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Columns per row</label>
+ <div className="flex overflow-hidden rounded-lg border border-black/10">
+ {["2", "3", "4"].map((c) => (
+ <button key={c} type="button" onClick={() => editField(selBlockObj.id, "cols", c)} className={`flex-1 py-1.5 text-[13px] font-medium transition ${(bp.cols || "3") === c ? "bg-[#5D0F17] text-white" : "text-stone-600 hover:bg-stone-100"}`}>{c}</button>
+ ))}
+ </div>
+ </div>
+ )}
+
+ {/* Deep style inspector — full visual control over the selected section */}
+ <div className="mt-5 border-t border-black/10 pt-4">
+ <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Style</p>
+ <SectionStyleInspector block={selBlockObj} one={(k, v) => setBlockStyle(selBlockObj.id, k, v)} multi={(patch) => setBlockStyleMulti(selBlockObj.id, patch)} pick={pickAndUpload} uploading={uploading} />
+ </div>
+ <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">Tip: click text directly on the canvas to edit it, and drag the section handles to reorder.</p>
  </div>
  );
  })()
@@ -793,9 +1180,8 @@ export default function StorefrontStudio() {
  <div className="space-y-1.5">
  {([["bg", "Background"], ["text", "Text"], ["accent", "Accent"]] as const).map(([key, label]) => (
  <div key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
- <span className="h-6 w-6 shrink-0 rounded-md ring-1 ring-black/15" style={{ background: colors[key] }} />
  <span className="flex-1 text-[13px] text-stone-700">{label}</span>
- <HexInput value={colors[key]} onChange={(v) => changeColor(key, v)} className="w-[96px] rounded-md border border-black/10 bg-white px-2 py-1 text-right font-mono text-[12px] uppercase text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ <ColorSwatch value={colors[key]} onChange={(v) => changeColor(key, v)} />
  </div>
  ))}
  </div>
@@ -849,16 +1235,56 @@ export default function StorefrontStudio() {
  <textarea value={footerAbout} onChange={(e) => { setFooterAbout(e.target.value); pushDesign({ footerAbout: e.target.value }); }} rows={2} placeholder="A short line about your store (footer)" className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50" />
  </div>
 
+ {/* Custom header/footer links — add anything to the nav (an external link, a page, "Contact") */}
+ <p className="mb-1 mt-7 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Header & footer links</p>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">Add your own links to the top nav and/or footer — a page, a policy, or an external URL.</p>
+ <div className="space-y-2">
+ {navLinks.map((l, i) => {
+ const update = (patch: Partial<NavLink>) => { const next = navLinks.map((x, j) => (j === i ? { ...x, ...patch } : x)); setNavLinks(next); pushDesign({ navLinks: next }); };
+ return (
+ <div key={i} className="rounded-lg border border-black/10 bg-white p-2">
+ <div className="mb-1.5 flex items-center gap-1.5">
+ <input value={l.label} onChange={(e) => update({ label: e.target.value })} placeholder="Label" className="w-[38%] rounded-md border border-black/10 px-2 py-1.5 text-[12px] outline-none focus:border-[#5D0F17]/50" />
+ <input value={l.href} onChange={(e) => update({ href: e.target.value })} placeholder="/about or https://…" className="flex-1 rounded-md border border-black/10 px-2 py-1.5 text-[12px] outline-none focus:border-[#5D0F17]/50" />
+ <button type="button" onClick={() => { const next = navLinks.filter((_, j) => j !== i); setNavLinks(next); pushDesign({ navLinks: next }); }} className="grid h-6 w-6 shrink-0 place-items-center rounded text-stone-400 hover:bg-red-50 hover:text-red-600"><X size={13} /></button>
+ </div>
+ <div className="flex overflow-hidden rounded-md border border-black/10">
+ {(["header", "footer", "both"] as const).map((p) => (
+ <button key={p} type="button" onClick={() => update({ place: p })} className={`flex-1 py-1 text-[11px] font-medium capitalize transition ${l.place === p ? "bg-[#5D0F17] text-white" : "text-stone-500 hover:bg-stone-100"}`}>{p}</button>
+ ))}
+ </div>
+ </div>
+ );
+ })}
+ <button type="button" onClick={() => { const next = [...navLinks, { label: "", href: "", place: "both" as const }]; setNavLinks(next); }} className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-black/20 py-2 text-[12px] font-medium text-stone-500 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Plus size={13} /> Add a link</button>
+ </div>
+
  <button type="button" onClick={() => setShowTemplates(true)} className="mt-6 flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 py-2.5 text-[12px] font-semibold text-stone-600 transition hover:bg-stone-100"><LayoutTemplate size={13} /> Start from a full template</button>
  <p className="mt-2 text-center text-[11px] leading-snug text-stone-400">Change anything here, or switch to <button type="button" onClick={() => setRailTab("assist")} className="font-semibold text-[#5D0F17] underline">Assist</button> and just describe it.</p>
  </div>
- ) : (
+ ) : railTab === "sections" ? (
  <div className="h-full overflow-y-auto px-4 py-4">
- {/* Free-form elements — drop onto a section, then drag anywhere */}
- <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add a section</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Full-width sections. Click one to drop it at the bottom of {activeTitle}.</p>
+ <div className="grid grid-cols-2 gap-2">
+ {BLOCK_TYPES.map((bt) => (
+ <button key={bt.type} type="button" onClick={() => addSection(bt.type)} title={bt.description} className="group flex flex-col overflow-hidden rounded-xl border border-black/10 bg-white text-left transition hover:-translate-y-px hover:border-[#5D0F17]/40 hover:shadow-[0_10px_26px_-14px_rgba(43,36,29,0.5)]">
+ <div className="h-[68px] w-full border-b border-black/5 bg-gradient-to-b from-white to-stone-50"><SectionThumb type={bt.type} /></div>
+ <span className="flex items-center gap-1 px-2.5 py-2">
+ <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-stone-800">{bt.label}</span>
+ <Plus size={12} className="shrink-0 text-stone-300 transition group-hover:text-[#5D0F17]" />
+ </span>
+ </button>
+ ))}
+ </div>
+ <button type="button" onClick={() => setShowTemplates(true)} className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 py-2.5 text-[12px] font-semibold text-stone-600 transition hover:bg-stone-100"><LayoutTemplate size={13} /> Start from a full template</button>
+ </div>
+ ) : railTab === "elements" ? (
+ <div className="h-full overflow-y-auto px-4 py-4">
  <p className="mb-2.5 text-[12px] leading-snug text-stone-400">Drop onto {selBlock ? "the selected section" : "the last section"}, then drag it anywhere. It scales with the layout and stacks neatly on mobile.</p>
- <div className="mb-3 grid grid-cols-3 gap-2">
- {([["button", "Button", MousePointerClick], ["text", "Text", Type], ["image", "Image", ImageIcon]] as const).map(([kind, label, Icon]) => (
+ <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
+ <div className="mb-4 grid grid-cols-3 gap-2">
+ {([["button", "Button", MousePointerClick], ["image", "Image", ImageIcon]] as const).map(([kind, label, Icon]) => (
  <button key={kind} type="button" onClick={() => addElement(kind)} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03] hover:text-[#5D0F17]">
  <Icon size={17} strokeWidth={1.8} />
  <span className="text-[11px] font-medium">{label}</span>
@@ -866,7 +1292,7 @@ export default function StorefrontStudio() {
  ))}
  </div>
  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Shapes</p>
- <div className="mb-6 grid grid-cols-3 gap-2">
+ <div className="grid grid-cols-3 gap-2">
  {([["rect", "Rectangle", Square], ["circle", "Circle", Circle], ["line", "Line", Minus]] as const).map(([kind, label, Icon]) => (
  <button key={kind} type="button" onClick={() => addElement(kind)} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03] hover:text-[#5D0F17]">
  <Icon size={17} strokeWidth={1.8} />
@@ -874,23 +1300,37 @@ export default function StorefrontStudio() {
  </button>
  ))}
  </div>
-
- <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add to {activeTitle}</p>
- <p className="mb-3 text-[12px] leading-snug text-stone-400">Full-width sections. Click one to drop it at the bottom of the page.</p>
- <div className="space-y-1.5">
- {BLOCK_TYPES.map((bt) => (
- <button key={bt.type} type="button" onClick={() => addSection(bt.type)} className="group flex w-full items-start gap-3 rounded-lg border border-black/10 bg-white px-3 py-2.5 text-left transition hover:border-[#5D0F17]/40 hover:bg-[#5D0F17]/[0.03]">
- <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-500 group-hover:bg-[#5D0F17] group-hover:text-white"><Plus size={13} /></span>
- <span className="min-w-0">
- <span className="block text-[13px] font-semibold capitalize text-stone-800">{bt.label}</span>
- <span className="block text-[11px] leading-snug text-stone-400">{bt.description}</span>
- </span>
- </button>
- ))}
  </div>
+ ) : railTab === "text" ? (
+ <div className="h-full overflow-y-auto px-4 py-4">
+ <button type="button" onClick={() => addElement("text", { text: "Your text here", size: "md", color: colors.text, font: fonts.body })} className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#5D0F17] py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]"><Type size={14} /> Add a text box</button>
+ <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Text styles</p>
+ <div className="space-y-2">
+ <button type="button" onClick={() => addElement("text", { text: "Add a heading", size: "xl", color: colors.text, font: fonts.heading })} className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-left transition hover:border-[#5D0F17]/40"><span className="text-[22px] font-bold leading-tight text-stone-800" style={{ fontFamily: ff(fonts.heading) }}>Add a heading</span></button>
+ <button type="button" onClick={() => addElement("text", { text: "Add a subheading", size: "lg", color: colors.text, font: fonts.heading })} className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-left transition hover:border-[#5D0F17]/40"><span className="text-[16px] font-semibold text-stone-800" style={{ fontFamily: ff(fonts.heading) }}>Add a subheading</span></button>
+ <button type="button" onClick={() => addElement("text", { text: "Add a little bit of body text", size: "sm", color: colors.text, font: fonts.body })} className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-left transition hover:border-[#5D0F17]/40"><span className="text-[13px] text-stone-600">Add a little bit of body text</span></button>
+ </div>
+ <p className="mt-4 text-[12px] leading-snug text-stone-400">Each drops a text box onto {selBlock ? "the selected section" : "the last section"} — then drag it anywhere and format it inline.</p>
+ </div>
+ ) : railTab === "uploads" ? (
+ <div className="h-full overflow-y-auto px-4 py-4">
+ <label className="mb-4 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#5D0F17] px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">{assetsBusy ? "Uploading…" : (<><UploadIcon size={14} /> Upload a photo</>)}<input type="file" accept="image/*" className="hidden" disabled={assetsBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) await uploadToLibrary(f); }} /></label>
+ <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Your uploads</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Click a photo to add it to {selBlock ? "the selected section" : "the last section"}, then drag it anywhere.</p>
+ {assets.length === 0 ? (
+ <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet — add photos and they'll live here, reusable across your whole site."}</p>
+ ) : (
+ <div className="grid grid-cols-3 gap-1.5">
+ {assets.map(({ url }) => (
+ // eslint-disable-next-line @next/next/no-img-element
+ <button key={url} type="button" onClick={() => addElement("image", { src: url })} className="aspect-square overflow-hidden rounded-md border border-black/10 transition hover:ring-2 hover:ring-[#5D0F17]/40"><img src={url} alt="" className="h-full w-full object-cover" /></button>
+ ))}
  </div>
  )}
  </div>
+ ) : null}
+ </div>
+ )}
  </div>
 
  <div className="flex min-w-0 flex-1 flex-col items-center overflow-hidden p-5">
@@ -934,7 +1374,7 @@ export default function StorefrontStudio() {
  </>
  )}
  </div>
- <div className="ml-auto flex h-5 items-center rounded-md bg-white px-2 text-[11px] text-stone-400">vyaplatform.com/s/<span className="text-stone-600">{handle || "your-store"}</span>{activeSlug !== "home" ? `/${activeSlug}` : ""}</div>
+ <div className="ml-auto flex h-5 items-center rounded-md bg-white px-2 text-[11px] text-stone-400"><span className="text-stone-600">{handle || "your-store"}</span>.getvya.ai{activeSlug !== "home" ? `/${activeSlug}` : ""}</div>
  </div>
 
  {/* editable canvas */}
@@ -947,13 +1387,13 @@ export default function StorefrontStudio() {
  {customCss && <style dangerouslySetInnerHTML={{ __html: stripThemeBackgroundOverrides(customCss) }} />}
  {/* Persistent site chrome — the header + footer wrap every page (same as the live storefront). */}
  <div style={{ fontFamily: ff(fonts.body), color: colors.text }}>
- <StoreHeader storeName={storeName} logo={null} nav={chromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug && switchPage(item.slug)} search={<Search size={16} strokeWidth={1.8} />} />
+ <StoreHeader storeName={storeName} logo={null} nav={headerChromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} search={<Search size={16} strokeWidth={1.8} />} />
  {curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} />
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products.map((p) => ({ title: p.title, price: money(p.price, p.currency), image: p.image }))} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} />
  ) : activeSlug === "shop" ? null : (
  <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-8 py-20 text-center">
  <p className="text-[14px] text-stone-400" style={{ fontFamily: ff(fonts.body) }}>This page is empty.</p>
- <p className="text-[13px] text-stone-400">Add sections from the <button type="button" onClick={() => setRailTab("add")} className="font-semibold text-[#5D0F17] underline">Add</button> panel, or ask VYA to build it.</p>
+ <p className="text-[13px] text-stone-400">Add sections from the <button type="button" onClick={() => setRailTab("sections")} className="font-semibold text-[#5D0F17] underline">Sections</button> panel, or ask VYA to build it.</p>
  </div>
  )}
  {/* Shop page: the product grid auto-lists your live inventory (same as the storefront) — shown here so the page reads true. */}
@@ -975,8 +1415,31 @@ export default function StorefrontStudio() {
  )}
  </section>
  )}
- <StoreFooter storeName={storeName} logo={null} nav={chromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} />
+ <StoreFooter storeName={storeName} logo={null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
  </div>
+ </div>
+ </div>
+ {/* Canva-style Pages strip — visual page tiles below the canvas (click to switch, + to add) */}
+ <div className="mt-3 flex w-full items-end gap-3 overflow-x-auto px-1 pb-1">
+ {pageList.map((p) => (
+ <div key={p.slug} className="group/pt flex shrink-0 flex-col items-center gap-1.5">
+ <button type="button" onClick={() => switchPage(p.slug)} title={p.title} className={`relative grid h-[68px] w-[52px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${p.slug === activeSlug ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <div className="absolute inset-0 flex flex-col gap-1 p-1.5">
+ <div className="h-1.5 w-3/4 rounded-full bg-stone-200" />
+ <div className="h-1 w-full rounded-full bg-stone-100" />
+ <div className="h-1 w-5/6 rounded-full bg-stone-100" />
+ <div className="mt-auto h-3 w-full rounded-sm bg-stone-100" />
+ </div>
+ {p.slug !== "home" && p.slug !== "shop" && (
+ <button type="button" onClick={(e) => { e.stopPropagation(); deletePage(p.slug); }} title="Delete page" className="absolute -right-1 -top-1 hidden h-4 w-4 place-items-center rounded-full bg-white text-stone-400 shadow ring-1 ring-black/10 hover:text-red-600 group-hover/pt:grid"><X size={10} /></button>
+ )}
+ </button>
+ <span className={`max-w-[60px] truncate text-[10px] ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-500"}`}>{p.n}. {p.title}</span>
+ </div>
+ ))}
+ <div className="flex shrink-0 flex-col items-center gap-1.5">
+ <button type="button" onClick={addPage} title="Add page" className="grid h-[68px] w-[52px] place-items-center rounded-md border border-dashed border-black/20 text-stone-400 transition hover:border-[#5D0F17] hover:text-[#5D0F17]"><Plus size={16} /></button>
+ <span className="text-[10px] text-stone-400">Add page</span>
  </div>
  </div>
  </div>
@@ -991,11 +1454,16 @@ export default function StorefrontStudio() {
  <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("bold"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Bold"><span className="text-[15px] font-bold">B</span></button>
  <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("italic"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Italic"><span className="font-serif text-[15px] italic">I</span></button>
  <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("underline"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Underline"><span className="text-[15px] underline">U</span></button>
+ <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("strikeThrough"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Strikethrough"><span className="text-[15px] line-through">S</span></button>
  <span className="mx-0.5 h-4 w-px bg-white/20" />
  <label className="grid h-7 w-7 cursor-pointer place-items-center rounded-md hover:bg-white/15" title="Text colour">
  <span className="h-4 w-4 rounded-full border border-white/60" style={{ background: colors.accent }} />
  <input type="color" defaultValue={colors.accent} onChange={(e) => fmtCmd("foreColor", e.target.value)} className="absolute h-0 w-0 opacity-0" />
  </label>
+ <span className="mx-0.5 h-4 w-px bg-white/20" />
+ <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("justifyLeft"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Align left"><AlignLeft size={14} /></button>
+ <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("justifyCenter"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Align centre"><AlignCenter size={14} /></button>
+ <button type="button" onMouseDown={(e) => { e.preventDefault(); fmtCmd("justifyRight"); }} className="grid h-7 w-7 place-items-center rounded-md text-[#e9e3d8] hover:bg-white/15" title="Align right"><AlignRight size={14} /></button>
  </div>
  )}
 
@@ -1011,11 +1479,7 @@ export default function StorefrontStudio() {
  {selOverlayObj && selOverlay && anchor && !ovlDragging && (() => {
  const { blockId, overlayId } = selOverlay;
  const p = selOverlayObj.props || {};
- const swatch = (val: string, onChange: (v: string) => void, title: string) => (
- <label title={title} className="relative grid h-7 w-7 cursor-pointer place-items-center rounded-md ring-1 ring-black/10" style={{ background: val }}>
- <input type="color" value={val} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
- </label>
- );
+ const swatch = (val: string, onChange: (v: string) => void, title: string) => <ColorDot value={val} onChange={onChange} title={title} />;
  const inp = "rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
  const fontSel = (val: string, onChange: (v: string) => void) => (
  <select value={val} title="Font" onChange={(e) => onChange(e.target.value)} className={`shrink-0 max-w-[9rem] ${inp}`} style={{ fontFamily: val ? ff(val) : undefined }}>
@@ -1086,9 +1550,18 @@ export default function StorefrontStudio() {
  </>
  )}
  <span className="h-5 w-px shrink-0 bg-black/10" />
+ {/* Align within the section */}
+ <button type="button" onClick={() => alignOverlay("left")} title="Align left" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><AlignStartVertical size={14} /></button>
+ <button type="button" onClick={() => alignOverlay("hcenter")} title="Align centre" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><AlignCenterVertical size={14} /></button>
+ <button type="button" onClick={() => alignOverlay("right")} title="Align right" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><AlignEndVertical size={14} /></button>
+ <button type="button" onClick={() => alignOverlay("top")} title="Align top" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><AlignStartHorizontal size={14} /></button>
+ <button type="button" onClick={() => alignOverlay("vmiddle")} title="Align middle" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><AlignCenterHorizontal size={14} /></button>
+ <button type="button" onClick={() => alignOverlay("bottom")} title="Align bottom" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><AlignEndHorizontal size={14} /></button>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
  <button type="button" onClick={() => reorderOverlay(blockId, overlayId, "front")} title="Bring to front" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><BringToFront size={14} /></button>
  <button type="button" onClick={() => reorderOverlay(blockId, overlayId, "back")} title="Send to back" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><SendToBack size={14} /></button>
- <button type="button" onClick={() => removeOverlay(blockId, overlayId)} title="Delete element" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ <button type="button" onClick={() => duplicateOverlay(blockId, overlayId)} title="Duplicate (⌘D)" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><Copy size={14} /></button>
+ <button type="button" onClick={() => removeOverlay(blockId, overlayId)} title="Delete element (⌫)" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
  </div>
  );
  })()}
@@ -1110,9 +1583,7 @@ export default function StorefrontStudio() {
  <button type="button" onClick={() => setBlockStyle(bid, "bg", "accent")} className={chip(st.bg === "accent")}>Accent</button>
  <button type="button" onClick={() => setBlockStyle(bid, "bg", "dark")} className={chip(st.bg === "dark")}>Dark</button>
  </div>
- <label title="Custom colour" className="relative grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md ring-1 ring-black/10" style={{ background: /^#/.test(st.bg || "") ? st.bg : "#ffffff" }}>
- <input type="color" value={/^#/.test(st.bg || "") ? st.bg! : "#ffffff"} onChange={(e) => setBlockStyle(bid, "bg", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
- </label>
+ <ColorDot value={/^#/.test(st.bg || "") ? st.bg! : "#ffffff"} onChange={(v) => setBlockStyle(bid, "bg", v)} title="Custom colour" />
  {/* Background photo — upload or drag-drop (no URLs) */}
  <div className="flex shrink-0 items-center gap-1.5">
  {bgUrl
@@ -1123,9 +1594,7 @@ export default function StorefrontStudio() {
  </div>
  <span className="h-5 w-px shrink-0 bg-black/10" />
  {/* Text colour */}
- <label title="Text colour" className="relative grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md ring-1 ring-black/10" style={{ background: st.textColor || "#111111" }}>
- <input type="color" value={st.textColor || "#111111"} onChange={(e) => setBlockStyle(bid, "textColor", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
- </label>
+ <ColorDot value={st.textColor || "#111111"} onChange={(v) => setBlockStyle(bid, "textColor", v)} title="Text colour" />
  {/* Alignment */}
  <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
  {(["left", "center", "right"] as const).map((a) => (
@@ -1144,6 +1613,13 @@ export default function StorefrontStudio() {
  {b.type === "hero" && b.props?.image && (b.props?.cx || b.props?.cy) && (
  <button type="button" onClick={() => updateCur((bs) => bs.map((x) => (x.id === bid ? { ...x, props: { ...(x.props || {}), cx: "", cy: "" } } : x)))} title="Recenter the content" className="shrink-0 rounded-md border border-black/10 px-2.5 py-1 text-[11px] font-medium text-stone-600 transition hover:bg-stone-100">Recenter</button>
  )}
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ {(() => { const idx = curBlocks.findIndex((x) => x.id === bid); return (
+ <>
+ <button type="button" disabled={idx <= 0} onClick={() => moveBlock(bid, "up")} title="Move section up" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-800 disabled:opacity-25"><ChevronUp size={15} /></button>
+ <button type="button" disabled={idx < 0 || idx >= curBlocks.length - 1} onClick={() => moveBlock(bid, "down")} title="Move section down" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-800 disabled:opacity-25"><ChevronDown size={15} /></button>
+ </>
+ ); })()}
  <span className="h-5 w-px shrink-0 bg-black/10" />
  <button type="button" onClick={() => duplicateBlock(bid)} title="Duplicate section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"><Copy size={14} /></button>
  <button type="button" onClick={() => removeBlock(bid)} title="Delete section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>

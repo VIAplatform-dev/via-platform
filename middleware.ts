@@ -260,6 +260,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // Free branded subdomain on the OS brand: {handle}.getvya.ai → that store's storefront. Same as the
+  // vyaplatform subdomain above, on getvya.ai. The bare/www OS host is handled by isOsHost above, so a
+  // subdomain here is always a store handle. (Needs a *.getvya.ai wildcard domain on Vercel.)
+  const osSub = host.endsWith(".getvya.ai") ? host.slice(0, -".getvya.ai".length) : null;
+  if (osSub && osSub !== "www" && !pathname.startsWith("/api") && !pathname.startsWith("/_next")) {
+    if (pathname.startsWith("/s/") || pathname.startsWith("/site/")) return NextResponse.next();
+    const url = request.nextUrl.clone();
+    url.pathname = `/s/${osSub}${pathname === "/" ? "" : pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   if (host && !isVyaHost && !isOsHost && !pathname.startsWith("/api") && !pathname.startsWith("/_next")) {
     // A captured site's internal links are /site/{slug}/… — let those through so
     // navigation within a brought-over site works on the seller's own domain.
