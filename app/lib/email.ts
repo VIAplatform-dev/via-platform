@@ -1459,7 +1459,7 @@ export async function sendStoreMessageNotification(params: {
  const resend = getResend();
  const esc = (s: string) =>
  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
- const dashUrl = `${BASE_URL}/store/dashboard`;
+ const dashUrl = `${BASE_URL}/infrastructure/admin/inbox`;
  const who = params.customerName?.trim() || "A shopper";
  const about = params.productTitle ? ` about <strong>${esc(params.productTitle)}</strong>` : "";
  await resend.emails.send({
@@ -1818,7 +1818,7 @@ export async function sendSourcingRequestToStores(
 ): Promise<void> {
  const resend = getResend();
  const VIA_EMAIL = "hana@vyaplatform.com";
- const DASHBOARD_URL = "https://vyaplatform.com/store/dashboard";
+ const DASHBOARD_URL = `${BASE_URL}/infrastructure/admin`;
 
  const imageBlock = details.imageUrl
  ? `<div style="text-align: center; margin: 20px 0;">

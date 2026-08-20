@@ -1050,7 +1050,7 @@ export default function StorefrontStudio() {
  {/* Top bar */}
  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
  <div className="flex items-center gap-2.5">
- <a href="/admin" title="Back to admin" className="grid h-7 w-7 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronLeft size={16} /></a>
+ <a href="/admin/home" title="Back to admin" className="grid h-7 w-7 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronLeft size={16} /></a>
  <span className="text-[15px] font-semibold tracking-tight">{storeName}</span>
  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
  <span className="mx-0.5 h-5 w-px bg-black/10" />

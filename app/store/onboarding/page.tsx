@@ -83,7 +83,7 @@ export default function OnboardingPage() {
   <p className="text-sm text-[#5D0F17]/55">Bring your Shopify or Squarespace store over — every page, exactly as it looks. One-time import.</p>
   <span className="mt-4 inline-block text-xs uppercase tracking-[0.15em] text-[#5D0F17]">Bring it over →</span>
   </button>
-  <button onClick={() => { setPath("build"); router.push("/store/storefront"); }} className="text-left border border-[#5D0F17]/15 bg-white p-6 transition hover:border-[#5D0F17]/50 hover:shadow-[0_12px_40px_-24px_rgba(93,15,23,0.5)]">
+  <button onClick={() => { setPath("build"); router.push("/admin/storefront"); }} className="text-left border border-[#5D0F17]/15 bg-white p-6 transition hover:border-[#5D0F17]/50 hover:shadow-[0_12px_40px_-24px_rgba(93,15,23,0.5)]">
   <p className="font-serif text-xl mb-1.5">I need to build one</p>
   <p className="text-sm text-[#5D0F17]/55">Start from a clean storefront and let VYA design it from your products — add and arrange sections yourself.</p>
   <span className="mt-4 inline-block text-xs uppercase tracking-[0.15em] text-[#5D0F17]">Build from scratch →</span>

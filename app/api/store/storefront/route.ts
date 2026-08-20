@@ -11,6 +11,9 @@ import {
  normalizeHandle,
  type StorefrontSettings,
 } from "@/app/lib/storefront-db";
+import { deleteCaptures } from "@/app/lib/site-capture-db";
+import { getSellerBySlug } from "@/app/lib/db/sellers";
+import { deleteAllItems } from "@/app/lib/db/inventory";
 
 export const dynamic = "force-dynamic";
 
@@ -111,5 +114,11 @@ export async function DELETE(request: NextRequest) {
  const slug = new URL(request.url).searchParams.get("store") || (await resolveStoreSlugAny(request));
  if (!slug) return NextResponse.json({ error: "store slug required (?store=<slug>)" }, { status: 400 });
  await deleteStorefront(slug);
- return NextResponse.json({ ok: true, deleted: slug });
+ // Platform-admin full reset: remove the imported site (captured pages) AND its imported inventory,
+ // so nothing from the import lingers. Otherwise the wrapper still sees a capture and reopens the
+ // captured editor after reload — and the imported products stay in inventory.
+ await deleteCaptures(slug).catch(() => {});
+ const seller = await getSellerBySlug(slug).catch(() => null);
+ const itemsDeleted = seller ? await deleteAllItems(seller.id).catch(() => 0) : 0;
+ return NextResponse.json({ ok: true, deleted: slug, itemsDeleted });
 }

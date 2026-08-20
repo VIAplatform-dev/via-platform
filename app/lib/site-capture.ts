@@ -229,6 +229,12 @@ export async function crawlAndStore(slug: string, startUrl: string, maxPages = 8
  const { saveCapturePage, deleteCaptures, getSiteCss, setSiteCss } = await import("./site-capture-db");
  const start = safe.href;
  const origin = new URL(start).origin;
+ // Never mirror VYA's own app. Importing a getvya.ai / vyaplatform.com URL (including a store's own
+ // VYA storefront address) would clone our marketplace/404 pages instead of the seller's real site.
+ const host = new URL(start).host.toLowerCase().replace(/^www\./, "");
+ if (host === "vyaplatform.com" || host.endsWith(".vyaplatform.com") || host === "getvya.ai" || host.endsWith(".getvya.ai")) {
+ throw new Error("That's a VYA address — paste your store's own website (e.g. yourstore.com or your-store.myshopify.com).");
+ }
  const linkBase = `/site/${slug}`;
  const rewriteLink = (full: string) => {
  const p = new URL(full).pathname;
