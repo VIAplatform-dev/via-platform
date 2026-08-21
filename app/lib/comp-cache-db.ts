@@ -113,12 +113,11 @@ export async function getCachedComps(opts: {
  const sql = db();
  const qn = normalizeQuery(opts.query);
  const cutoff = new Date(Date.now() - opts.maxAgeDays * 86_400_000).toISOString();
+ // EXACT query only. The old brand+category segment fallback cross-contaminated models — e.g. a
+ // "Prada Re-Edition 2005" got priced off a "Prada Raso Luce sequin" bag's cached comps. A thin
+ // exact cache now simply triggers a fresh live fetch in the pricer (which returns the right model's
+ // comps), instead of borrowing another item's stale ones.
  const exact = (await sql`SELECT source, title, price_cents, sold, condition, currency, link FROM comp_cache WHERE query_norm = ${qn} AND fetched_at >= ${cutoff} ORDER BY fetched_at DESC LIMIT ${opts.limit}`) as Array<Record<string, unknown>>;
- if (exact.length >= 6) return exact.map(toComp);
- if (opts.brand && opts.category) {
- const seg = (await sql`SELECT source, title, price_cents, sold, condition, currency, link FROM comp_cache WHERE brand = ${opts.brand} AND category = ${opts.category} AND fetched_at >= ${cutoff} ORDER BY fetched_at DESC LIMIT ${opts.limit}`) as Array<Record<string, unknown>>;
- return [...exact, ...seg].map(toComp);
- }
  return exact.map(toComp);
 }
 

@@ -20,7 +20,15 @@ export default function LoginClient() {
  const [loading, setLoading] = useState(false);
  const [sent, setSent] = useState(false);
  const searchParams = useSearchParams();
- const next = searchParams.get("callbackUrl") || "/";
+ // Where to land after signing in. On the seller OS host (getvya.ai) default to the workspace
+ // (/admin) — its layout then routes to onboarding or the dashboard. On the marketplace
+ // (vyaplatform.com) default to home. An explicit ?callbackUrl always wins.
+ const [next, setNext] = useState("/");
+ useEffect(() => {
+  const raw = searchParams.get("callbackUrl");
+  const isOsHost = /(^|\.)getvya\.ai$/i.test(window.location.hostname);
+  setNext(raw || (isOsHost ? "/admin" : "/"));
+ }, [searchParams]);
  const isInApp = useIsInAppBrowser();
 
  async function handleEmailSignIn(e: React.FormEvent) {

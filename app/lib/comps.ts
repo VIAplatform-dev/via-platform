@@ -176,11 +176,60 @@ export function rankComps(comps: Comp[]): Comp[] {
  return unique.sort((a, b) => (PREMIUM_SOURCE.test(b.source) ? 1 : 0) - (PREMIUM_SOURCE.test(a.source) ? 1 : 0));
 }
 
+// Distinctive bag-MODEL names. Used to reject comps that are a different model than the query (e.g.
+// pricing a "Jumbo Single Flap" off "Accordion"/"Camera"/"Westminster" bags dragged the median wrong).
+// Generic words ("flap", "bag") are deliberately excluded — too many models share them.
+const BAG_MODELS = [
+ "jumbo", "maxi", "single flap", "double flap", "classic flap", "medium flap", "small flap", "mini flap",
+ "2.55", "reissue", "wallet on chain", "woc", "accordion", "camera bag", "westminster", "boy bag",
+ "gabrielle", "coco handle", "deauville", "cerf", "business affinity", "kelly", "birkin", "constance",
+ "garden party", "evelyne", "picotin", "lindy", "bolide", "saddle", "baguette", "peekaboo", "spy",
+ "speedy", "neverfull", "alma", "keepall", "pochette", "capucines", "twist", "petite malle", "lady dior",
+ "book tote", "montaigne", "gaucho", "marcie", "paddington", "faye", "antigona", "nightingale", "pandora",
+ "luggage tote", "trapeze", "sunset", "vanity", "bucket", "backpack",
+ // Distinctive silhouettes/shapes — a Saddle should not be priced off a Hobo, etc.
+ "hobo", "saddle", "pochette", "clutch", "tote bag", "shopper", "duffle", "bowling", "boston bag",
+];
+
+/** Reduce a long SEO title to a searchable brand + model + material core for eBay-SOLD lookup. The
+ *  full listing title ("… Vertical Stitch … Bag Ruthenium Hardware") is too specific to match any
+ *  sold listing, so eBay returns nothing and the pricer falls back to inflated asking prices. */
+export function compactQuery(query: string): string {
+ let q = " " + query.toLowerCase() + " ";
+ q = q
+  .replace(/\b(ruthenium|gunmetal|palladium|brushed|antiqued?|aged|light\s+gold|gold|silver)\s+hardware\b/g, " ")
+  .replace(/\bhardware\b/g, " ")
+  .replace(/\b(vertical|diagonal|horizontal)\s+stitch(ing)?\b/g, " ")
+  .replace(/\b(authentic|genuine|pre[-\s]?owned|preowned|nwt|nwot|brand\s+new|excellent|very\s+good|good\s+condition|mint|rare|iconic|stunning|beautiful|gorgeous)\b/g, " ")
+  .replace(/\b(bag|handbag|purse|pouch|tote)\b/g, " ")
+  .replace(/\b(with|and|the|a|an|in|for|of|by)\b/g, " ")
+  .replace(/[^\w\s&-]/g, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+ return q.split(" ").slice(0, 8).join(" ");
+}
+
+/** Drop comps that are a DIFFERENT bag model than the query. Only fires when the query names a model
+ *  AND a comp names ONLY other model(s) — comps with no model signal get the benefit of the doubt, and
+ *  the caller falls back to the unfiltered set if this leaves too few. */
+export function filterModelConflicts(comps: Comp[], query: string): Comp[] {
+ const q = query.toLowerCase();
+ const qModels = BAG_MODELS.filter((m) => q.includes(m));
+ if (!qModels.length) return comps; // query has no model signal → nothing to conflict with
+ return comps.filter((c) => {
+  const t = (c.title || "").toLowerCase();
+  const cModels = BAG_MODELS.filter((m) => t.includes(m));
+  if (!cModels.length) return true; // comp names no model → keep (benefit of the doubt)
+  return cModels.some((m) => qModels.includes(m)); // keep only if it shares the query's model
+ });
+}
+
 /** eBay SOLD + completed — real transaction prices (the reality anchor reverse-image can't
- *  give, since Google Lens shows asking/active listings). One SerpApi call. */
+ *  give, since Google Lens shows asking/active listings). One SerpApi call. Searched on a COMPACT
+ *  query so the model actually matches recent sold listings (recency also fixes stale valuations). */
 export async function fetchEbaySold(query: string): Promise<Comp[]> {
  if (!isCompsConfigured() || !query.trim()) return [];
- const r = await serp({ engine: "ebay", _nkw: query, ebay_domain: "ebay.com", LH_Sold: "1", LH_Complete: "1" });
+ const r = await serp({ engine: "ebay", _nkw: compactQuery(query), ebay_domain: "ebay.com", LH_Sold: "1", LH_Complete: "1" });
  const comps: Comp[] = [];
  for (const row of (r?.organic_results || []).slice(0, 25)) {
  const cents = priceToCents(row.price);

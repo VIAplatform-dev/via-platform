@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Build dir is overridable so a second dev server (the getvya.ai OS surface via `npm run dev:os`)
+  // can run alongside the marketplace one without fighting over `.next/dev/lock`. Defaults to `.next`
+  // everywhere (build/start/CI unchanged); only dev:os sets NEXT_DIST_DIR=.next-os.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Don't advertise the framework/version.
   poweredByHeader: false,
   // Baseline security headers on every response. Deliberately NOT a full content-security-policy

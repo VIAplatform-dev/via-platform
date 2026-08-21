@@ -179,7 +179,9 @@ export async function middleware(request: NextRequest) {
   // host) is served that store's hosted storefront. Runs before the waitlist/auth
   // gate so the seller's own customers never hit the VYA login wall. Static assets
   // and API calls pass through untouched.
-  const host = (request.headers.get("host") || "").toLowerCase().split(":")[0];
+  const rawHost = (request.headers.get("host") || "").toLowerCase();
+  const host = rawHost.split(":")[0];
+  const localPort = rawHost.split(":")[1] || "";
   const isVyaHost =
     host === "vyaplatform.com" ||
     host === "www.vyaplatform.com" ||
@@ -192,11 +194,17 @@ export async function middleware(request: NextRequest) {
   // it isn't mistaken for a seller's connected domain. APIs, /_next, /infra assets and
   // the raw /infrastructure routes pass through to the normal pipeline (which keeps
   // their auth gating + static rewrites); only the OS's own clean paths are rewritten.
-  const isOsHost = host === "getvya.ai" || host === "www.getvya.ai";
+  // Local dev convenience: hitting the app on port 3333 (`npm run dev:os`) behaves like the getvya.ai
+  // OS host — marketing homepage, /admin workspace, /company, etc. — so the OS surface is previewable
+  // locally without editing /etc/hosts. Marketplace stays on the default port (localhost:3000).
+  const isOsHost = host === "getvya.ai" || host === "www.getvya.ai" || localPort === "3333";
   if (isOsHost) {
     const passthrough =
       pathname.startsWith("/api") ||
       pathname.startsWith("/_next") ||
+      // Captured/imported storefront pages — the OS editor previews them in a SAME-ORIGIN iframe
+      // (/site/{slug}), so this host must serve them via the route handler, not the marketing rewrite.
+      pathname.startsWith("/site") ||
       pathname.startsWith("/infra/") ||
       pathname === "/infrastructure" ||
       pathname.startsWith("/infrastructure/") ||
