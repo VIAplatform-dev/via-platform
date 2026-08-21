@@ -45,3 +45,8 @@ next-env.d.ts
 # OS dev server build dir (npm run dev:os)
 .next-os
 .next-verify
+
+# local-only docs / editor config — never push
+/SECURITY_AUDIT_2026-08.md
+/docs/architecture.md
+/.vscode
