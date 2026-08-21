@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { embedImageResult, isEmbeddingConfigured } from "./embeddings";
+import { inferBrandFromTitle } from "./market-data-db";
 
 // The VYA training dataset — one clean, append-only "golden record" per example, so
 // that when we're ready to train our own model it starts from pristine data, not a
@@ -259,7 +260,7 @@ export async function getGoldenForReview(limit = 40): Promise<GoldenReviewRow[]>
 // correcting the AI's proposal on diverse real photos. Each saved row carries BOTH the human-verified
 // label AND the AI's proposal, so it's an answer key AND a direct read on model accuracy. ──
 
-export type LabelCandidate = { productId: number; storeSlug: string; storeName: string | null; title: string; image: string; priceCents: number | null };
+export type LabelCandidate = { productId: number; storeSlug: string; storeName: string | null; title: string; image: string; priceCents: number | null; titleBrand: string | null };
 /** A diverse set of real item photos to label — spread across stores, skipping ones already labeled. */
 export async function getLabelingCandidates(limit = 20): Promise<LabelCandidate[]> {
  await ensureTable();
@@ -275,26 +276,31 @@ export async function getLabelingCandidates(limit = 20): Promise<LabelCandidate[
   productId: Number(r.id), storeSlug: String(r.store_slug || ""), storeName: (r.store_name as string) ?? null,
   title: String(r.title || ""), image: String(r.image || ""),
   priceCents: r.price != null ? Math.round(Number(r.price) * 100) : null,
+  // The store's TITLE usually names the real brand ("Dior 2851") even when the AI blind-guesses wrong
+  // from the photo — pre-fill the TRUTH field with it so obvious cases don't need manual correction.
+  titleBrand: inferBrandFromTitle(String(r.title || "")),
  }));
 }
 
 /** Save a human-verified label as a golden row (upsert), keeping the AI's proposal for accuracy scoring. */
 export async function saveGoldenLabel(x: {
- productId: number; storeSlug: string; image: string; title: string; priceCents: number | null;
+ productId: number; storeSlug: string; image: string; title: string; priceCents: number | null; aiPriceCents?: number | null;
  brand: string | null; era: string | null; material: string | null; condition: string | null; category: string | null;
  ai: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; category?: string | null };
 }): Promise<void> {
  await ensureTable();
  const ref = "label-" + x.productId;
  const s = (v: string | null | undefined) => (v && String(v).trim() ? String(v).trim().slice(0, 200) : null);
+ // price_cents = the human-VERIFIED fair market value (the answer key). market_cents = the AI's PROPOSED
+ // price at labeling time, kept so we can see AI-vs-verified without a fresh exam run.
  await db()`
-  INSERT INTO training_examples (source, store_slug, item_ref, image_urls, brand, era, material, condition, category, title, price_cents,
+  INSERT INTO training_examples (source, store_slug, item_ref, image_urls, brand, era, material, condition, category, title, price_cents, market_cents,
    ai_brand, ai_era, ai_material, ai_condition, ai_category, trust, golden, golden_at)
-  VALUES ('golden', ${x.storeSlug}, ${ref}, ${JSON.stringify([x.image])}, ${s(x.brand)}, ${s(x.era)}, ${s(x.material)}, ${s(x.condition)}, ${s(x.category)}, ${s(x.title)}, ${x.priceCents},
+  VALUES ('golden', ${x.storeSlug}, ${ref}, ${JSON.stringify([x.image])}, ${s(x.brand)}, ${s(x.era)}, ${s(x.material)}, ${s(x.condition)}, ${s(x.category)}, ${s(x.title)}, ${x.priceCents}, ${x.aiPriceCents ?? null},
    ${s(x.ai.brand)}, ${s(x.ai.era)}, ${s(x.ai.material)}, ${s(x.ai.condition)}, ${s(x.ai.category)}, 'golden', true, now())
   ON CONFLICT (source, item_ref) DO UPDATE SET
    brand = EXCLUDED.brand, era = EXCLUDED.era, material = EXCLUDED.material, condition = EXCLUDED.condition,
-   category = EXCLUDED.category, golden = true, golden_at = now()
+   category = EXCLUDED.category, price_cents = EXCLUDED.price_cents, market_cents = EXCLUDED.market_cents, golden = true, golden_at = now()
  `.catch(() => {});
 }
 

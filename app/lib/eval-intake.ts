@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { draftListing } from "./ai-intake";
-import { reverseImageMatches, isCompsConfigured } from "./comps";
+import { reverseImageMatches, matchesToComps, isCompsConfigured, type VisualMatch } from "./comps";
 import { inferBrandFromTitle } from "./market-data-db";
 import { brandMatch } from "./brand-match";
 import { estimatePrice } from "./price-engine";
@@ -101,15 +101,18 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  try {
  const draft = await draftListing([imageUrl]); // blind — no seller memory, no answer
  let brand = draft.brand?.value ?? null;
+ let matches: VisualMatch[] = []; // hoisted so the price grading can feed them as comps, like production
  if (opts.withReverseImage && isCompsConfigured()) {
- const matches = await reverseImageMatches(imageUrl).catch(() => []);
+ matches = await reverseImageMatches(imageUrl).catch(() => []);
  const consensus = brandFromTitles(matches.map((m) => m.title));
  if (consensus) brand = consensus; // production trusts reverse-image consensus
  }
  let priceOk: boolean | null = null;
  if (opts.withPrice && Number(r.price_cents) > 0) {
- const query = [brand, draft.category].filter(Boolean).join(" ") || draft.title;
- const est = await estimatePrice({ query, photoUrl: imageUrl, minMarkupBps: 3000, context: { brand, era: draft.era?.value ?? null } }).catch(() => null);
+ const query = draft.searchQuery || [brand, draft.category].filter(Boolean).join(" ") || draft.title;
+ // Price EXACTLY like a live listing: feed the reverse-image matches as comps + full context, not a
+ // stripped-down call — so the graded price reflects the real production pricer, not a weaker one.
+ const est = await estimatePrice({ query, photoUrl: imageUrl, minMarkupBps: 3000, extraComps: matchesToComps(matches), context: { brand, era: draft.era?.value ?? null, material: draft.material?.value ?? null, condition: draft.condition?.value ?? null } }).catch(() => null);
  if (est?.suggestedCents) priceOk = Math.abs(est.suggestedCents - Number(r.price_cents)) / Number(r.price_cents) <= 0.2;
  }
  const specOk = specificMatch(draft.title || "", draft.searchQuery, (r.title as string) || "", brand);

@@ -251,30 +251,19 @@ export async function fetchGoogleShopping(query: string): Promise<Comp[]> {
  return comps;
 }
 
-/** Dedicated The RealReal keyword pass. Only used by the legacy full basket below — the lean
- *  live path relies on reverse-image, which already surfaces RealReal matches natively. */
-async function fetchRealRealPass(query: string): Promise<Comp[]> {
- if (!isCompsConfigured() || !query.trim()) return [];
- const r = await serp({ engine: "google_shopping", q: `${query} the real real`, gl: "us" });
- const comps: Comp[] = [];
- for (const row of (r?.shopping_results || []).slice(0, 20)) {
- if (!/real\s?real/i.test(String(row.source || ""))) continue;
- const cents = priceToCents(row.extracted_price ?? row.price);
- if (cents) comps.push({ title: String(row.title || ""), priceCents: cents, currency: "USD", sold: false, source: "The RealReal", link: row.link });
- }
- return comps;
-}
 
 /** Legacy full basket (eBay sold + Google Shopping + RealReal pass) — 3 SerpApi calls. Kept
  *  for the dry-run comparison; estimatePrice now uses the leaner reverse-image + eBay-sold path. */
 export async function fetchComps(query: string): Promise<Comp[]> {
  if (!isCompsConfigured() || !query.trim()) return [];
- const [ebay, shopping, realReal] = await Promise.all([
- fetchEbaySold(query),
- fetchGoogleShopping(query),
- fetchRealRealPass(query),
- ]);
- return rankComps([...ebay, ...shopping, ...realReal]);
+ // eBay-SOLD is the anchor and usually enough on its own. Two redundant calls dropped for speed:
+ //  • the dedicated RealReal pass — reverse-image already surfaces RealReal/Vestiaire/etc. natively;
+ //  • Google Shopping — now only fetched as a FALLBACK when the sold set is thin.
+ // Cold lookups go from 3 SerpApi calls to 1 (common case) or 2 (thin), and the slow stragglers are gone.
+ const ebay = await fetchEbaySold(query);
+ if (ebay.length >= 6) return rankComps(ebay);
+ const shopping = await fetchGoogleShopping(query).catch(() => []);
+ return rankComps([...ebay, ...shopping]);
 }
 
 export type ResaleTrend = { momentumPct: number; trending: boolean; note: string; source: string };

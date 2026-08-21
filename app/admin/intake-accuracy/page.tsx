@@ -122,6 +122,64 @@ type AblationRun = { sample: number; goldenOnly: boolean; memoryHitRate: number;
 const pctStr = (n: number | null) => (n == null ? "—" : `${n}%`);
 const SOURCE_LABEL: Record<string, string> = { intake: "AI listings", items: "VYA inventory", marketplace: "Marketplace" };
 
+type TrendPoint = { date: string; factualKeptPct: number | null; brandPct: number | null; categoryPct: number | null; materialPct: number | null; eraPct: number | null; priceWithin10Pct: number | null; listings30d: number };
+type Trend = { gate: number; readyToOnboard: boolean; gapToGatePct: number | null; deltaSinceFirstSnapshotPct: number | null; latest: TrendPoint | null; points: TrendPoint[] };
+
+// A tiny inline sparkline of the accuracy line vs the 95% gate.
+function Sparkline({ points, gate }: { points: number[]; gate: number }) {
+ if (points.length < 2) return null;
+ const w = 220, h = 44, pad = 4;
+ const min = Math.max(0, Math.min(...points, gate) - 3);
+ const x = (i: number) => pad + (i / (points.length - 1)) * (w - 2 * pad);
+ const y = (v: number) => pad + (1 - (v - min) / (100 - min)) * (h - 2 * pad);
+ const d = points.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+ return (
+ <svg width={w} height={h} aria-hidden>
+  <line x1={pad} y1={y(gate)} x2={w - pad} y2={y(gate)} stroke="#10b981" strokeWidth="1" strokeDasharray="3 3" opacity="0.55" />
+  <path d={d} fill="none" stroke="#1c1917" strokeWidth="1.75" strokeLinejoin="round" strokeLinecap="round" />
+  <circle cx={x(points.length - 1)} cy={y(points[points.length - 1])} r="2.5" fill="#1c1917" />
+ </svg>
+ );
+}
+
+// The centerpiece: recent (30-day) factual accuracy from seller edits, tracked toward the 95% bar.
+function TrendHero({ trend, onSeed, seeding }: { trend: Trend | null; onSeed: () => void; seeding: boolean }) {
+ const latest = trend?.latest;
+ const cur = latest?.factualKeptPct ?? null;
+ const line = (trend?.points ?? []).map((p) => p.factualKeptPct).filter((v): v is number => v != null);
+ const ready = trend?.readyToOnboard;
+ return (
+ <section className="mb-6 rounded-2xl border border-stone-200 bg-gradient-to-b from-white to-stone-50/70 p-5">
+  <div className="flex items-start justify-between gap-4">
+  <div>
+   <h2 className="text-[15px] font-semibold text-stone-900">Accuracy toward onboarding</h2>
+   <p className="mt-0.5 text-[11px] text-stone-500">Recent (30-day) factual accuracy from seller edits — the share of brand / category / material / era the AI got right (kept, not corrected). Clear <b>{trend?.gate ?? 95}%</b> before onboarding stores. <span className="text-stone-400">Only listings drafted through AI intake are graded — imported or hand-typed listings have no AI guess to check, so they’re not counted here.</span></p>
+  </div>
+  <span className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ${ready ? "bg-emerald-600 text-white" : "bg-stone-800 text-white"}`}>{ready ? "READY ✓" : cur == null ? "NO DATA" : "NOT YET"}</span>
+  </div>
+  {cur == null ? (
+  <div className="mt-4 flex flex-wrap items-center gap-3">
+   <p className="text-[12px] text-stone-500">No snapshots yet — seed the trend from your past listings.</p>
+   <button onClick={onSeed} disabled={seeding} className="rounded-lg bg-stone-900 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">{seeding ? "Building…" : "Seed from past listings"}</button>
+  </div>
+  ) : (
+  <div className="mt-4 flex flex-wrap items-end gap-x-8 gap-y-3">
+   <div>
+   <p className="text-3xl font-semibold tabular-nums text-stone-900">{cur}%</p>
+   <p className="text-[11px] text-stone-400">{trend?.gapToGatePct != null && trend.gapToGatePct > 0 ? `${trend.gapToGatePct} pts to ${trend.gate}%` : `at/above ${trend?.gate ?? 95}%`}{trend?.deltaSinceFirstSnapshotPct != null ? ` · ${trend.deltaSinceFirstSnapshotPct >= 0 ? "+" : ""}${trend.deltaSinceFirstSnapshotPct} pts since tracking began` : ""} · graded on {latest?.listings30d ?? 0} AI-intake listings/30d</p>
+   </div>
+   <Sparkline points={line} gate={trend?.gate ?? 95} />
+   <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
+   {([["Brand", latest?.brandPct], ["Category", latest?.categoryPct], ["Material", latest?.materialPct], ["Era", latest?.eraPct], ["Price ±10%", latest?.priceWithin10Pct]] as [string, number | null | undefined][]).map(([l, v]) => (
+    <span key={l} className="text-stone-500"><b className="tabular-nums text-stone-800">{v == null ? "—" : `${v}%`}</b> {l}</span>
+   ))}
+   </div>
+  </div>
+  )}
+ </section>
+ );
+}
+
 export default function IntakeAccuracyPage() {
  const router = useRouter();
  const [data, setData] = useState<Data | null>(null);
@@ -136,6 +194,8 @@ export default function IntakeAccuracyPage() {
  const [evalRuns, setEvalRuns] = useState<EvalRun[]>([]);
  const [ablation, setAblation] = useState<AblationRun | null>(null);
  const [ablationRunning, setAblationRunning] = useState(false);
+ const [trend, setTrend] = useState<Trend | null>(null);
+ const [seeding, setSeeding] = useState(false);
 
  useEffect(() => {
  fetch(`/api/admin/intake-accuracy?days=${days}`)
@@ -150,7 +210,17 @@ export default function IntakeAccuracyPage() {
  useEffect(() => {
  fetch("/api/admin/training-data").then((r) => (r.ok ? r.json() : null)).then((d) => d && setTrain(d)).catch(() => {});
  fetch("/api/admin/eval").then((r) => (r.ok ? r.json() : null)).then((d) => d && setEvalRuns(d.runs || [])).catch(() => {});
+ fetch("/api/admin/accuracy-trend?days=120").then((r) => (r.ok ? r.json() : null)).then((d) => d && setTrend(d)).catch(() => {});
  }, []);
+
+ async function seedTrend() {
+ setSeeding(true);
+ try {
+ const r = await fetch("/api/admin/accuracy-trend?backfill=16&days=120");
+ if (r.ok) setTrend(await r.json());
+ } catch { /* ignore */ }
+ setSeeding(false);
+ }
 
  async function backfill() {
  setBackfilling(true);
@@ -185,7 +255,7 @@ export default function IntakeAccuracyPage() {
  const cal = !price || price.samples < 3 ? null
  : price.samples < 10 ? { t: `Too little data · ${price.samples} listings`, c: "text-stone-400" }
  : price.medianRatio >= 0.9 && price.medianRatio <= 1.1
- ? (price.avgAbsErrorPct > 30 ? { t: `Centered, but noisy (±${price.avgAbsErrorPct}% per item)`, c: "text-amber-600" } : { t: "Well calibrated", c: "text-emerald-600" })
+ ? (price.avgAbsErrorPct > 30 ? { t: "Centered on the median", c: "text-emerald-600" } : { t: "Well calibrated", c: "text-emerald-600" })
  : price.medianRatio < 0.9 ? { t: `Runs ~${Math.round((1 - price.medianRatio) * 100)}% HIGH`, c: "text-red-600" }
  : { t: `Runs ~${Math.round((price.medianRatio - 1) * 100)}% LOW`, c: "text-amber-600" };
 
@@ -204,6 +274,13 @@ export default function IntakeAccuracyPage() {
  ))}
  </div>
  </div>
+
+ <TrendHero trend={trend} onSeed={seedTrend} seeding={seeding} />
+
+ {/* ── Lab: research & tooling — collapsed by default so the readiness view stays clean ── */}
+ <details className="mb-6 rounded-xl border border-stone-200 bg-stone-50/40">
+ <summary className="cursor-pointer select-none px-5 py-3 text-[13px] font-medium text-stone-600">Advanced — experiments &amp; tooling <span className="font-normal text-stone-400">· training data · manual exams · memory A/B · weekly history</span></summary>
+ <div className="space-y-6 px-3 pb-3">
 
  {/* Training dataset — labeled examples banked for a future VYA model. */}
  {train && (
@@ -349,6 +426,9 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
+ </div>
+ </details>
+
  {loading && !data ? (
  <div className="py-24 text-center text-sm text-stone-400">Loading…</div>
  ) : !data || data.totalPublishes === 0 ? (
@@ -356,11 +436,13 @@ export default function IntakeAccuracyPage() {
  No AI-drafted listings in this period yet. As sellers publish, this fills in.
  </div>
  ) : (
- <div className="space-y-6">
+ <details className="mb-6 rounded-xl border border-stone-200 bg-stone-50/40">
+ <summary className="cursor-pointer select-none px-5 py-3 text-[13px] font-medium text-stone-600">Detailed breakdowns <span className="font-normal text-stone-400">· golden exam · by field · price bias · by category · seller corrections</span></summary>
+ <div className="space-y-6 p-3 pt-1">
  {data.betaReadiness && <Readiness b={data.betaReadiness} />}
  {data.totalPublishes < 25 && (
  <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[12px] text-amber-800">
- <b>Still early — {data.totalPublishes} AI-drafted listing{data.totalPublishes === 1 ? "" : "s"} so far.</b> These numbers are <b>directional, not reliable yet</b> — a single item can swing a whole category. They get trustworthy as sellers publish (aim for a few dozen per category). Rows below with too few listings are marked as such.
+ <b>Only {data.totalPublishes} AI-intake listing{data.totalPublishes === 1 ? "" : "s"} to grade so far</b> — <i>not</i> your whole inventory. Imported and hand-typed listings have no AI guess to check, so they aren’t counted. At this size the numbers are <b>directional, not reliable yet</b> — one item can swing a category. They firm up as more listings go through AI intake (aim for a few dozen per category).
  </div>
  )}
  <div className="grid grid-cols-3 gap-3">
@@ -369,25 +451,8 @@ export default function IntakeAccuracyPage() {
  <Stat label="Price median" value={price ? `${price.medianRatio.toFixed(2)}×` : "—"} hint={cal ? cal.t : "need ≥3 priced"} />
  </div>
 
- {/* Field correction rates */}
- <div className="rounded-xl border border-stone-200 bg-white p-5">
- <p className="mb-1 text-[13px] font-medium text-stone-700">Per-field accuracy</p>
- <p className="mb-4 text-[11px] text-stone-400">Of the fields the AI predicted, the share the seller kept unchanged. Green = kept, red = fixed.</p>
- <div className="space-y-2.5">
- {data.fields.map((f) => (
- <div key={f.field} className="flex items-center gap-3 text-[13px]">
- <span className="w-20 shrink-0 text-stone-700">{cap(f.field)}</span>
- <div className="h-2 flex-1 overflow-hidden rounded-full bg-red-200">
- <div className="h-full rounded-full bg-emerald-500" style={{ width: `${f.accuracyPct}%` }} />
- </div>
- <span className="w-12 shrink-0 text-right font-semibold tabular-nums text-stone-900">
- {f.accepted + f.corrected ? `${f.accuracyPct}%` : "—"}
- </span>
- <span className="w-24 shrink-0 text-right text-[11px] text-stone-400">{f.accepted} kept · {f.corrected} fixed</span>
- </div>
- ))}
- </div>
- </div>
+ {/* Per-field accuracy lives in the hero now (coverage-aware); the old precision-only bars were a
+     contradictory duplicate, so they're removed. */}
 
  {/* Price calibration */}
  {price && price.samples >= 3 && (
@@ -396,28 +461,11 @@ export default function IntakeAccuracyPage() {
  <p className="text-[13px] font-medium text-stone-700">Price calibration</p>
  {cal && <span className={`text-[12px] font-semibold ${cal.c}`}>{cal.t}</span>}
  </div>
- <div className="grid grid-cols-3 gap-3 text-center">
+ <div className="grid grid-cols-2 gap-3 text-center">
  <div className="rounded-lg bg-stone-50 p-3"><p className="text-lg font-semibold tabular-nums text-red-600">{price.overpricedPct}%</p><p className="text-[11px] text-stone-500">priced too HIGH<br />(seller cut &gt;20%)</p></div>
  <div className="rounded-lg bg-stone-50 p-3"><p className="text-lg font-semibold tabular-nums text-amber-600">{price.underpricedPct}%</p><p className="text-[11px] text-stone-500">priced too LOW<br />(seller raised &gt;25%)</p></div>
- <div className="rounded-lg bg-stone-50 p-3"><p className="text-lg font-semibold tabular-nums text-stone-900">±{price.avgAbsErrorPct}%</p><p className="text-[11px] text-stone-500">avg error<br />vs. seller’s price</p></div>
  </div>
  <p className="mt-3 text-[11px] text-stone-400">Based on {price.samples} listings with both an AI market value and a final price. Some gap reflects a store’s own positioning, not model error.</p>
- </div>
- )}
-
- {/* Confidence calibration — does a high AI pricing-confidence actually mean the seller keeps the price? */}
- {data.priceConfidence?.some((b) => b.n > 0) && (
- <div className="rounded-xl border border-stone-200 bg-white p-5">
- <p className="mb-1 text-[13px] font-medium text-stone-700">Confidence calibration</p>
- <p className="mb-3 text-[11px] text-stone-400">If confidence means anything, high-confidence prices should be re-priced rarely and by little. A flat curve means confidence isn’t informative yet.</p>
- <table className="w-full text-[12px]">
- <thead><tr className="text-left text-[11px] uppercase tracking-[0.06em] text-stone-400"><th className="pb-1.5">AI confidence</th><th className="pb-1.5">Listings</th><th className="pb-1.5 text-right">Re-priced &gt;10%</th><th className="pb-1.5 text-right">Median error</th></tr></thead>
- <tbody>
- {data.priceConfidence.map((b) => (
- <tr key={b.bucket} className="border-t border-stone-100"><td className="py-1.5">{b.bucket}</td><td className="py-1.5 tabular-nums text-stone-500">{b.n}</td><td className="py-1.5 text-right tabular-nums font-medium text-stone-800">{b.repricedPct == null ? "—" : `${b.repricedPct}%`}</td><td className="py-1.5 text-right tabular-nums text-stone-500">{b.medianAbsErrorPct == null ? "—" : `±${b.medianAbsErrorPct}%`}</td></tr>
- ))}
- </tbody>
- </table>
  </div>
  )}
 
@@ -531,6 +579,7 @@ export default function IntakeAccuracyPage() {
 
  <p className="text-[11px] text-stone-400">True per-field accuracy: only fields the AI actually predicted are scored (fields sellers pre-typed are excluded). Each graded field is a labeled example — the dataset the eval harness will replay.</p>
  </div>
+ </details>
  )}
  </div>
  );

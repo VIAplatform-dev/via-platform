@@ -165,11 +165,21 @@ export default function IntakePage() {
  title: form.title,
  price: Number(form.price) || 0,
  images: [ghost, ...photos].filter(Boolean),
+ brand: form.brand || null,
+ era: form.era || null,
+ material: form.material || null,
+ condition: form.condition || null,
  size: form.size || null,
  description: form.description || null,
  category: form.category || null,
  collections: selectedCols,
  status: "draft" as const,
+ // AI guess + context so DRAFTS (not only publishes) build the accuracy signal — a seller's edit to
+ // the AI draft is the label, and most test drafts never get published. Recorded per draft id.
+ aiDraft,
+ marketCents: rawMarketCents,
+ reverseImage,
+ promptVersion,
  });
  // Kept current every render so the tab-close / unmount beacon always sends the latest state.
  const beaconRef = useRef<{ canSave: boolean; payload: unknown }>({ canSave: false, payload: null });

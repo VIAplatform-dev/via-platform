@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/app/lib/storeAuth";
 import { getGoldenStats, getGoldenCandidates, markGolden, seedGolden, getGoldenForReview, getLabelingCandidates, saveGoldenLabel, clearSeededGolden } from "@/app/lib/training-data-db";
 import { draftListing } from "@/app/lib/ai-intake";
+import { reverseImageBestOf, matchesToComps, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { estimatePrice } from "@/app/lib/price-engine";
+import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,13 +41,37 @@ export async function POST(request: NextRequest) {
  // AI proposes labels for a photo — POST { draft: "<imageUrl>" }.
  if (typeof body?.draft === "string" && body.draft) {
  try {
+ // Phase 1 — labels only, so they render instantly. The price (reverse-image + full pricer) is a
+ // separate, slower call (priceFor) that fills in after — the way the inventory upload does it.
  const d = await draftListing([body.draft]);
  return NextResponse.json({ ok: true, proposed: {
   brand: d?.brand?.value ?? null, era: d?.era?.value ?? null, material: d?.material?.value ?? null,
   condition: d?.condition?.value ?? null, category: d?.category ?? null,
+  searchQuery: d?.searchQuery ?? null, title: d?.title ?? null,
  } });
  } catch (e) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "AI draft failed" }, { status: 502 });
+ }
+ }
+ // Phase 2 — the REAL blind price for a photo: reverse-image + the full comp-based pricer, same as a
+ // live listing. Split from the draft so labels show instantly and the price fills in after.
+ if (body?.priceFor && typeof body.priceFor === "object" && typeof body.priceFor.image === "string") {
+ try {
+ const pf = body.priceFor as { image: string; brand?: string; category?: string; era?: string; material?: string; condition?: string; searchQuery?: string; title?: string };
+ let priceUsd: number | null = null;
+ if (isCompsConfigured()) {
+  const rev = await reverseImageBestOf([pf.image], { maxFrames: 1 }).catch(() => ({ matches: [] as VisualMatch[], framesUsed: 0 }));
+  const revBrand = rev.matches.map((m) => inferBrandFromTitle(m.title || "")).find(Boolean) || null;
+  const brand = (pf.brand && pf.brand.trim()) || revBrand || null;
+  const query = ((pf.searchQuery && pf.searchQuery.trim()) || [brand, pf.category].filter(Boolean).join(" ") || pf.title || "").trim();
+  if (query) {
+   const est = await estimatePrice({ query, photoUrl: pf.image, minMarkupBps: 3000, extraComps: matchesToComps(rev.matches), context: { brand, era: pf.era || null, material: pf.material || null, condition: pf.condition || null } }).catch(() => null);
+   if (est?.marketCents && est.marketCents > 0) priceUsd = Math.round(est.marketCents / 100);
+  }
+ }
+ return NextResponse.json({ ok: true, price: priceUsd });
+ } catch (e) {
+ return NextResponse.json({ error: e instanceof Error ? e.message : "Pricing failed" }, { status: 502 });
  }
  }
  // Save a human-verified label as golden — POST { saveGolden: {...} }.
