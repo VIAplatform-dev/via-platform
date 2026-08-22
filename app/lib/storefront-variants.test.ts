@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { sanitizeBlocks, makeBlock, blockDef } from "./storefront-blocks.ts";
+import { sanitizeBlocks, makeBlock, blockDef, featuredCount, MAX_FEATURED, autoColumns } from "./storefront-blocks.ts";
 import { resolveVariant, defaultVariantId, isKnownVariant, variantsFor, normalizeVariant, variantDefaults, VARIANTS, SECTION_CATEGORIES } from "./storefront-variants.ts";
 import { readItems, writeItems, addItem, removeItem, moveItem, duplicateItem, ITEM_SCHEMAS } from "./storefront-items.ts";
 
@@ -91,6 +91,31 @@ test("a pipe or a line break INSIDE a value no longer splits the row", () => {
  const items = [{ quote: "Day | night, it works.\nTruly.", name: "Maya R." }];
  const stored = writeItems(items, ITEM_SCHEMAS.testimonials);
  assert.deepEqual(readItems({ items: stored }, ITEM_SCHEMAS.testimonials), items);
+});
+
+test("a comma inside a loose value no longer shatters it into extra items", () => {
+ // A Cloudinary/imgix transform puts commas in the path, and a loose schema splits rows on commas —
+ // so one gallery photo used to come back as three broken entries.
+ const items = [{ src: "https://res.cloudinary.com/x/image/upload/w_800,h_600,c_fill/bag.jpg" }];
+ const stored = writeItems(items, ITEM_SCHEMAS.gallery);
+ assert.deepEqual(readItems({ images: stored }, ITEM_SCHEMAS.gallery), items);
+ // Same for a marquee label that just happens to contain a comma.
+ const labels = [{ label: "Free shipping, always" }, { label: "Authenticated" }];
+ assert.deepEqual(readItems({ items: writeItems(labels, ITEM_SCHEMAS.marquee) }, ITEM_SCHEMAS.marquee), labels);
+});
+
+test("a strict schema keeps commas bare — they aren't a delimiter there", () => {
+ // Escaping commas everywhere would litter backslashes through ordinary body copy.
+ const items = [{ quote: "Fast, kind, and honest.", name: "Maya R." }];
+ const stored = writeItems(items, ITEM_SCHEMAS.testimonials);
+ assert.ok(!stored.includes("\\,"), stored);
+ assert.deepEqual(readItems({ items: stored }, ITEM_SCHEMAS.testimonials), items);
+});
+
+test("sellers can still paste a comma-separated list by hand", () => {
+ // The escape is only about what WE write; a hand-typed list must keep splitting on commas.
+ assert.deepEqual(readItems({ items: "Dresses, Outerwear, Handbags" }, ITEM_SCHEMAS.marquee),
+  [{ label: "Dresses" }, { label: "Outerwear" }, { label: "Handbags" }]);
 });
 
 test("missing trailing fields read as empty, extras are ignored", () => {
@@ -306,4 +331,69 @@ test("width and font size are independent — a side drag can't disturb the type
  const [b] = sanitizeBlocks([{ id: "x", type: "text", props: {}, style: { free: { heading: { w: 40, fontPx: 52 } } } }]);
  assert.equal(b.style?.free?.heading?.w, 40);
  assert.equal(b.style?.free?.heading?.fontPx, 52);
+});
+
+// ── the product-count ceiling ───────────────────────────────────────────────────────────────────
+// A section can be pointed at a collection of any size, so the cap is what stops a homepage from
+// becoming the whole catalogue. It has to hold against values the picker can't produce.
+
+test("a section never shows more than the cap, whatever the stored value says", () => {
+ assert.equal(featuredCount("500", 8), MAX_FEATURED);      // hand-edited or imported
+ assert.equal(featuredCount("21", 8), MAX_FEATURED);       // one past the top option
+ assert.equal(featuredCount(String(MAX_FEATURED), 8), MAX_FEATURED);
+});
+
+test("a chosen count under the cap is respected exactly", () => {
+ for (const n of [4, 8, 12, 16, 20]) assert.equal(featuredCount(String(n), 8), n);
+});
+
+test("no value falls back to the layout's own default, not to the cap", () => {
+ // Each featured layout passes its own fallback (grid 8, carousel 12, archive 10) — the cap must not
+ // flatten them all to the same number when the merchant hasn't chosen.
+ assert.equal(featuredCount(undefined, 8), 8);
+ assert.equal(featuredCount("", 12), 12);
+ assert.equal(featuredCount("not-a-number", 5), 5);
+});
+
+test("a nonsense count can never render zero products", () => {
+ // 0 or a negative would otherwise slice to an empty grid — a section that silently shows nothing.
+ assert.equal(featuredCount("0", 8), 8);
+ assert.equal(featuredCount("-4", 8), 1);
+});
+
+// ── auto-fitting the grid ───────────────────────────────────────────────────────────────────────
+// A curated collection is whatever size the seller made it. The grid has to look deliberate at any
+// of those sizes without the seller reasoning about divisibility.
+
+test("a small collection sits on one row rather than wrapping", () => {
+ assert.equal(autoColumns(1), 1);
+ assert.equal(autoColumns(2), 2);
+ assert.equal(autoColumns(3), 3);
+});
+
+test("never leaves a single piece stranded alone on the last row", () => {
+ // The case that reads as broken rather than as a layout: 5 items at 4-across = 4 + 1.
+ for (let n = 1; n <= 40; n++) {
+  const c = autoColumns(n);
+  const lastRow = n % c;
+  assert.notEqual(lastRow, 1, `${n} pieces at ${c} per row leaves one stranded`);
+ }
+});
+
+test("prefers a row length that divides evenly", () => {
+ assert.equal(autoColumns(4), 4);   // 4
+ assert.equal(autoColumns(5), 5);   // 5 — one clean row, not 4 + 1
+ assert.equal(autoColumns(6), 3);   // 3 + 3
+ assert.equal(autoColumns(8), 4);   // 4 + 4
+ assert.equal(autoColumns(9), 3);   // 3 + 3 + 3
+ assert.equal(autoColumns(12), 4);  // 4 + 4 + 4
+});
+
+test("an awkward count still lands on a full-looking grid", () => {
+ assert.equal(autoColumns(7), 4);   // 4 + 3 reads fine; 3+3+1 would not
+ assert.equal(autoColumns(11), 4);  // 4 + 4 + 3
+});
+
+test("only ever returns a column count the grid can actually render", () => {
+ for (let n = 1; n <= 60; n++) assert.ok([1, 2, 3, 4, 5].includes(autoColumns(n)), `${n} -> ${autoColumns(n)}`);
 });

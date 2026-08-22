@@ -35,6 +35,28 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
  // rows collapse to their title and open on click.
  const [open, setOpen] = useState<number | null>(items.length === 1 ? 0 : null);
  const commit = (next: Item[]) => onChange(schema.key, writeItems(next, schema));
+
+ // `open` is a POSITION, so every operation that shifts rows has to move it too — otherwise you nudge
+ // the slide you're editing up one and find yourself typing into a different slide. Each helper below
+ // pairs the list change with the matching index change.
+ const move = (from: number, to: number) => {
+  commit(moveItem(items, from, to));
+  setOpen((o) => {
+   if (o === null) return o;
+   if (o === from) return to;                                  // the open row is the one that moved
+   if (from < to && o > from && o <= to) return o - 1;         // rows between shift back one
+   if (from > to && o >= to && o < from) return o + 1;         // …or forward one
+   return o;
+  });
+ };
+ const dup = (i: number) => {
+  commit(duplicateItem(items, i));
+  setOpen((o) => (o !== null && o > i ? o + 1 : o)); // the copy lands at i+1, pushing later rows down
+ };
+ const del = (i: number) => {
+  commit(removeItem(items, i));
+  setOpen((o) => (o === null || o === i ? null : o > i ? o - 1 : o));
+ };
  const inp = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
  const tf = titleField(schema);
 
@@ -50,10 +72,10 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
          <span className="mr-1.5 text-stone-400">{i + 1}.</span>
          {it[tf] || <span className="text-stone-400">{singular} {i + 1}</span>}
         </button>
-        <button type="button" title="Move up" disabled={i === 0} onClick={() => commit(moveItem(items, i, i - 1))} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronUp size={13} /></button>
-        <button type="button" title="Move down" disabled={i === items.length - 1} onClick={() => commit(moveItem(items, i, i + 1))} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronDown size={13} /></button>
-        <button type="button" title="Duplicate" onClick={() => commit(duplicateItem(items, i))} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"><Copy size={12} /></button>
-        <button type="button" title={`Delete ${singular.toLowerCase()}`} onClick={() => { commit(removeItem(items, i)); setOpen(null); }} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={12} /></button>
+        <button type="button" title="Move up" disabled={i === 0} onClick={() => move(i, i - 1)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronUp size={13} /></button>
+        <button type="button" title="Move down" disabled={i === items.length - 1} onClick={() => move(i, i + 1)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronDown size={13} /></button>
+        <button type="button" title="Duplicate" onClick={() => dup(i)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"><Copy size={12} /></button>
+        <button type="button" title={`Delete ${singular.toLowerCase()}`} onClick={() => del(i)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={12} /></button>
        </div>
        {isOpen && (
         <div className="border-t border-black/[0.06] px-2.5 py-2.5">
