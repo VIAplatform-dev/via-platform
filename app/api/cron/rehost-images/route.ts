@@ -6,7 +6,7 @@ import { rehostImage } from "@/app/lib/rehost-images";
 // in the background — so the listing survives them leaving the old platform, WITHOUT
 // making the interactive "bring your site over" import wait on hundreds of uploads.
 // Bounded per run + a self-healing `images_rehosted` marker so it never re-scans work
-// it already did. Idempotent. Manual run: ?key=<CRON_SECRET>.
+// it already did. Idempotent. Manual run: curl -H "Authorization: Bearer $CRON_SECRET" ...
 export const maxDuration = 300;
 
 const BATCH = 20; // items per run — each may re-host several images
@@ -14,8 +14,8 @@ const BATCH = 20; // items per run — each may re-host several images
 export async function GET(request: Request) {
  const secret = process.env.CRON_SECRET;
  const authHeader = request.headers.get("authorization");
- const key = new URL(request.url).searchParams.get("key");
- if (!secret || (authHeader !== `Bearer ${secret}` && key !== secret)) {
+ // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ if (!secret || authHeader !== `Bearer ${secret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;

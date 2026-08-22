@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { getBaseUrl } from "@/app/lib/base-url";
 import { createGiveawayEntry, processReferralEntry, getEntryByEmail, setReferredByCode } from "@/app/lib/giveaway-db";
 import { sendGiveawayConfirmation, sendFriendEnteredEmail } from "@/app/lib/email";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 export async function POST(request: Request) {
  try {
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "giveaway-enter", ip, max: 10, windowMinutes: 15 })) {
+ return NextResponse.json({ error: "Too many attempts. Please try again in a few minutes." }, { status: 429 });
+ }
  const { email, refCode } = await request.json();
 
  if (!email || typeof email !== "string" || !email.includes("@")) {

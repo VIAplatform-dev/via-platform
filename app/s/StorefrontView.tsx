@@ -94,6 +94,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const headingFont = theme.fonts?.heading;
  const bodyFont = theme.fonts?.body;
  const radius = theme.radius || "sharp"; // global corner style ("shapes")
+ const skin = theme.skin || undefined; // global style skin (type scale, spacing, button shape)
  const logo = theme.logo || null;
 
  const vars: Record<string, string> = { "--accent": accent, "--bg": bg, "--text": text };
@@ -252,7 +253,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} storeSlug={sf.handle} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} storeSlug={sf.handle} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -353,7 +354,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} storeSlug={sf.handle} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} storeSlug={sf.handle} />
  )}
 
  {showGrid && !hasBlocks && (

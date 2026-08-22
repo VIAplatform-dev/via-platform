@@ -13,12 +13,13 @@ export const maxDuration = 300;
 // categories / eras where VYA buyers' demand is rising and few stores carry them. Picks are market-
 // wide (the same signal for everyone), but deduped PER STORE so a segment that stays hot for weeks
 // isn't re-sent. Gated to Pro + the store's "sourcing_alerts" toggle (default on).
-//   ?slug=<store>&key=<CRON_SECRET>  → test-send to one store (ignores dedup, records nothing)
+//   ?slug=<store>  → test-send to one store (ignores dedup, records nothing) — still requires the
+//   Authorization header; the secret is never accepted via query string (it leaks into logs/Referer).
 export async function GET(request: Request) {
  const { searchParams } = new URL(request.url);
  const testSlug = searchParams.get("slug");
  const cronSecret = process.env.CRON_SECRET;
- const authed = request.headers.get("authorization") === `Bearer ${cronSecret}` || searchParams.get("key") === cronSecret;
+ const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
  // The top few market-wide sourcing opportunities right now (7-day window).

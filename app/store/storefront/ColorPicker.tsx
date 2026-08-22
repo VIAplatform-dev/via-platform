@@ -4,6 +4,7 @@
 // hue bar + a hex field (like Figma/Canva), plus a swatch that opens it in a popover. Shared so both the
 // blocks studio and the captured-site editor use the exact same control (never the native OS picker).
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 // A hex-code field so sellers can type/paste a colour (e.g. #5A0E17). Applies only on a valid 6-digit hex.
 export function HexInput({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
@@ -80,17 +81,22 @@ export function ColorPicker({ value, onChange }: { value: string; onChange: (v: 
  </div>
  );
 }
-// The picker popover, positioned `fixed` to the anchor button's rect so it escapes any overflow-clipping ancestor.
+// The picker popover, positioned `fixed` to the anchor button's rect. Portaled to <body> so it escapes
+// BOTH overflow-clipping AND transformed ancestors — a `transform` on an ancestor would otherwise make
+// `position: fixed` resolve against that ancestor (not the viewport), re-clipping the popover (e.g. the
+// element toolbar, which is translateX(-50%) + overflow-x-auto — the swatch popover was invisible there).
 export function PickerPopover({ anchor, value, onChange, onClose }: { anchor: DOMRect; value: string; onChange: (v: string) => void; onClose: () => void }) {
  const top = anchor.bottom + 6;
  const left = Math.max(8, Math.min(anchor.left, (typeof window !== "undefined" ? window.innerWidth : 1200) - 232));
- return (
+ if (typeof document === "undefined") return null;
+ return createPortal(
  <>
  <button type="button" aria-label="Close" className="fixed inset-0 z-[68] cursor-default" onClick={(e) => { e.stopPropagation(); onClose(); }} />
  <div style={{ position: "fixed", top, left }} className="z-[70] w-56 rounded-xl border border-black/10 bg-white p-3 shadow-[0_18px_44px_-12px_rgba(43,36,29,0.45)]" onClick={(e) => e.stopPropagation()}>
  <ColorPicker value={value} onChange={onChange} />
  </div>
- </>
+ </>,
+ document.body
  );
 }
 // A swatch + hex field that opens the visual picker on click.

@@ -10,11 +10,11 @@ export const maxDuration = 300;
 // Daily: fetch Google Search interest + eBay sold data for the trending brands and PERSIST snapshots
 // to Postgres, so the Trends tab reads from the database (with history for momentum) rather than
 // calling SerpApi on every page view. Dormant until SERPAPI_ENABLED=true.
-// Manual first run allowed via ?key=<CRON_SECRET> so you can populate it right after enabling.
+// Manual first run: curl -H "Authorization: Bearer $CRON_SECRET" ... so you can populate it right after enabling.
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
- const url = new URL(request.url);
- const authed = request.headers.get("authorization") === `Bearer ${cronSecret}` || (cronSecret && url.searchParams.get("key") === cronSecret);
+ // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
  // SerpApi (Google + eBay), Instagram, and Pinterest are independent — run whichever is configured.

@@ -16,9 +16,12 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "No file provided" }, { status: 400 });
  }
 
- // Validate type
- if (!file.type.startsWith("image/")) {
- return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
+ // Validate type. SVG is excluded even though it matches "image/*" — it's XML that can carry
+ // embedded <script>, and this check is client-asserted MIME with no magic-byte verification, so
+ // a renamed file would sail through otherwise. Uploaded to a public blob URL, so an SVG here
+ // would be a stored-XSS vector.
+ if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+ return NextResponse.json({ error: "Only photo files are allowed (SVG isn’t supported)." }, { status: 400 });
  }
 
  // Max 10MB

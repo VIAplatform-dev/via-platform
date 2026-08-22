@@ -31,6 +31,11 @@ export type StorefrontTheme = {
  fonts?: { heading?: string; body?: string };
  colors?: { bg?: string; text?: string; accent?: string };
  radius?: "sharp" | "soft" | "round"; // global corner style ("shapes") — rounds product cards, images, buttons
+ skin?: "gallery" | "editorial" | "boutique" | "archive" | "statement"; // global style skin — type scale, spacing, and button shape across every section (storefront-skins.ts)
+ // The palette + type the store had BEFORE its first skin was applied, so clearing the skin can put
+ // the store back rather than stranding it on the last skin's colours. Written when a skin is first
+ // applied, cleared when the skin is removed.
+ preSkin?: { colors?: { bg?: string; text?: string; accent?: string }; fonts?: { heading?: string; body?: string } };
  customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
  blocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)

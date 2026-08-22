@@ -3,17 +3,29 @@
 // APIs, so it renders identically in the live store (server component) and the
 // editor's live preview (client). Sections come from theme.blocks.
 import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
-import { SERIF_FONTS } from "@/app/lib/storefront-templates";
+import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
+import { resolveVariant } from "@/app/lib/storefront-variants";
+import { skinCss } from "@/app/lib/storefront-skins";
 import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
-import NewsletterForm from "./NewsletterForm";
-import ContactForm from "./ContactForm";
-import Countdown from "./Countdown";
 import SandboxEmbed from "./SandboxEmbed";
+// The shared editing kit + the per-family layout files. See blocks/kit.tsx for why the editing
+// affordances live outside this file.
+import { ff, makeKit, inlineHtml, decodeEntities, HANDLE_SET, HANDLE_POS, type Ctx, type Colors, type BlockProduct, type OverlayEdit, type FreeEdit, type FaqDnd } from "./blocks/kit";
+import { renderHero } from "./blocks/hero";
+import { renderFeatured } from "./blocks/featured";
+import { renderCollections } from "./blocks/collections";
+import { renderTestimonials } from "./blocks/testimonials";
+import { renderColumns } from "./blocks/columns";
+import { renderSplit } from "./blocks/split";
+import { renderAnnouncement, renderText, renderStatement, renderMarquee } from "./blocks/content";
+import { renderImage, renderGallery, renderVideo } from "./blocks/media";
+import { renderCountdown, renderNewsletter, renderContact } from "./blocks/marketing";
+import { renderBlog, renderSpotlight } from "./blocks/editorial";
+import { renderFaq } from "./blocks/faq";
 
-const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
-
-export type BlockProduct = { key?: string; title: string; price: string; image: string; href?: string };
-type Colors = { bg: string; text: string; accent: string };
+export type { BlockProduct };
+// Re-exported for the studio, which imports it from here.
+export { decodeEntities };
 export type Radius = "sharp" | "soft" | "round";
 
 // Corner style ("shapes") → CSS radius, in px. Images/cards get a moderate curve; buttons go fully
@@ -26,35 +38,36 @@ const BTN_RADIUS: Record<Radius, number> = { sharp: 0, soft: 8, round: 999 };
 // owns pointer events for drag/select). Positioned in % so it scales; the stacking on narrow screens is
 // handled by a container query in the root <style> (see below) — no per-element JS.
 const OVL_TEXT_SIZE: Record<string, string> = { sm: "text-sm", md: "text-xl", lg: "text-3xl @xl:text-4xl", xl: "text-5xl @xl:text-6xl" };
-type ResizeHandle = "nw" | "ne" | "sw" | "se" | "e" | "w";
-type OverlayEdit = {
- selectedId?: string | null;
- editingId?: string | null; // the text element currently being typed into
- onSelect: (blockId: string, overlayId: string) => void;
- onDragStart: (blockId: string, overlayId: string, e: React.PointerEvent) => void;
- onResizeStart: (blockId: string, overlayId: string, handle: ResizeHandle, e: React.PointerEvent) => void;
- onStartEdit: (blockId: string, overlayId: string) => void; // double-click a text element to edit inline
- onText: (blockId: string, overlayId: string, value: string) => void;
-};
-// Which resize handles a kind exposes: shapes/images resize in both axes (corners), text/buttons only
-// widen (side handles) since their height flows from content.
-const HANDLE_SET: Record<string, ResizeHandle[]> = {
- rect: ["nw", "ne", "sw", "se"], circle: ["nw", "ne", "sw", "se"], image: ["nw", "ne", "sw", "se"],
- line: ["w", "e"], button: ["w", "e"], text: ["w", "e"],
-};
-const HANDLE_POS: Record<ResizeHandle, string> = {
- nw: "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize",
- ne: "right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize",
- sw: "left-0 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize",
- se: "right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize",
- w: "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize",
- e: "right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize",
-};
+// A section's resize handle: just the bottom-edge pill (dragging it down grows the section, up
+// shrinks it). No corners, no top handle — a section is full-bleed with no width to speak of, and
+// one clear handle beat a box of six that fought neighbouring sections for clicks along the edges.
+const SEC_HANDLE_POS: [edge: "bottom", pos: string][] = [
+ ["bottom", "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2"],
+];
 function overlayContent(o: Overlay, shopHref: string, head: string | undefined, live: boolean, editText?: { editing: boolean; onText: (v: string) => void }) {
  const p = o.props || {};
  if (o.kind === "button") {
- const cls = "vya-cta inline-block whitespace-nowrap px-7 py-3 text-[12px] font-medium uppercase tracking-[0.18em]";
- const style = { background: p.bg || "#1a1a1a", color: p.color || "#ffffff", fontFamily: p.font ? ff(p.font) : undefined };
+ // Size: padding + type scale. "md" matches the pre-existing default exactly, so unset buttons don't shift.
+ const SIZE_CLS: Record<string, string> = { sm: "px-5 py-2 text-[10px]", md: "px-7 py-3 text-[12px]", lg: "px-9 py-3.5 text-[13px]" };
+ // fontPx (set by a corner-drag) scales the button continuously — inline font-size + proportional
+ // padding override the preset class. Unset → preset, so existing buttons don't shift.
+ const fpx = p.fontPx ? Math.min(200, Math.max(8, Number(p.fontPx))) : null;
+ const cls = `vya-cta inline-block whitespace-nowrap font-medium uppercase tracking-[0.18em] ${fpx ? "" : SIZE_CLS[p.size || "md"]}`;
+ // Shape overrides the theme's global corner style for this one button (undefined = inherit it, via .vya-cta's own CSS rule).
+ const SHAPE_RADIUS: Record<string, string> = { square: "0", rounded: "10px", pill: "999px" };
+ // "No fill": transparent background, coloured border + text — defaults to the button's own fill
+ // colour so toggling Fill→No-fill keeps the same colour, just hollowed out (mirrors the section CTA).
+ const outline = p.outline === "1";
+ const outlineColor = p.borderColor || p.bg || "#1a1a1a";
+ const bw = Number(p.border ?? (outline ? 2 : 0));
+ const style = {
+ background: outline ? "transparent" : (p.bg || "#1a1a1a"),
+ color: outline ? (p.color || outlineColor) : (p.color || "#ffffff"),
+ fontFamily: p.font ? ff(p.font) : undefined,
+ borderRadius: p.shape ? SHAPE_RADIUS[p.shape] : undefined,
+ border: bw > 0 ? `${bw}px solid ${outline ? outlineColor : (p.borderColor || "transparent")}` : undefined,
+ ...(fpx ? { fontSize: `${fpx}px`, padding: `${Math.round(fpx * 0.62)}px ${Math.round(fpx * 1.6)}px` } : {}),
+ };
  return live
  ? <a href={p.href || shopHref} className={cls} style={style}>{p.label || "Button"}</a>
  : <span className={cls} style={style}>{p.label || "Button"}</span>;
@@ -62,22 +75,28 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  if (o.kind === "image") {
  // Sized (h set) → fill the box and cover; unsized → natural height by width.
  const cls = o.h != null ? "vya-round block h-full w-full object-cover" : "vya-round block h-auto w-full object-cover";
+ const opacity = Number(p.opacity ?? 100) / 100;
  return p.src
- ? <img src={p.src} alt={p.alt || ""} className={cls} draggable={false} />
- : <div className="vya-round grid h-full w-full place-items-center bg-black/10 text-[10px] uppercase tracking-wide text-black/40" style={{ aspectRatio: o.h != null ? undefined : "1" }}>Image</div>;
+ ? <img src={p.src} alt={p.alt || ""} className={cls} style={{ opacity }} draggable={false} />
+ : <div className="vya-round grid h-full w-full place-items-center bg-black/10 text-[10px] uppercase tracking-wide text-black/40" style={{ aspectRatio: o.h != null ? undefined : "1", opacity }}>Image</div>;
  }
  if (o.kind === "rect") {
- return <div className="h-full w-full" style={{ background: p.fill || "#1a1a1a", borderRadius: `${p.radius ?? "10"}px`, opacity: (Number(p.opacity ?? 100) / 100) }} />;
+ const bw = Number(p.border ?? 0);
+ return <div className="h-full w-full" style={{ background: p.fill || "#1a1a1a", borderRadius: `${p.radius ?? "10"}px`, opacity: (Number(p.opacity ?? 100) / 100), border: bw > 0 ? `${bw}px solid ${p.borderColor || "#1a1a1a"}` : undefined, boxShadow: p.shadow ? SHADOW_CSS[p.shadow] : undefined }} />;
  }
  if (o.kind === "circle") {
- return <div className="h-full w-full" style={{ background: p.fill || "#1a1a1a", borderRadius: "50%", opacity: (Number(p.opacity ?? 100) / 100) }} />;
+ const bw = Number(p.border ?? 0);
+ return <div className="h-full w-full" style={{ background: p.fill || "#1a1a1a", borderRadius: "50%", opacity: (Number(p.opacity ?? 100) / 100), border: bw > 0 ? `${bw}px solid ${p.borderColor || "#1a1a1a"}` : undefined, boxShadow: p.shadow ? SHADOW_CSS[p.shadow] : undefined }} />;
  }
  if (o.kind === "line") {
- return <div className="flex h-full w-full items-center"><div className="w-full" style={{ height: `${p.thickness ?? "2"}px`, background: p.color || "#1a1a1a" }} /></div>;
+ // border-top (not a background block) so dashed/dotted styles are possible — solid looks identical to before.
+ return <div className="flex h-full w-full items-center"><div className="w-full" style={{ borderTopWidth: `${p.thickness ?? "2"}px`, borderTopStyle: (p.dash || "solid") as React.CSSProperties["borderTopStyle"], borderTopColor: p.color || "#1a1a1a" }} /></div>;
  }
  const font = p.font ? ff(p.font) : (p.size === "lg" || p.size === "xl" ? head : undefined);
- const tStyle = { color: p.color || "#ffffff", fontFamily: font, fontWeight: p.bold === "1" ? 700 : 500, fontStyle: p.italic === "1" ? "italic" as const : undefined };
- const tCls = `${OVL_TEXT_SIZE[p.size || "md"]} leading-tight`;
+ // fontPx (set by a corner-drag) scales the text continuously, overriding the preset size class.
+ const tFpx = p.fontPx ? Math.min(200, Math.max(8, Number(p.fontPx))) : null;
+ const tStyle = { color: p.color || "#ffffff", fontFamily: font, fontWeight: p.bold === "1" ? 700 : 500, fontStyle: p.italic === "1" ? "italic" as const : undefined, textDecoration: p.underline === "1" ? "underline" as const : undefined, ...(tFpx ? { fontSize: `${tFpx}px` } : {}) };
+ const tCls = `${tFpx ? "" : OVL_TEXT_SIZE[p.size || "md"]} leading-tight`;
  // Editing: type directly on the canvas (double-click enters this). Sync on blur so React never
  // re-renders mid-edit and jumps the caret. Autofocus + caret-to-end when the box mounts.
  if (editText?.editing) {
@@ -125,23 +144,124 @@ function sectionBg(st: BlockStyle, colors: Colors): string | undefined {
  if (/^#[0-9a-fA-F]{6}$/.test(b)) return b;
  return undefined;
 }
+
+// The effective solid colours a section actually renders with — for the editor's colour swatches, so the
+// displayed box matches what's on the page. `bg` falls back to the page/theme background when the section
+// has no solid fill of its own (Page default, or a gradient/photo that isn't a single colour); `text`
+// resolves exactly like the section's foreground (explicit override → contrast-aware default).
+export function effectiveSectionColors(st: BlockStyle, colors: Colors): { bg: string; text: string } {
+ const solid = sectionBg(st, colors);
+ const bg = solid && solid.startsWith("#") ? solid : colors.bg;
+ const text = st.textColor || bgFor(st.bg, colors).fg;
+ return { bg, text };
+}
 function sectionOverrideCss(id: string, st: BlockStyle): string {
  const sel = `.vya-b-${id}`;
  const out: string[] = [];
  if (st.align) {
+ // Section-wide default — applies to any text (by class, so it also covers fields with no dedicated
+ // per-field override below, like "quote"/"price"/"attribution"). The per-field rules that follow are
+ // emitted after this, so they win for the fields they cover without touching the others.
  out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{text-align:${st.align}!important}`);
  out.push(`${sel} .vya-hero-inner{align-items:${ALIGN_FLEX[st.align]}!important;text-align:${st.align}!important}`);
  }
+ // Per-field alignment: heading/subtext/cta/body can each be aligned independently of one another and
+ // of the section-wide default above — targeted by `data-field`, not by class, since the class alone
+ // can't tell two DIFFERENT fields apart (e.g. a "quote" also renders with the .vya-heading class).
+ // `align-self` is a no-op outside a flex container, so it's safe to always include — it only actually
+ // repositions the field within a flex hero, where align-items alone would otherwise move every field together.
+ for (const [field, a] of [["heading", st.headingAlign], ["subtext", st.subtextAlign], ["body", st.bodyAlign]] as const) {
+ if (!a) continue;
+ out.push(`${sel} [data-field="${field}"]{text-align:${a}!important;align-self:${ALIGN_FLEX[a]}!important}`);
+ }
+ // The button needs a DIFFERENT technique: it's a small inline-block pill, not full-width running
+ // text, so `text-align` on itself has nothing to do — text-align only matters to a box's OWN wrapped
+ // content. What actually repositions a small box is `display:block` + `width:max-content` (so it
+ // shrinks back to its label instead of stretching full-width) + auto-margins, which centers/pins it
+ // regardless of whether the parent happens to be a flex container (the hero WITH a photo) or a plain
+ // block (the hero with none — align-self alone does nothing there, which is why an earlier version
+ // of this control visibly did nothing for that variant).
+ if (st.ctaAlign) {
+ const a = st.ctaAlign;
+ const ml = a === "right" ? "auto" : "0", mr = a === "left" ? "auto" : "0";
+ out.push(`${sel} [data-field="cta"]{display:block!important;width:max-content!important;max-width:100%!important;margin-left:${ml}!important;margin-right:${mr}!important;align-self:${ALIGN_FLEX[a]}!important}`);
+ }
  if (st.textColor) out.push(`${sel},${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{color:${st.textColor}!important}`);
- if (st.headingSize) out.push(`${sel} .vya-heading{font-size:${HEAD_SCALE[st.headingSize]}!important;line-height:1.12!important}`);
+ // Explicit px wins over the preset scale — same "numeric overrides preset" pattern as padY/space.
+ if (st.headingSizePx) out.push(`${sel} .vya-heading{font-size:${st.headingSizePx}px!important;line-height:1.12!important}`);
+ else if (st.headingSize) out.push(`${sel} .vya-heading{font-size:${HEAD_SCALE[st.headingSize]}!important;line-height:1.12!important}`);
  if (st.headingFont) out.push(`${sel} .vya-heading{font-family:'${st.headingFont}',Georgia,serif!important}`);
  if (st.tracking != null) out.push(`${sel} .vya-heading{letter-spacing:${(st.tracking / 100).toFixed(3)}em!important}`);
+ if (st.subtextSizePx) out.push(`${sel} .vya-sub{font-size:${st.subtextSizePx}px!important}`);
+ if (st.subtextFont) out.push(`${sel} .vya-sub{font-family:'${st.subtextFont}',Georgia,serif!important}`);
+ if (st.lineHeight != null) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{line-height:${(st.lineHeight / 100).toFixed(2)}!important}`);
+ if (st.textBold) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{font-weight:700!important}`);
+ if (st.textItalic) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{font-style:italic!important}`);
+ if (st.textUnderline) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{text-decoration:underline!important}`);
+ // Per-ELEMENT text styling (free[key]) — the Figma/Canva-style per-field overrides. Emitted AFTER the
+ // section-wide size/weight/etc. rules above so a field's own styling always wins (equal specificity → later).
+ if (st.free) for (const [field, fv] of Object.entries(st.free)) {
+ const d: string[] = [];
+ if (fv.fontPx) d.push(`font-size:${fv.fontPx}px`);
+ if (fv.font) d.push(`font-family:'${fv.font}',Georgia,serif`);
+ if (fv.bold != null) d.push(`font-weight:${fv.bold ? 700 : 400}`);
+ if (fv.italic != null) d.push(`font-style:${fv.italic ? "italic" : "normal"}`);
+ if (fv.underline != null) d.push(`text-decoration:${fv.underline ? "underline" : "none"}`);
+ if (fv.color) d.push(`color:${fv.color}`);
+ if (fv.align) d.push(`text-align:${fv.align}`);
+ if (fv.ls != null) d.push(`letter-spacing:${(fv.ls / 100).toFixed(3)}em`);
+ if (fv.lh != null) d.push(`line-height:${(fv.lh / 100).toFixed(2)}`);
+ if (fv.transform) d.push(`text-transform:${fv.transform}`);
+ if (d.length) out.push(`${sel} [data-field="${field}"]{${d.map((x) => x + "!important").join(";")}}`);
+ }
+ // The section's own built-in CTA (`.vya-cta`) — distinct from a free-form overlay button.
+ // "Fill" (default) vs "No fill" (outline): the outline's border/text colour defaults to ctaBg, so
+ // toggling Fill→No-fill on an already-coloured button keeps the same colour, just hollowed out.
+ const ctaBase: string[] = [];
+ if (st.ctaOutline) {
+ const c = st.ctaBorderColor || st.ctaBg || "currentColor";
+ ctaBase.push("background:transparent!important", `color:${st.ctaColor || c}!important`, `border-color:${c}!important`);
+ } else {
+ if (st.ctaBg) ctaBase.push(`background:${st.ctaBg}!important`, `border-color:${st.ctaBg}!important`);
+ if (st.ctaColor) ctaBase.push(`color:${st.ctaColor}!important`);
+ }
+ if (st.ctaShape) ctaBase.push(`border-radius:${st.ctaShape === "pill" ? "999px" : st.ctaShape === "rounded" ? "10px" : "0"}!important`);
+ if (st.ctaFont) ctaBase.push(`font-family:'${st.ctaFont}',Georgia,serif!important`);
+ // Same sm/md/lg scale as a free-form overlay button's own Size control (SIZE_CLS below), so the two
+ // read as literally the same control, just applied to a different kind of button.
+ if (st.ctaSize) { const CTA_SIZE_PX: Record<string, string> = { sm: "padding:8px 20px!important;font-size:10px!important", md: "padding:12px 28px!important;font-size:12px!important", lg: "padding:14px 36px!important;font-size:13px!important" }; ctaBase.push(CTA_SIZE_PX[st.ctaSize]); }
+ const ctaBorderW = st.ctaBorder ?? (st.ctaOutline ? 2 : undefined); // outline defaults to a visible 2px if no width was set
+ if (ctaBorderW != null) ctaBase.push("border-style:solid!important", `border-width:${ctaBorderW}px!important`);
+ // Full width wins over any per-field alignment set above (a 100%-wide button has nowhere left/right
+ // to move to) — this rule is declared after that one, so it correctly takes precedence for `.vya-cta`.
+ if (st.ctaFullWidth) ctaBase.push("display:block!important", "width:100%!important", "max-width:none!important", "text-align:center!important");
+ if (ctaBase.length) out.push(`${sel} .vya-cta{${ctaBase.join(";")}}`);
+ if (st.ctaHoverBg || st.ctaHoverColor || st.ctaOutline) {
+ // A "No fill" button fills in on hover by default — reads as an intentional action even if no
+ // explicit hover colour was set.
+ const hoverBg = st.ctaHoverBg || (st.ctaOutline ? (st.ctaBorderColor || st.ctaBg) : undefined);
+ const hoverColor = st.ctaHoverColor || (st.ctaOutline ? "#ffffff" : undefined);
+ const parts = [hoverBg ? `background:${hoverBg}!important;border-color:${hoverBg}!important` : "", hoverColor ? `color:${hoverColor}!important` : ""].filter(Boolean).join(";");
+ if (parts) out.push(`${sel} .vya-cta:hover{${parts}}`);
+ }
  // Padding: explicit px wins over the preset.
  if (st.padY != null || st.padX != null) {
  const py = st.padY != null ? `${st.padY}px` : (st.space ? PAD_SCALE[st.space] : null);
  const parts = [py != null ? `padding-top:${py}!important;padding-bottom:${py}!important` : "", st.padX != null ? `padding-left:${st.padX}px!important;padding-right:${st.padX}px!important` : ""].filter(Boolean).join(";");
  if (parts) out.push(`${sel}{${parts}}`);
  } else if (st.space) out.push(`${sel}{padding-top:${PAD_SCALE[st.space]}!important;padding-bottom:${PAD_SCALE[st.space]}!important}`);
+ if (st.minH) {
+ // A HARD height, not a floor: `min-height` can only ever grow a box, never shrink it below its
+ // content's natural size — so dragging a resize handle inward (smaller) would silently do nothing.
+ // `height` (+ clipping the overflow) makes the box match exactly what was dragged, in both directions.
+ out.push(`${sel}{height:${st.minH}px!important;overflow:hidden}`);
+ // A section can force its own height from INSIDE itself — a hero's image frame carries an inline
+ // 84vh, and (when the content isn't free-positioned) its text wrapper carries min-h-[84vh] — both
+ // independent of the section box above. Override those too, or resizing visibly does nothing.
+ // `.vya-fill` is the general contract for this: any layout whose wrapper sets its own height wears
+ // it, so a NEW variant participates in section resizing without this compiler learning about it.
+ out.push(`${sel} .vya-fill,${sel} .vya-hero-frame,${sel} .vya-hero-inner,${sel} .vya-fill .vya-slide{height:${st.minH}px!important;min-height:0!important}`);
+ }
  // Border · radius · shadow — the section reads as a styled card.
  const box: string[] = [];
  if (st.radius) box.push(`border-radius:${st.radius}px`, "overflow:hidden");
@@ -151,445 +271,65 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  return out.join("");
 }
 
-// ── inline rich text (the editor writes it on the canvas, the live storefront renders it) ──
-// Store owners format their own copy, and it renders on their own public storefront, so this is
-// self-authored content — but the storefront is public, so we still keep a tight allowlist and
-// sanitize at both ends: a DOM walker at capture time, a script/attr strip at render time.
-function escHtml(s: string) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-function escAttr(s: string) { return escHtml(s).replace(/"/g, "&quot;"); }
-const SAFE_TAGS = new Set(["B", "STRONG", "I", "EM", "U", "A", "BR", "SPAN"]);
-function safeStyle(s: CSSStyleDeclaration): string {
- const parts: string[] = [];
- if (s.color && /^(rgb|#)/i.test(s.color)) parts.push(`color:${s.color}`);
- if (s.fontWeight === "bold" || (parseInt(s.fontWeight) || 0) >= 600) parts.push("font-weight:600");
- if (s.fontStyle === "italic") parts.push("font-style:italic");
- if ((s.textDecorationLine || s.textDecoration || "").includes("underline")) parts.push("text-decoration:underline");
- const size = parseFloat(s.fontSize);
- if (size >= 8 && size <= 200) parts.push(`font-size:${Math.round(size)}px`);
- return parts.join(";");
+// A free-form overlay BUTTON's hover state. Inline styles can't express `:hover`, so this scopes a
+// real CSS rule to the one overlay via its `data-ovl` attribute (already on its wrapper element).
+function overlayOverrideCss(o: Overlay): string {
+ if (o.kind !== "button") return "";
+ const p = o.props || {};
+ if (!p.hoverBg && !p.hoverColor) return "";
+ const parts = [p.hoverBg ? `background:${p.hoverBg}!important` : "", p.hoverColor ? `color:${p.hoverColor}!important` : ""].filter(Boolean).join(";");
+ return `[data-ovl="${o.id}"] .vya-cta:hover{${parts}}`;
 }
-// Client-only (runs in an onBlur handler): serialize a contentEditable subtree into safe inline HTML.
-function serializeInline(node: Node): string {
- let out = "";
- node.childNodes.forEach((n) => {
- if (n.nodeType === Node.TEXT_NODE) { out += escHtml(n.textContent || ""); return; }
- if (n.nodeType !== Node.ELEMENT_NODE) return;
- const el = n as HTMLElement;
- const tag = el.tagName;
- if (tag === "BR") { out += "<br>"; return; }
- const inner = serializeInline(el);
- if (!SAFE_TAGS.has(tag)) { out += inner; return; } // unwrap unknowns (e.g. DIV) but keep their text
- if (tag === "A") {
- const href = el.getAttribute("href") || "";
- out += /^(https?:|mailto:)/i.test(href) ? `<a href="${escAttr(href)}">${inner}</a>` : inner;
- } else if (tag === "SPAN") {
- const style = safeStyle(el.style);
- out += style ? `<span style="${style}">${inner}</span>` : inner;
- } else if (tag === "STRONG") out += `<b>${inner}</b>`;
- else if (tag === "EM") out += `<i>${inner}</i>`;
- else out += `<${tag.toLowerCase()}>${inner}</${tag.toLowerCase()}>`;
- });
- return out;
-}
-// Render-time: only trust a value as HTML if it carries markup; strip anything script-like as a guard.
-function inlineHtml(v?: string): { __html: string } | null {
- if (!v || v.indexOf("<") === -1) return null;
- return { __html: v.replace(/<\s*script/gi, "").replace(/\son\w+\s*=/gi, " ").replace(/javascript:/gi, "") };
-}
-// Decode HTML entities for plain-text rendering — so a stored "Shipping &amp; Returns" shows "Shipping &
-// Returns", not the literal entity. (Only used on the no-markup branch; React re-escapes on output, so safe.)
-export function decodeEntities(s: string): string {
- return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&#0?38;/g, "&");
-}
-
-// Drag-to-reorder for FAQ rows — within a section and between two FAQ sections, with a snap/drop line.
-// State lives in the parent (studio) so a row can travel across sections; this renderer just reports the
-// drag/over/drop events and draws the indicator where the row will land.
-type FaqDnd = {
- dragBlock?: string | null;
- dragIndex?: number | null;
- overBlock?: string | null;
- overIndex?: number | null;
- onGripDown: (blockId: string, index: number, e: React.PointerEvent) => void;
-};
-type Ctx = { colors: Colors; head?: string; body?: string; products: BlockProduct[]; shopHref: string; fg: string; edit?: boolean; onEditField?: (id: string, key: string, value: string) => void; selectedId?: string | null; onContentDragStart?: (blockId: string, e: React.PointerEvent) => void; onFaqOp?: (blockId: string, op: "add" | { remove: number }) => void; faqDnd?: FaqDnd; storeSlug?: string };
 
 function blockBody(b: Block, ctx: Ctx) {
- const p = b.props || {};
- const { colors, head, products, shopHref, fg } = ctx;
- const selected = ctx.edit && ctx.selectedId === b.id;
- // A move grip that appears on the selected hero's content group so it can be dragged anywhere in the
- // banner (Canva-style). Grabbing it starts the drag in the parent (which owns the frame rect + snapping).
- const moveGrip = selected && ctx.onContentDragStart ? (
- <button type="button" title="Drag to move" onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onContentDragStart!(b.id, e); }} onClick={(e) => e.stopPropagation()} className="vya-content-grip absolute -top-3 left-1/2 z-20 -translate-x-1/2 cursor-move touch-none rounded-full border border-white/70 bg-[#5D0F17] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow">move</button>
- ) : null;
- // Editor-only: type directly on the canvas. Sync on blur (not while typing, so React never
- // re-renders mid-edit and jumps the caret). Clicking text edits it; the click is swallowed so it
- // doesn't also select the whole section.
- const editBase = {
- contentEditable: true as const,
- suppressContentEditableWarning: true as const,
- onClick: (e: React.MouseEvent) => e.stopPropagation(),
- };
- // Rich text: keeps inline formatting (bold/italic/underline/colour) the floating toolbar applies.
- // On blur we serialize the DOM into a tight safe subset, so what we store is already clean.
- const txt = (v: string | undefined, key: string) => {
- const content = inlineHtml(v) ? { dangerouslySetInnerHTML: inlineHtml(v)! } : { children: decodeEntities(v ?? "") };
- if (!ctx.edit) return content;
- // On blur: serialize to safe inline HTML, but if the result carries NO markup, store the raw text
- // instead — else "Shipping & Returns" saves as the escaped entity and renders literally. Rich
- // formatting (bold/italic/spans) still round-trips as HTML.
- return { ...editBase, onBlur: (e: React.FocusEvent<HTMLElement>) => { const html = serializeInline(e.currentTarget); ctx.onEditField?.(b.id, key, html.indexOf("<") === -1 ? (e.currentTarget.textContent || "").trim() : html); }, ...content };
- };
- // Plain text: for multi-line copy (the text-block body), where preserving line breaks matters more
- // than inline styling. Syncs the raw text content.
- const txtPlain = (v: string | undefined, key: string) => {
- if (!ctx.edit) return { children: v ?? "" };
- return { ...editBase, onBlur: (e: React.FocusEvent<HTMLElement>) => ctx.onEditField?.(b.id, key, (e.currentTarget.textContent || "").trim()), children: v ?? "" };
- };
+ // Every editing affordance a layout needs — see blocks/kit.tsx.
+ const kit = makeKit(b, ctx);
+ const { p } = kit;
+ const { colors, head, fg } = ctx;
+ // Which LAYOUT this section renders as. An absent or unrecognized id resolves to the type's default,
+ // so a storefront never goes blank because of a variant this build doesn't know about.
+ const variant = resolveVariant(b.type, b.variant)?.id ?? "";
  switch (b.type) {
- case "announcement":
- return p.text ? <div {...txt(p.text, "text")} className="px-4 py-2.5 text-center text-[10px] uppercase tracking-[0.22em]" style={{ background: colors.accent, color: "#fff" }} /> : null;
+ case "announcement": return renderAnnouncement(kit, variant);
 
- case "hero": {
- // Free-positioned content: when the seller has dragged the content group, it's absolutely placed at
- // cx/cy% of the banner (anchored by its centre). Otherwise it keeps the default bottom-centre layout.
- const free = p.cx !== undefined && p.cx !== "" && p.cy !== undefined && p.cy !== "";
- return p.image ? (
- <div className="vya-hero-frame relative w-full overflow-hidden" style={{ minHeight: "84vh" }}>
- <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
- <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.1) 45%, rgba(0,0,0,0.6) 100%)" }} />
- <div
- className={`vya-hero-inner relative z-10 px-6 text-center text-white ${free ? "vya-hero-free" : "flex min-h-[84vh] flex-col items-center justify-end pb-24 pt-36"}`}
- style={free ? { position: "absolute", left: `${p.cx}%`, top: `${p.cy}%`, transform: "translate(-50%,-50%)", width: "max-content", maxWidth: "min(88%,46rem)" } : undefined}
- >
- {moveGrip}
- <h2 {...txt(p.heading, "heading")} className="vya-heading max-w-3xl text-5xl leading-[1.04] @xl:text-7xl" style={{ fontFamily: head }} />
- {p.subtext && <p {...txt(p.subtext, "subtext")} className="vya-sub mt-5 max-w-xl text-sm leading-relaxed text-white/85 @xl:text-[15px]" />}
- {p.cta && <a href={shopHref} {...txt(p.cta, "cta")} className="vya-cta mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black" />}
- </div>
- </div>
- ) : (
- <div className="vya-hero-inner px-6 py-32 text-center">
- <h2 {...txt(p.heading, "heading")} className="vya-heading mx-auto max-w-3xl text-5xl leading-[1.05] @xl:text-6xl" style={{ fontFamily: head }} />
- {p.subtext && <p {...txt(p.subtext, "subtext")} className="vya-sub mt-5 mx-auto max-w-xl text-sm leading-relaxed opacity-65 @xl:text-[15px]" />}
- {p.cta && <a href={shopHref} {...txt(p.cta, "cta")} className="vya-cta mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
- </div>
- );
- }
+ // The hero family lives in blocks/hero.tsx — five layouts sharing one editing contract. The
+ // default ("bleed") is the exact markup this switch used to hold, so existing storefronts are
+ // unchanged.
+ case "hero": return renderHero(kit, variant);
 
- case "featured": {
- const shown = products.slice(0, 8);
- return (
- <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
- {p.heading && (
- <div className="mb-12 text-center">
- <span className="mb-3 block text-[10px] uppercase tracking-[0.3em] opacity-40">The Edit</span>
- <h2 {...txt(p.heading, "heading")} className="vya-heading text-3xl @xl:text-[2.6rem] leading-tight" style={{ fontFamily: head }} />
- </div>
- )}
- {shown.length ? (
- <div className="grid grid-cols-2 gap-x-5 gap-y-12 @lg:grid-cols-3 @2xl:grid-cols-4 @lg:gap-x-8">
- {shown.map((it, i) => (
- <a key={it.key || i} href={it.href || shopHref} className="group block">
- <div className="vya-round aspect-[4/5] w-full overflow-hidden" style={{ background: `${fg}0d` }}>
- {it.image && <img src={it.image} alt={it.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.045]" />}
- </div>
- <p className="mt-3.5 line-clamp-1 text-[11px] uppercase tracking-[0.1em] opacity-65">{it.title}</p>
- <p className="mt-1 text-[13px]" style={{ color: colors.accent }}>{it.price}</p>
- </a>
- ))}
- </div>
- ) : (
- <p className="py-16 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">Coming soon</p>
- )}
- </section>
- );
- }
+ case "featured": return renderFeatured(kit, variant);
 
- case "collections": {
- // Shop-by-category tiles. Each line is "Label" or "Label | image URL".
- const tiles = (p.items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [label, img] = l.split("|").map((s) => s.trim()); return { label, img: img || "" }; });
- if (!tiles.length) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Shop by category — add tiles</div> : null;
- return (
- <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" style={{ fontFamily: head }} />}
- <div className={`grid grid-cols-2 gap-3 @xl:gap-4 ${p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3"}`}>
- {tiles.slice(0, 12).map((t, i) => (
- <a key={i} href={shopHref} className="vya-round group relative block aspect-[4/5] overflow-hidden" style={{ background: t.img ? undefined : `${fg}12` }}>
- {t.img && <img src={t.img} alt={t.label} className="absolute inset-0 h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.05]" />}
- {t.img && <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />}
- <span className={`absolute inset-x-0 bottom-0 p-4 text-lg uppercase tracking-[0.08em] ${t.img ? "text-white" : ""}`} style={{ fontFamily: head, color: t.img ? undefined : fg }}>{t.label}</span>
- </a>
- ))}
- </div>
- </section>
- );
- }
+ case "collections": return renderCollections(kit, variant);
 
- case "testimonials": {
- // Social proof — each line is "Quote | Name".
- const items = (p.items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [quote, nm] = l.split("|").map((s) => s.trim()); return { quote, name: nm || "" }; });
- if (!items.length) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Reviews — add customer quotes</div> : null;
- return (
- <section className="mx-auto max-w-5xl px-6 @xl:px-8 py-16 @xl:py-24" style={{ borderTop: `1px solid ${fg}14`, borderBottom: `1px solid ${fg}14` }}>
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-12 text-center text-2xl @xl:text-3xl leading-tight" style={{ fontFamily: head }} />}
- <div className="grid gap-8 @lg:grid-cols-3 @lg:gap-10">
- {items.slice(0, 3).map((t, i) => (
- <div key={i} className="text-center @lg:text-left">
- <div className="mb-3 text-[13px] tracking-[0.25em]" style={{ color: colors.accent }}>★★★★★</div>
- <p className="text-[15px] leading-relaxed @xl:text-[16px]">{`“${t.quote}”`}</p>
- {t.name && <p className="mt-4 text-[11px] uppercase tracking-[0.18em] opacity-55">{t.name}</p>}
- </div>
- ))}
- </div>
- </section>
- );
- }
+ case "testimonials": return renderTestimonials(kit, variant);
 
- case "countdown": {
- const target = (p.date || "").trim();
- if (!target && !ctx.edit) return null; // no date set → don't show a placeholder on the live site
- return (
- <section className="mx-auto max-w-3xl px-6 py-16 @xl:py-24 text-center">
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading text-2xl @xl:text-3xl leading-tight" style={{ fontFamily: head }} />}
- {(p.subtext || ctx.edit) && <p {...txt(p.subtext, "subtext")} className="vya-sub mx-auto mt-2 max-w-md text-sm opacity-65" />}
- <div className="mt-10">
- {target ? <Countdown target={target} accent={colors.accent} headingFontFamily={head} paused={ctx.edit} /> : <p className="text-[11px] uppercase tracking-[0.25em] opacity-40">Set a drop date & time</p>}
- </div>
- {p.cta && <a href={p.ctaHref || shopHref} className="vya-cta mt-10 inline-block px-9 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }}>{p.cta}</a>}
- </section>
- );
- }
+ case "countdown": return renderCountdown(kit, variant);
 
- case "blog": {
- // Each line: "Title | excerpt | image URL | link".
- const arts = (p.items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [title, excerpt, img, link] = l.split("|").map((s) => (s || "").trim()); return { title, excerpt, img, link }; }).filter((a) => a.title);
- if (!arts.length) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Blog — add posts</div> : null;
- return (
- <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" style={{ fontFamily: head }} />}
- <div className="grid gap-8 @lg:grid-cols-3 @lg:gap-10">
- {arts.slice(0, 3).map((a, i) => (
- <a key={i} href={a.link || "#"} className="group block">
- <div className="vya-round aspect-[3/2] w-full overflow-hidden" style={{ background: `${fg}0d` }}>
- {a.img && <img src={a.img} alt={a.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.04]" />}
- </div>
- <h3 className="mt-4 text-lg leading-snug @xl:text-xl" style={{ fontFamily: head }}>{a.title}</h3>
- {a.excerpt && <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed opacity-65">{a.excerpt}</p>}
- <span className="mt-3 inline-block text-[11px] uppercase tracking-[0.16em]" style={{ color: colors.accent }}>Read more →</span>
- </a>
- ))}
- </div>
- </section>
- );
- }
+ case "blog": return renderBlog(kit, variant);
 
- case "columns": {
- // Each line: "Heading | Text | image URL | button label | button link". Any field may be blank.
- const cols = (p.items || "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [heading, body, img, btn, href] = l.split("|").map((s) => (s || "").trim()); return { heading, body, img, btn, href }; }).filter((c) => c.heading || c.body || c.img);
- if (!cols.length) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Columns — add content</div> : null;
- const gridCls = p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3";
- return (
- <section className="mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-12 text-center text-3xl @xl:text-[2.4rem] leading-tight" style={{ fontFamily: head }} />}
- <div className={`grid grid-cols-1 gap-8 @sm:grid-cols-2 @lg:gap-10 ${gridCls}`}>
- {cols.slice(0, 8).map((c, i) => (
- <div key={i} className="flex flex-col">
- {c.img && <div className="vya-round mb-5 aspect-[4/3] w-full overflow-hidden" style={{ background: `${fg}0d` }}><img src={c.img} alt={c.heading || ""} loading="lazy" className="h-full w-full object-cover" /></div>}
- {c.heading && <h3 className="text-xl leading-snug @xl:text-2xl" style={{ fontFamily: head }}>{c.heading}</h3>}
- {c.body && <p className="mt-2 text-[14px] leading-relaxed opacity-70 whitespace-pre-wrap">{c.body}</p>}
- {c.btn && <a href={c.href || shopHref} className="vya-cta mt-4 inline-block self-start px-6 py-2.5 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }}>{c.btn}</a>}
- </div>
- ))}
- </div>
- </section>
- );
- }
+ case "columns": return renderColumns(kit, variant);
 
- case "text":
- return (
- <section className="mx-auto max-w-2xl px-6 py-20 @xl:py-24 text-center">
- {p.heading && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-5 text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
- {p.body && <p {...txtPlain(p.body, "body")} className="vya-body text-sm leading-[1.9] opacity-75 @xl:text-[15px] whitespace-pre-wrap" />}
- </section>
- );
+ case "text": return renderText(kit, variant);
 
- case "image":
- return p.image ? (
- <figure className="w-full">
- <img src={p.image} alt={p.caption || ""} className="vya-img w-full object-cover" style={{ maxHeight: "70vh" }} />
- {p.caption && <figcaption className="px-6 py-3 text-center text-xs opacity-60">{p.caption}</figcaption>}
- </figure>
- ) : null;
+ case "image": return renderImage(kit, variant);
 
- case "gallery": {
- const imgs = (p.images || "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
- return imgs.length ? (
- <div className="grid grid-cols-2 gap-1 @lg:grid-cols-3">
- {imgs.slice(0, 9).map((src, i) => (
- <div key={i} className="vya-round aspect-square overflow-hidden"><img src={src} alt="" className="h-full w-full object-cover" /></div>
- ))}
- </div>
- ) : null;
- }
+ case "gallery": return renderGallery(kit, variant);
 
- case "split": {
- const right = (p.imageSide || "").toLowerCase().startsWith("r");
- return (
- <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
- {p.image
- ? <img src={p.image} alt="" className={`vya-img aspect-[4/5] w-full object-cover ${right ? "@lg:order-2" : ""}`} />
- : <div className={`aspect-[4/5] w-full ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }} />}
- <div>
- {p.heading && <h2 {...txt(p.heading, "heading")} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
- {p.body && <p {...txtPlain(p.body, "body")} className="vya-body mt-4 whitespace-pre-wrap text-sm leading-[1.9] opacity-75 @xl:text-[15px]" />}
- {p.cta && <a href={shopHref} {...txt(p.cta, "cta")} className="vya-cta mt-7 inline-block px-8 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
- </div>
- </section>
- );
- }
+ case "split": return renderSplit(kit, variant);
 
- case "marquee": {
- const items = (p.items || "").split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
- if (!items.length) return ctx.edit ? <div className="px-6 py-6 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Marquee — add the names you carry</div> : null;
- const rowd = [...items, ...items];
- const sep = p.sep ?? "✦"; // separator character between names — customizable, or blank for none
- return (
- <div className="vya-marquee overflow-hidden whitespace-nowrap py-5" style={{ borderTop: `1px solid ${fg}1a`, borderBottom: `1px solid ${fg}1a` }}>
- <div className="vya-marquee-track inline-flex gap-12">
- {rowd.map((it, i) => <span key={i} className="text-lg uppercase tracking-wide opacity-55">{it}{sep ? <span style={{ marginLeft: "3rem", color: colors.accent }}>{sep}</span> : null}</span>)}
- </div>
- </div>
- );
- }
+ case "marquee": return renderMarquee(kit, variant);
 
- case "statement":
- return (
- <section className="mx-auto max-w-4xl px-6 py-20 @xl:py-28">
- {p.quote && <p {...txtPlain(p.quote, "quote")} className="vya-heading whitespace-pre-wrap text-3xl leading-[1.1] tracking-tight @xl:text-5xl" style={{ fontFamily: head }} />}
- {p.attribution && <p {...txt(p.attribution, "attribution")} className="vya-sub mt-6 text-[11px] uppercase tracking-[0.22em] opacity-60" />}
- </section>
- );
+ case "statement": return renderStatement(kit, variant);
 
- case "spotlight":
- return (
- <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
- {p.image
- ? <img src={p.image} alt="" className="vya-img aspect-square w-full object-cover" />
- : <div className="aspect-square w-full" style={{ background: `${fg}0d` }} />}
- <div>
- {p.heading && <h2 {...txt(p.heading, "heading")} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
- {p.price && <p {...txt(p.price, "price")} className="mt-2 text-xl" style={{ color: colors.accent }} />}
- {p.subtext && <p {...txtPlain(p.subtext, "subtext")} className="vya-body mt-4 whitespace-pre-wrap text-sm leading-[1.8] opacity-75 @xl:text-[15px]" />}
- {p.cta && <a href={shopHref} {...txt(p.cta, "cta")} className="vya-cta mt-7 inline-block px-8 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
- </div>
- </section>
- );
+ case "spotlight": return renderSpotlight(kit, variant);
 
- case "video": {
- const url = (p.url || "").trim();
- if (!url) return null;
- const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
- const vimeo = url.match(/vimeo\.com\/(\d+)/);
- const embed = yt ? `https://www.youtube.com/embed/${yt[1]}` : vimeo ? `https://player.vimeo.com/video/${vimeo[1]}` : null;
- return (
- <section className="mx-auto max-w-5xl px-5 @xl:px-8 py-16 @xl:py-20">
- <div className="vya-round relative w-full overflow-hidden bg-black" style={{ aspectRatio: "16 / 9" }}>
- {embed ? (
- <iframe src={embed} className="absolute inset-0 h-full w-full" allow="autoplay; fullscreen; picture-in-picture; clipboard-write" allowFullScreen title={p.caption || "Video"} />
- ) : (
- <video src={url} controls playsInline className="absolute inset-0 h-full w-full object-cover" />
- )}
- </div>
- {p.caption && <p className="mt-3 text-center text-xs opacity-60">{p.caption}</p>}
- </section>
- );
- }
+ case "video": return renderVideo(kit, variant);
 
- case "newsletter":
- return (
- <section className="px-6 py-20 @xl:py-24 text-center" style={{ borderTop: `1px solid ${fg}1a` }}>
- <h2 {...txt(p.heading || (ctx.edit ? "" : "Join the list"), "heading")} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />
- {p.subtext && <p {...txt(p.subtext, "subtext")} className="vya-sub mt-3 mx-auto max-w-md text-sm opacity-65" />}
- <div className="mt-7"><NewsletterForm accent={colors.accent} /></div>
- </section>
- );
+ case "newsletter": return renderNewsletter(kit, variant);
 
- case "contact":
- return (
- <section className="mx-auto max-w-xl px-6 py-16 @xl:py-24 text-center">
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
- {(p.subtext || ctx.edit) && <p {...txt(p.subtext, "subtext")} className="vya-sub mt-3 mx-auto max-w-md text-sm opacity-65" />}
- <div className="mt-8 text-left">
- {!ctx.edit && ctx.storeSlug
- ? <ContactForm accent={colors.accent} storeSlug={ctx.storeSlug} />
- : (
- <div className="flex flex-col gap-2.5">
- <input disabled placeholder="Name" className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
- <input disabled placeholder="Email" className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
- <textarea disabled placeholder="Message" rows={4} className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
- <span className="mt-1 grid place-items-center rounded-md py-2.5 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Send</span>
- </div>
- )}
- </div>
- {p.email && <p className="mt-6 text-center text-xs opacity-55">Or email us at <a href={`mailto:${p.email}`} style={{ color: colors.accent }}>{p.email}</a></p>}
- </section>
- );
+ case "contact": return renderContact(kit, variant);
 
- case "faq": {
- // A real accordion. Q&A are stored as pairs (q0/a0, q1/a1…) so they're editable on the canvas; on
- // the live site each row is a native <details> that expands on click — interactive with zero JS.
- const pairs: { q: string; a: string; i: number }[] = [];
- for (let i = 0; p[`q${i}`] !== undefined; i++) pairs.push({ q: p[`q${i}`] || "", a: p[`a${i}`] || "", i });
- // Back-compat: an assistant-built "items" blob (question line, then answer, blank line between).
- if (!pairs.length && p.items) String(p.items).split(/\n\s*\n/).forEach((blk, i) => { const ls = blk.split("\n"); const q = (ls.shift() || "").trim(); const a = ls.join("\n").trim(); if (q) pairs.push({ q, a, i }); });
- const chev = <svg className="vya-faq-chev ml-3 shrink-0 opacity-50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>;
- return (
- <section className="mx-auto max-w-3xl px-5 @xl:px-8 py-16 @xl:py-20">
- {(p.heading || ctx.edit) && <h2 {...txt(p.heading, "heading")} className="vya-heading mb-3 text-center text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: head }} />}
- {(p.subtext || ctx.edit) && <p {...txtPlain(p.subtext, "subtext")} className="vya-sub mx-auto mb-8 max-w-xl text-center text-sm leading-relaxed opacity-65" />}
- <div className="vya-faq" data-faq-container data-faq-block={b.id} style={{ borderBottom: `1px solid ${fg}1f` }}>
- {pairs.map(({ q, a, i }) => ctx.edit ? (
- <div
- key={i}
- data-faq-row data-faq-block={b.id} data-faq-index={i}
- className={`group/faq relative flex items-start gap-2 py-4 ${ctx.faqDnd?.dragBlock === b.id && ctx.faqDnd?.dragIndex === i ? "opacity-40" : ""}`}
- style={{ borderTop: `1px solid ${fg}1f` }}
- >
- {/* snap line where the dragged row will land */}
- {ctx.faqDnd?.overBlock === b.id && ctx.faqDnd?.overIndex === i && <div className="pointer-events-none absolute inset-x-0 -top-px z-10 h-[2px]" style={{ background: colors.accent }} />}
- {ctx.faqDnd && (
- <span
- role="button" title="Drag to reorder" aria-label="Drag to reorder"
- onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); ctx.faqDnd!.onGripDown(b.id, i, e); }}
- onClick={(e) => e.stopPropagation()}
- className="mt-0.5 grid h-7 w-6 shrink-0 cursor-grab touch-none select-none place-items-center rounded text-current opacity-30 transition hover:bg-black/5 hover:opacity-70 group-hover/faq:opacity-60 active:cursor-grabbing"
- ><GripVertical size={15} /></span>
- )}
- <div className="min-w-0 flex-1">
- <div className="flex items-start justify-between gap-3">
- <div {...txt(q, `q${i}`)} className="vya-faq-q flex-1 text-[15px] font-medium leading-snug" />
- {ctx.onFaqOp && <button type="button" title="Remove question" onClick={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onFaqOp!(b.id, { remove: i }); }} className="shrink-0 rounded p-1 text-xs opacity-0 transition hover:bg-black/5 group-hover/faq:opacity-60">✕</button>}
- </div>
- <div {...txtPlain(a, `a${i}`)} className="vya-faq-a mt-2 whitespace-pre-wrap text-[14px] leading-relaxed opacity-70" />
- </div>
- </div>
- ) : (
- <details key={i} style={{ borderTop: `1px solid ${fg}1f` }}>
- <summary className="flex cursor-pointer items-center justify-between gap-3 py-4 text-[15px] font-medium leading-snug">
- <span>{q}</span>{chev}
- </summary>
- <div className="pb-4 whitespace-pre-wrap text-[14px] leading-relaxed opacity-70">{a}</div>
- </details>
- ))}
- {/* drop line at the end of the list */}
- {ctx.edit && ctx.faqDnd?.overBlock === b.id && ctx.faqDnd?.overIndex === pairs.length && <div className="pointer-events-none h-[2px]" style={{ background: colors.accent }} />}
- </div>
- {ctx.edit && ctx.onFaqOp && <button type="button" onClick={() => ctx.onFaqOp!(b.id, "add")} className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed py-2.5 text-[12px] font-medium opacity-60 transition hover:opacity-100" style={{ borderColor: `${fg}40` }}>+ Add question</button>}
- </section>
- );
- }
+ case "faq": return renderFaq(kit, variant);
 
  case "custom": {
  // Interactive components (js present, or mode "sandbox") run in an isolated sandboxed iframe —
@@ -624,10 +364,15 @@ export default function Blocks({
  onEditField,
  reorder,
  overlayEdit,
+ freeEdit,
  onContentDragStart,
  onFaqOp,
  faqDnd,
  storeSlug,
+ onFieldFocus,
+ onResizeSectionStart,
+ onPickImage,
+ skin,
 }: {
  blocks: Block[];
  colors: Colors;
@@ -636,6 +381,9 @@ export default function Blocks({
  shopHref?: string;
  // Global corner style ("shapes") — rounds product cards, images, and buttons store-wide.
  radius?: Radius;
+ // Global style skin — type scale, spacing, and button shape across every section at once.
+ // Emitted with NO !important, so any per-section override the merchant sets still beats it.
+ skin?: string;
  // Editor-only: click a section in the preview to select/edit it.
  onSelect?: (id: string) => void;
  selectedId?: string | null;
@@ -656,6 +404,7 @@ export default function Blocks({
  // Editor-only: drag free-form overlay elements around a section. Drag math (px→%) lives in the parent
  // since it needs the section's rect; this renderer just reports select + drag-start.
  overlayEdit?: OverlayEdit;
+ freeEdit?: FreeEdit;
  // Editor-only: drag the selected hero's content group to reposition it within the banner.
  onContentDragStart?: (blockId: string, e: React.PointerEvent) => void;
  // Editor-only: add/remove a FAQ accordion row.
@@ -664,6 +413,13 @@ export default function Blocks({
  faqDnd?: FaqDnd;
  // Live-site only: the store handle, so a contact section can submit to the right store.
  storeSlug?: string;
+ // Editor-only: focusing a text field inside a section reports (blockId, field key) — the parent
+ // uses this to show that field's own contextual toolbar instead of the section's background one.
+ onFieldFocus?: (blockId: string, key: string) => void;
+ // Editor-only: drag a section's top/bottom resize handle to set its height explicitly.
+ onResizeSectionStart?: (blockId: string, edge: "top" | "bottom", e: React.PointerEvent) => void;
+ // Editor-only: open the file picker for an image slot clicked directly on the canvas.
+ onPickImage?: (apply: (url: string) => void) => void;
 }) {
  const head = ff(fonts.heading);
  const body = ff(fonts.body);
@@ -677,32 +433,43 @@ export default function Blocks({
  // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.
  // z-index:20 so overlays float ABOVE section content that sets its own stacking (e.g. the hero's
  // z-10 inner) instead of hiding behind it. Layer is click-through; only the elements catch pointers.
- const overlayCss = ".vya-ovl-layer{position:absolute;inset:0;z-index:20;pointer-events:none}.vya-ovl{position:absolute;pointer-events:auto}@container (max-width:640px){.vya-ovl-layer{position:static;display:flex;flex-direction:column;align-items:center;gap:.85rem;padding:1.75rem 1.25rem}.vya-ovl{position:static!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;max-width:100%}.vya-ovl-shape{width:52%!important}.vya-ovl-line{width:82%!important}.vya-hero-free{position:static!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;margin:0 auto;padding:6rem 1.25rem}}";
+ // Skin rules are emitted LAST so they lose to nothing but the merchant's own !important overrides.
+ const skinRules = skinCss(skin);
+ const overlayCss = ".vya-ovl-layer{position:absolute;inset:0;z-index:20;pointer-events:none}.vya-ovl{position:absolute;pointer-events:auto}@container (max-width:640px){.vya-ovl-layer{position:static;display:flex;flex-direction:column;align-items:center;gap:.85rem;padding:1.75rem 1.25rem}.vya-ovl{position:static!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;max-width:100%}.vya-ovl-shape{width:52%!important}.vya-ovl-line{width:82%!important}.vya-hero-free{position:static!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;margin:0 auto;padding:6rem 1.25rem}.vya-free,.vya-free-el{position:static!important;left:auto!important;top:auto!important;transform:none!important;max-width:100%!important}.vya-free-spacer{display:none!important}}";
  return (
  // `@container` makes the sections respond to THIS element's width, not the viewport — so the
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
- <div className="@container" style={{ fontFamily: body, color: colors.text }}>
- <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + overlayCss }} />
+ <div className={`@container${skinRules ? ` vya-skin-${skin}` : ""}`} style={{ fontFamily: body, color: colors.text }}>
+ <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + overlayCss + skinRules }} />
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
- const inner = blockBody(b, { colors, head, body, products, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug });
+ const inner = blockBody(b, { colors, head, body, products, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage });
  const editable = typeof onSelect === "function";
  // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
  // and element: e.g. `.vya-hero .vya-heading { ... }` or `.vya-b-<id> { ... }`.
  const secClass = `vya-sec vya-${b.type} vya-b-${b.id}`;
  const dragging = reorder?.dragIndex ?? null;
  const showLine = editable && reorder && reorder.overIndex === i && dragging !== null && dragging !== i;
- const overrideCss = b.style ? sectionOverrideCss(b.id, b.style) : "";
+ const overrideCss = (b.style ? sectionOverrideCss(b.id, b.style) : "") + (b.overlays?.length ? b.overlays.map(overlayOverrideCss).join("") : "");
  // A section background photo (full-bleed, behind everything). Wins over a bg colour; a soft scrim
  // keeps overlaid text legible without forcing the seller to fiddle. url() is quote-escaped.
  // Hero/image sections render their OWN picture (props.image), so they ignore this layer — otherwise a
  // stale bgImage would show a grey scrim behind them.
- const bgImg = b.type === "hero" || b.type === "image" ? undefined : b.style?.bgImage;
- const ov = (b.style?.bgOverlay ?? 24) / 100; // scrim strength over a photo (default keeps text legible)
+ // Background media: a bgMedia object (image/video/embed) supersedes the legacy bgImage string.
+ // Hero/image sections paint their own picture, so they opt out of this full-bleed layer.
+ const selfPaints = b.type === "hero" || b.type === "image";
+ const media = selfPaints ? undefined : b.style?.bgMedia;
+ const bgImg = selfPaints ? undefined : (media?.kind === "image" ? media.url : b.style?.bgImage);
+ const bgVideo = media?.kind === "video" ? media.url : null;
+ const bgVideoPoster = media?.kind === "video" ? media.poster : undefined;
+ const bgEmbed = media?.kind === "embed" ? backgroundEmbedSrc(media.url) : null;
+ const ov = (b.style?.bgOverlay ?? 24) / 100; // scrim strength over a photo/video (keeps text legible)
+ const scrim = `linear-gradient(rgba(0,0,0,${(ov * 0.75).toFixed(2)}),rgba(0,0,0,${ov.toFixed(2)}))`;
  const secStyle: React.CSSProperties = bgImg
- ? { backgroundImage: `linear-gradient(rgba(0,0,0,${(ov * 0.75).toFixed(2)}),rgba(0,0,0,${ov.toFixed(2)})), url("${bgImg.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center", color: b.style?.textColor || "#ffffff" }
+ ? { backgroundImage: `${scrim}, url("${bgImg.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center", color: b.style?.textColor || "#ffffff" }
+ : (bgVideo || bgEmbed) ? { background: background || "#000", color: b.style?.textColor || "#ffffff" }
  : background ? { background, color: b.style?.textColor || fg } : {};
  return (
  <div
@@ -710,7 +477,11 @@ export default function Blocks({
  onClick={editable ? (e) => { e.preventDefault(); e.stopPropagation(); onSelect!(b.id); } : undefined}
  onDragOver={editable && reorder ? (e) => { if (Array.from(e.dataTransfer.types).includes("Files")) return; e.preventDefault(); reorder.onOver(i); } : undefined}
  onDrop={editable && reorder ? (e) => { if (Array.from(e.dataTransfer.types).includes("Files")) return; e.preventDefault(); reorder.onDrop(i); } : undefined}
- className={editable ? `${secClass} group/sec relative cursor-pointer transition-shadow ${dragging === i ? "opacity-40" : ""} ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : `${secClass} relative`}
+ // A section CLIPS its own content. A free-positioned heading dragged near an edge (or any position
+ // stored before the drag clamp existed) would otherwise paint over the section above or below it —
+ // on the live storefront as much as in the editor. Sections resized with the handle already did
+ // this via style.minH; this makes it true of every section.
+ className={editable ? `${secClass} group/sec relative overflow-hidden cursor-pointer transition-shadow ${dragging === i ? "opacity-40" : ""} ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : `${secClass} relative overflow-hidden`}
  style={Object.keys(secStyle).length ? secStyle : undefined}
  >
  {overrideCss && <style dangerouslySetInnerHTML={{ __html: overrideCss }} />}
@@ -739,7 +510,29 @@ export default function Blocks({
  </button>
  </div>
  )}
- {inner}
+ {editable && onResizeSectionStart && selectedId === b.id && SEC_HANDLE_POS.map(([edge, pos]) => (
+ // A larger, invisible hit box (z-30, above the reorder controls/section label) with the small
+ // visible pill centred inside it, so a slightly-off click still lands.
+ <span
+ key={edge + pos}
+ title="Drag to resize the section"
+ onClick={(e) => e.stopPropagation()}
+ onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onResizeSectionStart(b.id, edge, e); }}
+ className={`absolute z-30 cursor-ns-resize touch-none h-3 w-12 ${pos}`}
+ >
+ <span className="pointer-events-none absolute inset-0 m-auto h-2 w-10 rounded-full border border-white bg-[#5D0F17] shadow" />
+ </span>
+ ))}
+ {/* Full-bleed video / embed background behind the section — click-through, muted, looping. */}
+ {(bgVideo || bgEmbed) && (
+ <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+ {bgVideo
+ ? <video className="absolute inset-0 h-full w-full object-cover" src={bgVideo} poster={bgVideoPoster} autoPlay muted loop playsInline preload="metadata" />
+ : <iframe className="pointer-events-none absolute left-1/2 top-1/2 h-[56.25vw] min-h-full w-[177.78vh] min-w-full max-w-none -translate-x-1/2 -translate-y-1/2 border-0" src={bgEmbed!} title="Background video" allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" tabIndex={-1} />}
+ <div className="absolute inset-0" style={{ background: scrim }} />
+ </div>
+ )}
+ {(bgVideo || bgEmbed) ? <div className="relative z-[1]">{inner}</div> : inner}
  {b.overlays?.length ? (
  <div className="vya-ovl-layer">
  {b.overlays.map((o) => {

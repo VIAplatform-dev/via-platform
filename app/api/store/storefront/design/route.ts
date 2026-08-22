@@ -3,6 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, normalizeHandle } from "@/app/lib/storefront-db";
 import { STOREFRONT_TEMPLATES, getTemplate, HEADING_FONTS, BODY_FONTS } from "@/app/lib/storefront-templates";
 import { BLOCK_TYPES, sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
+import { isSkin } from "@/app/lib/storefront-skins";
 import { getListingsByStore } from "@/app/lib/listings-db";
 import { defaultStarterTheme } from "@/app/lib/storefront-default";
 import { stores } from "@/app/lib/stores";
@@ -46,6 +47,8 @@ export async function GET(request: NextRequest) {
  colors: { bg: theme.colors?.bg || "#FFFDF8", text: theme.colors?.text || "#1a1a1a", accent: theme.colors?.accent || "#5D0F17" },
  fonts: { heading: theme.fonts?.heading || "Playfair Display", body: theme.fonts?.body || "Inter" },
  radius: theme.radius || "sharp",
+ skin: theme.skin ?? "",
+ preSkin: theme.preSkin ?? null,
  customCss: theme.customCss ?? "",
  blocks: theme.blocks ?? [],
  shopBlocks: theme.shopBlocks ?? [],
@@ -98,6 +101,19 @@ export async function POST(request: NextRequest) {
  }
 
  if (body?.radius === "sharp" || body?.radius === "soft" || body?.radius === "round") theme.radius = body.radius;
+ // Global style skin. "" clears it (back to no skin); anything unrecognized is ignored rather than stored.
+ if (typeof body?.skin === "string") { if (body.skin === "") delete theme.skin; else if (isSkin(body.skin)) theme.skin = body.skin; }
+ // The pre-skin look, so removing a skin can restore what the store looked like before it. `null`
+ // clears it (sent when the skin is removed); an object stores it (sent when the first skin is applied).
+ if (body?.preSkin === null) delete theme.preSkin;
+ else if (body?.preSkin && typeof body.preSkin === "object") {
+ const c = body.preSkin.colors, f = body.preSkin.fonts;
+ const hex = (v: unknown) => (/^#[0-9a-fA-F]{6}$/.test(String(v ?? "")) ? String(v) : undefined);
+ const pre: NonNullable<typeof theme.preSkin> = {};
+ if (c) { const bg = hex(c.bg), text = hex(c.text), accent = hex(c.accent); if (bg && text && accent) pre.colors = { bg, text, accent }; }
+ if (f) { const heading = HEADING_FONTS.includes(f.heading) ? f.heading : undefined; const bodyF = BODY_FONTS.includes(f.body) ? f.body : undefined; if (heading && bodyF) pre.fonts = { heading, body: bodyF }; }
+ if (pre.colors || pre.fonts) theme.preSkin = pre;
+ }
 
  if (Array.isArray(body?.blocks)) theme.blocks = sanitizeBlocks(body.blocks);
  if (Array.isArray(body?.shopBlocks)) theme.shopBlocks = sanitizeBlocks(body.shopBlocks);
@@ -123,5 +139,5 @@ export async function POST(request: NextRequest) {
  }
 
  await setStorefrontTheme(slug, theme);
- return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
+ return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", skin: theme.skin ?? "", preSkin: theme.preSkin ?? null, customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
 }

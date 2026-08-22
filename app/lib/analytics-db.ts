@@ -255,9 +255,13 @@ export async function saveConversion(conversion: ConversionRecord): Promise<{ du
  SELECT id, order_total FROM conversions WHERE order_id = ${conversion.orderId} AND store_slug = ${storeSlug} LIMIT 1
  `;
  if (existing.length > 0) {
- // If the first webhook saved with total=0 and we now have the real (USD) total, update it
+ // If the first webhook saved with total=0 (a placeholder, before the real total was known)
+ // and we now have the real (USD) total, correct it once. Deliberately NOT "any higher total
+ // wins" — this endpoint is reachable from untrusted store-side callers (see /api/conversion),
+ // and an unbounded upgrade would let a replayed request with an inflated orderTotal overwrite
+ // an already-real total. Only a genuine $0→real correction is allowed; a real total is final.
  const existingTotal = Number(existing[0].order_total ?? 0);
- if (usdTotal > existingTotal) {
+ if (existingTotal === 0 && usdTotal > 0) {
  await sql`
  UPDATE conversions
  SET order_total = ${usdTotal}, currency = 'USD', original_total = ${origTotal}, original_currency = ${origCurrency}

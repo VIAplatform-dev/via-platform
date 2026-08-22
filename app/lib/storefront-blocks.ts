@@ -8,16 +8,64 @@ export type BlockType = "announcement" | "hero" | "featured" | "collections" | "
 export type BlockScale = "sm" | "md" | "lg" | "xl";
 export type BlockAlign = "left" | "center" | "right";
 export type BlockShadow = "sm" | "md" | "lg" | "xl";
+// A richer section background than a flat photo: an uploaded image/GIF, an uploaded video
+// (autoplays muted + looping behind the section), or an embedded YouTube/Vimeo/Drive link.
+export type BgMedia =
+ | { kind: "image"; url: string }
+ | { kind: "video"; url: string; poster?: string }
+ | { kind: "embed"; url: string };
+// Per-element ("free") overrides for one built-in text field — position, size, and full Figma/Canva-style
+// text styling, all independent per field (the heading can be bold + wide-tracked while the subtext isn't).
+export type FreeStyle = {
+ x?: number; y?: number;        // position: % of the section, centre-anchored (both set = floated out of flow)
+ fontPx?: number;               // font size in px
+ w?: number;                    // width as a % of the field's own container — set by dragging a SIDE
+                                // handle. Rewraps the text (three lines become one long line); the
+                                // corner handles scale the type instead.
+ font?: string;                 // font family (from the storefront font list)
+ bold?: boolean; italic?: boolean; underline?: boolean;
+ color?: string;                // #hex text colour
+ align?: BlockAlign;            // text-align for this field only
+ ls?: number;                   // letter-spacing, in hundredths of an em (2 = 0.02em; negatives allowed)
+ lh?: number;                   // line-height, as a percent of font size (140 = 1.4)
+ transform?: "none" | "uppercase" | "lowercase" | "capitalize"; // text case
+};
 export type BlockStyle = {
  bg?: string; // "accent" | "dark" | a #hex (default = theme background)
  bgGradient?: string; // "#hex|#hex|angleDeg" — a two-stop linear gradient (wins over bg colour)
  bgImage?: string; // URL — a full-bleed background photo behind the whole section (wins over gradient/colour)
+ bgMedia?: BgMedia; // richer background (uploaded video / GIF / embedded YouTube-Vimeo-Drive link); supersedes bgImage
+ free?: Record<string, FreeStyle>; // per-ELEMENT overrides, keyed by the element's edit key (heading/subtext/cta/…). Position (x,y), size (fontPx), and full per-field text styling. Any subset.
  bgOverlay?: number; // 0–80 — dark scrim strength over a background photo (for legible text)
  textColor?: string; // #hex — overrides the section's text colour
- align?: BlockAlign; // text alignment
- headingSize?: BlockScale; // heading scale
+ align?: BlockAlign; // text alignment — section-wide default, used by any field below with no override of its own
+ headingAlign?: BlockAlign; // heading's own alignment (wins over `align`, independent of subtext/body/cta)
+ subtextAlign?: BlockAlign; // subtext's own alignment (ditto)
+ ctaAlign?: BlockAlign; // the built-in button's own alignment (ditto)
+ bodyAlign?: BlockAlign; // body copy's own alignment (ditto)
+ headingSize?: BlockScale; // heading scale — legacy preset, used only when headingSizePx isn't set
+ headingSizePx?: number; // px — explicit heading font size (wins over headingSize)
  headingFont?: string; // per-section heading font override
  tracking?: number; // heading letter-spacing, in hundredths of an em (2 = 0.02em; negatives allowed)
+ subtextSizePx?: number; // px — explicit subtext font size (also applies to "attribution" fields, which share the same class)
+ subtextFont?: string; // per-section subtext font override (ditto)
+ lineHeight?: number; // heading/subtext/body line-height, as a percent of font size (140 = 1.4)
+ textBold?: boolean; // bold heading/subtext/body text in this section
+ textItalic?: boolean; // italicize heading/subtext/body text in this section
+ textUnderline?: boolean; // underline heading/subtext/body text in this section
+ // The section's own built-in CTA button (the `cta` field — e.g. hero/featured/split "Shop now").
+ // Distinct from a free-form overlay button, which carries its own colours/shape in its `props`.
+ ctaBg?: string; // #hex — button background (default: theme accent)
+ ctaColor?: string; // #hex — button text colour (default: white)
+ ctaShape?: "square" | "rounded" | "pill"; // button corner style (default: theme corner style)
+ ctaHoverBg?: string; // #hex — button background on hover
+ ctaHoverColor?: string; // #hex — button text colour on hover
+ ctaBorder?: number; // px — button outline width. With ctaOutline on, this IS the button (no fill).
+ ctaBorderColor?: string; // #hex — button outline colour (default: ctaBg)
+ ctaOutline?: boolean; // "No fill" style — transparent background, coloured border + text; fills in on hover
+ ctaFont?: string; // per-button font override — parity with a free-form overlay button's own Font control
+ ctaSize?: "sm" | "md" | "lg"; // parity with a free-form overlay button's own Size control
+ ctaFullWidth?: boolean; // stretch the button to the section's full content width, instead of hugging its label
  space?: BlockScale; // vertical breathing-room preset (used when padY isn't set)
  padY?: number; // px — explicit vertical padding (overrides `space`)
  padX?: number; // px — explicit horizontal padding
@@ -25,7 +73,23 @@ export type BlockStyle = {
  border?: number; // px — section border width
  borderColor?: string; // #hex — section border colour
  shadow?: BlockShadow; // preset drop shadow
+ minH?: number; // px — explicit section height, set by dragging the resize handle on the canvas
 };
+
+// Turn a pasted YouTube / Vimeo / Google-Drive URL into an embeddable, autoplaying, muted,
+// looping, chrome-free iframe src for a section background. Returns null if unrecognized.
+// (Drive is best-effort: its /preview embed ignores autoplay/loop — steer sellers to YouTube/Vimeo.)
+export function backgroundEmbedSrc(rawUrl: string): string | null {
+ const url = (rawUrl || "").trim();
+ if (!url) return null;
+ let m = url.match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/i);
+ if (m) { const id = m[1]; return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}&controls=0&modestbranding=1&playsinline=1&rel=0&iv_load_policy=3&disablekb=1&fs=0`; }
+ m = url.match(/(?:vimeo\.com\/(?:video\/)?|player\.vimeo\.com\/video\/)(\d+)/i);
+ if (m) return `https://player.vimeo.com/video/${m[1]}?autoplay=1&muted=1&loop=1&background=1`;
+ m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([\w-]+)/i);
+ if (m) return `https://drive.google.com/file/d/${m[1]}/preview`;
+ return null;
+}
 // Free-form overlay elements ("add a button/text/image anywhere on a section"). Each is anchored to a
 // section and positioned in PERCENT of that section's box (0–100), so it scales with the layout instead
 // of breaking at a fixed pixel. On narrow screens the overlay layer auto-stacks below the section content
@@ -40,7 +104,10 @@ export type Overlay = {
  h?: number; // 0–100, % height (images/shapes; text/buttons auto-height)
  props: Record<string, string>; // button:{label,href,bg,color}; text:{text,color,size}; image:{src,alt}; rect/circle:{fill,radius,opacity}; line:{color,thickness}
 };
-export type Block = { id: string; type: BlockType; props: Record<string, string>; style?: BlockStyle; overlays?: Overlay[] };
+// `variant` picks the section's LAYOUT (see storefront-variants.ts) — where the image sits, how many
+// columns, grid vs carousel. Absent = the layout that shipped before variants existed, so every
+// storefront saved to date keeps rendering exactly as it did. `style` stays the separate "skin" axis.
+export type Block = { id: string; type: BlockType; variant?: string; props: Record<string, string>; style?: BlockStyle; overlays?: Overlay[] };
 
 export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" | "datetime" };
 export type BlockDef = { type: BlockType; label: string; description: string; fields: BlockField[]; defaults: Record<string, string> };
@@ -69,9 +136,9 @@ export const BLOCK_TYPES: BlockDef[] = [
  { type: "statement", label: "Statement — big quote", description: "One large statement or quote. Best given a dark or accent background for drama.", fields: [{ key: "quote", label: "Quote", kind: "textarea" }, { key: "attribution", label: "Attribution", kind: "text" }], defaults: { quote: "When it’s gone, it’s gone.", attribution: "" } },
  { type: "spotlight", label: "Spotlight — one piece", description: "Feature a single hero product, big, with its details and a button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Details", kind: "textarea" }, { key: "price", label: "Price", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }], defaults: { heading: "Piece of the week", subtext: "", price: "", cta: "Shop this piece", image: "" } },
  { type: "video", label: "Video", description: "Embed a video — paste a YouTube, Vimeo, or .mp4 link.", fields: [{ key: "url", label: "Video URL (YouTube, Vimeo, or .mp4)", kind: "text" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { url: "", caption: "" } },
- { type: "newsletter", label: "Newsletter signup", description: "Collect emails from your visitors.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }], defaults: { heading: "Join the list", subtext: "First access to new arrivals." } },
+ { type: "newsletter", label: "Newsletter signup", description: "Collect emails from your visitors.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }], defaults: { heading: "Join the list", subtext: "First access to new arrivals.", cta: "Sign up" } },
  // A real contact form (name · email · message) that emails the store, plus an optional contact email.
- { type: "contact", label: "Contact form", description: "A get-in-touch form — name, email, message — plus your contact email. Every store should have one.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "email", label: "Contact email (optional, shown below the form)", kind: "text" }], defaults: { heading: "Get in touch", subtext: "Questions about a piece, sizing, or an order? Send us a note.", email: "" } },
+ { type: "contact", label: "Contact form", description: "A get-in-touch form — name, email, message — plus your contact email. Every store should have one.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "email", label: "Contact email (optional, shown below the form)", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }], defaults: { heading: "Get in touch", subtext: "Questions about a piece, sizing, or an order? Send us a note.", email: "", cta: "Send" } },
  // A real, interactive accordion — each Q&A is a stored pair (q0/a0, q1/a1…), so it's editable on the
  // canvas and expands on click natively (<details>), no scripts. Great for FAQs, shipping, sizing.
  { type: "faq", label: "FAQ / Accordion", description: "Expandable question-and-answer rows — click to open. Perfect for FAQs, shipping & returns, sizing.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Intro line (optional)", kind: "textarea" }], defaults: { heading: "Frequently asked", subtext: "", q0: "How are pieces sourced?", a0: "Every piece is hand-selected for quality and authenticity.", q1: "What condition are items in?", a1: "Condition is noted on each listing — most pieces are pre-loved or vintage.", q2: "Do you accept returns?", a2: "See our Shipping & Returns page for the details." } },
@@ -87,15 +154,27 @@ export function blockDef(type: string): BlockDef | undefined {
  return BLOCK_TYPES.find((b) => b.type === type);
 }
 
+// A layout id is a short slug (see storefront-variants.ts). Validated by shape, never by membership —
+// see the note in sanitizeBlocks for why an unrecognized id is kept rather than thrown away.
+export const VARIANT_ID_RE = /^[a-z0-9-]{1,32}$/;
+
 let seq = 0;
 export function newBlockId(): string {
  seq += 1;
  return `b_${Date.now().toString(36)}${seq}`;
 }
 
-export function makeBlock(type: BlockType, props?: Record<string, string>): Block {
+// `variant` is stored verbatim (shape-checked) — this module deliberately knows nothing about the
+// variant REGISTRY, so it stays a dependency-free description of the data. Callers that want a
+// variant's seeded defaults compose the two: makeBlock(type, variantDefaults(type, v), normalizeVariant(type, v)).
+export function makeBlock(type: BlockType, props?: Record<string, string>, variant?: string): Block {
  const def = blockDef(type);
- return { id: newBlockId(), type, props: { ...(def?.defaults || {}), ...(props || {}) } };
+ return {
+  id: newBlockId(),
+  type,
+  ...(variant && VARIANT_ID_RE.test(variant) ? { variant } : {}),
+  props: { ...(def?.defaults || {}), ...(props || {}) },
+ };
 }
 
 // Default props + a sensible starting position (roughly centred) for a new overlay element.
@@ -154,6 +233,7 @@ export function sanitizeOverlays(input: unknown): Overlay[] {
  p.bg = hex6(o.props?.bg, "#1a1a1a");
  p.color = hex6(o.props?.color, "#ffffff");
  if (o.props?.font) p.font = safeFont(o.props.font);
+ if (o.props?.fontPx != null && String(o.props.fontPx).trim() !== "") p.fontPx = intStr(o.props.fontPx, 8, 200, 20);
  } else if (o.kind === "text") {
  p.text = String(o.props?.text ?? "").slice(0, 240);
  p.color = hex6(o.props?.color, "#ffffff");
@@ -161,6 +241,7 @@ export function sanitizeOverlays(input: unknown): Overlay[] {
  if (o.props?.bold === "1") p.bold = "1";
  if (o.props?.italic === "1") p.italic = "1";
  if (o.props?.font) p.font = safeFont(o.props.font);
+ if (o.props?.fontPx != null && String(o.props.fontPx).trim() !== "") p.fontPx = intStr(o.props.fontPx, 8, 200, 20);
  } else if (o.kind === "image") {
  p.src = safeSrc(o.props?.src);
  p.alt = String(o.props?.alt ?? "").slice(0, 200);
@@ -230,6 +311,13 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (bg === "accent" || bg === "dark" || /^#[0-9a-fA-F]{6}$/.test(bg)) style.bg = bg;
  const bgImg = safeSrc(s.bgImage);
  if (bgImg) style.bgImage = bgImg;
+ // Rich background media: image/video keep a safe URL; embed is stored only if it parses to a known player.
+ const bm = s.bgMedia;
+ if (bm && typeof bm === "object") {
+  if (bm.kind === "image") { const u = safeSrc(bm.url); if (u) style.bgMedia = { kind: "image", url: u }; }
+  else if (bm.kind === "video") { const u = safeSrc(bm.url); if (u) { const poster = bm.poster ? safeSrc(bm.poster) : undefined; style.bgMedia = poster ? { kind: "video", url: u, poster } : { kind: "video", url: u }; } }
+  else if (bm.kind === "embed") { const u = String(bm.url || "").trim(); if (backgroundEmbedSrc(u)) style.bgMedia = { kind: "embed", url: u.slice(0, 500) }; }
+ }
  if (/^#[0-9a-fA-F]{6}$/.test(String(s.textColor ?? ""))) style.textColor = s.textColor;
  if (s.align === "left" || s.align === "center" || s.align === "right") style.align = s.align;
  if (scale(s.headingSize)) style.headingSize = s.headingSize;
@@ -248,9 +336,39 @@ export function sanitizeBlocks(input: unknown): Block[] {
  { const bw = num(s.border, 0, 12); if (bw !== undefined) style.border = bw; }
  if (hex(s.borderColor)) style.borderColor = s.borderColor;
  if (s.shadow === "sm" || s.shadow === "md" || s.shadow === "lg" || s.shadow === "xl") style.shadow = s.shadow;
+ // Per-element free transforms (heading/subtext/cta/… dragged & scaled on the canvas).
+ if (s.free && typeof s.free === "object") {
+  const free: Record<string, FreeStyle> = {};
+  for (const [k, v] of Object.entries(s.free as Record<string, unknown>)) {
+   if (!/^[a-z0-9_]{1,30}$/i.test(k) || !v || typeof v !== "object") continue;
+   const val = v as Record<string, unknown>;
+   const entry: FreeStyle = {};
+   const fx = num(val.x, 0, 100), fy = num(val.y, 0, 100), fp = num(val.fontPx, 8, 200);
+   if (fx !== undefined && fy !== undefined) { entry.x = fx; entry.y = fy; } // position needs both
+   if (fp !== undefined) entry.fontPx = fp;
+   const fw = num(val.w, 5, 100); if (fw !== undefined) entry.w = fw;
+   if (typeof val.font === "string" && val.font.trim()) entry.font = String(val.font).slice(0, 50).replace(/[^\w \-]/g, "");
+   if (typeof val.bold === "boolean") entry.bold = val.bold;
+   if (typeof val.italic === "boolean") entry.italic = val.italic;
+   if (typeof val.underline === "boolean") entry.underline = val.underline;
+   if (hex(val.color)) entry.color = String(val.color);
+   if (val.align === "left" || val.align === "center" || val.align === "right") entry.align = val.align;
+   const ls = num(val.ls, -20, 80); if (ls !== undefined) entry.ls = ls;
+   const lh = num(val.lh, 80, 300); if (lh !== undefined) entry.lh = lh;
+   if (val.transform === "none" || val.transform === "uppercase" || val.transform === "lowercase" || val.transform === "capitalize") entry.transform = val.transform;
+   if (Object.keys(entry).length) free[k] = entry;
+  }
+  if (Object.keys(free).length) style.free = free;
+ }
  const hasStyle = Object.keys(style).length > 0;
  const overlays = sanitizeOverlays(b.overlays);
- out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, props, ...(hasStyle ? { style } : {}), ...(overlays.length ? { overlays } : {}) });
+ // Variant: validated by SHAPE (a short slug), not by membership in the registry. An id we don't
+ // recognize is kept and left for the renderer to fall back on — because the id we don't recognize
+ // today may be one a NEWER deploy wrote (a rollback, or a preview build), and stripping it here
+ // would permanently destroy that merchant's layout choice on the next autosave. Rendering falls
+ // back safely (resolveVariant); storage does not throw information away.
+ const variant = typeof b.variant === "string" && VARIANT_ID_RE.test(b.variant) ? b.variant : undefined;
+ out.push({ id: typeof b.id === "string" && b.id ? b.id : newBlockId(), type: b.type, ...(variant ? { variant } : {}), props, ...(hasStyle ? { style } : {}), ...(overlays.length ? { overlays } : {}) });
  }
  return out;
 }

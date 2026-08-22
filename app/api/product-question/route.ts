@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 function getResend() {
  const apiKey = process.env.RESEND_API_KEY;
@@ -29,6 +30,10 @@ function baseStyles() {
 
 export async function POST(request: NextRequest) {
  try {
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "product-question", ip, max: 10, windowMinutes: 15 })) {
+ return NextResponse.json({ error: "Too many questions sent. Please try again in a few minutes." }, { status: 429 });
+ }
  const body = await request.json();
  const { email, question, productTitle, storeName, productUrl } = body;
 

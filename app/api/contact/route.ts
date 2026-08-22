@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createConversation } from "@/app/lib/messaging-db";
 import { getInboxSettings } from "@/app/lib/storefront-settings-db";
 import { notifyStoreOfMessage } from "@/app/lib/message-notify";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 export const dynamic = "force-dynamic";
 
 // Public: a storefront contact form / item question opens a conversation.
 // { storeSlug, name?, email?, message, itemTitle? } → returns a thread token.
 export async function POST(request: NextRequest) {
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "storefront-contact", ip, max: 10, windowMinutes: 15 })) {
+ return NextResponse.json({ error: "Too many messages. Please try again in a few minutes." }, { status: 429 });
+ }
  const body = await request.json().catch(() => null);
  const storeSlug = body?.storeSlug ? String(body.storeSlug).trim() : "";
  const message = body?.message ? String(body.message).trim() : "";

@@ -6,9 +6,12 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Formats a browser can render directly — stored as-is (keeps PNG transparency, GIF animation, SVG).
+// Formats a browser can render directly — stored as-is (keeps PNG transparency, GIF animation).
 // Anything else (notably iPhone HEIC) is transcoded to JPEG so it actually displays on the storefront.
-const WEB_SAFE = /^image\/(jpeg|png|webp|gif|avif|svg\+xml)$/i;
+// SVG is deliberately excluded even though browsers render it directly: it's XML that can carry
+// embedded <script>, this is client-asserted MIME with no magic-byte check, and the file is stored
+// at a public URL — so an SVG here would be a stored-XSS vector. Rejected outright below.
+const WEB_SAFE = /^image\/(jpeg|png|webp|gif|avif)$/i;
 
 // A store's media library — photos they upload to drop into their storefront (hero,
 // banners, lookbook). Stored in Blob under a per-store prefix; no DB table needed —
@@ -39,8 +42,20 @@ export async function POST(request: NextRequest) {
  const formData = await request.formData();
  const file = formData.get("file") as File | null;
  if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+
+ // Video (section background) — stored as-is (no transcode); the storefront plays it muted + looping.
+ if ((file.type || "").startsWith("video/")) {
+ if (!/^video\/(mp4|webm|quicktime)$/i.test(file.type)) return NextResponse.json({ error: "Use an MP4, WebM, or MOV video." }, { status: 400 });
+ if (file.size > 64 * 1024 * 1024) return NextResponse.json({ error: "Video must be under 64MB." }, { status: 400 });
+ const ext = file.type === "video/webm" ? "webm" : file.type === "video/quicktime" ? "mov" : "mp4";
+ const vstamp = `${prefixFor(slug)}${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+ const vblob = await put(`${vstamp}.${ext}`, file, { access: "public", contentType: file.type });
+ return NextResponse.json({ url: vblob.url });
+ }
+
  // HEIC often arrives with an empty type; let it through and let sharp be the real validator below.
- if (file.type && !file.type.startsWith("image/")) return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
+ if (file.type && !file.type.startsWith("image/")) return NextResponse.json({ error: "Only image or video files are allowed" }, { status: 400 });
+ if (file.type === "image/svg+xml") return NextResponse.json({ error: "Only photo files are allowed (SVG isn’t supported)." }, { status: 400 });
  if (file.size > 25 * 1024 * 1024) return NextResponse.json({ error: "Image must be under 25MB" }, { status: 400 });
 
  const stamp = `${prefixFor(slug)}${Date.now()}-${Math.round(Math.random() * 1e6)}`;
@@ -82,7 +97,16 @@ export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const url = request.nextUrl.searchParams.get("url") || "";
- if (!url || !url.includes(prefixFor(slug))) return NextResponse.json({ error: "Not your asset." }, { status: 403 });
+ // Ownership must be a real path-prefix check, not `.includes()` — a substring match lets a
+ // crafted URL (e.g. a query/fragment appended after the victim's path) satisfy `.includes()`
+ // for OUR prefix while `del()` still resolves and deletes the victim store's blob.
+ let ownPath: string;
+ try {
+ ownPath = new URL(url).pathname.replace(/^\/+/, "");
+ } catch {
+ return NextResponse.json({ error: "Invalid asset URL." }, { status: 400 });
+ }
+ if (!url || !ownPath.startsWith(prefixFor(slug))) return NextResponse.json({ error: "Not your asset." }, { status: 403 });
  try {
  await del(url);
  return NextResponse.json({ ok: true });
