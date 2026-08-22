@@ -29,7 +29,7 @@ function isAuthorized(request: NextRequest): boolean {
 // Same brand-name → slug resolution the sync uses, so the partnership match is identical.
 const storeNameToSlug = new Map<string, string>(stores.map((s) => [s.name.toLowerCase(), s.slug]));
 const slugByNormalized = new Map<string, string>(stores.map((s) => [s.slug.replace(/-/g, ""), s.slug]));
-const collabsHandleOverrides: Record<string, string> = { "source 24": "source-twenty-four", "chill boutique consignment": "chill-boutique", "chillboutiqueconsignment": "chill-boutique" };
+const collabsHandleOverrides: Record<string, string> = { "source 24": "source-twenty-four", "chill boutique consignment": "chill-boutique", "chillboutiqueconsignment": "chill-boutique", "sablier": "sablier-vintage", "lamash store": "lamash", "chomp chomp": "chomp-chomp-vintage", "vintage girlfriend luxury": "vintage-girlfriend" };
 function resolveStoreSlug(brandName: string): string {
  const key = (brandName || "").toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "").trim();
  if (storeNameToSlug.has(key)) return storeNameToSlug.get(key)!;
@@ -41,23 +41,39 @@ function resolveStoreSlug(brandName: string): string {
 
 type CollabsCommission = { commissionId: string; orderName: string | null; commissionUsd: number; group: string; earnedAt: string; orderTotalUsd: number | null };
 
-async function fetchPartnershipCommissions(partnershipId: string, cookie: string, csrf: string, sinceIso: string): Promise<CollabsCommission[]> {
+// Fetches recent commissions across all groups, stepping the query down (full → partial → minimal)
+// on GraphQL error exactly like the sync — and returns per-group debug so we can SEE why it's empty.
+async function fetchPartnershipCommissions(partnershipId: string, cookie: string, csrf: string, sinceIso: string): Promise<{ commissions: CollabsCommission[]; groupDebug: Record<string, unknown> }> {
  const groups = ["NEXT_PAYOUT", "IN_HOLDING_PERIOD", "PAYOUT_REQUESTED", "CREATOR_ACTION_REQUIRED", "PAID_OUT"];
  const headers = {
   "content-type": "application/json", "cookie": cookie, "x-csrf-token": csrf,
   "origin": "https://collabs.shopify.com", "referer": "https://collabs.shopify.com/", "x-client-type": "web",
   "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
  };
- const body = (group: string) => JSON.stringify({ query: `query { payouts { partnershipCommissions(group: ${group}, partnershipId: "${partnershipId}", first: 50) { nodes { id commissionUsd { amount } earnedAt lineItemTitle order { name total { amount currency } } } } } }` });
+ const makeBody = (group: string, tier: "full" | "partial" | "minimal") => JSON.stringify({
+  query: `query { payouts { partnershipCommissions(group: ${group}, partnershipId: "${partnershipId}", first: 50) { nodes {
+   id commissionUsd { amount } earnedAt
+   ${tier !== "minimal" ? "lineItemTitle lineItemPrice { amount }" : ""}
+   ${tier === "full" ? "order { name total { amount currency } }" : ""}
+   ${tier === "partial" ? "order { name }" : ""}
+  } } } }`,
+ });
  const since = new Date(sinceIso).getTime();
  const out: CollabsCommission[] = [];
+ const groupDebug: Record<string, unknown> = {};
  for (const group of groups) {
   try {
-   const res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: body(group) });
-   const json = await res.json();
+   let tier: "full" | "partial" | "minimal" = "full";
+   let res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: makeBody(group, tier) });
+   let json = await res.json();
+   if (json?.errors && tier === "full") { tier = "partial"; res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: makeBody(group, tier) }); json = await res.json(); }
+   if (json?.errors && tier === "partial") { tier = "minimal"; res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: makeBody(group, tier) }); json = await res.json(); }
+   if (json?.errors) { groupDebug[group] = { status: res.status, error: JSON.stringify(json.errors).slice(0, 200) }; continue; }
    const nodes = (json?.data?.payouts?.partnershipCommissions?.nodes ?? []) as Array<Record<string, unknown>>;
+   let kept = 0;
    for (const n of nodes) {
     if (!n.earnedAt || new Date(String(n.earnedAt)).getTime() < since) continue;
+    kept++;
     const order = n.order as { name?: string; total?: { amount: number; currency: string } } | undefined;
     const total = order?.total ? convertCurrencyToUSD(order.total.amount, order.total.currency || "USD") : null;
     out.push({
@@ -66,14 +82,48 @@ async function fetchPartnershipCommissions(partnershipId: string, cookie: string
      group, earnedAt: String(n.earnedAt), orderTotalUsd: total && total > 0 ? total : null,
     });
    }
-  } catch { /* skip this group */ }
+   groupDebug[group] = { tier, rawNodes: nodes.length, keptInWindow: kept };
+  } catch (e) { groupDebug[group] = { fetchError: String(e).slice(0, 200) }; }
  }
- return out;
+ return { commissions: out, groupDebug };
 }
 
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const q = new URL(request.url).searchParams;
+
+ // ── ?all=1 — sweep EVERY Collabs partnership and flag stores where Collabs' order count > ours.
+ // Cheap: one grouped conversions count + the in-memory snapshot, NO per-order Collabs fetch. This
+ // answers "which other stores are we missing orders for?" — then deep-dive/recover each flagged store.
+ if (q.get("all") === "1") {
+  const raw = await getSetting("collabs_data").catch(() => null);
+  let partnerships: Array<{ id: string; name: string; totalOrders?: number; commissionRules?: Array<{ value: number }> }> = [];
+  if (raw) { try { partnerships = JSON.parse(raw); } catch { /* ignore */ } }
+  if (!partnerships.length) return NextResponse.json({ error: "collabs_data snapshot empty — open/sync the Collabs tab first, then retry." });
+  const sqlAll = db();
+  const counts = (await sqlAll`SELECT store_slug, count(*)::int AS n FROM conversions WHERE conversion_id LIKE 'collabs_%' GROUP BY store_slug`) as Array<{ store_slug: string; n: number }>;
+  const countBySlug = new Map(counts.map((c) => [c.store_slug, c.n]));
+  const report = partnerships.map((p) => {
+   const slug = resolveStoreSlug(p.name);
+   const store = stores.find((s) => s.slug === slug);
+   const collabsTotal = Number(p.totalOrders) || 0;
+   const ours = countBySlug.get(slug) ?? 0;
+   return { store: slug, storeName: store?.name || p.name, partnershipId: p.id, matched: !!store, collabsTotalOrders: collabsTotal, ourCollabsConversions: ours, gap: collabsTotal - ours };
+  }).sort((a, b) => b.gap - a.gap);
+  const withGap = report.filter((r) => r.gap > 0);
+  const unmatched = report.filter((r) => !r.matched); // Collabs partnership whose name doesn't resolve to a VYA store — a slug-mismatch bug (orders would NEVER record)
+  return NextResponse.json({
+   mode: "all-stores-dry-run",
+   storesChecked: report.length,
+   storesWithGap: withGap.length,
+   totalMissingEstimate: withGap.reduce((s, r) => s + r.gap, 0),
+   gaps: withGap,                                   // every store Collabs shows more orders than we've recorded, worst first
+   unmatchedPartnerships: unmatched.map((r) => ({ collabsName: r.storeName, resolvedSlug: r.store, collabsTotalOrders: r.collabsTotalOrders })),
+   cleanStores: report.filter((r) => r.gap <= 0 && r.matched).length,
+   hint: "for each store with a gap: ?store=<slug>&days=90 to see the specific orders, then add &recover=1",
+  });
+ }
+
  const storeParam = (q.get("store") || "").trim();
  if (!storeParam) return NextResponse.json({ error: "Pass ?store=<name or slug> (e.g. ?store=Lovergirl%20Vintage)" }, { status: 400 });
  const days = Math.max(1, Math.min(120, Number(q.get("days")) || 45));
@@ -101,7 +151,7 @@ export async function GET(request: NextRequest) {
   const [cookie, csrf] = await Promise.all([getSetting("collabs_cookie"), getSetting("collabs_csrf_token")]);
   if (!cookie || !csrf) return NextResponse.json({ store: slug, storeName, ourConversions, collabsTotalOrders: partnership.totalOrders ?? null, error: "Collabs session missing (cookie/csrf). Sync the Collabs tab to refresh it, then retry." });
 
-  const commissions = await fetchPartnershipCommissions(partnership.id, cookie, csrf, sinceIso);
+  const { commissions, groupDebug } = await fetchPartnershipCommissions(partnership.id, cookie, csrf, sinceIso);
   // Group commission line items by order.
   const byOrder = new Map<string, CollabsCommission[]>();
   for (const c of commissions) { const key = c.orderName || `commission-${c.commissionId}`; const g = byOrder.get(key) ?? []; g.push(c); byOrder.set(key, g); }
@@ -141,6 +191,8 @@ export async function GET(request: NextRequest) {
    store: slug, storeName,
    collabsTotalOrders: partnership.totalOrders ?? null, // what Collabs says (all-time)
    ourCollabsConversions: ourConversions,               // what we've recorded
+   partnershipId: partnership.id,
+   collabsFetch: groupDebug,                            // per-group: which query tier worked, raw + kept node counts, or the error
    windowDays: days,
    recentCollabsOrders: rows.length,                    // orders Collabs shows in the window
    alreadyInConversions: rows.filter((r) => r.inConversions).length,

@@ -2094,10 +2094,12 @@ export async function sendCollabsLinksStuckAlert(stuckProducts: DBProduct[]): Pr
  });
 }
 
-async function createMagicSignInLink(email: string): Promise<string> {
+// One-click Auth.js magic sign-in. callbackUrl = where to land AFTER sign-in (default: the buyer
+// pilot-check flow → home). fallbackPath = where to send them if we can't mint a token (no secret/DB).
+async function createMagicSignInLink(email: string, callbackUrl: string = `/api/pilot-check?next=/`, fallbackPath: string = "/login"): Promise<string> {
  try {
  const secret = process.env.AUTH_SECRET;
- if (!secret) return `${BASE_URL}/login`;
+ if (!secret) return `${BASE_URL}${fallbackPath}`;
 
  const rawToken = randomUUID();
  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -2108,7 +2110,7 @@ async function createMagicSignInLink(email: string): Promise<string> {
  const hashedToken = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
 
  const databaseUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
- if (!databaseUrl) return `${BASE_URL}/login`;
+ if (!databaseUrl) return `${BASE_URL}${fallbackPath}`;
 
  const sql = neon(databaseUrl);
  // Clean up any existing tokens for this email, then insert
@@ -2118,13 +2120,11 @@ async function createMagicSignInLink(email: string): Promise<string> {
  VALUES (${email}, ${hashedToken}, ${expires.toISOString()})
  `;
 
- // callbackUrl goes through pilot-check so the via_access cookie gets set
- // Use a relative path so Auth.js doesn't reject it as cross-origin
- const callbackUrl = `/api/pilot-check?next=/`;
+ // Use a relative path so Auth.js doesn't reject it as cross-origin.
  const params = new URLSearchParams({ callbackUrl, token: rawToken, email });
  return `${BASE_URL}/api/auth/callback/resend?${params}`;
  } catch {
- return `${BASE_URL}/login`;
+ return `${BASE_URL}${fallbackPath}`;
  }
 }
 
@@ -2526,8 +2526,6 @@ export async function sendPopupThankYouEmail(
 export async function sendStoreSaleEmail({
  storeEmail,
  storeName,
- storeSlug,
- dashboardToken,
  productName,
  orderId,
  timestamp,
@@ -2535,7 +2533,6 @@ export async function sendStoreSaleEmail({
  storeEmail: string;
  storeName: string;
  storeSlug: string;
- dashboardToken: string;
  orderTotal: number;
  currency: string;
  productName?: string | null;
@@ -2544,7 +2541,11 @@ export async function sendStoreSaleEmail({
 }): Promise<void> {
  const resend = getResend();
 
- const dashboardUrl = `${BASE_URL}/for-stores/analytics?store=${storeSlug}&token=${dashboardToken}`;
+ // One-click magic sign-in that drops the owner into THEIR OWN store portal — resolveStoreSlug maps
+ // their session email → their store. Redirect straight to /store/dashboard (a SESSION_ONLY route, no
+ // pilot cookie needed); NOT through pilot-check, which would bounce a non-pilot store email to
+ // /pilot-pending. NOT the legacy tokened /for-stores/analytics mini-page.
+ const dashboardUrl = await createMagicSignInLink(storeEmail, "/store/dashboard", "/store/login");
  const formattedDate = new Date(timestamp).toLocaleDateString("en-US", {
  month: "long",
  day: "numeric",

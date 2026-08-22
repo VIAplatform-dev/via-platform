@@ -54,7 +54,6 @@ async function trySendStoreSaleEmail(
  storeEmail,
  storeName: storeConfig.name,
  storeSlug,
- dashboardToken: storeConfig.dashboardToken,
  orderTotal: Number(conv.order_total),
  currency: (conv.currency as string) || "USD",
  productName,

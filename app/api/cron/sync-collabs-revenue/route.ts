@@ -23,6 +23,12 @@ const collabsHandleOverrides: Record<string, string> = {
  "source 24": "source-twenty-four",
  "chill boutique consignment": "chill-boutique",
  "chillboutiqueconsignment": "chill-boutique",
+ // Collabs display names that drift from the VYA store name (extra/missing word) — without these the
+ // order records under an orphan slug no store owns, so it never shows in that store's analytics.
+ "sablier": "sablier-vintage",
+ "lamash store": "lamash",
+ "chomp chomp": "chomp-chomp-vintage",
+ "vintage girlfriend luxury": "vintage-girlfriend",
 };
 
 function resolveStoreSlug(brandName: string): string {
@@ -551,6 +557,121 @@ async function retroactivelyMatchCollabsConversions() {
 
 const COLLABS_GRAPHQL_URL = "https://api.collabs.shopify.com/creator/graphql";
 
+type ReconcileCommission = { commissionId: string; orderName: string | null; commissionUsd: number; earnedAt: string; orderTotalUsd: number | null };
+
+/**
+ * Fetch a partnership's recent commissions across ALL groups (incl. IN_HOLDING_PERIOD), stepping the
+ * query down full → partial → minimal on GraphQL error — same as the delta path, but windowed by date
+ * for the reconcile safety net (not by deltaOrders). Used to find orders the delta sync never recorded.
+ */
+async function fetchCommissionsForReconcile(partnershipId: string, cookie: string, csrfToken: string, sinceIso: string): Promise<ReconcileCommission[]> {
+ const groups = ["NEXT_PAYOUT", "IN_HOLDING_PERIOD", "PAYOUT_REQUESTED", "CREATOR_ACTION_REQUIRED", "PAID_OUT"];
+ const headers = {
+  "content-type": "application/json", "cookie": cookie, "x-csrf-token": csrfToken,
+  "origin": "https://collabs.shopify.com", "referer": "https://collabs.shopify.com/", "x-client-type": "web",
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+ };
+ const makeBody = (group: string, tier: "full" | "partial" | "minimal") => JSON.stringify({
+  query: `query { payouts { partnershipCommissions(group: ${group}, partnershipId: "${partnershipId}", first: 50) { nodes {
+   id commissionUsd { amount } earnedAt
+   ${tier === "full" ? "order { name total { amount currency } }" : ""}
+   ${tier === "partial" ? "order { name }" : ""}
+  } } } }`,
+ });
+ const since = new Date(sinceIso).getTime();
+ const out: ReconcileCommission[] = [];
+ for (const group of groups) {
+  try {
+   let tier: "full" | "partial" | "minimal" = "full";
+   let res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: makeBody(group, tier) });
+   let json = await res.json();
+   if (json?.errors && tier === "full") { tier = "partial"; res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: makeBody(group, tier) }); json = await res.json(); }
+   if (json?.errors && tier === "partial") { tier = "minimal"; res = await fetch(COLLABS_GRAPHQL_URL, { method: "POST", headers, body: makeBody(group, tier) }); json = await res.json(); }
+   if (json?.errors) continue;
+   const nodes = (json?.data?.payouts?.partnershipCommissions?.nodes ?? []) as Array<Record<string, unknown>>;
+   for (const n of nodes) {
+    if (!n.earnedAt || new Date(String(n.earnedAt)).getTime() < since) continue;
+    const order = n.order as { name?: string; total?: { amount: number; currency: string } } | undefined;
+    const total = order?.total ? convertCurrencyToUSD(order.total.amount, order.total.currency || "USD") : null;
+    out.push({
+     commissionId: String(n.id), orderName: order?.name ?? null,
+     commissionUsd: Number((n.commissionUsd as { amount?: number })?.amount ?? 0),
+     earnedAt: String(n.earnedAt), orderTotalUsd: total && total > 0 ? total : null,
+    });
+   }
+  } catch { continue; }
+ }
+ return out;
+}
+
+/**
+ * Safety net that runs after the delta sync: for any partnership where Collabs shows MORE orders than
+ * we've recorded, deep-fetch its commissions and insert the ones missing from conversions. Cheap up front
+ * (one grouped count; only gap>0 partnerships get a live fetch). Dedups by order_id AND by rounded order
+ * total within ±14 days of the commission date — so an order already recorded under a name-based id can't
+ * be re-inserted under a commission-based id at minimal tier (the West Village dupe). Never touches
+ * partnerships whose name doesn't resolve to a real VYA store (those need a slug override, not a synthetic row).
+ */
+async function reconcileMissingOrders(
+ partnerships: Array<{ id: string; name: string; totalOrders?: number; currency?: string; commissionRules?: CommissionRule[] }>,
+ cookie: string, csrfToken: string
+): Promise<{ reconciled: number; storesSwept: number }> {
+ const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+ if (!dbUrl) return { reconciled: 0, storesSwept: 0 };
+ const sql = neon(dbUrl);
+
+ const counts = (await sql`SELECT store_slug, count(*)::int AS n FROM conversions WHERE conversion_id LIKE 'collabs_%' GROUP BY store_slug`) as Array<{ store_slug: string; n: number }>;
+ const countBySlug = new Map(counts.map((c) => [c.store_slug, c.n]));
+ const sinceIso = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString();
+
+ let reconciled = 0;
+ let storesSwept = 0;
+ for (const p of partnerships) {
+  const slug = resolveStoreSlug(p.name);
+  const gap = (p.totalOrders ?? 0) - (countBySlug.get(slug) ?? 0);
+  if (gap <= 0) continue;                                   // we have >= Collabs — nothing missing
+  if (!stores.find((s) => s.slug === slug)) continue;       // unmatched partnership — needs a slug override, skip
+  storesSwept++;
+
+  const commissions = await fetchCommissionsForReconcile(p.id, cookie, csrfToken, sinceIso);
+  const byOrder = new Map<string, ReconcileCommission[]>();
+  for (const c of commissions) { const key = c.orderName || `commission-${c.commissionId}`; const g = byOrder.get(key) ?? []; g.push(c); byOrder.set(key, g); }
+  const rate = Number(p.commissionRules?.[0]?.value) || null; // % — back-calc a total when Collabs gives none
+
+  for (const [, items] of byOrder) {
+   const orderName = items[0].orderName;
+   const orderId = orderName ? `collabs-${slug}-${orderName.replace(/^#/, "")}` : `collabs-commission-${items[0].commissionId}`;
+   const commissionUsd = Math.round(items.reduce((s, i) => s + i.commissionUsd, 0) * 100) / 100;
+   const orderTotalUsd = items.find((i) => i.orderTotalUsd)?.orderTotalUsd ?? (rate ? Math.round((commissionUsd / (rate / 100)) * 100) / 100 : null);
+   if (!orderTotalUsd || orderTotalUsd <= 0) continue;      // no resolvable total — leave for a future run
+
+   const earnedMs = new Date(items[0].earnedAt).getTime();
+   const loIso = new Date(earnedMs - 14 * 24 * 60 * 60 * 1000).toISOString();
+   const hiIso = new Date(earnedMs + 14 * 24 * 60 * 60 * 1000).toISOString();
+   const dollars = Math.round(orderTotalUsd);
+   const dupe = ((await sql`
+    SELECT 1 FROM conversions
+    WHERE store_slug = ${slug}
+      AND (order_id = ${orderId}
+        OR (round(order_total::numeric) = ${dollars} AND timestamp BETWEEN ${loIso} AND ${hiIso}))
+    LIMIT 1
+   `) as unknown[]).length > 0;
+   if (dupe) continue;                                      // already recorded under any id — never double-count
+
+   const convId = `collabs_reconcile_${slug}_${earnedMs}`;
+   await sql`
+    INSERT INTO conversions (conversion_id, timestamp, order_id, order_total, currency, items, via_click_id, store_slug, store_name, matched, matched_click_data)
+    VALUES (${convId}, ${items[0].earnedAt}, ${orderId}, ${orderTotalUsd}, 'USD',
+     ${JSON.stringify([{ productName: "Item via Shopify Collabs", quantity: 1, price: orderTotalUsd }])},
+     null, ${slug}, ${p.name}, true, ${JSON.stringify({ source: "shopify-collabs", partnershipId: p.id, commissionUsd, dataSource: "reconcile", itemsSource: "commission-nodes" })})
+    ON CONFLICT (order_id, store_slug) DO NOTHING
+   `.catch(() => {});
+   reconciled++;
+  }
+ }
+ return { reconciled, storesSwept };
+}
+
 const PARTNERSHIPS_QUERY = `query PartnershipsAnalyticsQuery($first: Int, $last: Int, $after: String, $before: String) {
  partnershipsForPayouts(
  first: $first
@@ -754,7 +875,21 @@ export async function GET(request: Request) {
  // Retroactively match any older collabs conversions that still have no user_id
  const retroMatched = await retroactivelyMatchCollabsConversions();
 
+ // Safety net: sweep any orders Collabs shows but we never recorded (slipped past the delta pointer or
+ // stuck in a holdback loop). Only deep-fetches partnerships with a positive gap; dedups robustly so it
+ // can never double-count. Uses the freshest (rotated) CSRF token.
+ let reconciled = 0;
+ let reconcileStores = 0;
+ try {
+  const r = await reconcileMissingOrders(partnerships, cookie, activeCsrf);
+  reconciled = r.reconciled;
+  reconcileStores = r.storesSwept;
+  if (reconciled > 0) console.log(`[Sync Collabs Revenue] Reconcile swept ${reconciled} missing order(s) across ${reconcileStores} store(s)`);
+ } catch (err) {
+  console.error("[Sync Collabs Revenue] Reconcile pass failed:", err);
+ }
+
  const heldBack = holdbackIds.size;
- console.log(`[Sync Collabs Revenue] Synced ${partnerships.length} partnerships, recorded ${newOrdersRecorded} new orders, ${heldBack} held back (holding period), retro-matched ${retroMatched} existing orders${dbWriteFailed ? " (snapshot NOT advanced — DB errors)" : ""}`);
- return NextResponse.json({ ok: !dbWriteFailed, partnerships: partnerships.length, newOrdersRecorded, heldBack, retroMatched, syncedAt: now, snapshotAdvanced: !dbWriteFailed });
+ console.log(`[Sync Collabs Revenue] Synced ${partnerships.length} partnerships, recorded ${newOrdersRecorded} new orders, ${heldBack} held back (holding period), retro-matched ${retroMatched} existing orders, reconciled ${reconciled} missing${dbWriteFailed ? " (snapshot NOT advanced — DB errors)" : ""}`);
+ return NextResponse.json({ ok: !dbWriteFailed, partnerships: partnerships.length, newOrdersRecorded, heldBack, retroMatched, reconciled, reconcileStores, syncedAt: now, snapshotAdvanced: !dbWriteFailed });
 }

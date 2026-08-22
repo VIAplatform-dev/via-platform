@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
  storeEmail: "hana@vyaplatform.com",
  storeName: "Test Store",
  storeSlug: "test-store",
- dashboardToken: "test-token",
  orderTotal: 485,
  currency: "USD",
  productName: "Vintage Chanel Classic Flap Bag",
