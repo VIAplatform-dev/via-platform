@@ -347,6 +347,13 @@ async function saveCollabsConversions(
  if (held && held.totalUsd > 0) {
  orderTotal = held.totalUsd;
  if (held.items.length > 0) lineItems = held.items;
+ } else if (totalCommission > 0) {
+ // Held/holding-period order: THIS order's commission is already known (from the IN_HOLDING_PERIOD
+ // fetch) even though it hasn't cleared. Back-calc the order total from it (commission is already USD)
+ // so the conversion lands NOW instead of looping in the waiting period until Collabs finalizes.
+ // Deduped by order id, so the later confirmed sync can't double-count it.
+ orderTotal = calculateOrderTotal(totalCommission, commissionRules);
+ lineItems = [{ productName: firstItem.productName ?? (click?.product_name as string | null) ?? "Item via Shopify Collabs", quantity: 1, price: orderTotal }];
  } else if (deltaCommission > 0) {
  orderTotal = calculateOrderTotal(convertCurrencyToUSD(deltaCommission, currency) / Math.max(1, deltaOrders), commissionRules);
  lineItems = [{ productName: firstItem.productName ?? (click?.product_name as string | null) ?? "Item via Shopify Collabs", quantity: 1, price: orderTotal }];
