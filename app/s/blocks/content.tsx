@@ -6,10 +6,18 @@ import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 // ── announcement ────────────────────────────────────────────────────────────────────────────────
 // The thin strip across the very top. Three volumes: a solid accent bar (what shipped), a quiet
 // hairline rule, and a scrolling ticker for when there's more than one thing to say.
+// `vya-fill` is the contract that makes a section's resize handle drive THIS element's height (see
+// sectionOverrideCss). Without it the coloured band keeps its natural height and a resize just piles
+// empty page behind it — the seller drags for a taller bar and gets a short bar with a gap under it.
+// With it, the colour is the section, at whatever height they choose, text centred in the middle.
 function AnnouncementBar({ kit }: { kit: EditKit }) {
  const { ctx, p, txt } = kit;
  if (!p.text) return null;
- return <div {...txt(p.text, "text")} className="px-4 py-2.5 text-center text-[10px] uppercase tracking-[0.22em]" style={{ background: ctx.colors.accent, color: "#fff" }} />;
+ return (
+  <div className="vya-fill flex items-center justify-center" style={{ background: ctx.colors.accent, color: "#fff" }}>
+   <div {...txt(p.text, "text")} className="w-full px-4 py-2.5 text-center text-[10px] uppercase tracking-[0.22em]" />
+  </div>
+ );
 }
 
 // No fill: the message sits on the page's own ground between two hairlines. Reads as a note rather
@@ -17,7 +25,11 @@ function AnnouncementBar({ kit }: { kit: EditKit }) {
 function AnnouncementQuiet({ kit }: { kit: EditKit }) {
  const { ctx, p, txt } = kit;
  if (!p.text) return null;
- return <div {...txt(p.text, "text")} className="px-4 py-3 text-center text-[10px] uppercase tracking-[0.22em] opacity-70" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }} />;
+ return (
+  <div className="vya-fill flex items-center justify-center" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
+   <div {...txt(p.text, "text")} className="w-full px-4 py-3 text-center text-[10px] uppercase tracking-[0.22em] opacity-70" />
+  </div>
+ );
 }
 
 // A ticker. The message repeats across the strip and scrolls — for stores running several notices at
@@ -25,8 +37,11 @@ function AnnouncementQuiet({ kit }: { kit: EditKit }) {
 function AnnouncementTicker({ kit }: { kit: EditKit }) {
  const { ctx, p, txt } = kit;
  if (!p.text) return null;
+ // Centred in the editor, where the ticker is paused showing ONE copy — left-aligned it just reads as
+ // text that failed to load. Live it stays flush left: a strip that scrolls from a centred start
+ // would visibly jump the moment the animation begins.
  return (
-  <div className="vya-annticker overflow-hidden whitespace-nowrap py-2.5" style={{ background: ctx.colors.accent, color: "#fff" }}>
+  <div className={`vya-fill vya-annticker flex items-center overflow-hidden whitespace-nowrap py-2.5${ctx.edit ? " justify-center" : ""}`} style={{ background: ctx.colors.accent, color: "#fff" }}>
    <div className="vya-annticker-track inline-flex gap-16" style={ctx.edit ? { animation: "none" } : undefined}>
     {(ctx.edit ? [0] : [0, 1, 2, 3, 4, 5]).map((i) => (
      <span key={i} className="text-[10px] uppercase tracking-[0.22em]">
@@ -144,7 +159,7 @@ function MarqueeScroll({ kit }: { kit: EditKit }) {
  const sep = p.sep ?? "✦";
  const set = (i: number, v: string) => kit.setItems(S_MARQ, items.map((x, j) => (j === i ? { label: v } : x)));
  return (
-  <div className="vya-marquee overflow-hidden whitespace-nowrap py-5" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
+  <div className="vya-fill vya-marquee flex items-center overflow-hidden whitespace-nowrap py-5" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
    <div className="vya-marquee-track inline-flex gap-12" style={ctx.edit ? { animation: "none" } : undefined}>
     {(ctx.edit ? labels : [...labels, ...labels]).map((it, i) => (
      <span key={i} className="text-lg uppercase tracking-wide opacity-55">
@@ -166,7 +181,7 @@ function MarqueeStatic({ kit }: { kit: EditKit }) {
  const sep = p.sep ?? "✦";
  const set = (i: number, v: string) => kit.setItems(S_MARQ, items.map((x, j) => (j === i ? { label: v } : x)));
  return (
-  <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-6 py-6" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
+  <div className="vya-fill flex flex-wrap items-center justify-center gap-x-6 gap-y-2 px-6 py-6" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
    {items.map((t, i) => (
     <span key={i} className="flex items-center gap-6 text-[13px] uppercase tracking-[0.18em] opacity-60">
      <span {...kit.txtItem(t.label, (v) => set(i, v))} />
@@ -187,7 +202,7 @@ function MarqueeDisplay({ kit }: { kit: EditKit }) {
  const sep = p.sep ?? "—";
  const set = (i: number, v: string) => kit.setItems(S_MARQ, items.map((x, j) => (j === i ? { label: v } : x)));
  return (
-  <div className="vya-marquee overflow-hidden whitespace-nowrap py-10">
+  <div className="vya-fill vya-marquee flex items-center overflow-hidden whitespace-nowrap py-10">
    <div className="vya-marquee-track inline-flex gap-10" style={ctx.edit ? { animation: "none" } : undefined}>
     {(ctx.edit ? labels : [...labels, ...labels]).map((it, i) => (
      <span key={i} className="text-4xl uppercase tracking-tight opacity-15 @xl:text-6xl" style={{ fontFamily: ctx.head }}>

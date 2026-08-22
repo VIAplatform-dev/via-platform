@@ -3,6 +3,18 @@ import { getDb } from "./index";
 import { collections, itemCollections, items } from "./schema";
 import type { Collection, Item } from "./schema";
 
+// The `position` column is added lazily and idempotently rather than through a migration step, the
+// same way the other additive columns in this codebase are — so a deploy never lands code that reads
+// a column the database doesn't have yet. One statement, once per process.
+let orderReady: Promise<void> | null = null;
+function ensureOrderColumn(): Promise<void> {
+ orderReady ??= getDb()
+  .execute(dsql`ALTER TABLE item_collections ADD COLUMN IF NOT EXISTS position INTEGER`)
+  .then(() => undefined)
+  .catch(() => undefined); // a read-only replica or a race: ordering degrades, nothing breaks
+ return orderReady;
+}
+
 function slugify(s: string): string {
  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "collection";
 }
@@ -85,7 +97,15 @@ export async function addItemsToCollection(sellerId: string, title: string, item
  const db = getDb();
  const owned = await db.select({ id: items.id }).from(items).where(and(eq(items.sellerId, sellerId), inArray(items.id, ids)));
  const ownedIds = owned.map((r) => r.id);
- if (ownedIds.length) await db.insert(itemCollections).values(ownedIds.map((id) => ({ itemId: id, collectionId: col.id }))).onConflictDoNothing();
+ if (ownedIds.length) {
+ await ensureOrderColumn();
+ // Newly added pieces go to the END of the collection. Appending is the predictable behaviour —
+ // adding an item should never silently reshuffle what a storefront section is already showing.
+ const [{ next } = { next: 0 }] = (await db.execute(dsql`SELECT COALESCE(MAX(position) + 1, 0) AS next FROM item_collections WHERE collection_id = ${col.id}::uuid`)).rows as { next: number }[];
+ await db.insert(itemCollections)
+  .values(ownedIds.map((id, i) => ({ itemId: id, collectionId: col.id, position: Number(next) + i })))
+  .onConflictDoNothing();
+ }
  return col;
 }
 
@@ -145,12 +165,37 @@ export async function getItemCollectionIds(itemId: string): Promise<string[]> {
 
 /** Active items in a collection (sold/removed drop out automatically). */
 export async function listCollectionItems(collectionId: string, opts?: { manage?: boolean }): Promise<Item[]> {
+ await ensureOrderColumn();
  const db = getDb();
  const rows = await db
  .select()
  .from(items)
  .innerJoin(itemCollections, eq(itemCollections.itemId, items.id))
  // Storefront view shows only live items; the management view shows everything except removed.
- .where(and(eq(itemCollections.collectionId, collectionId), opts?.manage ? dsql`${items.status} <> 'removed'` : eq(items.status, "active")));
+ .where(and(eq(itemCollections.collectionId, collectionId), opts?.manage ? dsql`${items.status} <> 'removed'` : eq(items.status, "active")))
+ // The seller's chosen order first; anything never ordered falls in behind it, newest first. `id`
+ // last so the sequence is fully deterministic — a section showing "the first 5" must show the SAME
+ // five on every render, which is exactly what was not true before.
+ .orderBy(dsql`${itemCollections.position} ASC NULLS LAST`, dsql`${items.createdAt} DESC NULLS LAST`, items.id);
  return rows.map((r) => r.items);
+}
+
+/**
+ * Set the order of items within a collection. Takes the ids in the order the seller arranged them;
+ * anything in the collection but absent from the list keeps its place behind them. Ownership is
+ * checked by the caller (the collection is already scoped to the seller).
+ */
+export async function reorderCollectionItems(collectionId: string, orderedItemIds: string[]): Promise<void> {
+ await ensureOrderColumn();
+ const ids = [...new Set(orderedItemIds.filter(Boolean))];
+ if (!ids.length) return;
+ const db = getDb();
+ // One statement rather than a write per row: a 60-item collection shouldn't be 60 round trips.
+ // ::int on the index — a bare parameter arrives as text and Postgres won't coerce it into an
+ // integer column ("column position is of type integer but expression is of type text").
+ const cases = dsql.join(ids.map((id, i) => dsql`WHEN ${id}::uuid THEN ${i}::int`), dsql` `);
+ await db.execute(dsql`
+  UPDATE item_collections SET position = CASE item_id ${cases} END
+  WHERE collection_id = ${collectionId}::uuid AND item_id IN (${dsql.join(ids.map((id) => dsql`${id}::uuid`), dsql`, `)})
+ `);
 }

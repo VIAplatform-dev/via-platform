@@ -21,6 +21,8 @@
 //     there was no way back. Either all of them set colour or none can. Choosing a skin is now a
 //     complete look, and ⌘Z (or picking another palette) is the way back.
 
+import { STRIP_SECTION_TYPES } from "./storefront-blocks.ts";
+
 export type SkinId = "gallery" | "editorial" | "boutique" | "archive" | "statement";
 export type Skin = {
  id: SkinId;
@@ -86,8 +88,19 @@ const SKIN_CSS: Record<SkinId, string> = {
  `,
 };
 
+// Sections that are STRIPS, not content: a thin full-width band that belongs flush against whatever
+// sits above it. Every skin sets roomy `.vya-sec` padding, which is right for a hero or a text block
+// and wrong here — "Boutique" turned a 35px announcement bar into a 224px box with the message
+// floating in the middle of it, in the editor and on the live storefront alike. Emitted AFTER the
+// skin's own rules at equal specificity, so it wins the tie; a seller's explicit per-section padding
+// still beats both, because those carry !important.
+function stripReset(id: SkinId): string {
+ const sel = STRIP_SECTION_TYPES.map((t) => `.vya-skin-${id} .vya-${t}`).join(",");
+ return `${sel}{padding-top:0;padding-bottom:0}`;
+}
+
 // Collapse whitespace so the inlined <style> stays small on every storefront render.
 export function skinCss(id?: string): string {
  if (!isSkin(id)) return "";
- return SKIN_CSS[id].replace(/\s*\n\s*/g, "").trim();
+ return (SKIN_CSS[id].replace(/\s*\n\s*/g, "").trim() + stripReset(id));
 }
