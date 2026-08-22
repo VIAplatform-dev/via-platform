@@ -345,6 +345,31 @@ export function normalizeCategory(raw: string): string | null {
  return null; // don't show unrecognized product types
 }
 
+// ── Category families ───────────────────────────────────────────────────────────────────────────
+// The tier ABOVE normalizeCategory's buckets. A shopper looking for a skirt starts at "Clothing",
+// not at a flat list of thirteen buckets — so a storefront menu can read Clothing → Tops · Skirts
+// while the buckets underneath stay exactly the ones every other number on VYA is counted by.
+// Ordered as a shopper scans: what you wear, then what you carry, then the rest.
+export const CATEGORY_FAMILIES: { label: string; members: string[] }[] = [
+ { label: "Clothing", members: ["Tops", "Sweaters", "Dresses", "Skirts", "Pants", "Jeans", "Shorts", "Jumpsuits", "Coats & Jackets"] },
+ { label: "Bags", members: ["Bags"] },
+ { label: "Shoes", members: ["Shoes"] },
+ { label: "Accessories", members: ["Accessories"] },
+ { label: "Home", members: ["Home"] },
+];
+
+/** The family a canonical bucket belongs to ("Skirts" → "Clothing"). Null for anything unrecognized. */
+export function categoryFamily(bucket: string | null | undefined): string | null {
+ if (!bucket) return null;
+ return CATEGORY_FAMILIES.find((f) => f.members.includes(bucket))?.label ?? null;
+}
+
+/** The buckets a family covers ("clothing" → ["Tops", …]). Accepts a label or its slug. Empty if unknown. */
+export function familyMembers(labelOrSlug: string): string[] {
+ const k = labelOrSlug.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+ return CATEGORY_FAMILIES.find((f) => f.label.toLowerCase().replace(/[^a-z0-9]+/g, "-") === k)?.members ?? [];
+}
+
 export async function getTopCategories(limit = 50): Promise<CategoryStat[]> {
  const sql = neon(getDatabaseUrl());
  const rows = await sql`

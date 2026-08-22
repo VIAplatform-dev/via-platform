@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 // Editorial sections — blog (the journal row) and spotlight (one hero piece).
-import { FreeField, ImageSlot, emptyHint, type EditKit, type Item } from "./kit";
+import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.blog;
@@ -155,6 +155,10 @@ export function renderBlog(kit: EditKit, variant: string) {
  }
 }
 export function renderSpotlight(kit: EditKit, variant: string) {
+ // A Spotlight pointed at a collection features that collection's lead piece. Rebuilt here rather
+ // than inside each layout so all three behave identically — and so a new Spotlight layout gets it
+ // without having to know the feature exists.
+ kit = { ...kit, p: spotlightProps(kit.ctx, kit.p) };
  switch (variant) {
   case "overlay": return <SpotlightOverlay kit={kit} />;
   case "stacked": return <SpotlightStacked kit={kit} />;

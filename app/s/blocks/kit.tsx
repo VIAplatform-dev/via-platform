@@ -47,6 +47,9 @@ export type FreeEdit = {
 // widen (side handles) since their height flows from content.
 export const HANDLE_SET: Record<string, ResizeHandle[]> = {
  rect: ["nw", "ne", "sw", "se"], circle: ["nw", "ne", "sw", "se"], image: ["nw", "ne", "sw", "se"],
+ triangle: ["nw", "ne", "sw", "se"],
+ // A form sizes by width; its height comes from the fields inside it.
+ form: ["w", "e"],
  line: ["w", "e"],
  // Corners SCALE text/buttons (font size); side handles still adjust width only.
  button: ["nw", "ne", "sw", "se", "w", "e"], text: ["nw", "ne", "sw", "se", "w", "e"],
@@ -73,6 +76,9 @@ export type FaqDnd = {
 
 export type Ctx = {
  colors: Colors; head?: string; body?: string; products: BlockProduct[]; shopHref: string; fg: string;
+ // The store's own collections, each with the items the seller put in it. A product section can name
+ // one (props.collection) and show exactly those pieces instead of "the newest few".
+ collections?: { slug: string; title: string; products: BlockProduct[] }[];
  edit?: boolean;
  onEditField?: (id: string, key: string, value: string) => void;
  selectedId?: string | null;
@@ -87,6 +93,10 @@ export type Ctx = {
  // the canvas BE the upload control — click the empty frame, choose a photo, done — instead of
  // making the merchant hunt for the matching field in the side panel.
  onPickImage?: (apply: (url: string) => void) => void;
+ // Upload a dropped file and hand back its URL. Separate from onPickImage because dragging a photo
+ // straight onto the slot is the gesture people actually reach for — clicking, then hunting through
+ // a file dialog for something already sitting in a folder, is the slower path.
+ onDropImage?: (file: File, apply: (url: string) => void) => void;
 };
 
 // An image slot inside a layout (a column's photo, a split's picture, a category tile).
@@ -101,6 +111,11 @@ export function ImageSlot({ kit, src, alt, onPick, ratio = "aspect-[4/3]", class
 }) {
  const { ctx } = kit;
  const pick = ctx.onPickImage;
+ const drop = ctx.onDropImage;
+ // Drag feedback is applied to the node directly rather than held in state: this file is hook-free on
+ // purpose (see the header) so the very same components render the live storefront as a server
+ // component. A useState here would break that, and only the editor ever sees this highlight anyway.
+ const ring = "ring-2 ring-[#5D0F17]";
  if (!ctx.edit) {
   return src ? <div className={`${rounded} ${ratio} w-full overflow-hidden ${className}`} style={{ background: `${ctx.fg}0d` }}><img src={src} alt={alt || ""} loading="lazy" className="h-full w-full object-cover" /></div> : null;
  }
@@ -111,7 +126,16 @@ export function ImageSlot({ kit, src, alt, onPick, ratio = "aspect-[4/3]", class
    tabIndex={open ? 0 : undefined}
    onClick={open}
    onKeyDown={open ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); pick!(onPick); } } : undefined}
-   title={open ? (src ? "Click to replace this photo" : "Click to add a photo") : undefined}
+   onDragOver={drop ? (e) => { if (!e.dataTransfer.types.includes("Files")) return; e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add(...ring.split(" ")); } : undefined}
+   onDragLeave={drop ? (e) => e.currentTarget.classList.remove(...ring.split(" ")) : undefined}
+   onDrop={drop ? (e) => {
+    const f = e.dataTransfer.files?.[0];
+    e.currentTarget.classList.remove(...ring.split(" "));
+    if (!f) return;
+    e.preventDefault(); e.stopPropagation();
+    drop(f, onPick);
+   } : undefined}
+   title={open ? (src ? "Click or drop a photo to replace" : "Click or drop a photo") : undefined}
    className={`vya-slot group/slot relative ${rounded} ${ratio} w-full overflow-hidden ${open ? "cursor-pointer" : ""} ${className} ${src ? "" : "grid place-items-center border border-dashed"}`}
    style={src ? { background: `${ctx.fg}0d` } : { borderColor: `${ctx.fg}33`, background: `${ctx.fg}08` }}
   >
@@ -172,8 +196,38 @@ export function inlineHtml(v?: string): { __html: string } | null {
  if (!v || v.indexOf("<") === -1) return null;
  return { __html: v.replace(/<\s*script/gi, "").replace(/\son\w+\s*=/gi, " ").replace(/javascript:/gi, "") };
 }
+/**
+ * The single piece a Spotlight features, when it's been pointed at a collection. Returns the props
+ * with the collection's LEAD item filled into anything the seller left blank — so curating the
+ * collection is enough and they never retype a title, price, or photo they already entered once.
+ *
+ * A value the seller typed always wins. And with no collection chosen, nothing changes at all:
+ * every Spotlight saved before this keeps rendering exactly what it renders today.
+ */
+export function spotlightProps(ctx: Ctx, props: Record<string, string>): Record<string, string> {
+ const slug = (props.collection || "").trim();
+ if (!slug) return props;
+ const lead = ctx.collections?.find((c) => c.slug === slug)?.products[0];
+ if (!lead) return props;
+ return {
+  ...props,
+  heading: props.heading || lead.title,
+  price: props.price || lead.price,
+  image: props.image || lead.image,
+ };
+}
 // Decode HTML entities for plain-text rendering — so a stored "Shipping &amp; Returns" shows "Shipping &
 // Returns", not the literal entity. (Only used on the no-markup branch; React re-escapes on output, so safe.)
+// Which products a section shows. A named collection wins; an unnamed one (or a name that no longer
+// matches a collection — renamed, deleted) falls back to the store's newest items, because a shopper
+// must never meet a blank section on a live storefront.
+export function productsFor(ctx: Ctx, props: Record<string, string>): BlockProduct[] {
+ const slug = (props.collection || "").trim();
+ if (!slug) return ctx.products;
+ const hit = ctx.collections?.find((c) => c.slug === slug);
+ return hit && hit.products.length ? hit.products : ctx.products;
+}
+// Decode HTML entities for plain-text rendering — so a stored "Shipping &amp; Returns" shows "Shipping &
 export function decodeEntities(s: string): string {
  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&#0?38;/g, "&");
 }

@@ -13,6 +13,7 @@ import SandboxEmbed from "./SandboxEmbed";
 import { ff, makeKit, inlineHtml, decodeEntities, HANDLE_SET, HANDLE_POS, type Ctx, type Colors, type BlockProduct, type OverlayEdit, type FreeEdit, type FaqDnd } from "./blocks/kit";
 import { renderHero } from "./blocks/hero";
 import { renderFeatured } from "./blocks/featured";
+import ContactForm from "./ContactForm";
 import { renderCollections } from "./blocks/collections";
 import { renderTestimonials } from "./blocks/testimonials";
 import { renderColumns } from "./blocks/columns";
@@ -44,7 +45,7 @@ const OVL_TEXT_SIZE: Record<string, string> = { sm: "text-sm", md: "text-xl", lg
 const SEC_HANDLE_POS: [edge: "bottom", pos: string][] = [
  ["bottom", "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2"],
 ];
-function overlayContent(o: Overlay, shopHref: string, head: string | undefined, live: boolean, editText?: { editing: boolean; onText: (v: string) => void }) {
+function overlayContent(o: Overlay, shopHref: string, head: string | undefined, live: boolean, accent: string, storeSlug: string | undefined, editText?: { editing: boolean; onText: (v: string) => void }) {
  const p = o.props || {};
  if (o.kind === "button") {
  // Size: padding + type scale. "md" matches the pre-existing default exactly, so unset buttons don't shift.
@@ -87,6 +88,32 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  if (o.kind === "circle") {
  const bw = Number(p.border ?? 0);
  return <div className="h-full w-full" style={{ background: p.fill || "#1a1a1a", borderRadius: "50%", opacity: (Number(p.opacity ?? 100) / 100), border: bw > 0 ? `${bw}px solid ${p.borderColor || "#1a1a1a"}` : undefined, boxShadow: p.shadow ? SHADOW_CSS[p.shadow] : undefined }} />;
+ }
+ if (o.kind === "triangle") {
+ // clip-path rather than the old border trick, so it scales with the box and takes a real fill.
+ return <div className="h-full w-full" style={{ background: p.fill || "#1a1a1a", opacity: Number(p.opacity ?? 100) / 100, clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)" }} />;
+ }
+ if (o.kind === "form") {
+ // Live: a real, working form that posts to the store, labelled with its own purpose. In the editor
+ // it renders inert — the same swap the contact SECTION uses, so a seller never accidentally sends
+ // themselves a test message while arranging the page.
+ const title = p.title || "Enquire";
+ return (
+ <div className="w-full rounded-md p-4" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 10px 30px -12px rgba(0,0,0,0.35)" }}>
+  <p className="mb-1 text-[13px] font-semibold text-stone-800">{title}</p>
+  {p.note && <p className="mb-2 text-[11px] leading-snug text-stone-500">{p.note}</p>}
+  {live && storeSlug
+   ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} compact />
+   : (
+   <div className="flex flex-col gap-2 opacity-70">
+    <input disabled placeholder="Name" className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
+    <input disabled placeholder="Email" className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
+    <textarea disabled placeholder="Message" rows={3} className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
+    <span className="mt-0.5 self-start rounded px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white" style={{ background: accent }}>{p.cta || "Send"}</span>
+   </div>
+   )}
+ </div>
+ );
  }
  if (o.kind === "line") {
  // border-top (not a background block) so dashed/dotted styles are possible — solid looks identical to before.
@@ -356,6 +383,7 @@ export default function Blocks({
  colors,
  fonts,
  products,
+ collections,
  shopHref = "#",
  radius = "sharp",
  onSelect,
@@ -372,12 +400,16 @@ export default function Blocks({
  onFieldFocus,
  onResizeSectionStart,
  onPickImage,
+ onDropImage,
  skin,
 }: {
  blocks: Block[];
  colors: Colors;
  fonts: { heading?: string; body?: string };
  products: BlockProduct[];
+ // The store's collections with their items — lets a product section show a curated set instead of
+ // the newest few. Optional: a storefront that has never made a collection behaves exactly as before.
+ collections?: { slug: string; title: string; products: BlockProduct[] }[];
  shopHref?: string;
  // Global corner style ("shapes") — rounds product cards, images, and buttons store-wide.
  radius?: Radius;
@@ -420,6 +452,7 @@ export default function Blocks({
  onResizeSectionStart?: (blockId: string, edge: "top" | "bottom", e: React.PointerEvent) => void;
  // Editor-only: open the file picker for an image slot clicked directly on the canvas.
  onPickImage?: (apply: (url: string) => void) => void;
+ onDropImage?: (file: File, apply: (url: string) => void) => void;
 }) {
  const head = ff(fonts.heading);
  const body = ff(fonts.body);
@@ -445,7 +478,7 @@ export default function Blocks({
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
- const inner = blockBody(b, { colors, head, body, products, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage });
+ const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
  const editable = typeof onSelect === "function";
  // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
  // and element: e.g. `.vya-hero .vya-heading { ... }` or `.vya-b-<id> { ... }`.
@@ -549,7 +582,7 @@ export default function Blocks({
  onDragStart={editable ? (e) => e.preventDefault() : undefined}
  onPointerDown={editable && overlayEdit && !editing ? (e) => { e.stopPropagation(); overlayEdit.onDragStart(b.id, o.id, e); } : undefined}
  >
- {overlayContent(o, shopHref, head, !editable, editing && overlayEdit ? { editing: true, onText: (v) => overlayEdit.onText(b.id, o.id, v) } : undefined)}
+ {overlayContent(o, shopHref, head, !editable, colors.accent, storeSlug, editing && overlayEdit ? { editing: true, onText: (v) => overlayEdit.onText(b.id, o.id, v) } : undefined)}
  {sel && !editing && overlayEdit ? (HANDLE_SET[o.kind] || []).map((hd) => (
  <span
  key={hd}

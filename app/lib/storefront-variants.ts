@@ -18,8 +18,10 @@ import type { BlockType, BlockField } from "./storefront-blocks";
 import type { ItemSchemaName } from "./storefront-items";
 
 // Picker groupings — so ~75 layouts read as an organized library instead of a wall of cards.
-export type SectionCategory = "Hero" | "Products" | "Collections" | "Editorial" | "Social Proof" | "Content" | "Media" | "Marketing" | "Utility";
-export const SECTION_CATEGORIES: SectionCategory[] = ["Hero", "Products", "Collections", "Editorial", "Social Proof", "Content", "Media", "Marketing", "Utility"];
+export type SectionCategory = "Hero" | "Products" | "Collections" | "Editorial" | "Social Proof" | "Content" | "Media" | "Marketing" | "Miscellaneous";
+// Display order in the picker. "Miscellaneous" last — it is the catch-all, so it should read as the
+// place you look when nothing else fits, not as a category with a theme of its own.
+export const SECTION_CATEGORIES: SectionCategory[] = ["Hero", "Products", "Collections", "Editorial", "Social Proof", "Content", "Media", "Marketing", "Miscellaneous"];
 
 // What editing affordances a variant exposes. The editor reads this instead of special-casing
 // layouts, so a new variant gets the right controls by declaring them rather than by wiring them.
@@ -52,9 +54,13 @@ export type VariantGroup = { type: BlockType; category: SectionCategory; variant
 // Fields shared by several hero layouts.
 const HERO_BASE_FREE = ["heading", "subtext", "cta"] as const;
 
+// Shared by every OPEN product layout. Capped at MAX_FEATURED so pointing a section at a 200-piece
+// collection can never dump 200 products onto a homepage — the Shop page is where "everything" lives.
+const HOW_MANY: BlockField = { key: "limit", label: "How many to show", kind: "choice", options: [{ value: "4", label: "4" }, { value: "8", label: "8" }, { value: "12", label: "12" }, { value: "16", label: "16" }, { value: "20", label: "20 (max)" }] };
+
 export const VARIANTS: VariantGroup[] = [
  {
-  type: "announcement", category: "Utility",
+  type: "announcement", category: "Miscellaneous",
   variants: [
    { id: "bar", label: "Bar", description: "A thin colour bar across the very top.", supports: { free: [] } },
    { id: "quiet", label: "Hairline", description: "No fill — the message between two rules, on the page's own ground.", supports: { free: [] } },
@@ -83,11 +89,20 @@ export const VARIANTS: VariantGroup[] = [
  {
   type: "featured", category: "Products",
   variants: [
-   { id: "grid", label: "Grid", description: "An even grid of your products.", supports: { free: ["heading"], resize: ["cols", "gap"] } },
-   { id: "carousel", label: "Carousel", description: "A swipeable rail that bleeds off the edge — fits more pieces without lengthening the page.", supports: { free: ["heading"], resize: ["cardWidth", "gap"] } },
+   // How many pieces a section shows belongs to the LAYOUT, not to the section type. An open layout
+   // (grid, carousel, archive list) can hold any number, so it offers the choice. A composed layout
+   // (editorial's lead-plus-stack, mosaic's alternating anchors) is built around a fixed arrangement
+   // — offering a count there would be a control that can't honestly change anything.
+   { id: "grid", label: "Grid", description: "An even grid of your products.", supports: { free: ["heading"], resize: ["cols", "gap"] },
+    fields: [
+     HOW_MANY,
+     // Only the grid has rows to divide, so only the grid offers a per-row control.
+     { key: "cols", label: "Per row", kind: "choice", options: [{ value: "", label: "Auto — fit the number of pieces" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }] },
+    ] },
+   { id: "carousel", label: "Carousel", description: "A swipeable rail that bleeds off the edge — fits more pieces without lengthening the page.", supports: { free: ["heading"], resize: ["cardWidth", "gap"] }, fields: [HOW_MANY] },
    { id: "editorial", label: "Editorial", description: "One piece leads at full height, the rest stacked beside it. Reads as a point of view.", supports: { free: ["heading"] } },
    { id: "mosaic", label: "Mosaic", description: "A deliberately uneven grid — large pieces anchoring alternating corners.", supports: { free: ["heading"], resize: ["gap"] } },
-   { id: "list", label: "Archive list", description: "One piece per row: small photo, title, price. Dense and scannable.", supports: { free: ["heading"] } },
+   { id: "list", label: "Archive list", description: "One piece per row: small photo, title, price. Dense and scannable.", supports: { free: ["heading"] }, fields: [HOW_MANY] },
   ],
  },
  {
@@ -170,7 +185,7 @@ export const VARIANTS: VariantGroup[] = [
   ],
  },
  {
-  type: "marquee", category: "Utility",
+  type: "marquee", category: "Miscellaneous",
   variants: [
    { id: "scroll", label: "Scrolling strip", description: "Words that scroll continuously across the page.", supports: { items: "marquee" } },
    { id: "static", label: "Static row", description: "The names centred in a row, no motion — easier to actually read.", supports: { items: "marquee" } },
@@ -211,7 +226,7 @@ export const VARIANTS: VariantGroup[] = [
   ],
  },
  {
-  type: "contact", category: "Utility",
+  type: "contact", category: "Miscellaneous",
   variants: [
    { id: "form", label: "Form", description: "A name / email / message form with an optional contact address.", supports: { free: ["heading", "subtext", "cta"] } },
    { id: "split", label: "Split", description: "Copy and contact details one side, the form the other.", supports: { free: ["heading", "subtext", "cta"] } },
@@ -219,7 +234,7 @@ export const VARIANTS: VariantGroup[] = [
   ],
  },
  {
-  type: "faq", category: "Utility",
+  type: "faq", category: "Miscellaneous",
   variants: [
    { id: "accordion", label: "Accordion", description: "Expandable question-and-answer rows — click to open, one column.", supports: { free: ["heading"] } },
    { id: "two-column", label: "Two column", description: "The same accordion split down the middle. For a list long enough to read as a wall.", supports: { free: ["heading"] } },
@@ -230,7 +245,7 @@ export const VARIANTS: VariantGroup[] = [
   ],
  },
  {
-  type: "custom", category: "Utility",
+  type: "custom", category: "Miscellaneous",
   variants: [
    { id: "html", label: "Custom", description: "Your own HTML, CSS, and (sandboxed) JavaScript.", supports: {} },
   ],
@@ -246,7 +261,7 @@ export function variantsFor(type: string): VariantDef[] {
  return BY_TYPE.get(type)?.variants ?? [];
 }
 export function categoryFor(type: string): SectionCategory {
- return BY_TYPE.get(type)?.category ?? "Utility";
+ return BY_TYPE.get(type)?.category ?? "Miscellaneous";
 }
 // The id a block with no explicit variant renders as — the layout that shipped before variants existed.
 export function defaultVariantId(type: string): string {

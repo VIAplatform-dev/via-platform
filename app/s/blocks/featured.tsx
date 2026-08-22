@@ -5,7 +5,15 @@
 // varies between these layouts is composition: an even grid, a swipeable rail, one lead piece with
 // a supporting stack, an asymmetric mosaic, or a dense archive list. The section's own heading and
 // eyebrow are editable in all five.
-import { FreeField, type EditKit, type BlockProduct } from "./kit";
+import { FreeField, productsFor, type EditKit, type BlockProduct } from "./kit";
+import { featuredCount, autoColumns } from "@/app/lib/storefront-blocks";
+
+// Composed layouts are built around an exact arrangement, so their capacity is a property of the
+// design rather than something a merchant sets. Named here so the number and the reason live together.
+const EDITORIAL_PIECES = 5; // one lead + a stack of four
+const MOSAIC_PIECES = 6;    // three alternating large/small pairs
+
+
 
 // The shared product card. Every layout draws its products with this, so hover behaviour, image
 // radius (.vya-round), and the title/price treatment stay identical across the family — only the
@@ -42,9 +50,12 @@ const Empty = () => <p className="py-16 text-center text-[11px] uppercase tracki
 // original exactly (2 up on a phone, 3 at @lg, 4 at @2xl).
 function FeaturedGrid({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- const { products, shopHref, colors, fg } = ctx;
- const shown = products.slice(0, Number(p.limit) || 8);
- const cols = p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "3" ? "@lg:grid-cols-3" : p.cols === "5" ? "@lg:grid-cols-4 @2xl:grid-cols-5" : "@lg:grid-cols-3 @2xl:grid-cols-4";
+ const { shopHref, colors, fg } = ctx;
+ const products = productsFor(ctx, p);
+ const shown = products.slice(0, featuredCount(p.limit, 8));
+ // Unset = "Auto": fit the row length to how many pieces there actually are.
+ const c = p.cols || String(autoColumns(shown.length));
+ const cols = c === "1" ? "@lg:grid-cols-1" : c === "2" ? "@lg:grid-cols-2" : c === "3" ? "@lg:grid-cols-3" : c === "5" ? "@lg:grid-cols-4 @2xl:grid-cols-5" : "@lg:grid-cols-4";
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
    <Head kit={kit} />
@@ -64,8 +75,9 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
 // which is what signals "there's more this way".
 function FeaturedCarousel({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- const { products, shopHref, colors, fg } = ctx;
- const shown = products.slice(0, Number(p.limit) || 12);
+ const { shopHref, colors, fg } = ctx;
+ const products = productsFor(ctx, p);
+ const shown = products.slice(0, featuredCount(p.limit, 12));
  const w = Math.min(60, Math.max(18, Number(p.cardW) || 26));
  return (
   <section className="vya-free-canvas relative py-20 @xl:py-24">
@@ -90,8 +102,11 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
 // "edit" in the first place.
 function FeaturedEditorial({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- const { products, shopHref, colors, fg } = ctx;
- const shown = products.slice(0, Number(p.limit) || 5);
+ const { shopHref, colors, fg } = ctx;
+ const products = productsFor(ctx, p);
+ // Composed layout: one lead piece plus a fixed stack. The count IS the composition, so a stale
+ // `limit` left behind by a previous layout is deliberately ignored rather than honoured.
+ const shown = products.slice(0, EDITORIAL_PIECES);
  if (!shown.length) return <section className="mx-auto max-w-6xl px-5 py-20"><Head kit={kit} /><Empty /></section>;
  const [lead, ...rest] = shown;
  return (
@@ -112,8 +127,10 @@ function FeaturedEditorial({ kit }: { kit: EditKit }) {
 // irregularity is the point — it reads as curation rather than as a catalogue page.
 function FeaturedMosaic({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- const { products, shopHref, colors, fg } = ctx;
- const shown = products.slice(0, Number(p.limit) || 6);
+ const { shopHref, colors, fg } = ctx;
+ const products = productsFor(ctx, p);
+ // Composed layout: alternating large/small anchors. Same reasoning as editorial above.
+ const shown = products.slice(0, MOSAIC_PIECES);
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
    <Head kit={kit} />
@@ -140,8 +157,9 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
 // dense, scannable, and the right answer for a store whose pieces are better read than browsed.
 function FeaturedList({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- const { products, shopHref, colors, fg } = ctx;
- const shown = products.slice(0, Number(p.limit) || 10);
+ const { shopHref, colors, fg } = ctx;
+ const products = productsFor(ctx, p);
+ const shown = products.slice(0, featuredCount(p.limit, 10));
  return (
   <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-20 @xl:py-24">
    <Head kit={kit} align="text-left" className="mb-8" />

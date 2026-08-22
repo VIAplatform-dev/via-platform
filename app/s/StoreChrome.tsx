@@ -52,22 +52,71 @@ function NavItem({ n, onNav, className, style }: { n: ChromeNav; onNav?: (i: Chr
  return <a href={n.href || "#"} className={className} style={css}>{n.label}</a>;
 }
 
-export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, announcement, search, onNav }: ChromeProps) {
+/**
+ * Header layouts. The same three parts — brand, nav, utilities — arranged the ways real storefronts
+ * arrange them. This is the axis Shopify and Squarespace both expose, and it is the difference
+ * between a store that looks like a template and one that looks like itself.
+ *   inline  — brand left, nav centre, utilities right (what every VYA storefront has today)
+ *   center  — brand centred with the nav on the row beneath it; the classic boutique masthead
+ *   split   — brand centred with the nav divided either side of it
+ *   stacked — brand left with the nav on its own row below, left-aligned
+ */
+export type HeaderLayout = "inline" | "center" | "split" | "stacked";
+export const HEADER_LAYOUTS: { id: HeaderLayout; label: string; description: string }[] = [
+ { id: "inline", label: "Inline", description: "Brand left, menu centre, search right." },
+ { id: "center", label: "Centred", description: "Brand centred, menu on the row below." },
+ { id: "split", label: "Split menu", description: "Brand centred with the menu either side of it." },
+ { id: "stacked", label: "Stacked", description: "Brand left, menu on its own row beneath." },
+];
+
+export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, announcement, search, onNav, layout = "inline" }: ChromeProps & { layout?: HeaderLayout }) {
+ const brand = logo
+  ? <img src={logo} alt={storeName} className="h-7 w-auto shrink-0 object-contain" draggable={false} />
+  : <NavItem n={{ ...(nav.find((n) => /^home/i.test(n.label)) || {}), label: storeName }} onNav={onNav} className="shrink-0 text-lg tracking-[0.12em]" style={headingFontFamily} />;
+ const links = (items: ChromeNav[], className = "") => (
+  <div className={`hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex ${className}`}>
+   {items.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className={`hover:opacity-100 ${n.active ? "opacity-100 underline underline-offset-4" : ""}`} />)}
+  </div>
+ );
+ const utils = <div className="flex shrink-0 items-center gap-4 opacity-70">{search}</div>;
+ const bar = "sticky top-0 z-40 border-b border-black/[0.07] px-6 sm:px-8" as const;
+ const style = { background: colors.bg, color: colors.text };
+ // Split puts half the menu on each side of the brand. An odd number leans left, which reads as
+ // deliberate; centring the extra item would make the brand sit visibly off-centre.
+ const half = Math.ceil(nav.length / 2);
  return (
  <header>
  {announcement && (
  <div className="px-4 py-2 text-center text-[11px] tracking-wide text-white" style={{ background: colors.accent }}>{announcement}</div>
  )}
- <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 border-b border-black/[0.07] px-6 sm:px-8 py-5" style={{ background: colors.bg, color: colors.text }}>
- {logo
- ? <img src={logo} alt={storeName} className="h-7 w-auto shrink-0 object-contain" draggable={false} />
- : <NavItem n={{ ...(nav.find((n) => /^home/i.test(n.label)) || {}), label: storeName }} onNav={onNav} className="shrink-0 text-lg tracking-[0.12em]" style={headingFontFamily} />}
- <div className="hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex">
- {nav.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className={`hover:opacity-100 ${n.active ? "opacity-100 underline underline-offset-4" : ""}`} />)}
- </div>
- <div className="flex shrink-0 items-center gap-4 opacity-70">{search}</div>
+ {layout === "center" ? (
+ <nav className={`${bar} py-5`} style={style}>
+  <div className="flex items-center justify-between gap-4"><span className="w-8 shrink-0" />{brand}{utils}</div>
+  {nav.length > 0 && <div className="mt-3 flex justify-center">{links(nav)}</div>}
  </nav>
- {/* Mobile nav row */}
+ ) : layout === "split" ? (
+ <nav className={`${bar} flex items-center gap-6 py-5`} style={style}>
+  {/* Menu halves pushed to the outer edges; the spacer mirrors the search icon so the brand
+      lands dead centre rather than nudged left by it. */}
+  <span className="w-8 shrink-0" />
+  {links(nav.slice(0, half), "flex-1 justify-start")}
+  {brand}
+  {links(nav.slice(half), "flex-1 justify-end")}
+  {utils}
+ </nav>
+ ) : layout === "stacked" ? (
+ <nav className={`${bar} py-5`} style={style}>
+  <div className="flex items-center justify-between gap-4">{brand}{utils}</div>
+  {nav.length > 0 && <div className="mt-3">{links(nav)}</div>}
+ </nav>
+ ) : (
+ <nav className={`${bar} flex items-center justify-between gap-4 py-5`} style={style}>
+  {brand}
+  {links(nav)}
+  {utils}
+ </nav>
+ )}
+ {/* Mobile nav row — one row of links under the brand, whatever the desktop layout does. */}
  {nav.length > 0 && (
  <div className="flex items-center gap-5 overflow-x-auto border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden" style={{ background: colors.bg }}>
  {nav.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className="whitespace-nowrap" />)}

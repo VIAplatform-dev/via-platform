@@ -94,7 +94,10 @@ export function backgroundEmbedSrc(rawUrl: string): string | null {
 // section and positioned in PERCENT of that section's box (0–100), so it scales with the layout instead
 // of breaking at a fixed pixel. On narrow screens the overlay layer auto-stacks below the section content
 // (see Blocks) so nothing overlaps or runs off a phone.
-export type OverlayKind = "button" | "text" | "image" | "rect" | "circle" | "line";
+// `triangle` is a shape like rect/circle. `form` is a real, working form the seller can drop anywhere
+// and label for its own purpose — wholesale enquiries, stylist bookings, sourcing requests — not only
+// the "get in touch" the contact SECTION already covers.
+export type OverlayKind = "button" | "text" | "image" | "rect" | "circle" | "line" | "triangle" | "form";
 export type Overlay = {
  id: string;
  kind: OverlayKind;
@@ -109,13 +112,63 @@ export type Overlay = {
 // storefront saved to date keeps rendering exactly as it did. `style` stays the separate "skin" axis.
 export type Block = { id: string; type: BlockType; variant?: string; props: Record<string, string>; style?: BlockStyle; overlays?: Overlay[] };
 
-export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" | "datetime" };
+// STRIPS: sections that are a thin full-width band rather than a block of content. They behave
+// differently in two places — skins must not give them roomy section padding, and the resize handle
+// must let them go genuinely thin (a hero's 80px floor is taller than a whole announcement bar).
+// Kept here, next to BlockType, so the renderer, the skins, and the editor can't drift apart on it.
+export const STRIP_SECTION_TYPES = ["announcement", "marquee"] as const;
+export const isStripSection = (t?: string) => STRIP_SECTION_TYPES.includes(t as (typeof STRIP_SECTION_TYPES)[number]);
+/** How short a section may be dragged. Strips hug a line of text; everything else needs room to read. */
+/**
+ * The ceiling on how many products one section may show. A collection can hold hundreds of pieces;
+ * a section pointed at one must still read as a section, not the whole catalogue on the homepage —
+ * that's what the Shop page is for. Enforced in the renderer, not just the picker, so a hand-edited
+ * prop or a value saved before the cap existed is clamped too.
+ */
+export const MAX_FEATURED = 20;
+export const featuredCount = (raw: string | undefined, fallback: number) =>
+ Math.max(1, Math.min(MAX_FEATURED, Number(raw) || fallback));
+
+/**
+ * How many columns a product grid should use for a given number of pieces, when the seller hasn't
+ * chosen. A collection of five in a fixed four-across grid leaves one piece stranded on its own row,
+ * which reads as a mistake rather than a layout — and the seller can't fix it without understanding
+ * why. So: prefer a row length that divides evenly, and treat "one item alone on the last row" as the
+ * worst outcome (that's the case that looks broken), not merely as a gap.
+ */
+export function autoColumns(count: number): number {
+ if (count <= 3) return Math.max(1, count); // one, two or three pieces sit on a single row
+ let best = 4, bestScore = Infinity;
+ for (const c of [4, 3, 5, 2]) { // preference order breaks ties toward a conventional grid
+  const remainder = count % c;
+  const score = remainder === 0 ? 0 : remainder === 1 ? 100 : c - remainder;
+  if (score < bestScore) { bestScore = score; best = c; }
+ }
+ return best;
+}
+
+export const minSectionHeight = (t?: string) => (isStripSection(t) ? 24 : 80);
+/**
+ * How tall a section may be dragged. Strips are capped: past ~64px an announcement stops reading as
+ * a notice above the header and starts reading as a coloured section the shop is hiding behind. The
+ * cap is the guardrail that keeps the "thin bar across the top" promise no matter how far someone
+ * drags. Everything else keeps the old ceiling.
+ */
+export const maxSectionHeight = (t?: string) => (isStripSection(t) ? 64 : 2000);
+
+// `collection` renders a picker of the store's own collections. It's the seam that makes a product
+// section stop meaning "the newest few items" and start meaning "whatever the seller put in THIS
+// collection" — so they curate in Inventory once and the storefront follows.
+// `choice` renders a fixed dropdown (its own options); `collection` renders a picker of the store's
+// own collections. Both exist so a section can be configured without free-typing a magic value.
+export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" | "datetime" | "collection" | "choice"; options?: { value: string; label: string }[] };
 export type BlockDef = { type: BlockType; label: string; description: string; fields: BlockField[]; defaults: Record<string, string> };
 
 export const BLOCK_TYPES: BlockDef[] = [
  { type: "announcement", label: "Announcement bar", description: "A thin bar across the very top.", fields: [{ key: "text", label: "Text", kind: "text" }], defaults: { text: "Free shipping on orders over $150" } },
  { type: "hero", label: "Hero banner", description: "A large banner with a heading and button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Background image", kind: "image" }], defaults: { heading: "New Arrivals", subtext: "Curated vintage, one-of-one.", cta: "Shop now", image: "" } },
- { type: "featured", label: "Featured products", description: "A grid of your products.", fields: [{ key: "heading", label: "Heading", kind: "text" }], defaults: { heading: "The Edit" } },
+ { type: "featured", label: "Featured products", description: "A grid of your products.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "collection", label: "Products shown", kind: "collection" },
+  ], defaults: { heading: "The Edit", collection: "" } },
  // Shop-by-category tiles — the single most common section on real vintage/fashion stores. Gets a shopper
  // to what they want in one click; each tile deep-links a category, which is strong internal-linking SEO.
  { type: "collections", label: "Shop by category", description: "A grid of category/collection tiles — the fastest way for shoppers to find what they want.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Tiles — one per line, 'Label | image URL' (image optional)", kind: "textarea" }], defaults: { heading: "Shop by category", items: "Dresses\nOuterwear\nHandbags\nShoes\nDenim\nAccessories", cols: "3" } },
@@ -134,7 +187,7 @@ export const BLOCK_TYPES: BlockDef[] = [
  { type: "gallery", label: "Gallery", description: "A row of photos from your library.", fields: [{ key: "images", label: "Image URLs (one per line)", kind: "textarea" }], defaults: { images: "" } },
  { type: "marquee", label: "Marquee — scrolling strip", description: "A moving strip of words that scrolls across — the designers or brands you carry, or a tagline.", fields: [{ key: "items", label: "Items (one per line or comma-separated)", kind: "textarea" }, { key: "sep", label: "Separator between items (e.g. ✦ • — /, or leave blank for none)", kind: "text" }], defaults: { items: "", sep: "✦" } },
  { type: "statement", label: "Statement — big quote", description: "One large statement or quote. Best given a dark or accent background for drama.", fields: [{ key: "quote", label: "Quote", kind: "textarea" }, { key: "attribution", label: "Attribution", kind: "text" }], defaults: { quote: "When it’s gone, it’s gone.", attribution: "" } },
- { type: "spotlight", label: "Spotlight — one piece", description: "Feature a single hero product, big, with its details and a button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Details", kind: "textarea" }, { key: "price", label: "Price", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }], defaults: { heading: "Piece of the week", subtext: "", price: "", cta: "Shop this piece", image: "" } },
+ { type: "spotlight", label: "Spotlight — one piece", description: "Feature a single hero product, big, with its details and a button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Details", kind: "textarea" }, { key: "price", label: "Price", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }, { key: "collection", label: "Products shown", kind: "collection" }], defaults: { heading: "Piece of the week", subtext: "", price: "", cta: "Shop this piece", image: "", collection: "" } },
  { type: "video", label: "Video", description: "Embed a video — paste a YouTube, Vimeo, or .mp4 link.", fields: [{ key: "url", label: "Video URL (YouTube, Vimeo, or .mp4)", kind: "text" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { url: "", caption: "" } },
  { type: "newsletter", label: "Newsletter signup", description: "Collect emails from your visitors.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }], defaults: { heading: "Join the list", subtext: "First access to new arrivals.", cta: "Sign up" } },
  // A real contact form (name · email · message) that emails the store, plus an optional contact email.
@@ -185,6 +238,9 @@ const OVERLAY_DEFAULTS: Record<OverlayKind, Record<string, string>> = {
  rect: { fill: "#1a1a1a", radius: "10", opacity: "100" },
  circle: { fill: "#1a1a1a", radius: "0", opacity: "100" },
  line: { color: "#1a1a1a", thickness: "2" },
+ triangle: { fill: "#1a1a1a", opacity: "100" },
+ // `topic` rides along to the store with the message, so a seller can tell which form it came from.
+ form: { title: "Enquire", topic: "Enquiry", cta: "Send", note: "" },
 };
 // Starting box (in % of the section) per kind — shapes/images get a real size so they render
 // immediately; text/buttons stay auto-sized until the seller drags a resize handle.
@@ -193,6 +249,8 @@ const OVERLAY_START: Partial<Record<OverlayKind, { w?: number; h?: number }>> = 
  rect: { w: 26, h: 16 },
  circle: { w: 16, h: 16 },
  line: { w: 30 },
+ triangle: { w: 18, h: 16 },
+ form: { w: 34 },
 };
 export function makeOverlay(kind: OverlayKind): Overlay {
  seq += 1;
@@ -209,12 +267,14 @@ const safeHref = (v: unknown): string => {
  if (!s) return "";
  return /^(https?:\/\/|mailto:|\/)/i.test(s) ? s : "";
 };
-const safeSrc = (v: unknown): string => {
+// Exported: the design endpoint reuses it so a stored logo can only ever be a real URL or an app
+// path, never something like a javascript: or data: string typed into a field.
+export const safeSrc = (v: unknown): string => {
  const s = String(v ?? "").trim().slice(0, 800);
  return /^(https?:\/\/|\/)/i.test(s) ? s : "";
 };
 
-const OVERLAY_KINDS: OverlayKind[] = ["button", "text", "image", "rect", "circle", "line"];
+const OVERLAY_KINDS: OverlayKind[] = ["button", "text", "image", "rect", "circle", "line", "triangle", "form"];
 // A font-family name — letters/numbers/spaces/hyphens only (matches the storefront font list; no CSS injection).
 const safeFont = (v: unknown) => String(v ?? "").slice(0, 50).replace(/[^\w \-]/g, "").trim();
 const hex6 = (v: unknown, dflt: string) => (/^#[0-9a-fA-F]{6}$/.test(String(v ?? "")) ? String(v) : dflt);
@@ -249,6 +309,16 @@ export function sanitizeOverlays(input: unknown): Overlay[] {
  p.fill = hex6(o.props?.fill, "#1a1a1a");
  p.radius = intStr(o.props?.radius, 0, 400, o.kind === "rect" ? 10 : 0);
  p.opacity = intStr(o.props?.opacity, 0, 100, 100);
+ } else if (o.kind === "triangle") {
+ p.fill = hex6(o.props?.fill, "#1a1a1a");
+ p.opacity = intStr(o.props?.opacity, 0, 100, 100);
+ } else if (o.kind === "form") {
+ // Plain text only. These strings become a form a shopper fills in and a message the seller
+ // reads, so nothing here may carry markup or a URL.
+ p.title = String(o.props?.title ?? "").slice(0, 80);
+ p.topic = String(o.props?.topic ?? "").slice(0, 60);
+ p.cta = String(o.props?.cta ?? "Send").slice(0, 40);
+ p.note = String(o.props?.note ?? "").slice(0, 200);
  } else if (o.kind === "line") {
  p.color = hex6(o.props?.color, "#1a1a1a");
  p.thickness = intStr(o.props?.thickness, 1, 40, 2);
