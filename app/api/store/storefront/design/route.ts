@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, normalizeHandle } from "@/app/lib/storefront-db";
 import { STOREFRONT_TEMPLATES, getTemplate, HEADING_FONTS, BODY_FONTS } from "@/app/lib/storefront-templates";
-import { BLOCK_TYPES, sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
+import { BLOCK_TYPES, sanitizeBlocks, sanitizePages, safeSrc } from "@/app/lib/storefront-blocks";
+import { isSkin } from "@/app/lib/storefront-skins";
 import { getListingsByStore } from "@/app/lib/listings-db";
+import { loadStoreProducts } from "@/app/lib/loadStoreProducts";
+import { formatPrice } from "@/app/lib/formatPrice";
 import { defaultStarterTheme } from "@/app/lib/storefront-default";
 import { stores } from "@/app/lib/stores";
+import { getSellerBySlug } from "@/app/lib/db/sellers";
+import { listCollections, listCollectionItems } from "@/app/lib/db/collections";
 import { importStoreBlocks } from "@/app/lib/store-import";
 import { getCaptureOrigin } from "@/app/lib/site-capture-db";
 import type { StorefrontTheme } from "@/app/lib/store-import";
@@ -36,16 +41,57 @@ export async function GET(request: NextRequest) {
  }
  await setStorefrontTheme(slug, theme).catch(() => {});
  }
+ // Same source the live storefront reads its name from, so the editor can't disagree with it.
+ const seller = await getSellerBySlug(slug).catch(() => null);
+ // Inventory for the builder's product sections. This has to match what the LIVE storefront renders
+ // or the seller designs against a different shop than the one shoppers see:
+ //  • Same source and same fallback as app/s/StorefrontView.tsx — VYA listings first, synced external
+ //    products when a store has none. Without the fallback a synced store's builder looks empty
+ //    while its live page is full.
+ //  • No image filter. The live grid shows an imageless listing as a blank tile; hiding it here
+ //    would silently change the count and the layout.
+ //  • 30, not 6: featured layouts ask for up to 26 (see app/s/blocks/featured.tsx), so a smaller cap
+ //    under-fills the grid in the editor and only in the editor.
+ //  • Price arrives ready to render, formatted the same way the storefront formats it.
  const listings = await getListingsByStore(slug, true).catch(() => []);
- const products = listings
- .filter((l) => l.images?.[0])
- .slice(0, 6)
- .map((l) => ({ title: l.title, price: l.price, currency: l.currency, image: l.images[0] }));
+ const products = listings.length
+ ? listings.slice(0, 30).map((l) => ({ title: l.title, price: formatPrice(l.price, l.currency), image: l.images?.[0] || "" }))
+ : (await loadStoreProducts(slug).catch(() => []))
+   .slice(0, 30)
+   .map((p) => ({ title: p.name, price: p.price, image: p.image || p.images?.[0] || "" }));
+ // Collections for the "Products shown" picker — ALL of them, so a seller can point a section at any
+ // collection they have. Only the ones a section actually names get their items fetched: that's one
+ // query per USED collection rather than per existing one, and a store with forty collections would
+ // otherwise pay forty queries to render a page that references one.
+ const usedCollectionSlugs = new Set(
+  [theme.blocks ?? [], theme.shopBlocks ?? [], ...(theme.extraPages ?? []).map((p) => p.blocks ?? [])]
+   .flat()
+   .map((b) => (b as { props?: Record<string, string> }).props?.collection)
+   .filter((v): v is string => !!v),
+ );
+ const collections = seller
+  ? await Promise.all(
+     (await listCollections(seller.id, true).catch(() => [])).map(async (c) => ({
+      slug: c.slug,
+      title: c.title,
+      itemCount: c.itemCount,
+      products: usedCollectionSlugs.has(c.slug) && c.itemCount > 0
+       ? (await listCollectionItems(c.id).catch(() => []))
+          // listCollectionItems returns raw item rows (priceCents), not the dollar Listing view.
+          .map((it) => ({ title: it.title, price: formatPrice((it.priceCents ?? 0) / 100, it.currency), image: (it.images as string[] | null)?.[0] || "" }))
+       : [],
+     })),
+    )
+  : [];
  return NextResponse.json({
  template: theme.template ?? null,
  colors: { bg: theme.colors?.bg || "#FFFDF8", text: theme.colors?.text || "#1a1a1a", accent: theme.colors?.accent || "#5D0F17" },
  fonts: { heading: theme.fonts?.heading || "Playfair Display", body: theme.fonts?.body || "Inter" },
  radius: theme.radius || "sharp",
+ skin: theme.skin ?? "",
+ preSkin: theme.preSkin ?? null,
+ logo: theme.logo ?? "",
+ headerLayout: theme.headerLayout ?? "inline",
  customCss: theme.customCss ?? "",
  blocks: theme.blocks ?? [],
  shopBlocks: theme.shopBlocks ?? [],
@@ -53,13 +99,18 @@ export async function GET(request: NextRequest) {
  socials: theme.socials ?? {},
  footerAbout: theme.footerAbout ?? "",
  navLinks: theme.navLinks ?? [],
- storeName: sf?.theme?.storeName || sf?.tagline || null,
+ // Resolved the SAME way the live storefront resolves it (app/s/StorefrontView.tsx), so the
+ // editor's header and the published page can't show two different names. The old chain fell
+ // through to the tagline and then the slug, while the live page reached for the store's real
+ // name — which is why the studio said "via-admin" and the storefront said "VYA Test Store".
+ storeName: sf?.theme?.storeName || stores.find((s) => s.slug === slug)?.name || seller?.name || sf?.tagline || null,
  tagline: sf?.tagline || null,
  templates: STOREFRONT_TEMPLATES,
  blockTypes: BLOCK_TYPES,
  headingFonts: HEADING_FONTS,
  bodyFonts: BODY_FONTS,
  products,
+ collections,
  });
 }
 
@@ -79,7 +130,7 @@ export async function POST(request: NextRequest) {
 
  if (body?.template) {
  const t = getTemplate(String(body.template));
- if (t) { theme.template = t.id; theme.colors = { ...t.colors }; theme.fonts = { ...t.fonts }; }
+ if (t) { theme.template = t.id; theme.colors = { ...t.colors }; theme.fonts = { ...t.fonts }; theme.colorsFrom = "studio"; }
  }
  if (body?.colors) {
  const c = body.colors;
@@ -88,6 +139,9 @@ export async function POST(request: NextRequest) {
  text: HEX.test(c.text) ? c.text : theme.colors?.text || "#1a1a1a",
  accent: HEX.test(c.accent) ? c.accent : theme.colors?.accent || "#5D0F17",
  };
+ // Chosen in the studio, so the live page renders this accent as-is rather than second-guessing
+ // it the way it must with a palette scraped off an imported site.
+ theme.colorsFrom = "studio";
  }
  if (body?.fonts) {
  const f = body.fonts;
@@ -98,6 +152,23 @@ export async function POST(request: NextRequest) {
  }
 
  if (body?.radius === "sharp" || body?.radius === "soft" || body?.radius === "round") theme.radius = body.radius;
+ // Store logo. "" clears it (back to the store name in type). Only an uploaded asset URL is stored —
+ // safeSrc keeps this from becoming a way to point the header at an arbitrary remote URL.
+ if (["inline", "center", "split", "stacked"].includes(String(body?.headerLayout))) theme.headerLayout = body.headerLayout;
+ if (typeof body?.logo === "string") { const u = body.logo.trim(); theme.logo = u ? (safeSrc(u) ?? theme.logo ?? null) : null; }
+ // Global style skin. "" clears it (back to no skin); anything unrecognized is ignored rather than stored.
+ if (typeof body?.skin === "string") { if (body.skin === "") delete theme.skin; else if (isSkin(body.skin)) theme.skin = body.skin; }
+ // The pre-skin look, so removing a skin can restore what the store looked like before it. `null`
+ // clears it (sent when the skin is removed); an object stores it (sent when the first skin is applied).
+ if (body?.preSkin === null) delete theme.preSkin;
+ else if (body?.preSkin && typeof body.preSkin === "object") {
+ const c = body.preSkin.colors, f = body.preSkin.fonts;
+ const hex = (v: unknown) => (/^#[0-9a-fA-F]{6}$/.test(String(v ?? "")) ? String(v) : undefined);
+ const pre: NonNullable<typeof theme.preSkin> = {};
+ if (c) { const bg = hex(c.bg), text = hex(c.text), accent = hex(c.accent); if (bg && text && accent) pre.colors = { bg, text, accent }; }
+ if (f) { const heading = HEADING_FONTS.includes(f.heading) ? f.heading : undefined; const bodyF = BODY_FONTS.includes(f.body) ? f.body : undefined; if (heading && bodyF) pre.fonts = { heading, body: bodyF }; }
+ if (pre.colors || pre.fonts) theme.preSkin = pre;
+ }
 
  if (Array.isArray(body?.blocks)) theme.blocks = sanitizeBlocks(body.blocks);
  if (Array.isArray(body?.shopBlocks)) theme.shopBlocks = sanitizeBlocks(body.shopBlocks);
@@ -123,5 +194,5 @@ export async function POST(request: NextRequest) {
  }
 
  await setStorefrontTheme(slug, theme);
- return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
+ return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", skin: theme.skin ?? "", preSkin: theme.preSkin ?? null, customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
 }

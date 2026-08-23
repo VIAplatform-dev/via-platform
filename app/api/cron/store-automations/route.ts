@@ -14,8 +14,11 @@ export async function GET(request: Request) {
  const testEmail = searchParams.get("testEmail");
  const testSlug = searchParams.get("slug");
  const cronSecret = process.env.CRON_SECRET;
- // A test send (testEmail param) previews the new-arrivals email; the real cron needs the secret.
- if (!testEmail && (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`)) {
+ // The secret is required unconditionally — testEmail is just which mode of an already-
+ // authenticated call this is, never a way to skip authentication. (Previously `!testEmail &&`
+ // let anyone bypass the secret entirely by passing any testEmail value, turning this into an
+ // open, unauthenticated email relay off our sending domain.)
+ if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;

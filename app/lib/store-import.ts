@@ -30,13 +30,24 @@ export type ImportedProduct = {
 export type StorefrontTheme = {
  fonts?: { heading?: string; body?: string };
  colors?: { bg?: string; text?: string; accent?: string };
+ // Where `colors` came from, because it changes how much we should trust the accent. "studio" = a
+ // human picked this palette, so the live page must render it exactly. "imported" = we scraped it
+ // out of their old site's CSS, where the "accent" is often a spurious colour (a sale-tag red, a
+ // link blue) and the ink is the safer match. Absent = treated as studio.
+ colorsFrom?: "studio" | "imported";
  radius?: "sharp" | "soft" | "round"; // global corner style ("shapes") — rounds product cards, images, buttons
+ skin?: "gallery" | "editorial" | "boutique" | "archive" | "statement"; // global style skin — type scale, spacing, and button shape across every section (storefront-skins.ts)
+ // The palette + type the store had BEFORE its first skin was applied, so clearing the skin can put
+ // the store back rather than stranding it on the last skin's colours. Written when a skin is first
+ // applied, cleared when the skin is removed.
+ preSkin?: { colors?: { bg?: string; text?: string; accent?: string }; fonts?: { heading?: string; body?: string } };
  customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
  blocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
  shopBlocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
  extraPages?: { slug: string; title: string; blocks: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
  logo?: string | null;
+ headerLayout?: "inline" | "center" | "split" | "stacked"; // where the brand and menu sit (app/s/StoreChrome.tsx)
  // Footer: the store's social links + a short about blurb, shown site-wide in the footer.
  socials?: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string; pinterest?: string; email?: string };
  footerAbout?: string;
@@ -179,7 +190,8 @@ export function extractTheme(head: string, origin: string, themeColor: string | 
  const logoM = head.match(/<img[^>]*\b(?:class|id|alt|src)=["'][^"']*logo[^"']*["'][^>]*>/i);
  if (logoM) { const s = logoM[0].match(/\bsrc=["']([^"']+)["']/i); if (s) logo = absolutize(s[1], origin); }
 
- return { fonts, colors: Object.keys(colors).length ? colors : undefined, logo };
+ // Flagged as scraped: these colours are a best guess off someone else's CSS, not a chosen palette.
+ return { fonts, colors: Object.keys(colors).length ? colors : undefined, colorsFrom: "imported", logo };
 }
 
 /** Pull store name / brand color / platform hints from the homepage <head>. */

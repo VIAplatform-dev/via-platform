@@ -7,6 +7,7 @@ import { getListingsByStore, type Listing } from "@/app/lib/listings-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getCollectionBySlug, listCollectionItems, listCollections } from "@/app/lib/db/collections";
 import { formatPrice } from "@/app/lib/formatPrice";
+import { normalizeCategory, familyMembers, CATEGORY_FAMILIES } from "@/app/lib/market-data-db";
 import type { StorefrontSettings } from "@/app/lib/storefront-db";
 import NewsletterForm from "./NewsletterForm";
 import Blocks from "./Blocks";
@@ -68,7 +69,17 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const catWords = catSlug.split("-").map((w) => w.replace(/s$/, "")).filter((w) => w.length > 2);
  const toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
  const catFields = (l: Listing) => [...(l.tags || []), l.category || ""].filter(Boolean);
+ // A family slug ("clothing") stands for every bucket underneath it, so the Shop menu's group
+ // heading is a real destination and not just a label. Checked first and exactly — the loose word
+ // matching below would never connect "clothing" to a listing categorised "Skirts".
+ // Only a family that actually groups SEVERAL buckets takes this path. "bags" is a family of one, and
+ // routing it here would quietly retire the tag matching that imported stores' own menus depend on.
+ const familyBuckets = familyMembers(catSlug).length > 1 ? familyMembers(catSlug) : [];
  const matchesCat = (l: Listing) => {
+ if (familyBuckets.length) {
+  const bucket = normalizeCategory(l.category || "");
+  return !!bucket && familyBuckets.includes(bucket);
+ }
  const f = catFields(l);
  if (f.some((t) => toSlug(t) === catSlug)) return true; // exact collection membership
  const t = f.map((x) => x.toLowerCase().replace(/s$/, ""));
@@ -85,16 +96,25 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  // ── Theme ──
  const theme = sf.theme || {};
- // Headings/buttons/prices follow the site's own ink (its text colour) — the
- // extracted "accent" is often a spurious CSS colour (e.g. a sale-tag red), so the
- // text colour is the reliable match. Falls back to the accent, then VYA's.
- const accent = theme.colors?.text || theme.colors?.accent || sf.accentColor || "#5D0F17";
+ // Headings/buttons/prices take the accent — but only when we can trust it.
+ //   • A palette SCRAPED from an imported site: the extracted "accent" is often a spurious CSS
+ //     colour (a sale-tag red, a link blue), so the site's own ink is the reliable match.
+ //   • A palette CHOSEN in the studio: the seller clicked that colour and watched the preview use
+ //     it. Overriding it here is how the live page stops matching the editor. Honour it exactly.
+ // No marker means a theme saved before this distinction existed — treated as chosen, since the
+ // studio is where the overwhelming majority of these palettes came from.
+ const scraped = theme.colorsFrom === "imported";
+ const accent = (scraped
+  ? theme.colors?.text || theme.colors?.accent
+  : theme.colors?.accent || theme.colors?.text) || sf.accentColor || "#5D0F17";
  const bg = theme.colors?.bg || "#FFFDF8";
  const text = theme.colors?.text || "#241c17";
  const headingFont = theme.fonts?.heading;
  const bodyFont = theme.fonts?.body;
  const radius = theme.radius || "sharp"; // global corner style ("shapes")
+ const skin = theme.skin || undefined; // global style skin (type scale, spacing, button shape)
  const logo = theme.logo || null;
+ const headerLayout = theme.headerLayout || "inline";
 
  const vars: Record<string, string> = { "--accent": accent, "--bg": bg, "--text": text };
  if (headingFont) vars["--font-heading"] = `'${headingFont}', Georgia, serif`;
@@ -112,7 +132,47 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const pages = theme.pages ?? [];
  const sections = theme.sections ?? [];
  const categories = theme.categories ?? [];
- const categoryLabel = category ? categories.find((c) => c.slug === category)?.label || category.replace(/-/g, " ") : null;
+ // The Shop dropdown. An imported site arrives with its own nav categories (theme.categories) and
+ // those win — they're the seller's real menu. A store built in the studio has none, so derive them
+ // from what's actually IN STOCK, bucketed by the platform's canonical normalizeCategory: "skirt",
+ // "Skirts" and "MINI SKIRT" all collapse to one entry, and the labels match the numbers everywhere
+ // else on VYA. Only buckets holding a live item appear, so the menu can never open an empty aisle.
+ // Busiest first, so a store with one skirt and forty bags leads with Bags.
+ type MenuEntry = { label: string; slug: string; children: { label: string; slug: string }[] };
+ const shopMenu: MenuEntry[] = categories.length
+  ? categories.map((c) => ({ label: c.label, slug: c.slug, children: [] }))
+  : (() => {
+   // ONLY the item's category field. Not tags, not the title: normalizeCategory checks Tops before
+   // Bags, so a "top handle" tag on a Chanel flap lands the store an entire Tops aisle holding one
+   // handbag. An uncategorised item simply doesn't vote — a missing aisle is recoverable, a lying
+   // one sends the shopper to a page that doesn't hold what it promised.
+   const tally = new Map<string, number>();
+   for (const l of sortedListings) {
+    const bucket = normalizeCategory(l.category || "");
+    if (bucket) tally.set(bucket, (tally.get(bucket) || 0) + 1);
+   }
+   // Grouped a tier up (Clothing → Tops · Skirts), because nobody scans thirteen flat buckets.
+   // Family order is fixed rather than by count — a menu that reshuffles itself as stock turns over
+   // is a menu returning shoppers can't learn. Within a family, the fullest aisle leads.
+   const out: MenuEntry[] = [];
+   for (const fam of CATEGORY_FAMILIES) {
+    const present = fam.members
+     .filter((m) => tally.has(m))
+     .sort((a, b) => tally.get(b)! - tally.get(a)! || a.localeCompare(b));
+    if (!present.length) continue;
+    // A heading that expands to a single child just says the same thing twice — so a family
+    // holding one bucket (or holding only one in THIS store) becomes a plain link.
+    if (present.length === 1) {
+     const only = fam.members.length === 1 ? fam.label : present[0];
+     out.push({ label: only, slug: toSlug(only), children: [] });
+    } else {
+     out.push({ label: fam.label, slug: toSlug(fam.label), children: present.map((m) => ({ label: m, slug: toSlug(m) })) });
+    }
+   }
+   return out;
+  })();
+ const menuFlat = shopMenu.flatMap((c) => [c, ...c.children]);
+ const categoryLabel = category ? menuFlat.find((c) => c.slug === category)?.label || category.replace(/-/g, " ") : null;
  // Only render content sections that actually have content — skip stray image-only
  // sections (a lone full-bleed photo with no headline/text reads as a random "double image").
  const contentSections = sections.filter(
@@ -135,9 +195,17 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const showGrid = isShop || sections.length === 0 || sections.some((s) => s.type === "products");
  // The homepage shows a small "New Arrivals"-style highlight (a few items + a
  // "View all" link); the full catalogue lives on the Shop page.
+ //
+ // This cap applies ONLY to the legacy grid below — the one a captured/blockless storefront renders.
+ // A block-built page must not be truncated here: each featured layout declares how many pieces it
+ // shows (grid 8, carousel 12, archive 26 — see app/s/blocks/featured.tsx), and clamping every one of
+ // them to 3 meant a seller chose a layout in the builder and shoppers got a different page. Blocks
+ // receive the full list and slice it themselves.
  const HOME_HIGHLIGHT = 3;
  const productsSection = sections.find((s) => s.type === "products");
  const gridItems = isShop ? items : items.slice(0, HOME_HIGHLIGHT);
+ const blockItems = items;
+
  // VYA-built section layout. When present it replaces the default cloned
  // hero/sections/grid — the seller (or VYA) composes the page from blocks. A
  // pageSlug renders one of the store's extra pages; otherwise the home page.
@@ -146,6 +214,25 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const extraPages = sanitizePages(theme.extraPages ?? []);
  const activePage = pageSlug ? extraPages.find((p) => p.slug === pageSlug) : null;
  const blocks = pageSlug ? activePage?.blocks ?? [] : homeBlocks;
+ // The store's collections, each with its items, so a product section can show a curated set. Built
+ // from the same listings already loaded above — no extra product queries, just membership lookups.
+ // Capped because this is one query per collection and a nav menu of forty is not a real design.
+ const usedCollectionSlugs = new Set(
+  [...blocks, ...shopIntro].map((b) => b.props?.collection).filter((v): v is string => !!v),
+ );
+ const byId = new Map(items.map((t) => [t.key.replace(/^l/, ""), t]));
+ const blockCollections = (await Promise.all(
+  // Only the collections a section on this page actually names — one query per USED collection,
+  // not per existing one. A store with forty collections shouldn't pay forty queries per page view.
+  storeCollections.filter((c) => c.itemCount > 0 && usedCollectionSlugs.has(c.slug)).map(async (c) => ({
+   slug: c.slug,
+   title: c.title,
+   products: (await listCollectionItems(c.id).catch(() => []))
+    .map((it) => byId.get(it.id))
+    .filter(Boolean)
+    .map((t) => ({ key: t!.key, title: t!.title, price: t!.price, image: t!.image, href: t!.itemId ? withPreview(`/s/${sf.handle}/p/${t!.itemId}`) : t!.href || undefined })),
+  })),
+ )).filter((c) => c.products.length > 0);
  const hasBlocks = !isShop && (!!pageSlug || homeBlocks.length > 0);
  // A clean nav for block-based stores: Home · Shop · each collection (with items) · each extra page.
  const collectionNav = storeCollections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: withPreview(`/s/${sf.handle}/collections/${c.slug}`) }));
@@ -206,9 +293,11 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {header.announcement && (
  <div className="px-4 py-2 text-center text-[11px] tracking-wide text-white" style={{ background: accent }}>{header.announcement}</div>
  )}
- {/* Header: logo · nav · utility icons */}
- {(headerNav.length > 0 || logo) && (
- <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 border-b border-black/[0.07] px-6 sm:px-8 py-5" style={{ background: bg }}>
+ {/* Header: brand · nav · utility icons, in the arrangement the seller chose (headerLayout).
+     Defined once as three parts so a layout change can never alter what the header CONTAINS —
+     only where the parts sit. */}
+ {(headerNav.length > 0 || logo) && (() => {
+ const brand = (
  <a href={withPreview(`/s/${sf.handle}`)} className="shrink-0">
  {logo ? (
  <img src={logo} alt={storeName} className="h-7 w-auto object-contain" />
@@ -216,15 +305,26 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <span className="text-lg tracking-[0.12em]" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{storeName}</span>
  )}
  </a>
- <div className="hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex">
+ );
+ const links = (items: typeof headerNav, extra = "") => (
+ <div className={`hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex ${extra}`}>
+
  {headerNav.map((n, i) =>
- /^shop/i.test(n.label) && categories.length ? (
+ /^shop/i.test(n.label) && shopMenu.length ? (
  <div key={i} className="group relative">
  <a href={n.href} className="hover:opacity-100">{n.label} ⌄</a>
  <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-3 opacity-0 transition group-hover:visible group-hover:opacity-100">
  <div className="grid min-w-[210px] gap-0.5 border border-black/10 p-3 shadow-xl" style={{ background: bg }}>
- {categories.map((c, j) => (
- <a key={j} href={withPreview(`/s/${sf.handle}/shop?category=${c.slug}`)} className="px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100" style={{ letterSpacing: "normal" }}>{c.label}</a>
+ {/* "Shop all" first — the way back to the full catalogue once you've narrowed it. */}
+ <a href={n.href} className="px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100" style={{ letterSpacing: "normal" }}>Shop all</a>
+ {shopMenu.map((c, j) => (
+ <div key={j} className="contents">
+ {/* The family heading is itself a destination — "Clothing" shows every bucket beneath it. */}
+ <a href={withPreview(`/s/${sf.handle}/shop?category=${c.slug}`)} className={`px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100${c.children.length ? " font-medium" : ""}`} style={{ letterSpacing: "normal" }}>{c.label}</a>
+ {c.children.map((s, k) => (
+ <a key={k} href={withPreview(`/s/${sf.handle}/shop?category=${s.slug}`)} className="px-2 py-1 pl-5 text-[11px] normal-case tracking-normal opacity-70 hover:opacity-100" style={{ letterSpacing: "normal" }}>{s.label}</a>
+ ))}
+ </div>
  ))}
  </div>
  </div>
@@ -233,15 +333,49 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <a key={i} href={n.href} className="hover:opacity-100">{n.label}</a>
  ),
  )}
- </div>
+  </div>
+ );
+ const utils = (
  <div className="flex shrink-0 items-center gap-4 opacity-70">
  {/* Search is functional. Account + cart are hidden until VYA has buyer
  logins / a basket (revisit when we build payments) — header.hasAccount /
  header.hasCart are still captured so we can switch them back on. */}
  {header.hasSearch && <SearchBox handle={sf.handle} preview={preview} />}
  </div>
+ );
+ const bar = "sticky top-0 z-40 border-b border-black/[0.07] px-6 sm:px-8";
+ // An odd number of links leans left in the split layout, so the brand stays truly centred.
+ const half = Math.ceil(headerNav.length / 2);
+ if (headerLayout === "center") return (
+ <nav className={`${bar} py-5`} style={{ background: bg }}>
+ <div className="flex items-center justify-between gap-4"><span className="w-8 shrink-0" />{brand}{utils}</div>
+ {headerNav.length > 0 && <div className="mt-3 flex justify-center">{links(headerNav)}</div>}
  </nav>
- )}
+ );
+ if (headerLayout === "split") return (
+ <nav className={`${bar} flex items-center gap-6 py-5`} style={{ background: bg }}>
+ {/* The menu halves sit at the OUTER edges, not tucked against the brand — bunched in the middle
+     they read as one crowded list with empty gutters either side, which is the opposite of what a
+     split header is for. The spacer mirrors the search icon so the brand stays truly centred. */}
+ <span className="w-8 shrink-0" />
+ {links(headerNav.slice(0, half), "flex-1 justify-start")}
+ {brand}
+ {links(headerNav.slice(half), "flex-1 justify-end")}
+ {utils}
+ </nav>
+ );
+ if (headerLayout === "stacked") return (
+ <nav className={`${bar} py-5`} style={{ background: bg }}>
+ <div className="flex items-center justify-between gap-4">{brand}{utils}</div>
+ {headerNav.length > 0 && <div className="mt-3">{links(headerNav)}</div>}
+ </nav>
+ );
+ return (
+ <nav className={`${bar} flex items-center justify-between gap-4 py-5`} style={{ background: bg }}>
+ {brand}{links(headerNav)}{utils}
+ </nav>
+ );
+ })()}
  {/* Mobile nav row */}
  {headerNav.length > 0 && (
  <div className="flex items-center gap-5 overflow-x-auto border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden">
@@ -252,7 +386,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} storeSlug={sf.handle} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -353,7 +487,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={gridItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} storeSlug={sf.handle} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} />
  )}
 
  {showGrid && !hasBlocks && (

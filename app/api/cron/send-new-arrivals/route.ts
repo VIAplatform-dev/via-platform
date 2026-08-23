@@ -21,8 +21,10 @@ export async function GET(request: Request) {
  const testEmail = searchParams.get("testEmail");
  const status = searchParams.get("status"); // read-only lock inspection, no send
 
- // Allow unauthenticated access for test sends (testEmail param) — never touches the lock
- if (!testEmail && !status && (!cronSecret || authHeader !== `Bearer ${cronSecret}`)) {
+ // The secret is required unconditionally for every mode (test send, status probe, or the real
+ // cron run) — testEmail/status previously bypassed the secret check entirely, making this an
+ // unauthenticated open email-relay (testEmail) and an unauthenticated internal-state leak (status).
+ if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
 

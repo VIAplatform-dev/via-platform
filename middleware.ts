@@ -205,6 +205,17 @@ export async function middleware(request: NextRequest) {
       // Captured/imported storefront pages — the OS editor previews them in a SAME-ORIGIN iframe
       // (/site/{slug}), so this host must serve them via the route handler, not the marketing rewrite.
       pathname.startsWith("/site") ||
+      // Block-built storefronts (/s/{handle}) for the same reason: the studio's "View" opens
+      // /s/{handle}?preview=1 relative to whatever host you're on, so without this the OS host
+      // hands that link to the marketing rewrite and it 404s. Canonical still points at
+      // vyaplatform.com (see app/s/[handle]/page.tsx), so serving it here costs no SEO.
+      pathname.startsWith("/s/") ||
+      // The rest of the buying journey. A storefront served on this host links to /checkout, /cart
+      // and /order with root-relative hrefs, so they resolve against whatever host the shopper is
+      // on — hand those to the marketing rewrite and Buy now leads to a 404.
+      pathname === "/checkout" || pathname.startsWith("/checkout/") ||
+      pathname === "/cart" || pathname.startsWith("/cart/") ||
+      pathname === "/order" || pathname.startsWith("/order/") ||
       pathname.startsWith("/infra/") ||
       pathname === "/infrastructure" ||
       pathname.startsWith("/infrastructure/") ||

@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export default function ContactForm({ accent, storeSlug }: { accent: string; storeSlug: string }) {
+/**
+ * The store's message form. Used by the contact SECTION as-is, and by a form ELEMENT a seller drops
+ * anywhere and labels for its own purpose — wholesale, stylist bookings, sourcing requests. `topic`
+ * travels with the message so the seller can tell those apart in their inbox instead of receiving a
+ * pile of identical "get in touch" notes.
+ */
+export default function ContactForm({ accent, storeSlug, topic, cta = "Send", compact = false }: { accent: string; storeSlug: string; topic?: string; cta?: string; compact?: boolean }) {
  const [name, setName] = useState("");
  const [email, setEmail] = useState("");
  const [message, setMessage] = useState("");
@@ -30,17 +36,17 @@ export default function ContactForm({ accent, storeSlug }: { accent: string; sto
 
  const field = "w-full border border-black/20 bg-white/60 px-4 py-2.5 text-sm outline-none focus:border-black/50";
  return (
- <form onSubmit={submit} className="mx-auto mt-8 flex max-w-md flex-col gap-3">
+ <form onSubmit={submit} className={compact ? "flex w-full flex-col gap-2" : "mx-auto mt-8 flex max-w-md flex-col gap-3"}>
  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={field} />
  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className={field} />
- <textarea value={message} onChange={(e) => setMessage(e.target.value)} required placeholder="Message" rows={5} className={field} />
+ <textarea value={message} onChange={(e) => setMessage(e.target.value)} required placeholder="Message" rows={compact ? 3 : 5} className={field} />
  <button
  type="submit"
  disabled={busy}
  className="mt-1 self-start px-8 py-2.5 text-[11px] uppercase tracking-[0.18em] text-white transition hover:opacity-90 disabled:opacity-50"
  style={{ background: accent }}
  >
- {busy ? "Sending…" : "Send"}
+ {busy ? "Sending…" : cta}
  </button>
  </form>
  );

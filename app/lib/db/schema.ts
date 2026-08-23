@@ -153,6 +153,10 @@ export const itemCollections = pgTable(
  {
  itemId: uuid("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
  collectionId: uuid("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+ // Where this item sits INSIDE the collection. Without it the order was whatever Postgres chose to
+ // return, so "show the first 5 of this collection" was arbitrary and could differ between page
+ // loads. Nullable so existing rows stay valid — they sort behind anything explicitly ordered.
+ position: integer("position"),
  },
  (t) => [primaryKey({ columns: [t.itemId, t.collectionId] })],
 );

@@ -98,10 +98,13 @@ export const inputCls = "h-9 w-full rounded-md border border-stone-300 bg-white 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
  return <input {...props} className={cn(inputCls, props.className)} />;
 }
-export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
  return (
  <label className="block">
- <span className="mb-1.5 block text-[13px] font-medium text-stone-700">{label}</span>
+ <span className="mb-1.5 block text-[13px] font-medium text-stone-700">
+ {label}
+ {required && <span className="ml-0.5 text-rose-500" title="Required to publish" aria-label="required">*</span>}
+ </span>
  {children}
  {hint && <span className="mt-1 block text-xs text-stone-400">{hint}</span>}
  </label>

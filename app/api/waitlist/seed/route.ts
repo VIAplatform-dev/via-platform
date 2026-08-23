@@ -1,9 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import fs from "fs";
 import path from "path";
+import { isAdminRequest } from "@/app/lib/storeAuth";
 
-export async function POST() {
+// One-time seed script (backfills `waitlist` from app/data/waitlist.json). Admin-only —
+// it's reachable under the public /api/waitlist prefix, and was previously callable by
+// anyone, letting an unauthenticated caller trigger CREATE TABLE + bulk inserts at will.
+export async function POST(request: NextRequest) {
+ if (!isAdminRequest(request)) {
+ return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ }
  try {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
  if (!url) {

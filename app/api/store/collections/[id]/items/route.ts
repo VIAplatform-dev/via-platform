@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getCollection, addItemsToCollection, removeItemsFromCollection } from "@/app/lib/db/collections";
+import { getCollection, addItemsToCollection, removeItemsFromCollection, reorderCollectionItems } from "@/app/lib/db/collections";
 
 export const dynamic = "force-dynamic";
 
@@ -33,5 +33,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
  const ids = idsOf(await request.json().catch(() => ({})));
  if (!ids.length) return NextResponse.json({ error: "No items" }, { status: 400 });
  await removeItemsFromCollection(s.id, id, ids);
+ return NextResponse.json({ ok: true, count: ids.length });
+}
+
+// PATCH { ids } — set the ORDER of items within this collection, in the order given. This is what a
+// storefront section reads when it shows "the first few" of a collection, so it's the seller's control
+// over which pieces lead — curated once here rather than re-picked in every section that uses it.
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+ const s = await seller(request);
+ if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ const { id } = await params;
+ const col = await getCollection(s.id, id); // ownership-scoped: a seller can only order their own
+ if (!col) return NextResponse.json({ error: "Not found" }, { status: 404 });
+ const ids = idsOf(await request.json().catch(() => ({})));
+ if (!ids.length) return NextResponse.json({ error: "No items" }, { status: 400 });
+ await reorderCollectionItems(col.id, ids);
  return NextResponse.json({ ok: true, count: ids.length });
 }

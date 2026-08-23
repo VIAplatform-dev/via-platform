@@ -64,6 +64,25 @@ export default function CollectionsPage() {
  if (selId === id) setSelId(null);
  loadCols(false);
  }
+ // ── ordering ──
+ // Reordering happens live in local state while dragging (so the grid follows the cursor) and is
+ // persisted once on drop. Sending a request per hover would be dozens of writes for one gesture.
+ const [dragIdx, setDragIdx] = useState<number | null>(null);
+ function dragOverTile(i: number) {
+ setDragIdx((from) => {
+  if (from === null || from === i) return from;
+  setItems((prev) => { const next = [...prev]; const [moved] = next.splice(from, 1); next.splice(i, 0, moved); return next; });
+  return i;
+ });
+ }
+ async function commitOrder() {
+ setDragIdx(null);
+ if (!selId) return;
+ // Optimistic: the grid already shows the new order. If the write fails, reload puts it back —
+ // better than blocking the gesture on a round trip.
+ await fetch(`/api/store/collections/${selId}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: items.map((i) => i.id) }) }).catch(() => {});
+ }
+
  async function removeItem(itemId: string) {
  if (!selId) return;
  setItems((xs) => xs.filter((i) => i.id !== itemId)); // optimistic
@@ -127,11 +146,25 @@ export default function CollectionsPage() {
  ) : items.length === 0 ? (
  <TechEmpty icon={<Package size={26} strokeWidth={1.5} />} title="No items yet" body="Add items to this collection — a piece can be in several at once." />
  ) : (
+ <>
+ {/* The order is the seller's control over WHICH pieces lead: a storefront section showing
+     "the first four" of this collection takes them from here. Said plainly, because an order
+     that silently drives another screen is worse than no order at all. */}
+ <p className="mb-3 text-[12px] text-stone-400">Drag to reorder. Storefront sections that show a few pieces take them from the top.</p>
  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
- {items.map((it) => (
- <div key={it.id} className="group relative overflow-hidden rounded-xl border border-stone-200 bg-white">
+ {items.map((it, i) => (
+ <div
+  key={it.id}
+  draggable
+  onDragStart={() => setDragIdx(i)}
+  onDragOver={(e) => { e.preventDefault(); dragOverTile(i); }}
+  onDragEnd={commitOrder}
+  onDrop={(e) => { e.preventDefault(); commitOrder(); }}
+  className={`group relative cursor-grab overflow-hidden rounded-xl border bg-white transition active:cursor-grabbing ${dragIdx === i ? "border-[#5D0F17] opacity-50" : "border-stone-200"}`}
+ >
+ <span className="absolute left-1.5 top-1.5 z-10 grid h-5 min-w-[20px] place-items-center rounded-full bg-stone-900/75 px-1 text-[10px] font-semibold tabular-nums text-white">{i + 1}</span>
  <button type="button" title="Remove from collection" onClick={() => removeItem(it.id)} className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-stone-500 opacity-0 shadow transition hover:text-rose-600 group-hover:opacity-100"><X size={13} /></button>
- <div className="aspect-[4/5] w-full bg-stone-100">{it.image && <img src={it.image} alt={it.title} className="h-full w-full object-cover" />}</div>
+ <div className="aspect-[4/5] w-full bg-stone-100">{it.image && <img src={it.image} alt={it.title} className="pointer-events-none h-full w-full object-cover" />}</div>
  <div className="p-2">
  <p className="line-clamp-1 text-[12px] text-stone-700">{it.title}</p>
  <p className="text-[12px] text-stone-400">{money(it.priceCents, it.currency)}{it.status !== "active" ? ` · ${it.status}` : ""}</p>
@@ -139,6 +172,7 @@ export default function CollectionsPage() {
  </div>
  ))}
  </div>
+ </>
  )}
  </>
  )}

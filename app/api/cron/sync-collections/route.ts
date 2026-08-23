@@ -6,12 +6,12 @@ import { initDatabase } from "@/app/lib/db";
 // Daily capture of each Shopify store's collection membership → products.collections +
 // derived products.era. Decoupled from the main product sync so its per-collection fetches
 // don't slow the catalog sync. Internal data (era/brand/category ground truth for the
-// intake accuracy loop + pricing comps). Manual run: ?key=<CRON_SECRET>.
+// intake accuracy loop + pricing comps). Manual run: curl -H "Authorization: Bearer $CRON_SECRET" ...
 export async function GET(request: Request) {
  const secret = process.env.CRON_SECRET;
  const authHeader = request.headers.get("authorization");
- const key = new URL(request.url).searchParams.get("key");
- if (!secret || (authHeader !== `Bearer ${secret}` && key !== secret)) {
+ // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ if (!secret || authHeader !== `Bearer ${secret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
 

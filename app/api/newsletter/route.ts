@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+import { isAdminRequest } from "@/app/lib/storeAuth";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 function getDatabaseUrl() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -9,8 +11,12 @@ function getDatabaseUrl() {
  return url;
 }
 
-// GET - Return all giveaway entrants as the email list
-export async function GET() {
+// GET - Return all giveaway entrants as the email list. Admin-only: this is the full
+// subscriber PII list, not something to hand out to whoever requests it.
+export async function GET(request: NextRequest) {
+ if (!isAdminRequest(request)) {
+ return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ }
  try {
  const sql = neon(getDatabaseUrl());
 
@@ -44,6 +50,10 @@ export async function GET() {
 // POST - Add email (creates a giveaway entry)
 export async function POST(request: NextRequest) {
  try {
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "newsletter-signup", ip, max: 10, windowMinutes: 15 })) {
+ return NextResponse.json({ error: "Too many attempts. Please try again in a few minutes." }, { status: 429 });
+ }
  const body = await request.json();
  const { email } = body;
 

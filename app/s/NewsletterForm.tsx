@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export default function NewsletterForm({ accent }: { accent: string }) {
+export default function NewsletterForm({ accent, label }: { accent: string; label?: string }) {
  const [email, setEmail] = useState("");
  const [done, setDone] = useState(false);
  const [busy, setBusy] = useState(false);
@@ -42,7 +42,7 @@ export default function NewsletterForm({ accent }: { accent: string }) {
  className="px-8 py-2.5 text-[11px] uppercase tracking-[0.18em] text-white transition hover:opacity-90 disabled:opacity-50"
  style={{ background: accent }}
  >
- {busy ? "…" : "Sign up"}
+ {busy ? "…" : (label || "Sign up")}
  </button>
  </form>
  );

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createMagicLinkToken, findOrCreateUserByEmail, signMobileJwt } from "@/app/lib/mobileAuth";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,10 @@ const REVIEWER_EMAIL = "partnerships@vyaplatform.com";
  */
 export async function POST(request: Request) {
  try {
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "mobile-magic-link", ip, max: 6, windowMinutes: 15 })) {
+ return NextResponse.json({ error: "Too many requests. Please wait a few minutes and try again." }, { status: 429 });
+ }
  const body = await request.json();
  const rawEmail = (body?.email ?? "").toString().trim().toLowerCase();
  const scheme = (body?.scheme ?? "vya").toString().replace(/[^a-z0-9+.-]/gi, "");

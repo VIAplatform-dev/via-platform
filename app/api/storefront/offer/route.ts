@@ -4,6 +4,7 @@ import { getInboxSettings } from "@/app/lib/storefront-settings-db";
 import { sendNewOfferToStore } from "@/app/lib/email";
 import { getItem } from "@/app/lib/db/inventory";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
+import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,10 @@ export async function GET(request: NextRequest) {
 // Public: a shopper makes a price offer on a piece.
 // { storeSlug, itemId?, itemTitle?, listPriceCents, amountCents, name?, email }
 export async function POST(request: NextRequest) {
+ const ip = clientIp(request.headers);
+ if (await overRateLimit({ bucket: "storefront-offer", ip, max: 10, windowMinutes: 15 })) {
+ return NextResponse.json({ error: "Too many offers submitted. Please try again in a few minutes." }, { status: 429 });
+ }
  const b = await request.json().catch(() => null);
  const storeSlug = b?.storeSlug ? String(b.storeSlug).trim() : "";
  const amountCents = Math.round(Number(b?.amountCents) || 0);

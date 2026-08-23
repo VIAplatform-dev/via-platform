@@ -8,11 +8,11 @@ export const maxDuration = 300;
 // button: every VYA inventory item + marketplace product not already captured is folded in. Idempotent
 // (INSERT ... ON CONFLICT DO NOTHING), so re-running only ever adds the new ones. The embed-reference-
 // index cron then embeds the fresh rows, so a listing goes from published → tracked → searchable on its
-// own. Manual run: ?key=<CRON_SECRET>
+// own. Manual run: curl -H "Authorization: Bearer $CRON_SECRET" ...
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
- const url = new URL(request.url);
- const authed = request.headers.get("authorization") === `Bearer ${cronSecret}` || (cronSecret && url.searchParams.get("key") === cronSecret);
+ // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {
  const [items, products, sold] = await Promise.all([backfillFromItems().catch(() => 0), backfillFromProducts().catch(() => 0), backfillFromSold().catch(() => 0)]);

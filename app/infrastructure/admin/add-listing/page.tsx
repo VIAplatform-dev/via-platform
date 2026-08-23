@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Sparkles, Tag } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, Toggle, cn } from "../ui";
+import { CategoryBreadcrumb } from "../CategoryPicker";
+import { toCategorySlug } from "@/app/lib/item-tags";
 
 type Field = { value: string | null; confidence: number };
 type Draft = {
@@ -365,7 +367,7 @@ export default function IntakePage() {
  fill("era", dr.era?.value);
  fill("material", dr.material?.value);
  fill("condition", dr.condition?.value);
- fill("category", dr.category);
+ fill("category", toCategorySlug(dr.category) ?? dr.category);
  fill("description", dr.description);
  if (dr.parcel) { fill("weightOz", String(dr.parcel.weightOz)); fill("lengthIn", String(dr.parcel.lengthIn)); fill("widthIn", String(dr.parcel.widthIn)); fill("heightIn", String(dr.parcel.heightIn)); }
  }
@@ -631,7 +633,10 @@ export default function IntakePage() {
  </div>
  <div className="grid grid-cols-2 gap-3">
  <div><label className={label}>Size</label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="M / US 8" /></div>
- <div><label className={label}>Category</label><input className={input} value={form.category} onChange={(e) => set("category", e.target.value)} /></div>
+ <div>
+ <label className={label}>Category</label>
+ <div className="pt-1"><CategoryBreadcrumb value={form.category || null} onChange={(v) => set("category", v || "")} /></div>
+ </div>
  </div>
  <div>
  <label className={label}>Measurements <span className="font-normal text-stone-400">— flat, in inches</span></label>
