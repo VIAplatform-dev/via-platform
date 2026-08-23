@@ -4,6 +4,7 @@ import { reverseImageBestOf, matchesToComps, isCompsConfigured } from "./comps";
 import { resolveSpecificPiece } from "./intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "./embeddings";
 import { normalizeCategory } from "./market-data-db";
+import { inferItemFields } from "./infer-item-fields";
 import { gate } from "./concurrency";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -73,16 +74,21 @@ export type PriceEvalRun = { requested: number; graded: number; skipped: number;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Grade a fresh sample of real sales against the real sold price. Two modes:
- *  • default (title) — the pricer is handed the item's real title (easy mode: identification is free).
+ * Grade a fresh sample of real sales against the real sold price. Three modes:
+ *  • default (title) — the pricer is handed the item's real title (easy mode: identification is free)
+ *    but ONLY the brand as context — less than production intake gets.
+ *  • withContext (title-ctx) — same query, but era/material/condition are inferred from the title
+ *    (sold_items never stored them) and passed like production intake does. Graded separately per
+ *    (sale, mode), so title vs title-ctx is a clean A/B on the same items: how much of the miss rate
+ *    is the eval starving the engine of context vs the engine reading the market wrong.
  *  • photoOnly — the query is derived from the PHOTO alone via the reference index, no human title;
  *    this mirrors a real seller upload and is the honest test of "can VYA price from a photo?".
  * Costs SerpApi (reverse-image + comps) per item; keep the sample small. Accumulates per (sale, mode).
  */
-export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; confirmedOnly?: boolean }): Promise<PriceEvalRun> {
+export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; withContext?: boolean; confirmedOnly?: boolean }): Promise<PriceEvalRun> {
  await ensureTable();
  const sample = Math.max(1, Math.min(40, Math.round(opts.sample) || 12));
- const mode = opts.photoOnly ? "photo" : "title";
+ const mode = opts.photoOnly ? "photo" : opts.withContext ? "title-ctx" : "title";
  const sql = db();
 
  // Prefer sales not yet graded IN THIS MODE (grow coverage), newest first. `confirmedOnly` grades
@@ -129,8 +135,15 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  } else {
  query = title || [brand, "vintage"].filter(Boolean).join(" ");
  }
- // No condition passed → no condition multiplier skews the read (we don't know the sold item's grade).
- const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context: { brand } }).catch(() => null);
+ // Context: 'title'/'photo' pass ONLY the brand (the historical baseline). 'title-ctx' recovers
+ // era/material/condition from the title via the same canonical inference production imports use —
+ // sold_items never stored those columns — so the engine runs with production-shaped context. When
+ // the title carries no condition, none is passed and no condition multiplier skews the read.
+ const inferred = mode === "title-ctx" ? inferItemFields(title, title) : null;
+ const context = inferred
+ ? { brand: brand ?? inferred.brand, era: inferred.era, material: inferred.material, condition: inferred.condition, conditionGrade: inferred.condition }
+ : { brand };
+ const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context }).catch(() => null);
  const predCents = est?.marketCents && est.marketCents > 0 ? est.marketCents : null;
  const errorPct = predCents != null ? Math.round((Math.abs(predCents - soldCents) / soldCents) * 100) : null;
  const within10 = errorPct != null ? errorPct <= 10 : null;
@@ -261,4 +274,51 @@ export async function getPriceAccuracy(windowDays = 120, mode = "title"): Promis
  totalGraded: items.length,
  windowDays,
  };
+}
+
+export type PriceAccuracyComparison = {
+ windowDays: number;
+ modeA: string;
+ modeB: string;
+ overallA: PriceScore;
+ overallB: PriceScore;
+ /** Apples-to-apples: ONLY the sold items graded in BOTH modes — the honest read on what the extra context changed. */
+ paired: { n: number; a: PriceScore; b: PriceScore } | null;
+ byCategory: Array<{ segment: string; a: PriceScore | null; b: PriceScore | null; deltaWithin20Pct: number | null }>;
+};
+
+/** Side-by-side accuracy for two eval modes (default: brand-only 'title' vs production-context
+ *  'title-ctx') — overall, the paired subset graded in both modes, and per-category with the
+ *  within-±20% delta. This is the A/B that says how much of the miss rate was missing context. */
+export async function comparePriceAccuracy(windowDays = 120, modeA = "title", modeB = "title-ctx"): Promise<PriceAccuracyComparison> {
+ await ensureTable();
+ const cutoff = new Date(Date.now() - windowDays * 86400000).toISOString();
+ const rows = (await db()`
+  SELECT sold_id, mode, category, within10, within20, error_pct
+  FROM price_eval_items
+  WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode IN (${modeA}, ${modeB})
+ `.catch(() => [])) as { sold_id: number; mode: string; category: string | null; within10: boolean | null; within20: boolean | null; error_pct: number | null }[];
+
+ type Item = { soldId: number; category: string; within10: boolean | null; within20: boolean | null; errorPct: number | null };
+ const of = (mode: string): Item[] => rows.filter((r) => r.mode === mode).map((r) => ({ soldId: Number(r.sold_id), category: r.category || "uncategorized", within10: r.within10, within20: r.within20, errorPct: r.error_pct }));
+ const a = of(modeA), b = of(modeB);
+
+ const inBoth = new Set([...new Set(a.map((i) => i.soldId))].filter((id) => b.some((i) => i.soldId === id)));
+ const paired = inBoth.size
+ ? { n: inBoth.size, a: scoreOf(modeA, a.filter((i) => inBoth.has(i.soldId))), b: scoreOf(modeB, b.filter((i) => inBoth.has(i.soldId))) }
+ : null;
+
+ const cats = [...new Set([...a, ...b].map((i) => i.category))];
+ const byCategory = cats.map((cat) => {
+ const ca = a.filter((i) => i.category === cat), cb = b.filter((i) => i.category === cat);
+ const sa = ca.length ? scoreOf(cat, ca) : null, sb = cb.length ? scoreOf(cat, cb) : null;
+ return {
+  segment: cat,
+  a: sa,
+  b: sb,
+  deltaWithin20Pct: sa?.within20Pct != null && sb?.within20Pct != null ? sb.within20Pct - sa.within20Pct : null,
+ };
+ }).sort((x, y) => (y.a?.n ?? 0) + (y.b?.n ?? 0) - ((x.a?.n ?? 0) + (x.b?.n ?? 0)));
+
+ return { windowDays, modeA, modeB, overallA: scoreOf(modeA, a), overallB: scoreOf(modeB, b), paired, byCategory };
 }
