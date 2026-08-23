@@ -65,7 +65,7 @@ or Build (template + sections) -> edit -> preview -> publish.
 storefront SEO/JSON-LD.
 
 **Watch:**
-- Collections **rendering** is still orphaned (write-path done, rendering TODO) — required for collection sections.
+- ~~Collections **rendering** is still orphaned~~ — **done.** Collection pages render (`/s/{handle}/collections/{slug}` → `StorefrontView` filters by membership), collections appear in the storefront nav, and the "Shop by category" tiles now deep-link: a tile naming a real collection goes to that collection, anything else filters the shop by category.
 - Import **fidelity** is the hard part (capture must actually look like their real site) — biggest quality risk.
 
 ---

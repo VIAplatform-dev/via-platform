@@ -86,6 +86,10 @@ export type Ctx = {
  onFaqOp?: (blockId: string, op: "add" | { remove: number }) => void;
  faqDnd?: FaqDnd;
  storeSlug?: string;
+ // Lowercased collection title -> that collection's page href, pre-built (and preview-wrapped) by
+ // StorefrontView. Lets a shop-by-category tile deep-link the collection it names instead of
+ // dropping every tile on the bare shop page.
+ collectionHrefs?: Record<string, string>;
  onFieldFocus?: (blockId: string, key: string) => void;
  bgMedia?: BlockStyle["bgMedia"];
  freeEdit?: FreeEdit;
@@ -415,3 +419,15 @@ export function emptyHint(ctx: Ctx, label: string) {
 
 // Re-exported so layout files import their whole toolkit from one place.
 export type { Block, BlockStyle, Overlay, Item, ItemSchema };
+
+// Where a shop-by-category tile actually goes. A label naming one of the store's real collections
+// gets that collection's page; anything else — a template-seeded label like "Denim" — filters the
+// shop by category, which the shop page already matches tolerantly. On the editor canvas there is
+// no store to link into, so tiles fall back to shopHref and stay inert.
+export function tileHref(ctx: Ctx, label: string): string {
+ const known = ctx.collectionHrefs?.[(label || "").trim().toLowerCase()];
+ if (known) return known;
+ const cat = (label || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+ if (!cat || !ctx.storeSlug) return ctx.shopHref;
+ return `${ctx.shopHref}${ctx.shopHref.includes("?") ? "&" : "?"}category=${encodeURIComponent(cat)}`;
+}

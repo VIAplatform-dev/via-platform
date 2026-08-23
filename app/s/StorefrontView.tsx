@@ -236,6 +236,12 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const hasBlocks = !isShop && (!!pageSlug || homeBlocks.length > 0);
  // A clean nav for block-based stores: Home · Shop · each collection (with items) · each extra page.
  const collectionNav = storeCollections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: withPreview(`/s/${sf.handle}/collections/${c.slug}`) }));
+ // Same links keyed by lowercased title, for the shop-by-category tiles. Built from each
+ // collection's own slug (imported stores keep their source handle, so it is not always
+ // slugify(title)) and pre-wrapped here so preview mode survives the hop.
+ const collectionHrefs: Record<string, string> = Object.fromEntries(
+  collectionNav.map((c) => [c.label.trim().toLowerCase(), c.href]),
+ );
  const blockNav = homeBlocks.length > 0 || extraPages.length > 0
  ? [{ label: "Home", href: withPreview(`/s/${sf.handle}`) }, { label: "Shop", href: shopHref }, ...collectionNav, ...extraPages.map((p) => ({ label: p.title, href: withPreview(`/s/${sf.handle}/${p.slug}`) }))]
  : null;
@@ -386,7 +392,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -487,7 +493,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
  )}
 
  {showGrid && !hasBlocks && (

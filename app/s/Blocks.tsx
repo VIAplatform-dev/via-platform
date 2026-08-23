@@ -397,6 +397,7 @@ export default function Blocks({
  onFaqOp,
  faqDnd,
  storeSlug,
+ collectionHrefs,
  onFieldFocus,
  onResizeSectionStart,
  onPickImage,
@@ -445,6 +446,9 @@ export default function Blocks({
  faqDnd?: FaqDnd;
  // Live-site only: the store handle, so a contact section can submit to the right store.
  storeSlug?: string;
+ // Live-site only: lowercased collection title -> its page href, so shop-by-category tiles
+ // deep-link the collection they name instead of all landing on the bare shop page.
+ collectionHrefs?: Record<string, string>;
  // Editor-only: focusing a text field inside a section reports (blockId, field key) — the parent
  // uses this to show that field's own contextual toolbar instead of the section's background one.
  onFieldFocus?: (blockId: string, key: string) => void;
@@ -478,7 +482,7 @@ export default function Blocks({
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
- const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
+ const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, collectionHrefs, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
  const editable = typeof onSelect === "function";
  // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
  // and element: e.g. `.vya-hero .vya-heading { ... }` or `.vya-b-<id> { ... }`.

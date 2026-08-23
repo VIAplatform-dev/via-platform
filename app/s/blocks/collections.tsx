@@ -6,7 +6,7 @@
 // BlockProduct carries title/price/image/href and nothing else — so rather than print a fabricated
 // number, that slot is a typographic index ("list"), which is a real pattern and honest about the
 // data we have. If counts become available, it's a new variant, not a retrofit of this one.
-import { FreeField, emptyHint, type EditKit, type Item } from "./kit";
+import { FreeField, emptyHint, tileHref, type EditKit, type Item } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.collections;
@@ -30,7 +30,7 @@ function Heading({ kit, className }: { kit: EditKit; className: string }) {
 function Tile({ kit, t, i, setLabel, setImg, ratio, rounded }: { kit: EditKit; t: Item; i: number; setLabel: (i: number, v: string) => void; setImg: (i: number, v: string) => void; ratio: string; rounded?: string }) {
  const { ctx } = kit;
  return (
-  <a href={ctx.edit ? undefined : ctx.shopHref} className={`vya-round group relative block ${ratio} ${rounded || ""} overflow-hidden`} style={{ background: t.img ? undefined : `${ctx.fg}12` }}>
+  <a href={ctx.edit ? undefined : tileHref(ctx, t.label)} className={`vya-round group relative block ${ratio} ${rounded || ""} overflow-hidden`} style={{ background: t.img ? undefined : `${ctx.fg}12` }}>
    {t.img && <img src={t.img} alt={t.label} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.05]" />}
    {t.img && <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />}
    {/* Editor: the tile's photo area is the upload control — click it to set or replace the picture.
@@ -118,7 +118,7 @@ function CollectionsCircles({ kit }: { kit: EditKit }) {
    <Heading kit={kit} className="mb-8 text-center text-2xl @xl:text-[2rem] leading-tight" />
    <div className="flex flex-wrap justify-center gap-6 @xl:gap-9">
     {tiles.slice(0, 8).map((t, i) => (
-     <a key={i} href={ctx.edit ? undefined : ctx.shopHref} className="group flex w-24 flex-col items-center gap-3 @xl:w-28">
+     <a key={i} href={ctx.edit ? undefined : tileHref(ctx, t.label)} className="group flex w-24 flex-col items-center gap-3 @xl:w-28">
       <span
        className={`relative block h-24 w-24 overflow-hidden rounded-full @xl:h-28 @xl:w-28 ${ctx.edit && ctx.onPickImage ? "cursor-pointer" : ""}`}
        style={{ background: t.img ? undefined : `${ctx.fg}12` }}
@@ -148,7 +148,7 @@ function CollectionsList({ kit }: { kit: EditKit }) {
    <Heading kit={kit} className="mb-8 text-3xl @xl:text-[2.4rem] leading-tight" />
    <div style={{ borderTop: `1px solid ${ctx.fg}1f` }}>
     {tiles.map((t, i) => (
-     <a key={i} href={ctx.edit ? undefined : ctx.shopHref} className="group flex items-center justify-between gap-5 py-5" style={{ borderBottom: `1px solid ${ctx.fg}1f` }}>
+     <a key={i} href={ctx.edit ? undefined : tileHref(ctx, t.label)} className="group flex items-center justify-between gap-5 py-5" style={{ borderBottom: `1px solid ${ctx.fg}1f` }}>
       <span {...kit.txtItem(t.label, (val) => setLabel(i, val))} className="min-w-0 flex-1 text-2xl uppercase tracking-[0.06em] transition-opacity group-hover:opacity-60 @xl:text-3xl" style={{ fontFamily: ctx.head }} />
       {t.img && <span className="vya-round hidden h-14 w-12 shrink-0 overflow-hidden opacity-0 transition-opacity duration-300 group-hover:opacity-100 @lg:block"><img src={t.img} alt="" loading="lazy" className="h-full w-full object-cover" /></span>}
       <span className="shrink-0 text-[11px] uppercase tracking-[0.2em] opacity-40">→</span>
