@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOfferByToken, getOfferEvents, respondToOffer } from "@/app/lib/offers-db";
+import { getOfferByToken, getOfferEvents, publicOffer, respondToOffer } from "@/app/lib/offers-db";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { sendOfferUpdateToStore } from "@/app/lib/email";
 
 export const dynamic = "force-dynamic";
 
-// GET — the buyer's view of their offer (state + the full back-and-forth).
+// GET — the buyer's view of their offer (state + the full back-and-forth). `handle` is the
+// store's storefront handle, so the page can send the buyer back to the piece on the store's
+// OWN storefront (/s/{handle}/p/{id}) rather than the marketplace product page, which is
+// waitlist-gated and may not even carry this item.
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
  const { token } = await params;
  const offer = await getOfferByToken(token);
  if (!offer) return NextResponse.json({ error: "Offer not found." }, { status: 404 });
- return NextResponse.json({ ok: true, offer, events: await getOfferEvents(offer.id) });
+ const sf = await getStorefrontBySlug(offer.storeSlug).catch(() => null);
+ return NextResponse.json({ ok: true, offer: publicOffer(offer), handle: sf?.handle ?? null, events: await getOfferEvents(offer.id) });
 }
 
 // POST — the buyer responds. { action: "accept" | "counter" | "decline" | "withdraw", amountCents? }
@@ -30,5 +35,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const updated = await respondToOffer(offer, "buyer", action as "accept" | "counter" | "decline" | "withdraw", amountCents);
  if (!updated) return NextResponse.json({ error: "This offer can’t be changed anymore." }, { status: 409 });
  await sendOfferUpdateToStore(updated).catch(() => {});
- return NextResponse.json({ ok: true, offer: updated, events: await getOfferEvents(updated.id) });
+ return NextResponse.json({ ok: true, offer: publicOffer(updated), events: await getOfferEvents(updated.id) });
 }

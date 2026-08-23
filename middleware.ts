@@ -84,6 +84,12 @@ const PUBLIC_ROUTES = [
   "/checkout",
   "/api/thread",
   "/thread",
+  // A shopper negotiating on a seller's storefront is a member of the public — no VYA account,
+  // no pilot approval. Their offer-tracking page is authenticated by the unguessable token in the
+  // URL, exactly like /thread, and it is what the "track it" link and every offer email point at.
+  // Gating it dead-ends the negotiation: the buyer cannot answer a counter, and cannot reach the
+  // accepted-price checkout.
+  "/offer",
   "/store/login",
 ];
 
@@ -216,6 +222,8 @@ export async function middleware(request: NextRequest) {
       pathname === "/checkout" || pathname.startsWith("/checkout/") ||
       pathname === "/cart" || pathname.startsWith("/cart/") ||
       pathname === "/order" || pathname.startsWith("/order/") ||
+      // Offers are part of that same journey: the accepted-offer page links straight to /checkout.
+      pathname === "/offer" || pathname.startsWith("/offer/") ||
       pathname.startsWith("/infra/") ||
       pathname === "/infrastructure" ||
       pathname.startsWith("/infrastructure/") ||

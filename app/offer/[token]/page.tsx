@@ -16,6 +16,7 @@ const money = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
 export default function OfferPage() {
  const { token } = useParams<{ token: string }>();
  const [offer, setOffer] = useState<Offer | null>(null);
+ const [handle, setHandle] = useState<string | null>(null); // the store's storefront handle
  const [events, setEvents] = useState<Event[]>([]);
  const [loading, setLoading] = useState(true);
  const [counter, setCounter] = useState("");
@@ -28,7 +29,7 @@ export default function OfferPage() {
  (async () => {
  const r = await fetch(`/api/storefront/offer/${token}`).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  if (!active) return;
- if (r?.offer) { setOffer(r.offer); setEvents(r.events || []); }
+ if (r?.offer) { setOffer(r.offer); setHandle(r.handle ?? null); setEvents(r.events || []); }
  setLoading(false);
  })();
  return () => { active = false; };
@@ -51,6 +52,15 @@ export default function OfferPage() {
 
  const buyersTurn = offer.status === "pending" && offer.lastActor === "store";
  const waiting = offer.status === "pending" && offer.lastActor === "buyer";
+ // A binding offer checks out at the AGREED price — the token is what unlocks it (and what lets
+ // this buyer past the reservation the store's acceptance placed on the piece). A non-binding
+ // one is just a promise, so send them back to the piece on the store's own storefront to buy at
+ // list; only fall back to the marketplace page if the store has no storefront handle.
+ const buyHref = offer.binding
+ ? `/checkout?item=${offer.itemId}&offer=${token}`
+ : handle
+ ? `/s/${handle}/p/${offer.itemId}`
+ : `/products/${offer.itemId}`;
 
  return (
  <div className="min-h-screen bg-[#FFFDF8] px-6 py-16">
@@ -65,7 +75,7 @@ export default function OfferPage() {
  <>
  <p className="text-[13px] font-medium text-emerald-700">✓ Accepted at {money(offer.amountCents)}</p>
  <p className="mt-1 text-[13px] text-black/60">{offer.binding ? "Complete your purchase at the agreed price." : "The seller will honor this price."}</p>
- {offer.itemId && <a href={offer.binding ? `/checkout?item=${offer.itemId}&offer=${token}` : `/products/${offer.itemId}`} className="mt-3 inline-block bg-[#5D0F17] text-[#FFFDF8] text-[11px] uppercase tracking-[0.15em] px-6 py-3 hover:bg-[#5D0F17]/85 transition">Buy now</a>}
+ {offer.itemId && <a href={buyHref} className="mt-3 inline-block bg-[#5D0F17] text-[#FFFDF8] text-[11px] uppercase tracking-[0.15em] px-6 py-3 hover:bg-[#5D0F17]/85 transition">Buy now</a>}
  </>
  ) : offer.status === "declined" ? (
  <p className="text-[13px] text-black/60">The seller passed on this offer. The piece is still available at {money(offer.listPriceCents)}.</p>

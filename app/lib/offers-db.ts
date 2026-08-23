@@ -34,6 +34,30 @@ export type Offer = {
  expiresAt: string;
 };
 
+// The buyer's offer page is reachable by anyone holding the token (it's emailed, so it gets
+// forwarded and lands in shared history). This is the ONLY shape that may be served there —
+// an explicit allowlist, so a field added to Offer later is private by default rather than
+// silently published. Contact details (buyerName/buyerEmail) and internal bookkeeping
+// (consumedOrderId) stay server-side; the store sees those through its authenticated inbox.
+export type PublicOffer = Pick<
+ Offer,
+ "storeSlug" | "itemId" | "itemTitle" | "listPriceCents" | "amountCents" | "status" | "lastActor" | "binding" | "expiresAt"
+>;
+
+export function publicOffer(o: Offer): PublicOffer {
+ return {
+ storeSlug: o.storeSlug,
+ itemId: o.itemId,
+ itemTitle: o.itemTitle,
+ listPriceCents: o.listPriceCents,
+ amountCents: o.amountCents,
+ status: o.status,
+ lastActor: o.lastActor,
+ binding: o.binding,
+ expiresAt: o.expiresAt,
+ };
+}
+
 let ensured = false;
 async function ensure() {
  if (ensured) return;
