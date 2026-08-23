@@ -77,6 +77,28 @@ export async function recordVoyage(data: any, ctx?: { itemId?: string | null; st
  await recordCost({ provider: "voyage", operation: "embed", model: "voyage-multimodal-3", inputTokens: tokens, units: 1, costCents: (tokens / 1e6) * RATES.voyagePerM * 100, itemId: ctx?.itemId, storeSlug: ctx?.storeSlug });
 }
 
+// ── SerpApi monthly quota tracking ──
+const SERPAPI_MONTHLY_LIMIT = 5000;
+
+export async function getSerpApiUsage(): Promise<{ used: number; limit: number; remaining: number; pct: number; projectedMonthEnd: number; warning: boolean }> {
+ await ensure();
+ const sql = db();
+ // Count calls since the 1st of the current month (UTC)
+ const monthStart = new Date();
+ monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0);
+ const since = monthStart.toISOString();
+ const dayOfMonth = new Date().getUTCDate();
+ const daysInMonth = new Date(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 0).getUTCDate();
+
+ const rows = await sql`SELECT COUNT(*)::int AS n FROM api_costs WHERE provider = 'serpapi' AND created_at >= ${since}`;
+ const used = (rows[0] as any)?.n ?? 0;
+ const remaining = Math.max(0, SERPAPI_MONTHLY_LIMIT - used);
+ const pct = Math.round((used / SERPAPI_MONTHLY_LIMIT) * 100);
+ // Linear projection: if we used X in D days, we'll use X * (daysInMonth / D) by month end
+ const projectedMonthEnd = dayOfMonth > 0 ? Math.round(used * (daysInMonth / dayOfMonth)) : used;
+ return { used, limit: SERPAPI_MONTHLY_LIMIT, remaining, pct, projectedMonthEnd, warning: projectedMonthEnd > SERPAPI_MONTHLY_LIMIT * 0.85 };
+}
+
 // ── Aggregation for the admin costs view ──
 export async function getCostSummary(days = 30): Promise<any> {
  await ensure();

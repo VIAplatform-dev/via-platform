@@ -3,7 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getMarketReferenceFast, computePriceFlag, type PriceEstimate } from "@/app/lib/price-engine";
 import { getVisualVyaComps } from "@/app/lib/intake-memory-db";
 import { embedImage } from "@/app/lib/embeddings";
-import { reverseImageMatches, verifyMatchesByImage } from "@/app/lib/comps";
+import { reverseImageMatches, partitionByVisualMatch } from "@/app/lib/comps";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -73,12 +73,15 @@ export async function POST(request: NextRequest) {
  let webEst: PriceEstimate | null = null, webN = 0;
  if (imageUrl && textN < 3 && visualN < 3) {
   const matches = await reverseImageMatches(imageUrl).catch(() => []);
-  const { verified, filtered } = await verifyMatchesByImage(embedding, matches).catch(() => ({ verified: matches, filtered: false }));
-  const priced = verified.filter((m) => (m.priceCents ?? 0) > 0);
+  const { verified, unchecked, ran } = await partitionByVisualMatch(matches, { queryEmbedding: embedding }).catch(() => ({ verified: matches, unchecked: [] as typeof matches, ran: false }));
+  // Use verified matches when scoring ran; fall back to all matches if it couldn't run.
+  const pool = ran ? [...verified, ...unchecked.filter((m) => (m.priceCents ?? 0) > 0)] : matches;
+  const priced = pool.filter((m) => (m.priceCents ?? 0) > 0);
   webN = priced.length;
+  const verifiedN = verified.filter((m) => (m.priceCents ?? 0) > 0).length;
   // Verified visual matches are the truest comp there is → higher confidence than an unfiltered set.
-  const conf = filtered ? (webN >= 5 ? 0.62 : webN >= 3 ? 0.52 : 0.42) : (webN >= 5 ? 0.5 : 0.42);
-  webEst = estimateFromPrices(priced.map((m) => m.priceCents ?? 0), conf, `Priced from ${webN} ${filtered ? "visually-verified" : "visual"} web match${webN === 1 ? "" : "es"}.`);
+  const conf = ran ? (verifiedN >= 5 ? 0.62 : verifiedN >= 3 ? 0.52 : 0.42) : (webN >= 5 ? 0.5 : 0.42);
+  webEst = estimateFromPrices(priced.map((m) => m.priceCents ?? 0), conf, `Priced from ${verifiedN} visually-verified + ${webN - verifiedN} unverified web matches.`);
  }
 
  // Choose the strongest: score = confidence + a small bonus for more comps. Photo-based tiers win ties.

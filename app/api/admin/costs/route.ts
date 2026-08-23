@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { getCostSummary } from "@/app/lib/cost-tracker";
+import { getCostSummary, getSerpApiUsage } from "@/app/lib/cost-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const days = Math.max(1, Math.min(365, parseInt(request.nextUrl.searchParams.get("days") ?? "30", 10) || 30));
  try {
-  return NextResponse.json(await getCostSummary(days));
+  const [summary, serpQuota] = await Promise.all([getCostSummary(days), getSerpApiUsage()]);
+  return NextResponse.json({ ...summary, serpApiQuota: serpQuota });
  } catch (e) {
   return NextResponse.json({ error: "cost summary failed", detail: String(e) }, { status: 500 });
  }

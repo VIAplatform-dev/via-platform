@@ -18,7 +18,7 @@ import { gate } from "@/app/lib/concurrency";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 // Cap concurrent AI listing work so bursts (many stores at once) don't trip the
 // Anthropic per-minute rate limits. Tunable as the API tier grows.

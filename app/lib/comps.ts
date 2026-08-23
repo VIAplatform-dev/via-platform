@@ -8,7 +8,7 @@
 import { unstable_cache } from "next/cache.js";
 import { getCachedLens, saveCachedLens } from "./lens-cache-db.ts";
 import { lensPriceToUsdCents, symbolToIso, toUsdCents } from "./currency.ts";
-import { recordSerp } from "./cost-tracker.ts";
+import { recordSerp, getSerpApiUsage } from "./cost-tracker.ts";
 import { embedImages, cosine } from "./embeddings.ts";
 import { inferBrandFromTitle } from "./market-data-db.ts";
 
@@ -37,6 +37,23 @@ export function isCompsConfigured(): boolean {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+// Check SerpApi quota every ~100 calls (serverless = resets often, so this is cheap enough).
+let _serpCallsSinceCheck = 0;
+let _serpQuotaWarned = false;
+async function checkSerpQuota(): Promise<void> {
+ _serpCallsSinceCheck++;
+ if (_serpCallsSinceCheck < 100 && !_serpQuotaWarned) return;
+ _serpCallsSinceCheck = 0;
+ try {
+  const q = await getSerpApiUsage();
+  if (q.warning && !_serpQuotaWarned) {
+   console.warn(`[serpapi] ⚠️ QUOTA WARNING: ${q.used}/${q.limit} used (${q.pct}%), projected ${q.projectedMonthEnd} by month end`);
+   _serpQuotaWarned = true;
+  }
+ } catch { /* best-effort */ }
+}
+
 async function serp(params: Record<string, string>): Promise<any | null> {
  const apiKey = process.env.SERPAPI_API_KEY;
  if (!apiKey) return null;
@@ -51,6 +68,7 @@ async function serp(params: Record<string, string>): Promise<any | null> {
  if (!res.ok) return null;
  const json = await res.json();
  await recordSerp(params.engine);
+ checkSerpQuota().catch(() => {}); // fire-and-forget, never delays the response
  return json;
  } catch {
  console.log(`[serpapi] call engine=${params.engine} q="${q}" error ${Date.now() - t0}ms`);
