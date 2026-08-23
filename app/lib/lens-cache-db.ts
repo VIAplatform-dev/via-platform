@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import type { VisualMatch } from "./comps";
+import type { VisualMatch } from "./comps.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Google Lens (reverse-image) cache. The image URL is immutable, so the SAME photo

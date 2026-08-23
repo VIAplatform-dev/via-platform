@@ -6,6 +6,7 @@ import { Package, Search } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, cn } from "../ui";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
+import { PriceGuidance, type PriceContext } from "../PriceGuidance";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 type Item = {
  id: string;
@@ -67,6 +68,9 @@ export default function ItemsPage() {
  const [bulkColName, setBulkColName] = useState("");
  const [aiNotice, setAiNotice] = useState<string | null>(null); // result of the last AI re-tag
  const [editing, setEditing] = useState<Item | null>(null);
+ // The AI pricing context for the item being edited (market value, band, rationale). Bulk-drafted
+ // items carry this now, so their editor shows the same guidance the one-at-a-time flow shows.
+ const [priceCtx, setPriceCtx] = useState<PriceContext | null>(null);
  const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
@@ -210,6 +214,12 @@ export default function ItemsPage() {
  const num2str = (n: number | null) => (n == null ? "" : String(n));
  function openEdit(it: Item) {
  setEditing(it);
+ // Load asynchronously — the editor opens instantly and the guidance fills in when it arrives.
+ setPriceCtx(null);
+ fetch(`/api/store/items/${it.id}/price-context`)
+  .then((r) => (r.ok ? r.json() : null))
+  .then((d) => setPriceCtx(d?.context ?? null))
+  .catch(() => {});
  setEditForm({
  title: it.title, price: cents2str(it.priceCents), cost: cents2str(it.costCents),
  brand: it.brand || "", era: it.era || "", material: it.material || "", condition: it.condition || "",
@@ -659,6 +669,7 @@ export default function ItemsPage() {
  })()}
  </Field>
  </div>
+ <PriceGuidance ctx={priceCtx} priceUsd={Number(editForm.price) || 0} />
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>

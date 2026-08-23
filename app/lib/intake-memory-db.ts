@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
-import { cosine, embedImage, isEmbeddingConfigured } from "./embeddings";
-import { brandMatch } from "./brand-match";
-import type { Comp } from "./comps";
+import { cosine, embedImage, isEmbeddingConfigured } from "./embeddings.ts";
+import { brandMatch } from "./brand-match.ts";
+import type { Comp } from "./comps.ts";
 
 // The intake "correction memory" — v1 of the learning loop.
 //

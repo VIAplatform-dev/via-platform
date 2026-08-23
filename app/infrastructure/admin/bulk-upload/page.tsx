@@ -204,12 +204,17 @@ export default function BulkUploadPage() {
 
     // 2) Price it (same inputs as the single-item flow).
     let priceUsd = 0;
+    // The whole estimate, not just the number: the market value, the quick-sale→top-demand band
+    // and the rationale are what the editor needs to show the same AI guidance the one-at-a-time
+    // flow shows. Bulk used to keep only `suggestedCents` and drop the rest on the floor.
+    let est: Record<string, unknown> | null = null;
     try {
      const p = await fetch("/api/store/intake/pricing", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageUrls: photos, fields: { ...fields, conditionGrade: fields.condition, price: "", runway: (d?.runway ?? dr?.runway) || "", celebrity: d?.celebrity || "" }, searchQuery: d?.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d?.reverseComps ?? [], reverseTitles: d?.reverseTitles ?? [], editorialTitles: d?.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d?.needDraft === true }),
      }).then((r) => r.json()).catch(() => null);
      if (typeof p?.estimate?.suggestedCents === "number") priceUsd = Math.round(p.estimate.suggestedCents / 100);
+     if (p?.estimate) est = p.estimate;
     } catch { /* price stays 0 */ }
 
     // 3) Save a complete draft.
@@ -233,6 +238,19 @@ export default function BulkUploadPage() {
        widthIn: parcel.widthIn || null, heightIn: parcel.heightIn || null,
       }),
      }).catch(() => {});
+     // Attach the AI price context so the listing editor can render the rationale, the price
+     // scale and the over/under-market flag for bulk-drafted items too.
+     if (est) {
+      await fetch(`/api/store/items/${sd.id}/price-context`, {
+       method: "POST", headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({
+        suggestedCents: est.suggestedCents, marketCents: est.marketCents,
+        lowCents: est.lowCents, highCents: est.highCents,
+        confidence: est.confidence, source: est.source, rationale: est.rationale,
+        compCount: Array.isArray(est.comps) ? est.comps.length : null,
+       }),
+      }).catch(() => {});
+     }
     }
     setDrafted((d2) => ({ ...d2, [gi]: { id: sd?.id ?? null, ...fields, ...parcel, priceUsd, images, status: "draft", ok } }));
    } catch {

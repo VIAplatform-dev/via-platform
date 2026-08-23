@@ -3,14 +3,34 @@
 // an explicit enable flag, so it's fully dormant — no calls, no spend — until you
 // subscribe and flip PHOTOROOM-style SERPAPI_ENABLED=true.
 
-import { unstable_cache } from "next/cache";
-import { getCachedLens, saveCachedLens } from "./lens-cache-db";
-import { recordSerp } from "./cost-tracker";
-import { embedImages, cosine } from "./embeddings";
+// ".js" is required for Node's native TS runner (`node --test`) to resolve this — next has no
+// package "exports" map, so extensionless subpaths fail in ESM. Webpack/Next resolve it the same.
+import { unstable_cache } from "next/cache.js";
+import { getCachedLens, saveCachedLens } from "./lens-cache-db.ts";
+import { lensPriceToUsdCents, symbolToIso, toUsdCents } from "./currency.ts";
+import { recordSerp } from "./cost-tracker.ts";
+import { embedImages, cosine } from "./embeddings.ts";
+import { inferBrandFromTitle } from "./market-data-db.ts";
+
+/** Two brand strings refer to the same house (ignoring case/punctuation and sub-line wording). */
+function sameBrand(a: string, b: string): boolean {
+ const n = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+ const [x, y] = [n(a), n(b)];
+ return Boolean(x && y) && (x.includes(y) || y.includes(x));
+}
 
 const SERPAPI_URL = "https://serpapi.com/search.json";
 
-export type Comp = { title: string; priceCents: number; currency: string; sold: boolean; source: string; link?: string; condition?: string };
+// saleType distinguishes a Buy It Now sale (someone paid the seller's price — the real signal)
+// from an auction close (whatever the bidding happened to reach). Conflating them let a $900
+// auction close anchor a piece whose asking cluster sat at $1,459–$2,082.
+export type SaleType = "bin" | "auction" | null;
+export type SourceTier = "vya" | "specialist" | "marketplace";
+// exactPiece: this listing was VISUALLY confirmed to be the same garment as the seller's photo.
+// It is the strongest comp there is and outranks every keyword match, sold or not — nine listings
+// of one Versace runway dress ($1,733–$3,200) once lost to two unrelated sold dresses at $350–$500
+// purely because the unrelated ones had `sold: true`.
+export type Comp = { title: string; priceCents: number; currency: string; sold: boolean; source: string; link?: string; condition?: string; saleType?: SaleType; exactPiece?: boolean; similarity?: number };
 
 export function isCompsConfigured(): boolean {
  return Boolean(process.env.SERPAPI_API_KEY) && process.env.SERPAPI_ENABLED === "true";
@@ -51,25 +71,133 @@ export function priceToCents(p: any): number | null {
  return v && v > 0 ? Math.round(v * 100) : null;
 }
 
-export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string; thumbnail?: string; similarity?: number };
+// nativePriceCents/nativeCurrency are set by link price-verify: what the product page stated
+// before USD conversion, kept as comp provenance.
+// `image` is the ORIGINAL store image; `thumbnail` is Google's ~225px re-crop. Scoring the full
+// image separates the same garment from a look-alike about 10x better (measured on a real dress:
+// same piece 0.744 → 0.954, best non-match 0.733 → 0.849), so we keep both and prefer the former.
+export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string; thumbnail?: string; image?: string; similarity?: number; visuallyVerified?: boolean; sold?: boolean; nativePriceCents?: number; nativeCurrency?: string };
 
 /** Reverse-image search (Google Lens) for the exact / visually-identical product.
  *  This is the single best signal for BRAND ID and true price — it finds the same
  *  piece listed across the web instead of guessing from the look. [] if not enabled. */
-export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch[]> {
+export async function reverseImageMatches(imageUrl: string, q?: string): Promise<VisualMatch[]> {
  if (!isCompsConfigured() || !imageUrl) return [];
- // Same photo → same matches. Reuse a cached result (no SerpApi spend) before searching.
- const cached = await getCachedLens(imageUrl);
+ // Same photo + same refinement → same matches. The refinement is part of the cache key, so
+ // tier 2/3 don't collide with tier 1's cached result for the same photo.
+ const cacheKey = q ? `${imageUrl}#q=${q}` : imageUrl;
+ const cached = await getCachedLens(cacheKey);
  if (cached) return cached;
- const r = await serp({ engine: "google_lens", url: imageUrl, country: "us" });
+ const r = await serp({ engine: "google_lens", url: imageUrl, country: "us", ...(q ? { q } : {}) });
  const matches = ((r?.visual_matches || []) as any[])
  .slice(0, 25)
- .map((m) => ({ title: String(m.title || ""), priceCents: priceToCents(m.price), source: String(m.source || ""), link: m.link as string | undefined, thumbnail: (typeof m.thumbnail === "string" && m.thumbnail) || undefined }))
+ // lensPriceToUsdCents, not priceToCents: Lens matches are international, and their currency
+ // symbol must convert (€450 ≠ $450). Ambiguous currency → unpriced (link-verify can rescue it).
+ .map((m) => ({ title: String(m.title || ""), priceCents: lensPriceToUsdCents(m.price), source: String(m.source || ""), link: m.link as string | undefined, thumbnail: (typeof m.thumbnail === "string" && m.thumbnail) || undefined, image: (typeof m.image === "string" && m.image) || undefined }))
  .filter((m) => m.title);
  // Cache only a genuine SerpApi response (r != null) — never persist a transient timeout/error as
  // "no matches", which would poison this photo's lookups for the whole TTL.
- if (r) await saveCachedLens(imageUrl, matches);
+ if (r) await saveCachedLens(cacheKey, matches);
  return matches;
+}
+
+/**
+ * Tiered reverse-image search: image → image + BRAND → image + BRAND + CATEGORY.
+ *
+ * A photo alone often returns look-alikes from other labels, or too few priced matches to price
+ * from. Re-running Lens with the brand attached narrows it to that brand's own market; adding the
+ * category narrows it to the right garment. Brand ALWAYS leads the refinement, and a brand guard
+ * drops any match whose title resolves to a different label — phrasing alone can't prevent a
+ * refinement from wandering into another brand's listings.
+ *
+ * Escalation is evidence-driven, so a clean product shot still costs exactly one Lens call.
+ * Unbranded pieces skip the brand tier and refine on category + material instead.
+ */
+export async function reverseImageTiered(
+ imageUrl: string,
+ opts: {
+  brand?: string | null;
+  category?: string | null;
+  material?: string | null;
+  queryEmbedding?: number[] | null;
+  tier1Min?: number;
+  tier2Min?: number;
+  search?: (imageUrl: string, q?: string) => Promise<VisualMatch[]>;
+  verifyAll?: boolean; // tests: treat every match as visually verified
+ },
+): Promise<{ matches: VisualMatch[]; tiersUsed: number; queries: (string | undefined)[] }> {
+ const search = opts.search ?? ((u: string, q?: string) => reverseImageMatches(u, q));
+ const tier1Min = opts.tier1Min ?? 5;
+ const tier2Min = opts.tier2Min ?? 2;
+ let brand = (opts.brand || "").trim();
+ const cat = (opts.category || "").trim().replace(/ies$/i, "y").replace(/(ss|sh|ch|x|z)es$/i, "$1").replace(/([^s])s$/i, "$1");
+ const material = (opts.material || "").trim();
+
+ // Brand first, always. Without a brand, refine on what the piece intrinsically is.
+ const refinements: string[] = [
+  brand || null,
+  brand ? [brand, cat].filter(Boolean).join(" ") : [material, cat].filter(Boolean).join(" ") || null,
+ ].filter((q, i, a) => q && a.indexOf(q) === i) as string[];
+
+ const merged: VisualMatch[] = [];
+ const seen = new Set<string>();
+ const queries: (string | undefined)[] = [];
+ const add = (ms: VisualMatch[], refined: boolean) => {
+  for (const m of ms) {
+   // Brand guard: on a REFINED tier, a title that resolves to a different brand is dropped.
+   // A title with no brand signal keeps the benefit of the doubt — many true same-piece
+   // listings never name the label.
+   if (refined && brand) {
+    const inferred = inferBrandFromTitle(m.title);
+    if (inferred && !sameBrand(inferred, brand)) continue;
+   }
+   const k = m.link || `${m.title}|${m.priceCents}`;
+   if (seen.has(k)) continue;
+   seen.add(k);
+   merged.push(m);
+  }
+ };
+ const pricedVerified = async (): Promise<number> => {
+  const priced = merged.filter((m) => m.priceCents && m.priceCents > 0);
+  if (opts.verifyAll) return priced.length;
+  if (!opts.queryEmbedding) return priced.length;
+  const { verified } = await partitionByVisualMatch(priced, { queryEmbedding: opts.queryEmbedding });
+  return verified.length;
+ };
+
+ queries.push(undefined);
+ add(await search(imageUrl).catch(() => []), false);
+ let tiersUsed = 1;
+ if ((await pricedVerified()) >= tier1Min) return { matches: merged, tiersUsed, queries };
+
+ // At intake the brand usually ISN'T known yet — resolving it is half of what reverse-image is
+ // for. So when the caller didn't supply one, take the consensus brand off tier 1's own match
+ // titles and refine with that. Without this, an unlabelled photo could never escalate at all.
+ if (!brand) {
+  const tally = new Map<string, number>();
+  for (const m of merged) {
+   const b = inferBrandFromTitle(m.title);
+   if (b) tally.set(b, (tally.get(b) || 0) + 1);
+  }
+  const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] >= 2) {
+   brand = top[0];
+   refinements.length = 0;
+   refinements.push(brand, [brand, cat].filter(Boolean).join(" "));
+   console.log(`[comps] tier-1 brand consensus: ${brand} (${top[1]} matches)`);
+  }
+ }
+
+ for (let i = 0; i < refinements.length; i++) {
+  const q = refinements[i];
+  queries.push(q);
+  add(await search(imageUrl, q).catch(() => []), true);
+  tiersUsed++;
+  const enough = await pricedVerified();
+  if (i === 0 && enough >= tier2Min) break;
+ }
+ console.log(`[comps] reverse-image tiers=${tiersUsed} queries=${JSON.stringify(queries)} matches=${merged.length}`);
+ return { matches: merged, tiersUsed, queries };
 }
 
 /** Adaptive multi-frame reverse image. Sellers upload several photos but only the first
@@ -157,17 +285,95 @@ export async function verifyMatchesByImage(
  return { verified: kept, checked: embedded, filtered: true };
 }
 
+/**
+ * Split reverse-image matches into visually VERIFIED (same piece), REJECTED (provably different),
+ * and UNCHECKED (no thumbnail, or scoring unavailable) — instead of silently dropping everything
+ * that couldn't be scored.
+ *
+ * This exists so the caller can filter in the right ORDER. Filtering by brand text first threw
+ * away the strongest evidence there is: a listing of the SAME dress whose title never mentions the
+ * brand ("Pink Polka Dot Swing Dress"). A visual match outranks a title match, so verified matches
+ * should survive on their own merit and only the unchecked ones need the brand-text fallback.
+ *
+ * `scoreOne` is injectable for testing; by default each thumbnail is embedded and compared to the
+ * query photo. When nothing can be scored, `ran` is false and EVERYTHING lands in `unchecked` —
+ * the caller then keeps its previous behaviour rather than loosening a filter with nothing to
+ * replace it.
+ */
+export async function partitionByVisualMatch(
+ matches: VisualMatch[],
+ opts: { min?: number; max?: number; queryEmbedding?: number[] | null; scoreOne?: (imageUrl: string) => Promise<number | null> },
+): Promise<{ verified: VisualMatch[]; rejected: VisualMatch[]; unchecked: VisualMatch[]; ran: boolean }> {
+ const min = opts.min ?? VISUAL_MATCH_MIN;
+ const max = opts.max ?? 16;
+ const verified: VisualMatch[] = [], rejected: VisualMatch[] = [], unchecked: VisualMatch[] = [];
+
+ // Default scorer: embed each thumbnail and compare against the query photo's embedding.
+ // Scores ONE image URL. The image-vs-thumbnail fallback lives in the loop below, not in here,
+ // so it applies to any injected scorer too (and is testable on its own).
+ const scoreOne = opts.scoreOne ?? (async (url: string) => {
+  if (!opts.queryEmbedding) return null;
+  const [e] = await embedImages([url]).catch(() => [null]);
+  return e ? cosine(opts.queryEmbedding, e) : null;
+ });
+
+ // Full image first, Google's ~225px thumbnail as fallback. Some hosts (Vestiaire, Poshmark,
+ // TikTok) block the embedding API outright, and losing those matches entirely would be worse
+ // than scoring their lower-fidelity thumbnail.
+ const scoreMatch = async (m: VisualMatch): Promise<number | null> => {
+  for (const url of [m.image, m.thumbnail]) {
+   if (!url) continue;
+   const s = await scoreOne(url).catch(() => null);
+   if (s != null) return s;
+  }
+  return null;
+ };
+
+ let scored = 0;
+ // A match with no thumbnail is unscoreable by definition — never hand it to the scorer.
+ const scores = await Promise.all(matches.slice(0, max).map((m) => (m.image || m.thumbnail ? scoreMatch(m) : Promise.resolve(null))));
+ matches.forEach((m, i) => {
+  const s = i < scores.length ? scores[i] : null;
+  if (s == null) { unchecked.push(m); return; }
+  scored++;
+  if (s >= min) verified.push({ ...m, similarity: s, visuallyVerified: true });
+  else rejected.push({ ...m, similarity: s });
+ });
+ if (!scored) return { verified: [], rejected: [], unchecked: matches, ran: false };
+ console.log(`[comps] visual-partition: verified ${verified.length}, rejected ${rejected.length}, unchecked ${unchecked.length} (min=${min})`);
+ return { verified, rejected, unchecked, ran: true };
+}
+
 /** Reverse-image matches that carry a price → resale comps. Visually-identical items
- *  are the truest comps there are, so these anchor the valuation. */
+ *  are the truest comps there are, so these anchor the valuation. A match link-verified
+ *  as SoldOut enters as a SOLD comp — a realized transaction, the strongest signal. */
 export function matchesToComps(matches: VisualMatch[]): Comp[] {
  return matches
  .filter((m) => m.priceCents && m.priceCents > 0)
- .map((m) => ({ title: m.title, priceCents: m.priceCents as number, currency: "USD", sold: false, source: m.source || "Visual match", link: m.link }));
+ .map((m) => ({
+  title: m.title, priceCents: m.priceCents as number, currency: "USD", sold: m.sold === true,
+  source: m.source || "Visual match", link: m.link,
+  ...(m.visuallyVerified ? { exactPiece: true as const, similarity: m.similarity } : {}),
+ }));
 }
 
 // Authenticated-luxury resellers — the truest comps for designer pieces; surfaced first so
 // they survive any downstream truncation before the valuation step sees them.
 const PREMIUM_SOURCE = /real\s?real|vestiaire|fashionphile|rebag|luxury\s?closet|1st\s?dibs|farfetch/i;
+// General marketplaces: anyone can list anything, so caliber and authentication vary wildly.
+const MARKETPLACE_SOURCE = /ebay|depop|etsy|poshmark|mercari|grailed|vinted|shopozz|aliexpress|amazon|google shopping|visual match/i;
+
+/** Which caliber of seller a comp came from. A specialist archival dealer's price is far better
+ *  evidence for a 1999 runway piece than a general-marketplace listing, and VYA's own realized
+ *  prices are the strongest signal of all. Unrecognized sources default to `specialist` — they're
+ *  overwhelmingly the independent boutiques link-verify surfaces (Time's Up Vintage, Anteactus),
+ *  which are curated sellers, not general marketplaces. */
+export function sourceTier(source: string): SourceTier {
+ const s = (source || "").trim();
+ if (/^vya\b/i.test(s)) return "vya";
+ if (MARKETPLACE_SOURCE.test(s)) return "marketplace";
+ return "specialist"; // PREMIUM_SOURCE and independent curated dealers alike
+}
 
 /** Dedupe a comp set and rank authenticated-luxury sources first. */
 export function rankComps(comps: Comp[]): Comp[] {
@@ -224,18 +430,41 @@ export function filterModelConflicts(comps: Comp[], query: string): Comp[] {
  });
 }
 
-/** eBay SOLD + completed — real transaction prices (the reality anchor reverse-image can't
- *  give, since Google Lens shows asking/active listings). One SerpApi call. Searched on a COMPACT
- *  query so the model actually matches recent sold listings (recency also fixes stale valuations). */
-export async function fetchEbaySold(query: string): Promise<Comp[]> {
- if (!isCompsConfigured() || !query.trim()) return [];
- const r = await serp({ engine: "ebay", _nkw: compactQuery(query), ebay_domain: "ebay.com", LH_Sold: "1", LH_Complete: "1" });
+/** Parse eBay sold rows into comps, separating Buy It Now sales from auction closes.
+ *  Pure + exported for testing. A BIN sale means a buyer paid the seller's asking price; an
+ *  auction close only means the bidding stopped there. They are labelled distinctly so the
+ *  valuation can anchor on the former and treat the latter as a floor. */
+export function parseEbayRows(rows: any[]): Comp[] {
  const comps: Comp[] = [];
- for (const row of (r?.organic_results || []).slice(0, 25)) {
- const cents = priceToCents(row.price);
- if (cents) comps.push({ title: String(row.title || ""), priceCents: cents, currency: "USD", sold: true, source: "eBay (sold)", link: row.link, condition: row.condition });
+ for (const row of (rows || []).slice(0, 25)) {
+ const cents = priceToCents(row?.price);
+ if (!cents) continue;
+ const fmt = String(row?.buying_format ?? row?.buying_format_text ?? "").toLowerCase().replace(/[\s_-]/g, "");
+ // Only label what eBay actually told us — an unlabelled row is unknown, never assumed BIN.
+ const saleType: SaleType = fmt.includes("auction") ? "auction" : fmt.includes("buyitnow") || fmt === "bin" ? "bin" : null;
+ comps.push({
+  title: String(row.title || ""),
+  priceCents: cents,
+  currency: "USD",
+  sold: true,
+  saleType,
+  source: saleType === "auction" ? "eBay (auction)" : "eBay (sold)",
+  link: row.link,
+  condition: row.condition,
+ });
  }
  return comps;
+}
+
+/** eBay SOLD + completed — real transaction prices (the reality anchor reverse-image can't
+ *  give, since Google Lens shows asking/active listings). One SerpApi call. Searched on a COMPACT
+ *  query so the model actually matches recent sold listings (recency also fixes stale valuations).
+ *  Requests BUY IT NOW sales specifically: auction closes reflect bidding dynamics, not market
+ *  value, and a single low close was dragging archival pieces ~45% under. */
+export async function fetchEbaySold(query: string): Promise<Comp[]> {
+ if (!isCompsConfigured() || !query.trim()) return [];
+ const r = await serp({ engine: "ebay", _nkw: compactQuery(query), ebay_domain: "ebay.com", LH_Sold: "1", LH_Complete: "1", buying_format: "BIN" });
+ return parseEbayRows(r?.organic_results || []);
 }
 
 /** Google Shopping — broad keyword market. One SerpApi call. Used as a FALLBACK when the
@@ -251,30 +480,57 @@ export async function fetchGoogleShopping(query: string): Promise<Comp[]> {
  return comps;
 }
 
-/** Dedicated The RealReal keyword pass. Only used by the legacy full basket below — the lean
- *  live path relies on reverse-image, which already surfaces RealReal matches natively. */
-async function fetchRealRealPass(query: string): Promise<Comp[]> {
- if (!isCompsConfigured() || !query.trim()) return [];
- const r = await serp({ engine: "google_shopping", q: `${query} the real real`, gl: "us" });
+export const REALREAL_SOURCE = /real\s?real/i;
+export const VESTIAIRE_SOURCE = /vestiaire/i;
+
+/** Keep only the Shopping rows that genuinely come from the retailer we asked for, as USD comps.
+ *  Pure + exported so the filtering/pricing is testable without a SerpApi call. A row whose
+ *  currency can't be resolved is DROPPED rather than assumed USD (same rule as everywhere else). */
+export function pickRetailerRows(rows: any[], sourceRe: RegExp, label: string): Comp[] {
  const comps: Comp[] = [];
- for (const row of (r?.shopping_results || []).slice(0, 20)) {
- if (!/real\s?real/i.test(String(row.source || ""))) continue;
+ for (const row of (rows || []).slice(0, 20)) {
+ if (!sourceRe.test(String(row?.source || ""))) continue;
  const cents = priceToCents(row.extracted_price ?? row.price);
- if (cents) comps.push({ title: String(row.title || ""), priceCents: cents, currency: "USD", sold: false, source: "The RealReal", link: row.link });
+ if (!cents) continue;
+ // gl=us means these are almost always USD, but Shopping does surface foreign merchants —
+ // take the symbol from the raw price string when there is one.
+ const symbol = typeof row.price === "string" ? (row.price.match(/[^\d\s.,]+/)?.[0] ?? null) : null;
+ const iso = symbol ? symbolToIso(symbol) : "USD";
+ const usdCents = iso ? toUsdCents(cents, iso) : null;
+ if (!usdCents) continue;
+ comps.push({ title: String(row.title || ""), priceCents: usdCents, currency: "USD", sold: false, source: label, link: row.link });
  }
  return comps;
 }
 
-/** Legacy full basket (eBay sold + Google Shopping + RealReal pass) — 3 SerpApi calls. Kept
- *  for the dry-run comparison; estimatePrice now uses the leaner reverse-image + eBay-sold path. */
+/** Dedicated retailer keyword pass through Google Shopping. This is how we price retailers whose
+ *  own pages block automated access — Vestiaire returns 403 even to a full browser header set,
+ *  but Google has already crawled them, so we read the price out of SerpApi's index instead of
+ *  the retailer. One SerpApi call per pass. */
+async function fetchRetailerPass(query: string, term: string, sourceRe: RegExp, label: string): Promise<Comp[]> {
+ if (!isCompsConfigured() || !query.trim()) return [];
+ const r = await serp({ engine: "google_shopping", q: `${query} ${term}`, gl: "us" });
+ return pickRetailerRows(r?.shopping_results || [], sourceRe, label);
+}
+
+const fetchRealRealPass = (query: string) => fetchRetailerPass(query, "the real real", REALREAL_SOURCE, "The RealReal");
+/** Vestiaire Collective — a top-tier authenticated-resale comp source we cannot fetch directly. */
+export const fetchVestiairePass = (query: string) => fetchRetailerPass(query, "vestiaire collective", VESTIAIRE_SOURCE, "Vestiaire Collective");
+
+/** Full basket: eBay sold + Google Shopping + RealReal + Vestiaire passes — 4 SerpApi calls
+ *  (3 when the Vestiaire pass is disabled with VYA_VESTIAIRE_PASS=false). The Vestiaire pass
+ *  costs one extra search per live fetch and buys prices from a source we otherwise cannot
+ *  read at all, since their pages 403 automated requests. */
 export async function fetchComps(query: string): Promise<Comp[]> {
  if (!isCompsConfigured() || !query.trim()) return [];
- const [ebay, shopping, realReal] = await Promise.all([
+ const vestiaireOn = process.env.VYA_VESTIAIRE_PASS !== "false";
+ const [ebay, shopping, realReal, vestiaire] = await Promise.all([
  fetchEbaySold(query),
  fetchGoogleShopping(query),
  fetchRealRealPass(query),
+ vestiaireOn ? fetchVestiairePass(query) : Promise.resolve([] as Comp[]),
  ]);
- return rankComps([...ebay, ...shopping, ...realReal]);
+ return rankComps([...ebay, ...shopping, ...realReal, ...vestiaire]);
 }
 
 export type ResaleTrend = { momentumPct: number; trending: boolean; note: string; source: string };

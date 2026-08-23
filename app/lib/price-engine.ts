@@ -1,12 +1,12 @@
-import { fetchComps, rankComps, filterModelConflicts, isCompsConfigured, type Comp } from "./comps";
-import { getCachedComps, saveComps, getVyaComps, newestCompAgeDays } from "./comp-cache-db";
-import { inferCategoryFromTitle } from "./loadStoreProducts";
-import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db";
-import { getUnbrandedBenchmark } from "./data-layer/unbranded-benchmark-db";
-import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config";
-import { materialTier } from "./material-tier";
-import { AI_MODELS } from "./ai-models";
-import { recordAnthropic } from "./cost-tracker";
+import { fetchComps, rankComps, filterModelConflicts, isCompsConfigured, sourceTier, type Comp } from "./comps.ts";
+import { getCachedComps, saveComps, getVyaComps, newestCompAgeDays } from "./comp-cache-db.ts";
+import { inferCategoryFromTitle } from "./loadStoreProducts.ts";
+import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db.ts";
+import { getUnbrandedBenchmark } from "./data-layer/unbranded-benchmark-db.ts";
+import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config.ts";
+import { materialTier } from "./material-tier.ts";
+import { AI_MODELS } from "./ai-models.ts";
+import { recordAnthropic } from "./cost-tracker.ts";
 
 // The price engine: turn real comps into one defensible number.
 //  market value  = comps, filtered to TRUE comparables by the model (sold > asking)
@@ -30,6 +30,64 @@ export type PriceEstimate = {
  source: "comps" | "floor" | "knowledge" | "benchmark" | "none";
 };
 
+// Garment/accessory nouns that already pin the item type. If the query has one, appending the
+// category adds nothing; if it has none, the category is what stops a bare model name from
+// matching the wrong product entirely.
+// Compound forms matter: "sundress" must count as a garment or we append a redundant "dress".
+const GARMENT_NOUN = /\b(?:(?:sun|shirt|slip|shift|wrap|tea|maxi|midi|mini|sweater|smock)?dress(?:es)?|gown|skirt|top|blouse|shirt|tee|t-shirt|sweater|cardigan|knit|jacket|coat|blazer|trousers|pants|jeans|shorts|suit|jumpsuit|romper|bodysuit|corset|bra|lingerie|slip|robe|kimono|vest|bag|handbag|purse|clutch|tote|backpack|belt|scarf|hat|shoes?|boots?|heels?|sandals?|sneakers?|loafers?|flats?|pumps?|jewellery|jewelry|necklace|bracelet|earrings?|ring|watch|sunglasses)\b/i;
+
+/** "dresses" → "dress", "accessories" → "accessory", "bags" → "bag". A bare /s$/ strip turns
+ *  "dresses" into "dresse", which then reads as a different word entirely. */
+function singular(word: string): string {
+ return word
+  .replace(/ies$/i, "y")
+  .replace(/(ss|sh|ch|x|z)es$/i, "$1")
+  .replace(/([^s])s$/i, "$1");
+}
+
+/**
+ * Force the resolved brand to the FRONT of a comp query, and attach the category when the query
+ * names no garment.
+ *
+ * The vision draft writes `searchQuery` before reverse-image has resolved the brand, so a piece
+ * whose brand was only identified from web matches was searched for generically — a Valentino
+ * Boutique dress ran every comp search as "vintage 1970s 1980s pink polka dot ruched sundress"
+ * and came back priced against $18–$95 no-name sundresses. Brand first, category attached, every
+ * time: that is what makes the comps this brand's own market rather than a look-alike's.
+ */
+export function brandFirstQuery(query: string, brand?: string | null, category?: string | null): string {
+ const q = (query || "").trim();
+ const b = (brand || "").trim();
+ if (!q) return q;
+ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+ let out = b && norm(b).length >= 3 && !norm(q).includes(norm(b)) ? `${b} ${q}` : q;
+ // Category is a garment word ("dresses" → "dress"); only add it when the query lacks one.
+ const cat = singular((category || "").trim());
+ if (cat && !GARMENT_NOUN.test(out)) out = `${out} ${cat}`;
+ return out.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+/**
+ * One comp as the valuation model sees it, led by HOW WELL IT MATCHES THIS PIECE.
+ *
+ * Sold-vs-asking used to lead this line, and that ordering was the single biggest source of
+ * underpricing: whether a listing happened to transact says far less about value than whether
+ * it is the same garment. A visually-confirmed listing of THIS piece is the strongest evidence
+ * available and is labelled so it cannot be outvoted by keyword matches. Realized/auction status
+ * stays on the line as context, never as the hierarchy.
+ */
+export function compLine(c: Comp, i: number): string {
+ const match = c.exactPiece ? `SAME PIECE${c.similarity ? ` ✓${c.similarity.toFixed(2)}` : ""}` : "keyword match";
+ const kind = c.sold ? (c.saleType === "auction" ? "auction close" : "realized sale") : "listed";
+ return `${i}. [${match} · ${sourceTier(c.source)} · ${kind}] $${Math.round(c.priceCents / 100)} — ${c.title.slice(0, 90)} (${c.source})`;
+}
+
+/** How much same-piece evidence the comp set carries. Replaces the old sold-count gate. */
+export function exactPieceEvidence(comps: Comp[]): { exactCount: number; exactPrices: number[] } {
+ const exact = comps.filter((c) => c.exactPiece && c.priceCents > 0);
+ return { exactCount: exact.length, exactPrices: exact.map((c) => c.priceCents).sort((a, b) => a - b) };
+}
+
 function median(nums: number[]): number | null {
  if (!nums.length) return null;
  const s = [...nums].sort((a, b) => a - b);
@@ -48,8 +106,11 @@ export async function valueFromComps(
  ctx?: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null; unbrandedBenchmark?: { segment: string; medianCents: number; p25Cents: number; p75Cents: number; count: number; storeCount: number } | null },
 ) {
  const fallback = () => {
- const sold = comps.filter((c) => c.sold).map((c) => c.priceCents);
- const raw = sold.length >= 3 ? sold : comps.map((c) => c.priceCents);
+ // Prefer same-piece listings over anything else — that ordering is the whole point. Sold
+ // status is deliberately NOT considered here; a realized sale of a different garment is
+ // weaker evidence than a live listing of this one.
+ const exact = comps.filter((c) => c.exactPiece).map((c) => c.priceCents);
+ const raw = exact.length ? exact : comps.map((c) => c.priceCents);
  // Trim extreme high/low comps (a mis-matched look-alike) before the median, so one wrong
  // $2,000 comp can't drag a $60 piece's fallback price up (or a $5 part drag it down).
  const sortedRaw = raw.filter((n) => n > 0).sort((a, b) => a - b);
@@ -65,9 +126,9 @@ export async function valueFromComps(
  marketCents: market,
  low: market ? Math.round(market * 0.85) : null,
  high: market ? Math.round(market * 1.2) : null,
- confidence: useK ? 0.35 : sold.length >= 3 ? 0.6 : 0.4,
+ confidence: useK ? 0.35 : exact.length >= 2 ? 0.6 : 0.4,
  kept: comps.slice(0, 8),
- rationale: useK ? "Estimated from expert knowledge of this piece (no true marketplace comps)." : "Median of comparable resale prices.",
+ rationale: useK ? "Estimated from expert knowledge of this piece (no true marketplace comps)." : exact.length ? "Median of listings of this exact piece." : "Median of comparable resale prices.",
  };
  };
  const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -111,8 +172,17 @@ export async function valueFromComps(
  const unbrandedLine = isUnbranded
  ? `\n\nUNBRANDED PIECE — no brand to anchor to, so value it from INTRINSIC qualities in this order:\n- MATERIAL (primary): for the SAME garment, natural/luxury fibers (silk, leather, suede, cashmere, wool, linen) resell WELL ABOVE synthetics (polyester, acrylic, nylon). ${materialGuide}\n- CONSTRUCTION/QUALITY: bias cut, French seams, full lining, hand-finishing, quality hardware read as a better piece — nudge up only when visibly present in the photo.\n- ERA: genuine age adds a MODEST rarity premium, but you CANNOT reliably date a garment from photos (a bias-cut silk slip could be 1930s OR a 1990s revival). Do NOT price up on a guessed decade — only apply an age premium when the era is genuinely corroborated (a datable union label / metal zipper, or a seller-stated era). When the era is uncertain, treat it as UNCERTAINTY: WIDEN the low–high band and keep confidence ≤ 0.45.\n- Anchor to what this GARMENT TYPE in this MATERIAL realistically resells for UNBRANDED — realistic, not a designer wish-price. In the rationale, name the material as the driver, and if the era would change the value, say it's worth confirming.`
  : "";
- const list = comps.map((c, i) => `${i}. [${c.sold ? "SOLD" : "asking"}] $${(c.priceCents / 100).toFixed(0)} — ${c.title.slice(0, 90)} (${c.source})`).join("\n");
- const prompt = `Item being priced: "${query}".${idLine}${condLine}${benchLine}${goldenLine}${unbrandedLine}\n\nCandidate resale comps found online:\n${list}\n\nReturn ONLY JSON: {"marketCents": int, "lowCents": int, "highCents": int, "confidence": 0..1, "keptIndices": int[], "rationale": string}.\nRules:\n- Keep ONLY TRUE comparables: the SAME designer at a similar caliber, a similar garment and era, roughly the photographed condition. Discard fast-fashion, unrelated/diffusion brands, different garments, parts/accessories, wild outliers — never use them as an anchor, ceiling, or floor.\n- ANCHOR TO THE MEDIAN OF *SOLD* COMPS — real sold prices are the market. When 2+ true SOLD comparables exist, marketCents ≈ their MEDIAN. HIGH-SOLD OUTLIER: a single SOLD price far above the rest of the sold comps (≈1.8x+ the next-highest genuine sold) is a rare/lucky one-off — do NOT anchor, median, or ceiling to it; drop it and anchor to the remaining sold cluster. This is a curated marketplace, so don't fire-sale — but a common, findable piece with several comps is priced at what it REPEATEDLY sells for, NOT near its single highest-ever sale.\n- RARE-VARIANT / BIMODAL CLUSTER: if the SOLD comps split into two groups — a larger COMMON cluster and a smaller high cluster driven by rare variants (collector sizes, sought colorways, redline/early production, deadstock) that CANNOT be confirmed for THIS piece from the query/photo — anchor marketCents to the COMMON (larger, lower) cluster and use the premium group only as the HIGH ceiling. A typical example is NOT priced at the blended median that a few rare variants pull up; widen the low–high band and lower confidence to reflect the spread.\n- ASKING vs SOLD: don't anchor to the single HIGHEST aspirational ask (RealReal/Vestiaire/1stDibs asks can sit unsold) — but do NOT swing the other way and price BELOW the market either. Asking prices set the upper band; comparable shop/sold prices set the realistic level. Land AT market — the low-to-median of the true comps — NOT a quick-sale discount beneath the comp range. SOLD prices (eBay/Depop/VYA) are the true anchor; asking prices only cap the UPPER band. Land at the SOLD median — which, for a findable piece, can sit below the current asks and well below a single high sale.\n- ONLY IF there are essentially NO true comps (truly rare/archival, nothing comparable) may you price from expert knowledge of where this exact piece sells — realistic, not aspirational; don't lowball to fast-fashion, but don't invent a luxury wish-price either. Set confidence ≈0.4.\n- DEMAND / TREND: a sought-after designer/era earns only a MODEST premium — at most ~10-15%, and only when the comps support it. A demand-momentum percentage is NOT a price-increase percentage: NEVER multiply the price by it.${ctx?.trend ? ` Demand note: ${ctx.trend} — apply at most a small nudge, not a large one.` : ""}\n- UNCERTAIN VARIANT: if the exact material/variant can't be pinned down (e.g. a bag or piece that comes in several materials/versions at very different prices, and the comps span a wide range), WIDEN the low–high band to honestly reflect that spread and set confidence ≤ 0.5 — do NOT output a falsely precise number for a piece you can't fully identify.\n- marketCents = the MEDIAN of the true SOLD comps (a common/findable piece prices at what it repeatedly sells for — which may sit well below the single highest sale and below the current asks); lowCents = a competitive quick-sell within the sold cluster; highCents = a patient strong-demand ceiling near the top genuine comps; keptIndices = the true comps relied on; rationale = one brief sentence — describe the comps as "comparable", and NEVER call a comp "identical" or "the same piece" unless it is a verified exact match (a visual look-alike with the same logo is NOT identical).`;
+ const list = comps.map((c, i) => compLine(c, i)).join("\n");
+ // How much realized evidence there actually is. Sold-anchoring is right for a common, findable
+ // piece with a deep sold set and WRONG for a rare/archival one with a single close — which is
+ // where the worst underpricing happened. The rule now switches on the evidence, not on faith.
+ const ev = exactPieceEvidence(comps);
+ const usd = (c: number) => `$${Math.round(c / 100)}`;
+ const evidenceLine = ev.exactCount
+  ? `\n\nSAME-PIECE EVIDENCE: ${ev.exactCount} listing${ev.exactCount === 1 ? " is" : "s are"} visually confirmed to be THIS EXACT GARMENT, priced ${ev.exactPrices.length > 1 ? `${usd(ev.exactPrices[0])}–${usd(ev.exactPrices[ev.exactPrices.length - 1])}` : usd(ev.exactPrices[0])}. This is the market for this piece. ANCHOR HERE. Keyword matches — even ones that sold — describe different garments and may not move you off this range; use them only to sanity-check it.`
+  : `\n\nNO SAME-PIECE EVIDENCE: no listing was visually confirmed as this exact garment, so every comp below is a keyword match on brand/era/description. Weigh them by how closely they match THIS piece (same brand AND same garment type beats same brand alone), widen the low–high band, and keep confidence ≤ 0.5.`;
+ const prompt = `Item being priced: "${query}".${idLine}${condLine}${benchLine}${goldenLine}${unbrandedLine}${evidenceLine}\n\nCandidate resale comps. Each is tagged [match quality · seller tier · status]:\n- SAME PIECE = reverse-image confirmed to be THIS EXACT GARMENT (✓score = visual similarity). These outrank everything else, whether they sold or are merely listed. A listing of the same piece tells you more about its value than a completed sale of a different one.\n- keyword match = found by brand/description text. It is a DIFFERENT garment that shares words. Never let a cluster of these outvote same-piece evidence.\n- Seller tier: vya = this marketplace's own data; specialist = authenticated/curated resale (Vestiaire, RealReal, 1stDibs, archival dealers); marketplace = general sites (eBay, Depop, Etsy). Treat marketplace comps as a REAL market carrying roughly comparable weight — sellers genuinely transact there, and a well-matched eBay listing is strong evidence. Use the tier only to break ties: when two comps match this piece equally well but disagree on price, lean toward the specialist/vya one for caliber and authentication. Do NOT discount a comp merely for being from a marketplace.\n- status (listed / realized sale / auction close) is CONTEXT ONLY. Do not rank a comp above a better-matching one because it sold; an auction close in particular reflects bidding dynamics, not value.\n- All prices are already converted to USD from the seller's local currency.\n${list}\n\nReturn ONLY JSON: {"marketCents": int, "lowCents": int, "highCents": int, "confidence": 0..1, "keptIndices": int[], "rationale": string}.\nRules:\n- Keep ONLY TRUE comparables: the SAME designer at a similar caliber, a similar garment and era, roughly the photographed condition. Discard fast-fashion, unrelated/diffusion brands, different garments, parts/accessories, wild outliers — never use them as an anchor, ceiling, or floor.\n- OUTLIERS, BOTH DIRECTIONS: a comp sitting far outside the main cluster (roughly 3x above or 3x below the cluster's middle) is an outlier — a mislisted item, a different product, a fire-sale, or a wish-price. Never anchor, median, or ceiling to one, whatever its source or sold status; name it in the rationale and price off the cluster. This applies to a cheap marketplace listing and an aspirational specialist ask alike.
+- ANCHOR TO THE SAME-PIECE LISTINGS when the evidence note above says there are any — marketCents ≈ their median (or their level, if there is one). Do NOT discount that range because those listings are 'only asking prices'; they are the market for this exact garment. Keyword matches never override same-piece evidence, no matter how many of them there are or whether they sold. This is a curated marketplace, so don't fire-sale — but a common, findable piece with several comps is priced at what it REPEATEDLY sells for, NOT near its single highest-ever sale.\n- RARE-VARIANT / BIMODAL CLUSTER: if the SOLD comps split into two groups — a larger COMMON cluster and a smaller high cluster driven by rare variants (collector sizes, sought colorways, redline/early production, deadstock) that CANNOT be confirmed for THIS piece from the query/photo — anchor marketCents to the COMMON (larger, lower) cluster and use the premium group only as the HIGH ceiling. A typical example is NOT priced at the blended median that a few rare variants pull up; widen the low–high band and lower confidence to reflect the spread.\n- ASKING vs SOLD: don't anchor to the single HIGHEST aspirational ask (RealReal/Vestiaire/1stDibs asks can sit unsold) — but do NOT swing the other way and price BELOW the market either. Asking prices set the upper band; comparable shop/sold prices set the realistic level. Land AT market — the low-to-median of the true comps — NOT a quick-sale discount beneath the comp range. Judge every comp by how well it matches THIS piece first, and by seller caliber second. A general-marketplace sale of a loosely similar garment is WEAK evidence; a specialist dealer listing the same archival piece is STRONG evidence. Never price a piece below what specialist dealers ask for the same garment just because a cheaper, different item sold somewhere.\n- ONLY IF there are essentially NO true comps (truly rare/archival, nothing comparable) may you price from expert knowledge of where this exact piece sells — realistic, not aspirational; don't lowball to fast-fashion, but don't invent a luxury wish-price either. Set confidence ≈0.4.\n- DEMAND / TREND: a sought-after designer/era earns only a MODEST premium — at most ~10-15%, and only when the comps support it. A demand-momentum percentage is NOT a price-increase percentage: NEVER multiply the price by it.${ctx?.trend ? ` Demand note: ${ctx.trend} — apply at most a small nudge, not a large one.` : ""}\n- UNCERTAIN VARIANT: if the exact material/variant can't be pinned down (e.g. a bag or piece that comes in several materials/versions at very different prices, and the comps span a wide range), WIDEN the low–high band to honestly reflect that spread and set confidence ≤ 0.5 — do NOT output a falsely precise number for a piece you can't fully identify.\n- marketCents = the level the SAME-PIECE listings sit at when there are any; otherwise the level of the closest-matching comps (same brand AND same garment type), weighted toward specialist sellers; lowCents = a competitive quick-sell within the sold cluster; highCents = a patient strong-demand ceiling near the top genuine comps; keptIndices = the true comps relied on; rationale = one brief sentence — describe the comps as "comparable", and NEVER call a comp "identical" or "the same piece" unless it is a verified exact match (a visual look-alike with the same logo is NOT identical).`;
  const content: any[] = [];
  if (photoUrl) content.push({ type: "image", source: { type: "url", url: photoUrl } });
  content.push({ type: "text", text: prompt });
@@ -134,15 +204,27 @@ export async function valueFromComps(
  if (res.status !== 429 && res.status < 500) break; // non-retryable
  await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
  }
- if (!res || !res.ok) return fallback();
- const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+ // NEVER fall back silently. A dropped valuation looks identical to a real one downstream —
+ // it just quietly prices off a raw median instead (a Versace runway dress with $1.7k–$3.2k
+ // comps came out at $512 this way, and nothing in the output said the model hadn't run).
+ if (!res || !res.ok) { console.error(`[pricing] FELL BACK: Anthropic ${res?.status ?? "no response"}`); return fallback(); }
+ const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
  await recordAnthropic(MODEL, "pricing", data);
  const t = data.content?.find((c) => c.type === "text")?.text ?? "";
  const m = t.match(/\{[\s\S]*\}/);
- const raw: any = m ? JSON.parse(m[0]) : {};
+ let raw: any = {};
+ try {
+ raw = m ? JSON.parse(m[0]) : {};
+ } catch (e) {
+ console.error(`[pricing] FELL BACK: JSON.parse failed. stop_reason=${data.stop_reason} chars=${t.length} comps=${comps.length} tail=${JSON.stringify(t.slice(-120))} err=${String(e).slice(0, 80)}`);
+ return fallback();
+ }
  // Truncated/unparseable response (no marketCents) → degrade to the honest sold-median fallback
  // with its correct confidence + rationale, rather than a half-defaulted mix of model + defaults.
- if (typeof raw.marketCents !== "number" || raw.marketCents <= 0) return fallback();
+ if (typeof raw.marketCents !== "number" || raw.marketCents <= 0) {
+ console.error(`[pricing] FELL BACK: no marketCents. stop_reason=${data.stop_reason} chars=${t.length} comps=${comps.length} head=${JSON.stringify(t.slice(0, 120))}`);
+ return fallback();
+ }
  const keptIdx: number[] = Array.isArray(raw.keptIndices) ? raw.keptIndices.filter((n: any) => Number.isInteger(n) && comps[n]) : [];
  const kept = keptIdx.length ? keptIdx.map((i: number) => comps[i]) : comps.slice(0, 8);
  return {
@@ -153,7 +235,8 @@ export async function valueFromComps(
  kept,
  rationale: typeof raw.rationale === "string" ? raw.rationale : "Based on comparable resale prices.",
  };
- } catch {
+ } catch (e) {
+ console.error(`[pricing] FELL BACK: threw — ${String(e).slice(0, 160)}`);
  return fallback();
  }
 }
@@ -227,6 +310,12 @@ export async function estimatePrice(opts: {
  const category = inferCategoryFromTitle(opts.query) as string;
  const brand = opts.context?.brand ?? null;
  const material = opts.context?.material ?? null;
+ // BRAND FIRST. The vision draft writes searchQuery before reverse-image resolves the brand, so
+ // without this every downstream search (eBay, Shopping, RealReal, Vestiaire) runs brand-less and
+ // prices the piece against look-alikes. Rewriting it here fixes ALL of them at once, including
+ // the retailer passes and the comp-cache key, so the cache is keyed to the branded query too.
+ const query = brandFirstQuery(opts.query, brand, category);
+ if (query !== opts.query) console.log(`[pricing] query rewritten brand-first: "${opts.query}" → "${query}"`);
  // For an UNBRANDED piece, anchor to VYA's own golden set (how comparable unbranded pieces price,
  // by category × material tier) instead of guessing — real prices from curated stores.
  const unbrandedBenchmark = !brand ? await getUnbrandedBenchmark({ category, material }).catch(() => null) : null;
@@ -235,10 +324,10 @@ export async function estimatePrice(opts: {
  // on a cold/thin cache, then write every fresh comp back so the next similar item is free.
  // (Reverse-image comps in extraComps are always fresh — per photo — and also cached.)
  const [cached, benchmark, vyaComps, cacheAgeDays] = await Promise.all([
- getCachedComps({ query: opts.query, brand, category, maxAgeDays: 45, limit: 40 }).catch(() => []),
+ getCachedComps({ query: query, brand, category, maxAgeDays: 45, limit: 40 }).catch(() => []),
  getInternalPriceBenchmark({ brand, category }).catch(() => null),
  getVyaComps({ brand, limit: 15 }).catch(() => []),
- newestCompAgeDays(opts.query).catch(() => null),
+ newestCompAgeDays(query).catch(() => null),
  ]);
  // Go live when the cache is thin OR stale (newest cached comp older than COMP_FRESH_DAYS), so a
  // "known" item sitting on weeks-old comps still gets a fresh market read.
@@ -252,13 +341,13 @@ export async function estimatePrice(opts: {
  const soldThin = soldCached < 3 || (cached.length >= 12 && soldCached < cached.length * 0.25);
  let live: Comp[] = [];
  if (cached.length < 8 || stale || soldThin) {
- live = await fetchComps(opts.query).catch(() => []);
+ live = await fetchComps(query).catch(() => []);
  }
- if (isCompsConfigured()) console.log(`[serpapi] estimate "${opts.query.slice(0, 60)}" brand=${brand ?? "?"} cached=${cached.length} ageDays=${cacheAgeDays ?? "none"} stale=${stale} live=${live.length}`);
+ if (isCompsConfigured()) console.log(`[serpapi] estimate "${query.slice(0, 60)}" brand=${brand ?? "?"} cached=${cached.length} ageDays=${cacheAgeDays ?? "none"} stale=${stale} live=${live.length}`);
  // Persist this run's fresh EXTERNAL comps (reverse-image + any live) for future reuse. VYA
  // comps come straight from our own tables, so there's nothing to cache.
  const fresh = rankComps([...(opts.extraComps || []), ...live]);
- if (fresh.length) await saveComps(fresh, { query: opts.query, brand, category });
+ if (fresh.length) await saveComps(fresh, { query: query, brand, category });
  // With a STRONG external sold signal (plenty of real eBay/marketplace SOLD comps), trust it over
  // VYA's own broad brand-level signals: the internal benchmark + own-inventory comps are coarse
  // (brand-level, mixing in cheaper pieces) and would drag a high-value model down. Keep them only as
@@ -270,12 +359,12 @@ export async function estimatePrice(opts: {
  const ranked = rankComps([...(opts.extraComps || []), ...(strongExternal ? [] : vyaComps), ...cached, ...live]);
  // Drop keyword comps that are a DIFFERENT bag model than the query (a "Jumbo Flap" shouldn't be
  // priced off Accordion/Camera/Westminster bags). Keep the unfiltered set if this leaves too few.
- const modelFiltered = filterModelConflicts(ranked, opts.query);
+ const modelFiltered = filterModelConflicts(ranked, query);
  const comps = (modelFiltered.length >= 3 ? modelFiltered : ranked).slice(0, 40);
  let marketCents: number | null = null, low: number | null = null, high: number | null = null, confidence = 0, rationale = "", kept: Comp[] = [];
 
  if (comps.length) {
- const v = await valueFromComps(opts.query, opts.photoUrl, comps, { ...opts.context, knowledgeHintCents: opts.knowledgeHintCents, internalBenchmark: strongExternal ? null : benchmark, unbrandedBenchmark });
+ const v = await valueFromComps(query, opts.photoUrl, comps, { ...opts.context, knowledgeHintCents: opts.knowledgeHintCents, internalBenchmark: strongExternal ? null : benchmark, unbrandedBenchmark });
  marketCents = v.marketCents; low = v.low; high = v.high; confidence = v.confidence; rationale = v.rationale; kept = v.kept;
  } else if (unbrandedBenchmark) {
  // No external comps + unbranded → anchor to the golden set (comparable unbranded VYA pieces).

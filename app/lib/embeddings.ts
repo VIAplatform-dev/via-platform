@@ -5,7 +5,7 @@
 // Gated on VOYAGE_API_KEY — if it's not set, embedImage returns null and the whole
 // visual-retrieval path degrades gracefully back to the v1 text hints.
 
-import { recordVoyage } from "./cost-tracker";
+import { recordVoyage } from "./cost-tracker.ts";
 
 const VOYAGE_URL = "https://api.voyageai.com/v1/multimodalembeddings";
 const MODEL = "voyage-multimodal-3"; // 1024-dim, text+image

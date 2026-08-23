@@ -124,6 +124,46 @@ export function normalizeConditionGrade(text: string | null | undefined): Condit
  return null;
 }
 
+// ── Sold-comp anchoring (price engine) ──
+// How many genuine SOLD comps (Buy It Now / realized sales — never auction closes) it takes
+// before the sold median may anchor the valuation. Below this the sold prices are data points
+// to triangulate with, not a verdict: one $900 auction-adjacent close once dragged a 1999
+// archival piece to $1,155 against an asking cluster of $1,459–$2,082. Rare/archival pieces
+// almost never have a deep sold set, which is exactly where underpricing hurt most.
+export const MIN_SOLD_COMPS_FOR_ANCHOR = 3;
+
+// ── FX → USD (comp pricing) ──
+// Coarse market rates for normalizing foreign-currency comps (Google Lens returns international
+// matches constantly; a €450 comp must never enter the median as $450). Comp pricing tolerates
+// ±2% FX drift — refresh quarterly. Currencies not listed here are DROPPED, never guessed.
+// Rates as of 2026-08 (USD per 1 unit).
+export const FX_TO_USD: Record<string, number> = {
+ USD: 1,
+ EUR: 1.09,
+ GBP: 1.27,
+ JPY: 0.0068,
+ CHF: 1.13,
+ CAD: 0.73,
+ AUD: 0.66,
+ SEK: 0.095,
+ DKK: 0.146,
+ NOK: 0.093,
+ PLN: 0.25,
+ // Gulf/Asian boutiques show up in reverse-image comps too. These are pegged or stable;
+ // deliberately NO hyper-volatile currencies (e.g. TRY, ARS) — for those, dropping the comp
+ // is safer than converting at a rate that may be months stale.
+ AED: 0.272, // pegged 3.6725/USD
+ SAR: 0.267, // pegged 3.75/USD
+ HKD: 0.128, // pegged ~7.8/USD
+ SGD: 0.74,
+ NZD: 0.60,
+ CNY: 0.14,
+ KRW: 0.00072,
+ INR: 0.012,
+ ILS: 0.27,
+ CZK: 0.043,
+};
+
 // ── Event-quality filters (events ETL) ──
 // Junk traffic inflates the Demand Index. The events ETL drops it BEFORE building
 // the unified log (the legacy capture tables are never touched). Every threshold

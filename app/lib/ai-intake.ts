@@ -6,8 +6,8 @@
 // Uses Claude vision (raw REST, matching app/lib/data-layer/vision.ts).
 // ───────────────────────────────────────────────────────────────────────────
 
-import { AI_MODELS } from "./ai-models";
-import { recordAnthropic } from "./cost-tracker";
+import { AI_MODELS } from "./ai-models.ts";
+import { recordAnthropic } from "./cost-tracker.ts";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const INTAKE_MODEL = AI_MODELS.intake;

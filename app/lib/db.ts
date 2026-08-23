@@ -1,8 +1,8 @@
 import { neon } from "@neondatabase/serverless";
-import { unstable_cache } from "next/cache";
-import { HIDDEN_STORE_SLUGS } from "./stores";
-import { SHOPIFY_STORES } from "./storeConfig";
-import { logError } from "./error-log";
+import { unstable_cache } from "next/cache.js";
+import { HIDDEN_STORE_SLUGS } from "./stores.ts";
+import { SHOPIFY_STORES } from "./storeConfig.ts";
+import { logError } from "./error-log.ts";
 
 // Products from these slugs are hidden site-wide: manually disabled + stores without Collabs ID.
 // "venus-vintage" — removed as a store, but her product rows remain in the DB and sync as $0

@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
-import { gateSegment } from "./privacy";
-import { PRIVACY } from "./config";
+import { gateSegment } from "./privacy.ts";
+import { PRIVACY } from "./config.ts";
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;

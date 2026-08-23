@@ -9,7 +9,10 @@ import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
 import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
 import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece, resolveExactPiece, rememberDraftResolution } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
-import { reverseImageBestOf, matchesToComps, editorialCaptions, verifyMatchesByImage, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { reverseImageBestOf, reverseImageTiered, matchesToComps, editorialCaptions, partitionByVisualMatch, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { verifyMatchPrices } from "@/app/lib/comp-price-verify";
+import { getCachedLinkPrice, saveCachedLinkPrice } from "@/app/lib/link-price-cache-db";
+import { recordSuggestion } from "@/app/lib/price-suggestions-db";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
 
@@ -103,14 +106,28 @@ export async function POST(request: NextRequest) {
  return hits >= 2 && priced.length >= 2;
  };
 
- // Embedding (memory) + correction hints + reverse-image — each only when relevant. Reverse
- // image now scans multiple frames adaptively: a clean primary photo costs one Lens call; a
- // weak one escalates to later frames (the tag shot, a front-flat) to rescue the ID.
- const [embedding, brandHints, reverse] = await Promise.all([
+ // Embedding (memory) + correction hints + reverse-image — each only when relevant.
+ // Reverse image escalates in two independent directions, cheapest first:
+ //  1. REFINEMENT tiers on the primary photo — image → image + brand → image + brand + category.
+ //     The brand leads every refinement (and is taken from tier 1's own match consensus when the
+ //     seller didn't type one), so a narrowed search stays inside this brand's market.
+ //  2. FRAMES — only if the primary photo found essentially nothing, try the tag shot / front-flat.
+ // A clean product photo still costs exactly one Lens call.
+ const [embedding, brandHints, tiered] = await Promise.all([
  isEmbeddingConfigured() ? embedImage(mainUrl).catch(() => null) : Promise.resolve(null),
  needDraft ? getIntakeHints(slug).catch(() => "") : Promise.resolve(""),
- needReverse ? reverseImageBestOf(imageUrls, { maxFrames: reverseFrames, strong: strongReverse }) : Promise.resolve({ matches: [] as VisualMatch[], framesUsed: 0 }),
+ needReverse
+  ? reverseImageTiered(mainUrl, {
+    brand: brandTyped,
+    category: has("category") ? val("category") : null,
+    material: has("material") ? val("material") : null,
+   }).catch(() => ({ matches: [] as VisualMatch[], tiersUsed: 0, queries: [] as (string | undefined)[] }))
+  : Promise.resolve({ matches: [] as VisualMatch[], tiersUsed: 0, queries: [] as (string | undefined)[] }),
  ]);
+ // Frame escalation is the rescue path for a bad primary shot, not the default.
+ const reverse = tiered.matches.length || !needReverse || imageUrls.length < 2
+ ? { matches: tiered.matches, framesUsed: 1 }
+ : await reverseImageBestOf(imageUrls, { maxFrames: reverseFrames, strong: strongReverse });
  const matches = reverse.matches;
  // Near-duplicate RECALL: is this photo the SAME item we've already resolved (≥ NEAR_DUP bar)? If so
  // we lock its stored identity + reuse its price instead of re-generating — and we suppress the
@@ -238,15 +255,37 @@ export async function POST(request: NextRequest) {
  // (the common AI-intake case, where without this the raw look-alike matches flowed in unfiltered).
  // Fall back to the seller-brand-filtered set only if brand-filtering leaves nothing to price from.
  const resolvedBrand = (has("brand") ? val("brand") : (draft?.brand?.value || idBrand.brand)) || "";
- const brandFiltered = resolvedBrand ? matches.filter((m) => titleHasBrand(m.title, resolvedBrand)) : [];
- const pricingMatches = brandFiltered.length ? brandFiltered : relevantMatches;
- // VISUALLY verify the pricing comps. Brand-filtering keeps same-brand, but a different MODEL of
- // that brand still poisons the valuation (the look-alike that priced an $1,800 piece at $685).
- // Keep only matches whose photo actually looks like this one; when the check genuinely ran we
- // trust its verdict (even if it leaves few), else fall back to the brand-filtered set.
- const { verified: verifiedPricing, filtered: visFiltered } = await verifyMatchesByImage(embedding, pricingMatches).catch(() => ({ verified: pricingMatches, filtered: false }));
- const finalPricingMatches = visFiltered ? verifiedPricing : pricingMatches;
- const reverseComps = matchesToComps(finalPricingMatches);
+ // ORDER MATTERS: verify by IMAGE first, then use brand text only for what the image check
+ // couldn't score. Brand-filtering first threw away the strongest comps we had — a Valentino
+ // dress lost all 8 of its priced matches because their titles ("Pink Polka Dot Swing Dress")
+ // never said Valentino, even though they were the same dress. A visual match outranks a title
+ // match; a title match is only the fallback for matches with no thumbnail to compare.
+ const vis = await partitionByVisualMatch(matches, { queryEmbedding: embedding }).catch(
+  () => ({ verified: [], rejected: [], unchecked: matches, ran: false }),
+ );
+ const brandOf = (ms: VisualMatch[]) => (resolvedBrand ? ms.filter((m) => titleHasBrand(m.title, resolvedBrand)) : []);
+ let finalPricingMatches: VisualMatch[];
+ if (vis.ran) {
+ // Visually-confirmed same-piece matches are kept on their own merit, brand text or not.
+ // Everything unscoreable still has to earn its place via the brand filter. Rejected = dropped.
+ const uncheckedKept = brandOf(vis.unchecked);
+ finalPricingMatches = [...vis.verified, ...uncheckedKept];
+ // If the image check cleared nothing and brand text cleared nothing, don't price off an empty
+ // set — fall back to the old behaviour rather than losing every comp.
+ if (!finalPricingMatches.length) finalPricingMatches = brandOf(matches).length ? brandOf(matches) : relevantMatches;
+ console.log(`[intake] visual-first: verified=${vis.verified.length} unchecked-kept=${uncheckedKept.length} rejected=${vis.rejected.length}`);
+ } else {
+ // No embedding signal (key missing/invalid, no thumbnails) — brand text is all we have.
+ const brandFiltered = brandOf(matches);
+ finalPricingMatches = brandFiltered.length ? brandFiltered : relevantMatches;
+ }
+ // Link price-verify (flag-gated): Lens returns many true matches with NO price (Google simply
+ // lacks merchant data for boutique stores) — fetch those product pages and recover price +
+ // currency + sold status from their structured data. Best-effort: failures leave matches as-is.
+ const linkVerified = process.env.VYA_LINK_VERIFY_ENABLED === "true"
+ ? await verifyMatchPrices(finalPricingMatches, { getCached: getCachedLinkPrice, saveCached: saveCachedLinkPrice }).catch(() => finalPricingMatches)
+ : finalPricingMatches;
+ const reverseComps = matchesToComps(linkVerified);
  const reverseTitles = finalPricingMatches.map((m) => m.title);
  // Editorial/Getty captions from the FULL match set (not brand-filtered) — provenance evidence
  // for runway season + celebrity "worn by", which rarely repeat the brand in the caption.
@@ -283,6 +322,28 @@ export async function POST(request: NextRequest) {
  if (pr.runway) runway = pr.runway;
  if (draft && runway) draft.runway = runway;
  if (pr.celebrity) celebrity = pr.celebrity;
+ // Phase 3: log the suggestion the moment it's made. Fire-and-forget — a lost row costs eval
+ // data, never the seller's listing. This is what lets the marketplace's own outcomes grade
+ // the pricer later (override drift by category, accuracy by prompt version).
+ if (estimate) {
+ void recordSuggestion({
+  storeSlug: slug,
+  title: has("title") ? val("title") : (draft?.title || null),
+  brand: resolvedBrand || null,
+  category: has("category") ? val("category") : (draft?.category || null),
+  suggestedCents: estimate.suggestedCents,
+  marketCents: estimate.marketCents,
+  lowCents: estimate.lowCents,
+  highCents: estimate.highCents,
+  confidence: estimate.confidence,
+  source: estimate.source,
+  promptVersion: PROMPT_VERSION,
+  compCount: estimate.comps?.length ?? null,
+  exactPieceCount: estimate.comps?.filter((c) => c.exactPiece).length ?? null,
+  // When the seller already typed a price, that IS their published number.
+  sellerPriceCents: has("price") ? Math.round(Number(val("price")) * 100) || null : null,
+ });
+ }
  }
 
  // Persist this resolution keyed by the photo's fingerprint, so re-drafting the SAME photo later

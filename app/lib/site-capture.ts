@@ -5,7 +5,8 @@
 // the VYA-hosted copy — so the whole site can be navigated on VYA, pixel-faithful.
 // (JS is stripped for v1: looks identical; interactivity + cart + AI editing next.)
 import * as cheerio from "cheerio";
-import { assertPublicUrl, safeFetch } from "@/app/lib/safe-url";
+// Relative, not the "@/app" alias: Node's native TS test runner doesn't read tsconfig paths.
+import { assertPublicUrl, safeFetch } from "./safe-url.ts";
 // The DB helpers are imported lazily inside crawlAndStore (the only consumer) so that
 // the pure HTML functions here — applyEdits/prepareEditMode/captureSite — can be used
 // (and unit-tested) without pulling in the database layer.
@@ -55,6 +56,9 @@ export function deShopify($: cheerio.CheerioAPI): void {
  $('footer, [class*="footer"], [class*="copyright"], small').contents().each((_: number, node: any) => {
  if (node.type !== "text" || !node.data) return;
  let t = node.data.replace(/\s*powered by shopify\s*/gi, " ");
+ // The credit is usually split across nodes — "© 2026, Store Powered by" + <a>Shopify</a> — so
+ // removing the link above strands the lead-in. Drop a trailing "Powered by" with nothing after it.
+ t = t.replace(/[\s·•|,–—-]*\bpowered by\s*$/i, "");
  // Older captures swapped the whole "Powered by Shopify" link for the bare word "VYA", which lands
  // as its OWN text node next to the copyright ("© 2026, Store" + "VYA"). Drop a lone-VYA node, and
  // also a trailing "VYA" on the copyright line itself.

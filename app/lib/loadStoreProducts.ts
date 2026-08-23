@@ -1,9 +1,9 @@
-import type { StoreProduct } from "./types";
+import type { StoreProduct } from "./types.ts";
 import type { CategorySlug } from "@/app/lib/categoryMap";
-import { getProductsByStore, type DBProduct } from "./db";
-import { brands as brandDefs } from "./brandData";
-import { deriveDisplaySize } from "./inventory";
-import { getCategoryOverrideMap } from "./category-overrides-db";
+import { getProductsByStore, type DBProduct } from "./db.ts";
+import { brands as brandDefs } from "./brandData.ts";
+import { deriveDisplaySize } from "./inventory.ts";
+import { getCategoryOverrideMap } from "./category-overrides-db.ts";
 
 // Maps a coarse override family (written by the AI category sweep / admin) to a
 // representative CategorySlug, so a corrected product groups + filters under the

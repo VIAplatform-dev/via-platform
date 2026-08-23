@@ -177,7 +177,9 @@ test("shopify-section wrappers are used as sections and reorder correctly", () =
  assert.deepEqual($(".shopify-section h2").map((_, el) => $(el).text()).get(), ["Three", "Two", "One"]);
 });
 
-test("deShopify swaps Powered by Shopify → VYA and strips payment/Shop-Pay chrome", () => {
+// The inline Shopify credit is REMOVED, not rewritten — injectPoweredBy adds a fixed
+// "Powered by VYA" badge instead, so no inline credit belongs in the seller's footer.
+test("deShopify removes the Powered by Shopify credit and payment/Shop-Pay chrome", () => {
  const html = `<html><body><footer>
   <ul class="list-payment"><li><svg>visa</svg></li><li><svg>amex</svg></li></ul>
   <shop-follow-button>Follow on shop</shop-follow-button>
@@ -189,15 +191,16 @@ test("deShopify swaps Powered by Shopify → VYA and strips payment/Shop-Pay chr
  assert.equal($(".list-payment").length, 0, "payment badges removed");
  assert.equal($("shop-follow-button").length, 0, "Follow on shop removed");
  assert.equal($('a[href*="shopify.com"]').length, 0, "shopify.com link gone");
- assert.match(out, /Powered by VYA/);
- assert.doesNotMatch(out, /Powered by <a|Powered by Shopify/);
+ assert.doesNotMatch(out, /Powered by Shopify/);
+ // Removing the <a> must not strand the lead-in text — "© 2026, Store Powered by" reads broken.
+ assert.doesNotMatch(out, /Powered by/, "no dangling 'Powered by' left behind");
+ assert.match($(".copyright__content").text().trim(), /^© 2026, To Us Vintage$/);
 });
 
-test("deShopify rewrites an unlinked 'Powered by Shopify' text node", () => {
+test("deShopify removes an unlinked 'Powered by Shopify' text node", () => {
  const $ = cheerio.load(`<footer><small>Powered by Shopify</small></footer>`);
  deShopify($);
- assert.match($.html(), /Powered by VYA/);
- assert.doesNotMatch($.html(), /Powered by Shopify/);
+ assert.doesNotMatch($.html(), /Powered by/);
 });
 
 test("deLazy fills lazysizes {width} templates and promotes data-src", () => {

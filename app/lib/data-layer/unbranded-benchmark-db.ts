@@ -1,8 +1,10 @@
 import { neon } from "@neondatabase/serverless";
-import { unstable_cache } from "next/cache";
-import { inferBrandFromTitle } from "../market-data-db";
-import { inferCategoryFromTitle } from "../loadStoreProducts";
-import { materialTier, type MaterialTier } from "../material-tier";
+// ".js" so Node's native TS test runner can resolve it (next has no package "exports" map);
+// webpack/Next resolve it identically.
+import { unstable_cache } from "next/cache.js";
+import { inferBrandFromTitle } from "../market-data-db.ts";
+import { inferCategoryFromTitle } from "../loadStoreProducts.ts";
+import { materialTier, type MaterialTier } from "../material-tier.ts";
 
 // THE GOLDEN SET — how VYA's OWN unbranded + lesser-known pieces are actually priced, read straight
 // from live inventory and grouped by garment category × material tier. For a piece with no brand and

@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
-import { brands, WHOLE_WORD_ALIASES } from "@/app/lib/brandData";
-import { aliasMatches } from "@/app/lib/data-layer/brands";
+import { brands, WHOLE_WORD_ALIASES } from "./brandData.ts";
+import { aliasMatches } from "./data-layer/brands.ts";
 
 export function inferBrandFromTitle(title: string): string | null {
  const lower = title.toLowerCase();

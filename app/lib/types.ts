@@ -1,4 +1,4 @@
-import type { CategorySlug } from "./categoryMap";
+import type { CategorySlug } from "./categoryMap.ts";
 
 export type StoreProduct = {
  id: string;

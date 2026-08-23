@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
-import type { Comp } from "./comps";
-import { convertCurrencyToUSD } from "./stores";
+import type { Comp } from "./comps.ts";
+import { convertCurrencyToUSD } from "./stores.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Comp cache — every external comp we pay SerpApi to fetch is saved here, so future
@@ -36,6 +36,10 @@ async function ensure(): Promise<void> {
   fetched_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
  )
  `;
+ // Added after the auction/BIN split: without this, a cached comp came back with no sale type,
+// so every cached eBay sale counted as a genuine realized sale and the auction filter + thin-sold
+// guard were bypassed entirely on any cache hit. NULL on pre-existing rows = unknown format.
+ await sql`ALTER TABLE comp_cache ADD COLUMN IF NOT EXISTS sale_type TEXT`;
  await sql`CREATE INDEX IF NOT EXISTS idx_comp_cache_query ON comp_cache(query_norm, fetched_at DESC)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_comp_cache_segment ON comp_cache(brand, category, fetched_at DESC)`;
  ensured = true;
@@ -57,6 +61,8 @@ const toComp = (r: Record<string, unknown>): Comp => ({
  source: r.source as string,
  link: (r.link as string) ?? undefined,
  condition: (r.condition as string) ?? undefined,
+ // Rows cached before the auction/BIN split carry NULL — genuinely unknown, not "confirmed BIN".
+ saleType: r.sale_type === "auction" ? "auction" : r.sale_type === "bin" ? "bin" : null,
 });
 
 /**
@@ -76,7 +82,7 @@ export async function saveComps(
  const qn = normalizeQuery(meta.query);
  const col = <T>(f: (c: Comp) => T) => real.map(f);
  await sql`
- INSERT INTO comp_cache (dedup_key, query_norm, brand, category, source, title, price_cents, sold, condition, currency, link)
+ INSERT INTO comp_cache (dedup_key, query_norm, brand, category, source, title, price_cents, sold, condition, currency, link, sale_type)
  SELECT * FROM unnest(
   ${col(dedupKey)}::text[],
   ${real.map(() => qn)}::text[],
@@ -88,7 +94,8 @@ export async function saveComps(
   ${col((c) => c.sold)}::bool[],
   ${col((c) => c.condition ?? null)}::text[],
   ${col((c) => c.currency)}::text[],
-  ${col((c) => c.link ?? null)}::text[]
+  ${col((c) => c.link ?? null)}::text[],
+  ${col((c) => c.saleType ?? null)}::text[]
  )
  ON CONFLICT (dedup_key) DO UPDATE SET fetched_at = NOW(), query_norm = EXCLUDED.query_norm, brand = EXCLUDED.brand, category = EXCLUDED.category
  `;
@@ -117,7 +124,7 @@ export async function getCachedComps(opts: {
  // "Prada Re-Edition 2005" got priced off a "Prada Raso Luce sequin" bag's cached comps. A thin
  // exact cache now simply triggers a fresh live fetch in the pricer (which returns the right model's
  // comps), instead of borrowing another item's stale ones.
- const exact = (await sql`SELECT source, title, price_cents, sold, condition, currency, link FROM comp_cache WHERE query_norm = ${qn} AND fetched_at >= ${cutoff} ORDER BY fetched_at DESC LIMIT ${opts.limit}`) as Array<Record<string, unknown>>;
+ const exact = (await sql`SELECT source, title, price_cents, sold, condition, currency, link, sale_type FROM comp_cache WHERE query_norm = ${qn} AND fetched_at >= ${cutoff} ORDER BY fetched_at DESC LIMIT ${opts.limit}`) as Array<Record<string, unknown>>;
  return exact.map(toComp);
 }
 

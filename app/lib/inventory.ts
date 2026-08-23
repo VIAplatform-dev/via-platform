@@ -1,13 +1,13 @@
-import type { CategorySlug } from "./categoryMap";
-import { getAllProducts, type DBProduct } from "./db";
-import { inferCategoryFromTitle, inferBrandFromTitle } from "./loadStoreProducts";
-import { brandMap } from "./brandData";
-import { extractSizeFromTitle, extractSizeFromDescription, extractTaggedSizeFromDescription, extractFitSizeFromDescription, extractFitLetterFromDescription, extractUSConversionFromDescription, isValidSizeValue, GENERIC_CLOTHING_SIZE } from "./shopifyClient";
+import type { CategorySlug } from "./categoryMap.ts";
+import { getAllProducts, type DBProduct } from "./db.ts";
+import { inferCategoryFromTitle, inferBrandFromTitle } from "./loadStoreProducts.ts";
+import { brandMap } from "./brandData.ts";
+import { extractSizeFromTitle, extractSizeFromDescription, extractTaggedSizeFromDescription, extractFitSizeFromDescription, extractFitLetterFromDescription, extractUSConversionFromDescription, isValidSizeValue, GENERIC_CLOTHING_SIZE } from "./shopifyClient.ts";
 
 
 // Pure size helpers moved to ./sizeUtils (no db import) so Client Components can use them without
 // dragging the server-only chain into the browser bundle. Re-exported here for existing importers.
-import { SHOE_RE, convertSizeToUS, normalizeSize, expandSizeKeys, sortSizes } from "./sizeUtils";
+import { SHOE_RE, convertSizeToUS, normalizeSize, expandSizeKeys, sortSizes } from "./sizeUtils.ts";
 export { convertSizeToUS, normalizeSize, expandSizeKeys, sortSizes };
 
 export type InventoryItem = {

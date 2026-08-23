@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { unstable_cache } from "next/cache.js";
 import { getInventory } from "@/app/lib/inventory";
 import { brandMap } from "@/app/lib/brandData";
 
