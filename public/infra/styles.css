@@ -765,6 +765,23 @@
   .contact-cols{grid-template-columns:1fr;gap:36px}
   .form-row{grid-template-columns:1fr}
 }
+/* Mobile: contact form + feature cards breathing room */
+@media(max-width:480px){
+  .form-wrap{padding:0 16px}
+  .form-card{padding:22px 18px;border-radius:18px}
+  .form{gap:14px}
+  .field input,.field textarea,.field select{font-size:14px;padding:12px 13px}
+  .field textarea{min-height:110px}
+  .feat-rows{padding:0 20px}
+  .fr-visual{aspect-ratio:4/5}
+  .mk{padding:16px}
+  .mk-field{padding:8px 10px}
+  .mk-field .u{font-size:11px}
+  .mk-btn{font-size:10px;padding:6px 10px}
+  .mk-card{padding:10px}
+  .mk-t{font-size:12px}
+  .mk-pill{font-size:8.5px;padding:2px 7px}
+}
 
 /* image logo variants for subpages */
 .brand-mark{height:26px;width:auto;display:block}
@@ -944,6 +961,10 @@ header.nav.theme-dark .brand-mark{filter:invert(1) brightness(2)}
     .vs-mobframe .vs-asset.vs-on .vs-tr-row,.vs-mobframe .vs-asset.vs-on .vs-of-row,.vs-mobframe .vs-asset.vs-on .vs-ms-bub{animation:pop .5s both}
     .vs-mobframe::before{content:"";position:absolute;inset:0;background:radial-gradient(46% 42% at 50% 60%,rgba(255,255,255,0.08),transparent 70%);pointer-events:none;z-index:0}
     .vs-mobframe .vs-asset{position:static;opacity:1;transform:none;pointer-events:auto;padding:0;width:100%;z-index:1;display:flex;align-items:center;justify-content:center}
+  }
+  @media(max-width:480px){
+    .vs-mobframe{padding:14px;min-height:auto;border-radius:18px}
+    .vs-wrap{padding:40px 18px}
   }
 
 .vs-steps{background:#060607;position:relative;z-index:1;color:#f2f3f5}
@@ -1396,9 +1417,11 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 @media(max-width:560px){
  .vs-duo{flex-direction:column;gap:14px;min-height:auto;height:auto}
  .vs-duo-col{flex:none}
- .vs-mini{min-height:260px;height:260px}
+ .vs-mini{min-height:300px;height:300px}
  .vs-duo-label{font-size:11.5px}
  .vs-duo-i{width:18px;height:18px;border-radius:6px;font-size:10px}
+ /* Scale the store iframe down so its ~600px layout fits the ~340px container */
+ .vs-mini-screen iframe{width:166%;height:166%;transform:scale(0.6);transform-origin:top left}
  .vb-rail{flex:0 0 38px}
  .vb-ri{width:34px;font-size:7px;padding:5px 0}
  .vb-ri .vb-ic{font-size:12px}
