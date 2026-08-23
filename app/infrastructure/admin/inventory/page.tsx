@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Package, Search } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TH, TD, cn } from "../ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, cn } from "../ui";
+import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
-
-type ItemStatus = "draft" | "active" | "reserved" | "sold" | "removed";
+import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 type Item = {
  id: string;
  sku: number; // per-store sequence by creation order (1 = the store's first item)
@@ -31,17 +31,11 @@ type Item = {
  collections?: string[];
 };
 
-const TONE: Record<Item["status"], "live" | "pending" | "neutral" | "down" | "info"> = {
- draft: "pending",
- active: "live",
- reserved: "info",
- sold: "neutral",
- removed: "down",
-};
+const TONE = STATUS_TONE;
 
 type EditForm = {
  title: string; price: string; cost: string; brand: string; era: string; material: string;
- condition: string; size: string; category: string; description: string; status: ItemStatus;
+ condition: string; size: string; category: string | null; description: string; status: ItemStatus; // slug, or free text under "Other"
  weightOz: string; lengthIn: string; widthIn: string; heightIn: string;
 };
 
@@ -56,6 +50,10 @@ export default function ItemsPage() {
  const [items, setItems] = useState<Item[]>([]);
  const [importOpen, setImportOpen] = useState(false);
  const [q, setQ] = useState(""); // client-side search over title/category
+ // Tag filters — the same tags the editor assigns. null = no filter on that axis.
+ const [statusTag, setStatusTag] = useState<ItemStatus | null>(null);
+ const [famTag, setFamTag] = useState<string | null>(null);   // family alone = the whole family
+ const [catTag, setCatTag] = useState<string | null>(null);      // a category inside it
  const [page, setPage] = useState(1); // client-side pagination of the rendered rows
  // Where each item is posted — real cross-listing status per platform, keyed by itemId.
  const [channels, setChannels] = useState<Record<string, { key: string; status: string }[]>>({});
@@ -67,8 +65,9 @@ export default function ItemsPage() {
  const [bulkBusy, setBulkBusy] = useState(false);
  const [bulkColOpen, setBulkColOpen] = useState(false); // bulk "add to collection" popover
  const [bulkColName, setBulkColName] = useState("");
+ const [aiNotice, setAiNotice] = useState<string | null>(null); // result of the last AI re-tag
  const [editing, setEditing] = useState<Item | null>(null);
- const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: "", description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+ const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
  const [uploading, setUploading] = useState(false);
@@ -124,7 +123,9 @@ export default function ItemsPage() {
  }, [deepLinkId, items]);
 
  // A new search or sub-tab resets to the first page.
- useEffect(() => { setPage(1); }, [q, statusFilter]);
+ useEffect(() => { setPage(1); }, [q, statusFilter, statusTag, famTag, catTag]);
+ // The Drafts / Sold sub-tabs already pin a status — don't let a stale tag filter fight them.
+ useEffect(() => { setStatusTag(null); }, [statusFilter]);
 
  async function act(id: string, action: "sold" | "remove" | "publish") {
  if (action === "remove" && !confirm("Remove this item?")) return;
@@ -168,6 +169,29 @@ export default function ItemsPage() {
  await load();
  setBulkBusy(false);
  }
+ // Re-tag the selected items' categories from their photos. The model only ever answers with a
+ // slug from the taxonomy or nothing — items it can't place keep whatever they had.
+ async function tagWithAi() {
+ const ids = [...selected];
+ if (!ids.length) return;
+ setBulkBusy(true); setAiNotice(null);
+ const r = await fetch("/api/store/items/categorize", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ ids }),
+ }).then((x) => x.json()).catch(() => null);
+ setBulkBusy(false);
+ if (!r?.ok) { setAiNotice(r?.error || "Couldn’t tag those — try again."); return; }
+ setAiNotice(
+ `Tagged ${r.tagged} item${r.tagged === 1 ? "" : "s"}` +
+ (r.skipped ? ` · ${r.skipped} left alone (couldn’t tell from the photo)` : "") +
+ (r.capped ? " · capped at 60 per run" : ""),
+ );
+ setSelected(new Set());
+ await load();
+ setTimeout(() => setAiNotice(null), 9000);
+ }
+
  // Build a collection from the inventory: add all selected items to a collection (creating it if new).
  async function bulkAddToCollection(title: string) {
  const name = title.trim();
@@ -189,7 +213,7 @@ export default function ItemsPage() {
  setEditForm({
  title: it.title, price: cents2str(it.priceCents), cost: cents2str(it.costCents),
  brand: it.brand || "", era: it.era || "", material: it.material || "", condition: it.condition || "",
- size: it.size || "", category: it.category || "", description: it.description || "", status: it.status,
+ size: it.size || "", category: toCategorySlug(it.category), description: it.description || "", status: it.status,
  weightOz: num2str(it.weightOz), lengthIn: num2str(it.lengthIn), widthIn: num2str(it.widthIn), heightIn: num2str(it.heightIn),
  });
  setEditImages(it.images || []);
@@ -219,7 +243,8 @@ export default function ItemsPage() {
  body: JSON.stringify({
  title: editForm.title, price: Number(editForm.price) || 0, cost: editForm.cost.trim() === "" ? null : Number(editForm.cost),
  brand: editForm.brand, era: editForm.era, material: editForm.material, condition: editForm.condition,
- size: editForm.size, category: editForm.category, description: editForm.description, status: editForm.status,
+ // category is omitted when no tag is picked, so an unrecognised stored value survives an edit.
+ size: editForm.size, ...(editForm.category ? { category: editForm.category } : {}), description: editForm.description, status: editForm.status,
  weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
  images: editImages, collections: selCols,
  }),
@@ -248,11 +273,55 @@ export default function ItemsPage() {
  };
  const activeValueCents = items.filter((i) => i.status === "active").reduce((s, i) => s + i.priceCents, 0);
  const money0 = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
- // Route sub-tab filter (Drafts / Sold) + client-side search over title/category.
+ // Route sub-tab filter (Drafts / Sold) + tag filters + client-side search over title/category.
  const term = q.trim().toLowerCase();
- const shown = items
+ // Every item's effective category, resolved once: the canonical slug where the stored value
+ // folds onto one ("jackets", "Coats & Jackets", "coats-jackets" all become coats-jackets),
+ // otherwise the seller's own words from the editor's "Other" field.
+ const slugOf = new Map(items.map((i) => {
+ const s = toCategorySlug(i.category);
+ return [i.id, s ?? (i.category?.trim() || null)] as const;
+ }));
+ // Tag counts come from the OTHER filters' results, so a chip's number is what you'd actually get.
+ const base = items
  .filter((i) => (statusFilter ? i.status === statusFilter : true))
  .filter((i) => (term ? `${i.title} ${i.category || ""}`.toLowerCase().includes(term) : true));
+ // An item matches the category filter if it's the exact tag, or — when only a family is
+ // picked — anything inside that family (so "Bags" catches Totes, Clutches and Crossbody too).
+ const inCategory = (i: Item) => {
+ const s = slugOf.get(i.id);
+ if (catTag) return s === catTag;
+ if (famTag) return !!s && categoryFamily(s) === famTag;
+ return true;
+ };
+ const statusCounts: Partial<Record<ItemStatus, number>> = {};
+ for (const i of base.filter(inCategory)) statusCounts[i.status] = (statusCounts[i.status] || 0) + 1;
+ const catCounts: Record<string, number> = {};
+ const famCounts: Record<string, number> = {};
+ const famsPresent = new Set<string>();   // families with at least one item
+ const customPresent = new Set<string>(); // the distinct free-text categories in use
+ for (const i of base) {
+ const s = slugOf.get(i.id); if (!s) continue;
+ const f = categoryFamily(s);
+ famsPresent.add(f);
+ if (!isCanonicalCategory(s)) customPresent.add(s);
+ if (!statusTag || i.status === statusTag) {
+ catCounts[s] = (catCounts[s] || 0) + 1;
+ famCounts[f] = (famCounts[f] || 0) + 1;
+ }
+ }
+ // Every subcategory of a present family is offered, not just the ones currently in use —
+ // so a filter exists to click the moment an item is retagged into it.
+ const filterGroups: { label: string; values: string[] }[] = [
+ ...CATEGORY_GROUPS.filter((g) => famsPresent.has(g.label)).map((g) => ({ label: g.label, values: [...g.slugs] as string[] })),
+ ...(customPresent.size ? [{ label: OTHER_FAMILY, values: [...customPresent].sort() }] : []),
+ ];
+ const untagged = base.filter((i) => !slugOf.get(i.id)).length;
+ const filtering = !!(statusTag || famTag || catTag);
+ const clearFilters = () => { setStatusTag(null); setFamTag(null); setCatTag(null); };
+ const shown = base
+ .filter((i) => (statusTag ? i.status === statusTag : true))
+ .filter(inCategory);
  const allChecked = shown.length > 0 && shown.every((i) => selected.has(i.id));
 
  // Paginate the RENDERED rows — a big inventory (hundreds of image rows) is slow to paint all at
@@ -287,8 +356,9 @@ export default function ItemsPage() {
  );
  };
 
+ // Wider than the standard admin page — this table has 9 columns and shouldn't need to scroll.
  return (
- <AdminPage>
+ <AdminPage className="max-w-[92rem]">
  <AdminHeader
  eyebrow="Sell · Inventory"
  title={heading}
@@ -313,6 +383,12 @@ export default function ItemsPage() {
  />
  )}
 
+ {aiNotice && (
+ <div className="mb-4 flex items-start gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 text-[13px] text-stone-600">
+ <span>{aiNotice}</span>
+ </div>
+ )}
+
  {soldNotice && (
  <div className="mb-4 flex items-start gap-2 rounded-xl border border-[var(--accent,#0e9f76)]/25 bg-[var(--accent-soft,#eafaf3)] px-4 py-3 text-[13px] text-[var(--accent-ink,#0b7a5c)]">
  <span>✓ {soldNotice}</span>
@@ -327,6 +403,7 @@ export default function ItemsPage() {
  <MetricCard label="Sold" value={counts.sold} sub="All-time" />
  </div>
  )}
+
 
  {/* Bulk action bar — appears when items are selected (e.g. publish a whole drop). */}
  {selected.size > 0 && (
@@ -361,6 +438,9 @@ export default function ItemsPage() {
  <TechButton className="px-3 py-1.5 text-[12px]" disabled={bulkBusy || draftsSelected === 0} onClick={() => bulk("publish")}>
  {bulkBusy ? "Working…" : `Publish now${draftsSelected ? ` (${draftsSelected})` : ""}`}
  </TechButton>
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={tagWithAi} title="Re-read each item&rsquo;s photo and set its category">
+ {bulkBusy ? "Working…" : "Tag with AI"}
+ </TechButton>
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => bulk("remove")}>Remove</TechButton>
  <TechButton variant="ghost" className="px-3 py-1.5 text-[12px]" onClick={() => setSelected(new Set())}>Clear</TechButton>
  </div>
@@ -370,9 +450,11 @@ export default function ItemsPage() {
  {shown.length === 0 ? (
  <TechEmpty
  icon={<Package size={28} strokeWidth={1.5} />}
- title={term ? "No matches" : statusFilter ? `No ${statusFilter} items` : "No items yet"}
- body={term ? "Try a different search." : "Snap a photo and VYA drafts the listing for you — title, description, and a ghost-mannequin image."}
- action={term ? undefined : <TechButtonLink href="/admin/add-listing">Snap your first piece</TechButtonLink>}
+ title={term || filtering ? "No matches" : statusFilter ? `No ${statusLabel(statusFilter)} items` : "No items yet"}
+ body={term || filtering ? "Try a different search, or clear the filters in the table headers." : "Snap a photo and VYA drafts the listing for you — title, description, and a ghost-mannequin image."}
+ action={term ? undefined : filtering
+ ? <TechButton variant="secondary" onClick={clearFilters}>Clear filters</TechButton>
+ : <TechButtonLink href="/admin/add-listing">Snap your first piece</TechButtonLink>}
  />
  ) : (
  <TechCard className="overflow-hidden">
@@ -380,21 +462,52 @@ export default function ItemsPage() {
  <table className="w-full text-[13px]">
  <thead>
  <tr>
- <TH className="px-4 w-9"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label="Select all" /></TH>
+ <TH className="w-9 pl-4 pr-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label="Select all" /></TH>
+ {/* Category and Status get their own filterable headers — see HeaderFilter. */}
  <TH className="px-3">Item</TH>
- <TH right className="px-4">Revenue</TH>
- <TH right className="px-4">Cost</TH>
- <TH right className="px-4">Margin</TH>
- <TH className="px-4">Size</TH>
- <TH className="px-5">Status</TH>
- <TH className="px-5">Posted on</TH>
- <TH right className="px-5">Actions</TH>
+ <TH className="px-3">
+       {filterGroups.length > 0 ? (
+ <HeaderFilter
+ label="Category"
+ value={catTag ? categoryValueLabel(catTag) : famTag}
+ onClear={() => { setCatTag(null); setFamTag(null); }}
+ >
+ {(close) => (
+ <CategoryFilterMenu
+ groups={filterGroups} counts={catCounts} familyCounts={famCounts}
+ total={base.length} untagged={untagged} family={famTag} value={catTag}
+ onPick={(f, v) => { setFamTag(f); setCatTag(v); close(); }}
+ />
+ )}
+ </HeaderFilter>
+ ) : "Category"}
+ </TH>
+ <TH right className="px-3">Revenue</TH>
+ <TH right className="px-3">Cost</TH>
+ <TH right className="px-3">Margin</TH>
+ <TH className="px-3">Size</TH>
+ <TH className="px-3">
+ {statusFilter ? "Status" : (
+ <HeaderFilter label="Status" value={statusTag ? statusLabel(statusTag) : null} onClear={() => setStatusTag(null)}>
+ {(close) => (
+ <>
+ <HeaderFilterItem label="All statuses" count={base.length} selected={!statusTag} onClick={() => { setStatusTag(null); close(); }} />
+ {ITEM_STATUSES.map((s) => (
+ <HeaderFilterItem key={s} label={statusLabel(s)} count={statusCounts[s] ?? 0} selected={statusTag === s} onClick={() => { setStatusTag(s); close(); }} />
+ ))}
+ </>
+ )}
+ </HeaderFilter>
+ )}
+ </TH>
+ <TH className="px-3">Posted on</TH>
+ <TH right className="pl-3 pr-4">Actions</TH>
  </tr>
  </thead>
  <tbody>
  {paged.map((it) => (
  <tr key={it.id} className={`group transition hover:bg-stone-50/70 ${selected.has(it.id) ? "bg-stone-50" : ""}`}>
- <TD className="px-4"><input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${it.title}`} /></TD>
+ <TD className="pl-4 pr-2"><input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${it.title}`} /></TD>
  <TD className="px-3">
  <button onClick={() => openEdit(it)} className="flex items-center gap-3 text-left">
  <div className="h-11 w-9 shrink-0 overflow-hidden rounded-md bg-stone-100 ring-1 ring-stone-200">
@@ -404,14 +517,24 @@ export default function ItemsPage() {
  )}
  </div>
  <span className="flex min-w-0 flex-col">
- <span className="max-w-[240px] truncate font-medium text-stone-900 group-hover:underline">{it.title}</span>
- <span className="truncate text-[11px] text-stone-400"><span className="font-mono tabular-nums">SKU-{1000 + it.sku}</span>{it.category ? ` · ${it.category}` : ""}</span>
+ <span className="max-w-[180px] truncate font-medium text-stone-900 group-hover:underline xl:max-w-[250px]">{it.title}</span>
+ <span className="truncate font-mono text-[11px] tabular-nums text-stone-400">SKU-{1000 + it.sku}</span>
  </span>
  </button>
  </TD>
- <TD right className="px-4 font-medium text-stone-800">${(it.priceCents / 100).toFixed(0)}</TD>
- <TD right className="px-4 text-stone-500">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "—"}</TD>
- <TD right className="px-4">
+ <TD className="px-3">
+       {(() => {
+ const s = slugOf.get(it.id);
+ if (!s) return <span className="text-stone-300">—</span>;
+ // A custom category shows in lighter grey — it sits outside the taxonomy on purpose.
+ return isCanonicalCategory(s)
+ ? <span className="whitespace-nowrap text-stone-600">{categoryValueLabel(s)}</span>
+ : <span className="whitespace-nowrap text-stone-400" title="Custom category">{s}</span>;
+ })()}
+ </TD>
+ <TD right className="px-3 font-medium text-stone-800">${(it.priceCents / 100).toFixed(0)}</TD>
+ <TD right className="px-3 text-stone-500">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "—"}</TD>
+ <TD right className="px-3">
  {(() => {
  const hasCost = it.costCents != null && it.costCents > 0;
  if (!hasCost || it.priceCents <= 0) return <span className="text-stone-300">—</span>;
@@ -419,24 +542,24 @@ export default function ItemsPage() {
  return <span className={cn("font-semibold tabular-nums", m >= 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-rose-500")}>{m}%</span>;
  })()}
  </TD>
- <TD className="px-4 text-stone-500">{it.size || "—"}</TD>
- <TD className="px-5">
+ <TD className="px-3 text-stone-500">{it.size || "—"}</TD>
+ <TD className="px-3">
  {it.status === "draft" && it.publishAt ? (
  <div className="flex flex-col gap-0.5">
  <StatusPill tone="info">scheduled</StatusPill>
  <span className="text-[10px] text-stone-400" title={new Date(it.publishAt).toLocaleString()}>{new Date(it.publishAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
  </div>
  ) : (
- <StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{it.status}</StatusPill>
+ <StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{statusLabel(it.status)}</StatusPill>
  )}
  </TD>
- <TD className="px-5">{postedCell(it)}</TD>
- <TD right className="px-5">
- <div className="flex items-center justify-end gap-1">
- <TechButton variant="ghost" className="px-2.5 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => openEdit(it)}>Edit</TechButton>
- {it.status === "draft" && <TechButton variant="secondary" className="px-2.5 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "publish")}>Publish</TechButton>}
- {(it.status === "active" || it.status === "reserved") && <TechButton variant="secondary" className="px-2.5 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "sold")}>Mark sold</TechButton>}
- {it.status !== "removed" && <TechButton variant="ghost" className="px-2.5 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "remove")}>Remove</TechButton>}
+ <TD className="px-3">{postedCell(it)}</TD>
+ <TD right className="pl-3 pr-4">
+ <div className="flex items-center justify-end gap-0.5">
+ <TechButton variant="ghost" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => openEdit(it)}>Edit</TechButton>
+ {it.status === "draft" && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "publish")}>Publish</TechButton>}
+ {(it.status === "active" || it.status === "reserved") && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "sold")}>Mark sold</TechButton>}
+ {it.status !== "removed" && <TechButton variant="ghost" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "remove")}>Remove</TechButton>}
  </div>
  </TD>
  </tr>
@@ -444,10 +567,27 @@ export default function ItemsPage() {
  </tbody>
  </table>
  </div>
- {totalPages > 1 && (
- <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-4 py-3 text-[12px] text-stone-500">
- <span className="tabular-nums">Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, shown.length)} of {shown.length}</span>
- <div className="flex items-center gap-2">
+ {/* With the filters in the headers, this rail is the only place that says a filter is on —
+ so it shows up whenever one is, not just when the rows spill onto a second page. */}
+ {(totalPages > 1 || filtering) && (
+ <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-4 py-3 text-[12px] text-stone-500">
+ <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+ <span className="tabular-nums">
+ {totalPages > 1
+ ? <>Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, shown.length)} of {shown.length}</>
+ : <><span className="font-medium text-stone-700">{shown.length}</span> of {base.length} items</>}
+ </span>
+ {filtering && (
+ <>
+ <span className="flex flex-wrap items-center gap-1.5">
+ {statusTag && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{statusLabel(statusTag)}</span>}
+ {(catTag || famTag) && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{catTag ? categoryValueLabel(catTag) : famTag}</span>}
+ </span>
+ <button type="button" onClick={clearFilters} className="font-medium text-stone-500 underline-offset-2 transition hover:text-stone-800 hover:underline">Clear filters</button>
+ </>
+ )}
+ </span>
+ <div className={cn("flex items-center gap-2", totalPages <= 1 && "hidden")}>
  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pageSafe <= 1} className="rounded-full border border-stone-200 px-3 py-1 transition enabled:hover:bg-stone-50 disabled:opacity-40">Prev</button>
  <span className="tabular-nums">Page {pageSafe} / {totalPages}</span>
  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={pageSafe >= totalPages} className="rounded-full border border-stone-200 px-3 py-1 transition enabled:hover:bg-stone-50 disabled:opacity-40">Next</button>
@@ -466,11 +606,11 @@ export default function ItemsPage() {
  <h2 className="text-base font-semibold text-stone-900">Edit listing</h2>
  <p className="font-mono text-[11px] tabular-nums text-stone-400">SKU-{1000 + editing.sku}</p>
  </div>
- <StatusPill tone={TONE[editForm.status]} dot={editForm.status === "active"}>{editForm.status}</StatusPill>
+ <StatusPill tone={TONE[editForm.status]} dot={editForm.status === "active"}>{statusLabel(editForm.status)}</StatusPill>
  </div>
 
  {/* Photos — reorder (‹ ›), remove (✕), add (upload). First = cover. */}
- <SectionLabel className="mb-2">Photos</SectionLabel>
+ <SectionLabel className="mb-2">Photos <span className="text-rose-500" title="Required to publish">*</span></SectionLabel>
  <div className="mb-4 flex flex-wrap gap-2">
  {editImages.map((src, i) => (
  <div key={`${src}-${i}`} className="group relative h-20 w-16 overflow-hidden rounded-md ring-1 ring-stone-200">
@@ -491,7 +631,7 @@ export default function ItemsPage() {
  </div>
 
  <div className="space-y-3">
- <Field label="Title"><Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} /></Field>
+ <Field label="Title" required><Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} /></Field>
  <div className="grid grid-cols-2 gap-3">
  <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Fendi" /></Field>
  <Field label="Era"><Input value={editForm.era} onChange={(e) => setEditForm((f) => ({ ...f, era: e.target.value }))} placeholder="e.g. 1990s" /></Field>
@@ -501,9 +641,14 @@ export default function ItemsPage() {
  <Field label="Material"><Input value={editForm.material} onChange={(e) => setEditForm((f) => ({ ...f, material: e.target.value }))} /></Field>
  <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} /></Field>
  </div>
- <Field label="Category"><Input value={editForm.category} onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))} /></Field>
+ <Field label="Category" required>
+ <CategoryBreadcrumb value={editForm.category} onChange={(v) => setEditForm((f) => ({ ...f, category: v }))} />
+ {!editForm.category && editing.category && (
+ <p className="mt-1.5 text-[11px] text-stone-400">Currently &ldquo;{editing.category}&rdquo; — not one of the tags. Pick one to replace it.</p>
+ )}
+ </Field>
  <div className="grid grid-cols-3 gap-3">
- <Field label="Price (USD)"><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
+ <Field label="Price (USD)" required><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
  <Field label="Cost (USD)"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
  <Field label="Margin">
  {(() => {
@@ -517,14 +662,11 @@ export default function ItemsPage() {
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>
- <div className="grid grid-cols-2 gap-3">
  <Field label="Status">
- <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value as ItemStatus }))} className={inputCls}>
- {(["draft", "active", "reserved", "sold", "removed"] as ItemStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
- </select>
+ {/* Status can't be cleared — an item is always in one. */}
+ <TagRow options={ITEM_STATUSES} value={editForm.status} onChange={(v) => setEditForm((f) => ({ ...f, status: v ?? f.status }))} labelFor={statusLabel} />
  </Field>
  <Field label="Weight (oz)"><Input type="number" inputMode="numeric" value={editForm.weightOz} onChange={(e) => setEditForm((f) => ({ ...f, weightOz: e.target.value }))} placeholder="for shipping" /></Field>
- </div>
  <div className="grid grid-cols-3 gap-3">
  <Field label="Length (in)"><Input type="number" inputMode="numeric" value={editForm.lengthIn} onChange={(e) => setEditForm((f) => ({ ...f, lengthIn: e.target.value }))} /></Field>
  <Field label="Width (in)"><Input type="number" inputMode="numeric" value={editForm.widthIn} onChange={(e) => setEditForm((f) => ({ ...f, widthIn: e.target.value }))} /></Field>
@@ -553,10 +695,25 @@ export default function ItemsPage() {
  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </div>
  </div>
- <div className="mt-5 flex items-center justify-end gap-2">
+ {/* The * fields are what a LIVE listing needs. A draft can be saved half-finished —
+ the gate only bites when the item is going (or staying) active. */}
+ {(() => {
+ const missing = publishBlockers(editForm, editImages);
+ return (
+ <div className="mt-5 flex items-center justify-end gap-3">
+ {missing.length > 0 && (
+ <p className="mr-auto text-[11px] text-stone-400">
+ {editForm.status === "active" ? "To publish, add" : "Missing for publishing"}: <span className="text-rose-500">{missing.join(", ")}</span>
+ </p>
+ )}
  <TechButton variant="ghost" onClick={() => setEditing(null)}>Cancel</TechButton>
- <TechButton disabled={savingEdit || !editForm.title.trim()} onClick={saveEdit}>{savingEdit ? "Saving…" : "Save"}</TechButton>
+ <TechButton
+ disabled={savingEdit || !editForm.title.trim() || (editForm.status === "active" && missing.length > 0)}
+ onClick={saveEdit}
+ >{savingEdit ? "Saving…" : "Save"}</TechButton>
  </div>
+ );
+ })()}
  </div>
  </div>
  )}

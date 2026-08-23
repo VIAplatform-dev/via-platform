@@ -251,6 +251,47 @@ export function TechButtonLink({ variant = "primary", className, ...props }: Rea
  return <a className={cn(ADMIN_BTN_BASE, ADMIN_BTN[variant], className)} {...props} />;
 }
 
+// ── Tag chip — the single interaction for picking a category/status, and for filtering by one ──
+// Same pill in both places on purpose: what you tag an item with is what you filter it by.
+export function Tag({ on, count, className, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; count?: number }) {
+ return (
+  <button
+   type="button" aria-pressed={on}
+   className={cn(
+    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition disabled:pointer-events-none disabled:opacity-40",
+    on
+     ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white"
+     : "border-stone-300 bg-white text-stone-600 hover:border-stone-400 hover:text-stone-900",
+    className,
+   )}
+   {...props}
+  >
+   {children}
+   {count != null && <span className={cn("tabular-nums", on ? "text-white/70" : "text-stone-400")}>{count}</span>}
+  </button>
+ );
+}
+
+// A row of tags where exactly one (or none) is picked. Clicking the picked tag clears it.
+export function TagRow<T extends string>({ options, value, onChange, counts, labelFor, className }: {
+ options: readonly T[];
+ value: T | null;
+ onChange: (v: T | null) => void;
+ counts?: Partial<Record<T, number>>;
+ labelFor?: (v: T) => string;
+ className?: string;
+}) {
+ return (
+  <div className={cn("flex flex-wrap gap-1.5", className)}>
+   {options.map((o) => (
+    <Tag key={o} on={value === o} count={counts?.[o]} onClick={() => onChange(value === o ? null : o)}>
+     {labelFor ? labelFor(o) : o}
+    </Tag>
+   ))}
+  </div>
+ );
+}
+
 // ── Empty state — dashed hairline, calm ──
 export function TechEmpty({ icon, title, body, action, className }: { icon?: React.ReactNode; title: string; body?: string; action?: React.ReactNode; className?: string }) {
  return (
