@@ -51,6 +51,7 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  const pathname = usePathname();
  const [open, setOpen] = useState(false);
  const [suppressed, setSuppressed] = useState(false); // hide launcher when the home full-page chat is open
+ const [dismissed, setDismissed] = useState(false); // user closed the launcher bubble
  const [msgs, setMsgs] = useState<Msg[]>([]);
  const [input, setInput] = useState("");
  const [attached, setAttached] = useState<string[]>([]); // data-URL inspiration/reference images
@@ -60,7 +61,7 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  const msgsRef = useRef<Msg[]>([]);
  const busyRef = useRef(false);
  const pathRef = useRef(pathname);
- useEffect(() => { pathRef.current = pathname; }, [pathname]);
+ useEffect(() => { pathRef.current = pathname; setDismissed(false); }, [pathname]);
 
  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }); }, [msgs, busy]);
 
@@ -121,7 +122,7 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  useEffect(() => {
  function onAsk(e: Event) {
  const detail = (e as CustomEvent).detail;
- setOpen(true);
+ setDismissed(false); setOpen(true);
  if (typeof detail === "string" && detail.trim()) send(detail);
  }
  window.addEventListener("vya:ask", onAsk as EventListener);
@@ -139,14 +140,19 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  return (
  <>
  {/* Launcher */}
- {!docked && !open && !suppressed && (
- <button onClick={() => setOpen(true)} className="group fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#5D0F17] py-2.5 pl-2.5 pr-4 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12]">
+ {!docked && !open && !suppressed && !dismissed && (
+ <div className="fixed bottom-5 right-5 z-50 flex items-center">
+ <button onClick={() => setOpen(true)} className="group flex items-center gap-2 rounded-full bg-[#5D0F17] py-2.5 pl-2.5 pr-4 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12]">
  <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/10">
  <Sparkles size={15} />
  <span className="vya-status-dot absolute -right-0 -top-0 h-2 w-2 rounded-full border border-[#5D0F17] bg-emerald-400" />
  </span>
  <span className="font-mono text-[11px] uppercase tracking-[0.18em]">Ask VYA</span>
  </button>
+ <button onClick={(e) => { e.stopPropagation(); setDismissed(true); }} aria-label="Dismiss" className="-ml-1.5 grid h-5 w-5 place-items-center rounded-full bg-[#3a0a0f] text-white/70 shadow-sm transition hover:bg-[#2a0709] hover:text-white">
+ <X size={10} strokeWidth={3} />
+ </button>
+ </div>
  )}
 
  {/* Panel */}
