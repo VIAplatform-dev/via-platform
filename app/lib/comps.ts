@@ -375,11 +375,17 @@ export function sourceTier(source: string): SourceTier {
  return "specialist"; // PREMIUM_SOURCE and independent curated dealers alike
 }
 
-/** Dedupe a comp set and rank authenticated-luxury sources first. */
+/** Dedupe a comp set and rank by match quality first, source tier second.
+ *  Same-piece comps must survive the .slice(0, 40) cap in estimatePrice — if they
+ *  sort below keyword matches from premium sources, they get truncated out and the
+ *  model never sees the branch's strongest evidence. */
 export function rankComps(comps: Comp[]): Comp[] {
  const seen = new Set<string>();
  const unique = comps.filter((c) => { const k = c.link || `${c.title}|${c.priceCents}`; if (seen.has(k)) return false; seen.add(k); return true; });
- return unique.sort((a, b) => (PREMIUM_SOURCE.test(b.source) ? 1 : 0) - (PREMIUM_SOURCE.test(a.source) ? 1 : 0));
+ return unique.sort((a, b) =>
+  (b.exactPiece ? 1 : 0) - (a.exactPiece ? 1 : 0)
+  || (PREMIUM_SOURCE.test(b.source) ? 1 : 0) - (PREMIUM_SOURCE.test(a.source) ? 1 : 0)
+ );
 }
 
 // Distinctive bag-MODEL names. Used to reject comps that are a different model than the query (e.g.

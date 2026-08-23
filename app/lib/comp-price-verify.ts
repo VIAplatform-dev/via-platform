@@ -163,10 +163,10 @@ export function rankVerifyCandidates<T extends { link?: string }>(matches: T[], 
  for (const m of matches) {
   const link = m.link;
   if (!link || !/^https?:\/\//i.test(link)) continue;
-  let hostname: string;
-  try { hostname = new URL(link).hostname; } catch { continue; }
-  if (NON_COMMERCE_HOST.test(hostname)) continue;
-  const path = link.slice(link.indexOf(hostname) + hostname.length);
+  let u: URL;
+  try { u = new URL(link); } catch { continue; }
+  if (NON_COMMERCE_HOST.test(u.hostname)) continue;
+  const path = u.pathname + u.search;
   // Product-looking wins; a listing/search page is a last resort.
   const score = PRODUCT_PATH.test(path) ? 2 : LISTING_PATH.test(path) ? 0 : 1;
   scored.push({ m, score });
@@ -178,18 +178,44 @@ export function rankVerifyCandidates<T extends { link?: string }>(matches: T[], 
   .map((s) => s.m);
 }
 
+/** Reject private/loopback/link-local IPs so a malicious redirect can't hit internal services. */
+function isPrivateHost(hostname: string): boolean {
+ // IPv4 private ranges + loopback + link-local + metadata
+ if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.)/.test(hostname)) return true;
+ if (hostname === "localhost" || hostname === "[::1]") return true;
+ // Cloud metadata endpoints
+ if (hostname === "metadata.google.internal") return true;
+ return false;
+}
+
 /** Default page fetcher: single attempt, hard timeout, body cap, browser-like UA. null on any
  *  failure — a blocked or slow store must never break the pricing run. */
 async function fetchPage(url: string): Promise<string | null> {
  try {
-  const res = await fetch(url, {
-   signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-   headers: { "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36", accept: "text/html" },
-   redirect: "follow",
-  });
-  if (!res.ok) return null;
-  const text = await res.text();
-  return text.slice(0, MAX_BODY_BYTES);
+  let u: URL;
+  try { u = new URL(url); } catch { return null; }
+  if (isPrivateHost(u.hostname)) return null;
+  const MAX_REDIRECTS = 3;
+  let target = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+   const res = await fetch(target, {
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    headers: { "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36", accept: "text/html" },
+    redirect: "manual",
+   });
+   if ([301, 302, 303, 307, 308].includes(res.status)) {
+    const loc = res.headers.get("location");
+    if (!loc) return null;
+    try { target = new URL(loc, target).href; } catch { return null; }
+    const nextHost = new URL(target).hostname;
+    if (isPrivateHost(nextHost)) return null;
+    continue;
+   }
+   if (!res.ok) return null;
+   const text = await res.text();
+   return text.slice(0, MAX_BODY_BYTES);
+  }
+  return null; // too many redirects
  } catch {
   return null;
  }
@@ -236,10 +262,12 @@ export async function verifyMatchPrices<T extends MatchLike>(
   let found = (await opts?.getCached?.(url).catch(() => null)) ?? null;
   if (!found) {
    const html = await fetcher(url).catch(() => null);
-   if (!html) return;
+   if (!html) return; // fetch failed — don't cache, let it retry next run
    found = extractPriceFromHtml(html);
-   // Cache only a genuine page read (even a no-price one) — never a fetch failure.
-   if (found) await opts?.saveCached?.(url, found).catch(() => {});
+   // Cache the outcome — even "read fine, no price" — so we don't re-fetch the same
+   // dead page every run and waste the budget on candidates that will never yield a price.
+   const toCache = found ?? { priceCents: null, currency: null, availability: null };
+   await opts?.saveCached?.(url, toCache).catch(() => {});
   }
   if (found?.priceCents) extracted.set(m, found);
  }));
