@@ -4,6 +4,7 @@ import { getMarketReferenceFast, computePriceFlag, type PriceEstimate } from "@/
 import { getVisualVyaComps } from "@/app/lib/intake-memory-db";
 import { embedImage } from "@/app/lib/embeddings";
 import { reverseImageMatches, partitionByVisualMatch } from "@/app/lib/comps";
+import { sanitizeStoredBrand } from "@/app/lib/infer-item-fields";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,8 +32,10 @@ export async function POST(request: NextRequest) {
 
  const body = await request.json().catch(() => null);
  const price = Number(body?.price);
- const brand = typeof body?.brand === "string" ? body.brand.trim() : "";
  const title = typeof body?.title === "string" ? body.title.trim() : "";
+ // The form pre-fills brand from the synced catalog, where Shopify's `vendor` often holds the
+ // STORE's own name — sanitize it against the calling store before it steers the comp search.
+ const brand = sanitizeStoredBrand(typeof body?.brand === "string" ? body.brand : null, { title, storeName: slug }) || "";
  const era = typeof body?.era === "string" ? body.era.trim() : "";
  const material = typeof body?.material === "string" ? body.material.trim() : "";
  const category = typeof body?.category === "string" ? body.category.trim() : "";

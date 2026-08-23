@@ -4,7 +4,7 @@ import { reverseImageBestOf, matchesToComps, isCompsConfigured } from "./comps";
 import { resolveSpecificPiece } from "./intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "./embeddings";
 import { normalizeCategory } from "./market-data-db";
-import { inferItemFields } from "./infer-item-fields";
+import { inferItemFields, sanitizeStoredBrand } from "./infer-item-fields";
 import { gate } from "./concurrency";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -64,6 +64,20 @@ async function ensureTable() {
 
 const tierOf = (cents: number): string => (cents < 7500 ? "budget (<$75)" : cents <= 30000 ? "mid ($75–300)" : "premium (>$300)");
 
+// ── Answer-key hygiene ──
+// A sold price is only a usable "right answer" when it plausibly reflects the market. Two junk
+// patterns dominate the cheap-item misses: $5–$12 clearance blowouts / feed-drop artifacts recorded
+// as sales, and deep markdowns (sold at less than half the listed price). Grading against those
+// punishes the pricer for refusing to call a Hanky Panky tank $10.
+const MIN_ANSWER_CENTS = 1500; // below $15 a "sale" is clearance/sync noise, not a market price
+const MAX_MARKDOWN = 0.5; // sold at <50% of its own original list price = a blowout, not the market
+// Tolerance floor: ±20% of a $20 item is a ±$4 window — tighter than the market's own noise. A
+// prediction within these absolute dollars counts as a hit regardless of the percentage.
+const TOL10_CENTS = 500; // within ±10% OR ±$5
+const TOL20_CENTS = 1000; // within ±20% OR ±$10
+const hit = (errorPct: number | null, absErrCents: number | null, pctBar: number, floorCents: number): boolean | null =>
+ errorPct == null ? null : errorPct <= pctBar || (absErrCents != null && absErrCents <= floorCents);
+
 export type PriceEvalItem = {
  soldId: number; brand: string | null; category: string; tier: string;
  soldCents: number; predCents: number | null; errorPct: number | null;
@@ -95,18 +109,22 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  // against ONLY real confirmed order prices (the receipts) — the truest answer key, once we have them.
  const rows = (await (opts.confirmedOnly
  ? sql`
-  SELECT s.id, s.title, s.designer, s.final_price, s.image, s.embedding
+  SELECT s.id, s.title, s.designer, s.store_name, s.final_price, s.image, s.embedding
   FROM sold_items s
   LEFT JOIN price_eval_items p ON p.sold_id = s.id AND p.mode = ${mode}
   WHERE s.image IS NOT NULL AND s.image <> '' AND s.final_price > 0 AND s.confirmed = true AND p.id IS NULL
+   AND s.final_price * 100 >= ${MIN_ANSWER_CENTS}
+   AND (s.original_price IS NULL OR s.original_price <= 0 OR s.final_price >= s.original_price * ${MAX_MARKDOWN})
   ORDER BY s.sold_at DESC
   LIMIT ${sample}
  `
  : sql`
-  SELECT s.id, s.title, s.designer, s.final_price, s.image, s.embedding
+  SELECT s.id, s.title, s.designer, s.store_name, s.final_price, s.image, s.embedding
   FROM sold_items s
   LEFT JOIN price_eval_items p ON p.sold_id = s.id AND p.mode = ${mode}
   WHERE s.image IS NOT NULL AND s.image <> '' AND s.final_price > 0 AND p.id IS NULL
+   AND s.final_price * 100 >= ${MIN_ANSWER_CENTS}
+   AND (s.original_price IS NULL OR s.original_price <= 0 OR s.final_price >= s.original_price * ${MAX_MARKDOWN})
   ORDER BY s.sold_at DESC
   LIMIT ${sample}
  `).catch(() => [])) as any[];
@@ -114,8 +132,11 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  const g = gate("price-eval", 3);
  const graded = await Promise.all(rows.map((r) => g.run(async () => {
  const image = String(r.image || "");
- const brand = (r.designer || "").trim() || null;
  const title = String(r.title || "").trim();
+ // Shopify feeds default `vendor` to the STORE's own name, so `designer` often holds
+ // "To Us Vintage" / "My Store" instead of the maker — and the pricer would search eBay for
+ // the shop. Trust the column only when it survives the store-name guard; else infer from title.
+ const brand = sanitizeStoredBrand(r.designer, { title, storeName: r.store_name });
  const soldCents = Math.round(Number(r.final_price) * 100);
  if (!image || soldCents <= 0) return null;
  try {
@@ -145,9 +166,10 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  : { brand };
  const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context }).catch(() => null);
  const predCents = est?.marketCents && est.marketCents > 0 ? est.marketCents : null;
- const errorPct = predCents != null ? Math.round((Math.abs(predCents - soldCents) / soldCents) * 100) : null;
- const within10 = errorPct != null ? errorPct <= 10 : null;
- const within20 = errorPct != null ? errorPct <= 20 : null;
+ const absErr = predCents != null ? Math.abs(predCents - soldCents) : null;
+ const errorPct = predCents != null ? Math.round(((absErr as number) / soldCents) * 100) : null;
+ const within10 = hit(errorPct, absErr, 10, TOL10_CENTS);
+ const within20 = hit(errorPct, absErr, 20, TOL20_CENTS);
  const category = normalizeCategory(title) || "uncategorized";
  const tier = tierOf(soldCents);
  await sql`
@@ -237,7 +259,9 @@ export async function getPriceMisses(limit = 20, windowDays = 120, mode = "title
  const rows = (await db()`
   SELECT p.sold_id, p.brand, p.category, p.tier, p.sold_cents, p.pred_cents, p.error_pct, s.title, s.image
   FROM price_eval_items p LEFT JOIN sold_items s ON s.id = p.sold_id
-  WHERE p.ran_at >= ${cutoff} AND p.error_pct IS NOT NULL AND p.within10 = false AND p.mode = ${mode}
+  WHERE p.ran_at >= ${cutoff} AND p.error_pct IS NOT NULL AND p.mode = ${mode}
+   AND p.sold_cents >= ${MIN_ANSWER_CENTS}
+   AND p.error_pct > 10 AND (p.pred_cents IS NULL OR abs(p.pred_cents - p.sold_cents) > ${TOL10_CENTS})
   ORDER BY p.error_pct DESC LIMIT ${lim}
  `.catch(() => [])) as { sold_id: number; brand: string | null; category: string | null; tier: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null; title: string | null; image: string | null }[];
  return rows.map((r) => ({
@@ -255,11 +279,17 @@ export type PriceAccuracy = { overall: PriceScore; byCategory: PriceScore[]; byT
 export async function getPriceAccuracy(windowDays = 120, mode = "title"): Promise<PriceAccuracy> {
  await ensureTable();
  const cutoff = new Date(Date.now() - windowDays * 86400000).toISOString();
+ // Junk answers (below the minimum) are excluded even if graded before this policy existed, and
+ // within10/within20 are recomputed with the dollar tolerance floor so old rows score consistently.
  const rows = (await db()`
-  SELECT category, tier, within10, within20, error_pct
-  FROM price_eval_items WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode = ${mode}
- `.catch(() => [])) as { category: string | null; tier: string | null; within10: boolean | null; within20: boolean | null; error_pct: number | null }[];
- const items = rows.map((r) => ({ category: r.category || "uncategorized", tier: r.tier || "—", within10: r.within10, within20: r.within20, errorPct: r.error_pct }));
+  SELECT category, tier, sold_cents, pred_cents, error_pct
+  FROM price_eval_items
+  WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode = ${mode} AND sold_cents >= ${MIN_ANSWER_CENTS}
+ `.catch(() => [])) as { category: string | null; tier: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null }[];
+ const items = rows.map((r) => {
+ const absErr = r.pred_cents != null ? Math.abs(Number(r.pred_cents) - Number(r.sold_cents)) : null;
+ return { category: r.category || "uncategorized", tier: r.tier || "—", within10: hit(r.error_pct, absErr, 10, TOL10_CENTS), within20: hit(r.error_pct, absErr, 20, TOL20_CENTS), errorPct: r.error_pct };
+ });
 
  const group = (key: "category" | "tier") => {
  const m = new Map<string, typeof items>();
@@ -294,13 +324,16 @@ export async function comparePriceAccuracy(windowDays = 120, modeA = "title", mo
  await ensureTable();
  const cutoff = new Date(Date.now() - windowDays * 86400000).toISOString();
  const rows = (await db()`
-  SELECT sold_id, mode, category, within10, within20, error_pct
+  SELECT sold_id, mode, category, sold_cents, pred_cents, error_pct
   FROM price_eval_items
-  WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode IN (${modeA}, ${modeB})
- `.catch(() => [])) as { sold_id: number; mode: string; category: string | null; within10: boolean | null; within20: boolean | null; error_pct: number | null }[];
+  WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode IN (${modeA}, ${modeB}) AND sold_cents >= ${MIN_ANSWER_CENTS}
+ `.catch(() => [])) as { sold_id: number; mode: string; category: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null }[];
 
  type Item = { soldId: number; category: string; within10: boolean | null; within20: boolean | null; errorPct: number | null };
- const of = (mode: string): Item[] => rows.filter((r) => r.mode === mode).map((r) => ({ soldId: Number(r.sold_id), category: r.category || "uncategorized", within10: r.within10, within20: r.within20, errorPct: r.error_pct }));
+ const of = (mode: string): Item[] => rows.filter((r) => r.mode === mode).map((r) => {
+ const absErr = r.pred_cents != null ? Math.abs(Number(r.pred_cents) - Number(r.sold_cents)) : null;
+ return { soldId: Number(r.sold_id), category: r.category || "uncategorized", within10: hit(r.error_pct, absErr, 10, TOL10_CENTS), within20: hit(r.error_pct, absErr, 20, TOL20_CENTS), errorPct: r.error_pct };
+ });
  const a = of(modeA), b = of(modeB);
 
  const inBoth = new Set([...new Set(a.map((i) => i.soldId))].filter((id) => b.some((i) => i.soldId === id)));
