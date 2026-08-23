@@ -7,7 +7,7 @@ import { useStoreBase } from "../nav-base";
 import { RotateCw, Globe, ChevronDown, ChevronLeft, ChevronRight, Home as HomeIcon, Copy, Check, ExternalLink, SlidersHorizontal, GripVertical, ChevronUp, X as XIcon, Plus, Monitor, Tablet, Smartphone, AlignLeft, AlignCenter, AlignRight, Palette, Sparkles, Undo2, Redo2, Trash2, Layers, Shapes, Type, Upload as UploadIcon, Image as ImageIcon, Minus, MousePointerClick } from "lucide-react";
 import { makeBlock, pageSlugify, type Block, type BlockDef, type BlockType, type BlockStyle, type BlockScale, type StorePage } from "@/app/lib/storefront-blocks";
 import { parseDesign, buildDesignCss, type DesignSettings, type Radius } from "@/app/lib/captured-design";
-import { STOREFRONT_PALETTES, RADIUS_OPTIONS } from "@/app/lib/storefront-templates";
+import { STOREFRONT_PALETTES } from "@/app/lib/storefront-templates";
 import { ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
 
@@ -35,7 +35,6 @@ const FONT_PAIRS: { name: string; heading: string; body: string }[] = [
  { name: "Romantic", heading: "Cormorant Garamond", body: "Poppins" },
  { name: "Modern", heading: "Space Grotesk", body: "Inter" },
 ];
-const RADIUS_PREVIEW: Record<string, string> = { sharp: "0", soft: "6px", round: "9999px" };
 const money = (c: number | null, cur: string) => (c == null ? "" : new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(c / 100));
 
 export default function StorefrontEditor() {
@@ -763,16 +762,6 @@ export default function StorefrontEditor() {
  {design[key] && <button onClick={() => setDesignField({ [key]: null })} title="Keep original" className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">reset</button>}
  <ColorSwatch value={design[key] || fallback} onChange={(v) => setDesignField({ [key]: v })} />
  </div>
- ))}
- </div>
-
- <p className="mb-2 mt-6 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Corners</p>
- <div className="grid grid-cols-3 gap-2">
- {RADIUS_OPTIONS.map((r) => (
- <button key={r.id} type="button" onClick={() => setDesignField({ radius: r.id as Radius })} className={`flex flex-col items-center gap-2 rounded-lg border py-3 transition ${design.radius === r.id ? "border-[#5D0F17] bg-[#5D0F17]/[0.05] ring-1 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
- <span className="h-7 w-7 border-2 border-stone-500" style={{ borderRadius: RADIUS_PREVIEW[r.id] }} />
- <span className="text-[11px] font-medium text-stone-600">{r.name}</span>
- </button>
  ))}
  </div>
 

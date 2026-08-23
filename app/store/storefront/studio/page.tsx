@@ -14,7 +14,7 @@ import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, HEADER_LAYOUTS, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
-import { STOREFRONT_TEMPLATES, templateBlocks, STOREFRONT_PALETTES, RADIUS_OPTIONS, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
+import { STOREFRONT_TEMPLATES, templateBlocks, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
 import ItemsEditor from "@/app/store/storefront/ItemsEditor";
@@ -142,7 +142,6 @@ const FONT_PAIRS: { name: string; heading: string; body: string }[] = [
  { name: "Modern", heading: "Space Grotesk", body: "Inter" },
 ];
 // The corner-preview curve for each shape option, so the segmented control shows what it does.
-const RADIUS_PREVIEW: Record<Radius, string> = { sharp: "0px", soft: "6px", round: "12px" };
 
 // ── Snapping (Canva/Figma alignment guides) ───────────────────────────────────
 // At drag/resize start we gather every candidate line to snap to — the section's own edges + centre
@@ -862,7 +861,6 @@ export default function StorefrontStudio() {
  function changeColor(key: keyof Colors, val: string) { const next = { ...colors, [key]: val }; setColors(next); pushDesign({ colors: next }); }
  function changeFont(which: keyof Fonts, val: string) { const next = { ...fonts, [which]: val }; setFonts(next); pushDesign({ fonts: next }); }
  function changeFont2(heading: string, body: string) { const next = { heading, body }; setFonts(next); pushDesign({ fonts: next }); }
- function changeRadius(r: Radius) { setRadius(r); pushDesign({ radius: r }); }
  // Applying a skin sets the style layer, and SEEDS any palette/type the skin carries — once. It is
  // seeded rather than enforced: the colour and font controls keep working afterwards and their values
  // stick, which is what makes a skin a starting point rather than a theme that owns the storefront.
@@ -2318,21 +2316,6 @@ export default function StorefrontStudio() {
  </div>
  );
  })}
- </div>
-
- {/* Corners ("shapes") */}
- </>)}
- <button type="button" onClick={() => toggleDesign("Corners")} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
- <ChevronDown size={12} className={`transition ${openDesign.has("Corners") ? "" : "-rotate-90"}`} /> <span className="flex-1">Corners</span>
- </button>
- {openDesign.has("Corners") && (<>
- <div className="grid grid-cols-3 gap-2">
- {RADIUS_OPTIONS.map((r) => (
- <button key={r.id} type="button" onClick={() => changeRadius(r.id)} className={`flex flex-col items-center gap-2 rounded-lg border py-3 transition ${radius === r.id ? "border-[#5D0F17] bg-[#5D0F17]/[0.05] ring-1 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
- <span className="h-7 w-7 border-2 border-stone-500" style={{ borderRadius: RADIUS_PREVIEW[r.id] }} />
- <span className="text-[11px] font-medium text-stone-600">{r.name}</span>
- </button>
- ))}
  </div>
 
  {/* Fonts */}
