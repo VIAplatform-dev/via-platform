@@ -107,7 +107,9 @@ ${baseStyles()}
  },
  },
  trustHost: true,
- debug: true,
+ // debug: only when explicitly asked for. NextAuth debug prints the full provider
+ // config — clientSecret included — to the console on every sign-in.
+ debug: process.env.AUTH_DEBUG === "true",
  logger: {
  error(error: unknown) {
  const err = error instanceof Error ? error : new Error(String(error));
