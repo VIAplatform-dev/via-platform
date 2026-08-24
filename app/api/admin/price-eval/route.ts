@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/app/lib/storeAuth";
-import { runPriceEval, getPriceAccuracy, getPriceMisses, comparePriceAccuracy } from "@/app/lib/eval-price";
+import { runPriceEval, getPriceAccuracy, getPriceMisses, getNoiseFloor, comparePriceAccuracy } from "@/app/lib/eval-price";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // prices a sample of real sales (reverse-image + comps per item)
@@ -19,6 +19,8 @@ export async function GET(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const q = new URL(request.url).searchParams;
  const misses = Number(q.get("misses")) || 0;
+ // ?noise=1 — the ceiling on any pricer's accuracy for this catalogue, to judge the score against.
+ const wantNoise = q.get("noise") === "1";
  const mode = MODES.includes(q.get("mode") as (typeof MODES)[number]) ? (q.get("mode") as string) : "title";
  if (q.get("compare")) {
  try {
@@ -29,7 +31,8 @@ export async function GET(request: NextRequest) {
  }
  try {
  const acc = await getPriceAccuracy(120, mode);
- return NextResponse.json({ ok: true, mode, ...acc, ...(misses ? { misses: await getPriceMisses(misses, 120, mode) } : {}) });
+ const noise = wantNoise ? await getNoiseFloor().catch(() => null) : null;
+ return NextResponse.json({ ok: true, mode, ...acc, ...(noise ? { noiseFloor: noise } : {}), ...(misses ? { misses: await getPriceMisses(misses, 120, mode) } : {}) });
  } catch (e) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
  }

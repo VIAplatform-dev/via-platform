@@ -43,6 +43,13 @@ async function ensureTable() {
    sold_cents INTEGER NOT NULL,
    pred_cents INTEGER,
    error_pct INTEGER,          -- |pred - sold| / sold, as a whole %
+   signed_error_pct INTEGER,   -- (pred - sold) / sold: NEGATIVE = we priced it too low
+   low_cents INTEGER,          -- the predicted RANGE, not just its midpoint
+   high_cents INTEGER,
+   in_band BOOLEAN,            -- did the realized price land inside that range?
+   src TEXT,                   -- comps | benchmark | floor | knowledge — HOW the number was reached
+   comp_count INTEGER,         -- how many comps survived to the valuation
+   confidence REAL,
    within10 BOOLEAN,
    within20 BOOLEAN,
    ran_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -54,6 +61,16 @@ async function ensureTable() {
  // real seller upload. specific_resolved records whether the reference index matched a piece at all.
  await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'title'`.catch(() => {});
  await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS specific_resolved BOOLEAN`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS signed_error_pct INTEGER`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS low_cents INTEGER`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS high_cents INTEGER`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS in_band BOOLEAN`.catch(() => {});
+ // Without these, a bad price is a mystery: a brand-average fallback and a well-comped answer look
+ // identical in the results. Diagnosing the fourteen-identical-Dior-bags case took an hour and a
+ // hand-written query; it should have been one column.
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS src TEXT`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS comp_count INTEGER`.catch(() => {});
+ await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS confidence REAL`.catch(() => {});
  // Confirmed-sale flag lives on sold_items — ensure it exists so a `confirmedOnly` eval can filter on it.
  await db()`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
  // A sold item can be graded once PER MODE (title + photo coexist). Replace the old sold-only index.
@@ -164,19 +181,32 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  const context = inferred
  ? { brand: brand ?? inferred.brand, era: inferred.era, material: inferred.material, condition: inferred.condition, conditionGrade: inferred.condition }
  : { brand };
- const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context }).catch(() => null);
+ const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context, excludeSoldId: Number(r.id) }).catch(() => null);
  const predCents = est?.marketCents && est.marketCents > 0 ? est.marketCents : null;
  const absErr = predCents != null ? Math.abs(predCents - soldCents) : null;
  const errorPct = predCents != null ? Math.round(((absErr as number) / soldCents) * 100) : null;
+ // Direction, not just magnitude: a $630 bag priced at $150 and a $30 dress priced at $90 are
+ // both "off by ~50%" and need opposite fixes.
+ const signedErrorPct = predCents != null ? Math.round(((predCents - soldCents) / soldCents) * 100) : null;
+ // Band coverage: the honest question for one-of-one goods. A $600–$850 call on a piece that
+ // fetches $700 is a correct call, and scoring only the midpoint marks it wrong.
+ const lowCents = est?.lowCents ?? null;
+ const highCents = est?.highCents ?? null;
+ const inBand = lowCents != null && highCents != null ? soldCents >= lowCents && soldCents <= highCents : null;
+ const src = est?.source ?? null;
+ const compCount = est?.comps?.length ?? null;
+ const confidence = est?.confidence ?? null;
  const within10 = hit(errorPct, absErr, 10, TOL10_CENTS);
  const within20 = hit(errorPct, absErr, 20, TOL20_CENTS);
  const category = normalizeCategory(title) || "uncategorized";
  const tier = tierOf(soldCents);
  await sql`
-  INSERT INTO price_eval_items (sold_id, mode, brand, category, tier, sold_cents, pred_cents, error_pct, within10, within20, specific_resolved, ran_at)
-  VALUES (${r.id}, ${mode}, ${brand}, ${category}, ${tier}, ${soldCents}, ${predCents}, ${errorPct}, ${within10}, ${within20}, ${specificResolved}, now())
+  INSERT INTO price_eval_items (sold_id, mode, brand, category, tier, sold_cents, pred_cents, error_pct, signed_error_pct, low_cents, high_cents, in_band, src, comp_count, confidence, within10, within20, specific_resolved, ran_at)
+  VALUES (${r.id}, ${mode}, ${brand}, ${category}, ${tier}, ${soldCents}, ${predCents}, ${errorPct}, ${signedErrorPct}, ${lowCents}, ${highCents}, ${inBand}, ${src}, ${compCount}, ${confidence}, ${within10}, ${within20}, ${specificResolved}, now())
   ON CONFLICT (sold_id, mode) DO UPDATE SET
-   pred_cents = EXCLUDED.pred_cents, error_pct = EXCLUDED.error_pct, within10 = EXCLUDED.within10,
+   pred_cents = EXCLUDED.pred_cents, error_pct = EXCLUDED.error_pct, signed_error_pct = EXCLUDED.signed_error_pct,
+   low_cents = EXCLUDED.low_cents, high_cents = EXCLUDED.high_cents, in_band = EXCLUDED.in_band,
+   src = EXCLUDED.src, comp_count = EXCLUDED.comp_count, confidence = EXCLUDED.confidence, within10 = EXCLUDED.within10,
    within20 = EXCLUDED.within20, brand = EXCLUDED.brand, category = EXCLUDED.category, tier = EXCLUDED.tier, specific_resolved = EXCLUDED.specific_resolved, ran_at = now()
  `.catch(() => {});
  return { predCents, errorPct, specificResolved };
@@ -216,17 +246,28 @@ export type PriceScore = {
  within10Pct: number | null; within20Pct: number | null;
  ci95: [number, number] | null; // CI on the within-10% rate
  medianErrorPct: number | null;
+ // Direction of the miss. medianSignedPct < 0 = this segment reads LOW overall.
+ medianSignedPct: number | null; overCount: number; underCount: number;
+ // Share of sales that landed INSIDE the predicted range — the honest headline for one-of-one goods.
+ inBandPct: number | null; inBandN: number;
  verdict: "pass" | "close" | "fail" | "insufficient"; // vs the 95%-within-10% bar
 };
 
 const MIN_N = 30; // below this, a segment is "insufficient data" — never a verdict on noise
 const GATE = 0.95; // beta bar: 95% of items within ±10%
 
-function scoreOf(segment: string, items: { within10: boolean | null; within20: boolean | null; errorPct: number | null }[]): PriceScore {
+function scoreOf(segment: string, items: { within10: boolean | null; within20: boolean | null; errorPct: number | null; signedErrorPct?: number | null; inBand?: boolean | null }[]): PriceScore {
  const graded = items.filter((i) => i.errorPct != null);
  const n = graded.length;
  const w10 = graded.filter((i) => i.within10).length;
  const w20 = graded.filter((i) => i.within20).length;
+ // Bias: a segment can sit at 30% because it is noisy both ways, or because it is consistently
+ // one way — those need opposite fixes, and absolute error cannot tell them apart.
+ const signed = graded.map((i) => i.signedErrorPct).filter((v): v is number => v != null).sort((a, b) => a - b);
+ const overCount = signed.filter((v) => v > 0).length;
+ const underCount = signed.filter((v) => v < 0).length;
+ const banded = items.filter((i) => i.inBand != null);
+ const inBandPct = banded.length ? Math.round((banded.filter((i) => i.inBand).length / banded.length) * 100) : null;
  const errs = graded.map((i) => i.errorPct as number).sort((a, b) => a - b);
  const ci = wilson95(w10, n);
  const rate = n ? w10 / n : null;
@@ -241,6 +282,8 @@ function scoreOf(segment: string, items: { within10: boolean | null; within20: b
  within10Pct: n ? Math.round((w10 / n) * 100) : null,
  within20Pct: n ? Math.round((w20 / n) * 100) : null,
  ci95: ci, medianErrorPct: errs.length ? errs[Math.floor(errs.length / 2)] : null,
+ medianSignedPct: signed.length ? signed[Math.floor(signed.length / 2)] : null, overCount, underCount,
+ inBandPct, inBandN: banded.length,
  verdict,
  };
 }
@@ -282,13 +325,13 @@ export async function getPriceAccuracy(windowDays = 120, mode = "title"): Promis
  // Junk answers (below the minimum) are excluded even if graded before this policy existed, and
  // within10/within20 are recomputed with the dollar tolerance floor so old rows score consistently.
  const rows = (await db()`
-  SELECT category, tier, sold_cents, pred_cents, error_pct
+  SELECT category, tier, sold_cents, pred_cents, error_pct, signed_error_pct, in_band
   FROM price_eval_items
   WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode = ${mode} AND sold_cents >= ${MIN_ANSWER_CENTS}
- `.catch(() => [])) as { category: string | null; tier: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null }[];
+ `.catch(() => [])) as { category: string | null; tier: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null; signed_error_pct: number | null; in_band: boolean | null }[];
  const items = rows.map((r) => {
  const absErr = r.pred_cents != null ? Math.abs(Number(r.pred_cents) - Number(r.sold_cents)) : null;
- return { category: r.category || "uncategorized", tier: r.tier || "—", within10: hit(r.error_pct, absErr, 10, TOL10_CENTS), within20: hit(r.error_pct, absErr, 20, TOL20_CENTS), errorPct: r.error_pct };
+ return { category: r.category || "uncategorized", tier: r.tier || "—", within10: hit(r.error_pct, absErr, 10, TOL10_CENTS), within20: hit(r.error_pct, absErr, 20, TOL20_CENTS), errorPct: r.error_pct, signedErrorPct: r.signed_error_pct, inBand: r.in_band };
  });
 
  const group = (key: "category" | "tier") => {
@@ -354,4 +397,87 @@ export async function comparePriceAccuracy(windowDays = 120, modeA = "title", mo
  }).sort((x, y) => (y.a?.n ?? 0) + (y.b?.n ?? 0) - ((x.a?.n ?? 0) + (x.b?.n ?? 0)));
 
  return { windowDays, modeA, modeB, overallA: scoreOf(modeA, a), overallB: scoreOf(modeB, b), paired, byCategory };
+}
+
+
+// ───────────────────────────────────────────────────────────────────────────
+// The noise floor — what accuracy is even possible here.
+//
+// Every piece is one of one, so there is no single correct price: the same garment sells across a
+// spread depending on the week, the photos, the store and the buyer. Grading against ONE realized
+// sale therefore measures the market's own variance as well as the model's error, and no amount of
+// engineering removes the first part.
+//
+// This measures that first part. Group the sales we already have by brand x category and ask: if an
+// ORACLE predicted each group's median for every piece in it, how wrong would it still be? That is
+// the best any pricer can do on this data, in the same units as the eval's medianErrorPct.
+//
+//   floor 30% + eval 46%  ->  ~16pts are ours to fix, and a +/-20% target is unreachable
+//   floor 12% + eval 46%  ->  most of the error IS ours, and the target is fair
+// ───────────────────────────────────────────────────────────────────────────
+
+export type NoiseSegment = { segment: string; n: number; groups: number; medianDeviationPct: number; within20Pct: number };
+export type NoiseFloor = {
+ overall: NoiseSegment | null;
+ byCategory: NoiseSegment[];
+ note: string;
+};
+
+const MIN_GROUP = 2;
+
+function floorOf(segment: string, groups: Map<string, number[]>): NoiseSegment | null {
+ const devs: number[] = [];
+ let used = 0;
+ for (const prices of groups.values()) {
+  if (prices.length < MIN_GROUP) continue;
+  const sorted = [...prices].sort((a, b) => a - b);
+  const med = sorted[Math.floor(sorted.length / 2)];
+  if (!med) continue;
+  used++;
+  for (const pr of prices) devs.push(Math.round((Math.abs(pr - med) / med) * 100));
+ }
+ if (!devs.length) return null;
+ devs.sort((a, b) => a - b);
+ return {
+  segment, n: devs.length, groups: used,
+  medianDeviationPct: devs[Math.floor(devs.length / 2)],
+  within20Pct: Math.round((devs.filter((d) => d <= 20).length / devs.length) * 100),
+ };
+}
+
+/** How much do comparable pieces vary in what they sell for? The ceiling on any pricer's accuracy. */
+export async function getNoiseFloor(): Promise<NoiseFloor> {
+ const rows = (await db()`
+  SELECT designer, title, store_name, final_price FROM sold_items
+  WHERE final_price > 0 AND designer IS NOT NULL AND designer <> ''
+ `.catch(() => [])) as { designer: string; title: string; store_name: string | null; final_price: string }[];
+
+ const all = new Map<string, number[]>();
+ const byCat = new Map<string, Map<string, number[]>>();
+ for (const r of rows) {
+  const price = Number(r.final_price);
+  // Same junk-answer floor the eval applies, so the ceiling and the score are measured on
+  // comparable data rather than the floor being dragged down by clearance rows.
+  if (!Number.isFinite(price) || price * 100 < MIN_ANSWER_CENTS) continue;
+  // Trust a stored brand only where the eval would — a Shopify vendor field is often the shop.
+  const brand = sanitizeStoredBrand(r.designer, { title: r.title, storeName: r.store_name }) || inferItemFields(r.title, r.title).brand;
+  if (!brand) continue;
+  const cat = normalizeCategory(r.title || "") || "uncategorized";
+  const key = `${brand.trim().toLowerCase()}|${cat}`;
+  if (!all.has(key)) all.set(key, []);
+  all.get(key)!.push(price);
+  if (!byCat.has(cat)) byCat.set(cat, new Map());
+  const m = byCat.get(cat)!;
+  if (!m.has(key)) m.set(key, []);
+  m.get(key)!.push(price);
+ }
+
+ return {
+  overall: floorOf("All", all),
+  byCategory: [...byCat.entries()]
+   .map(([cat, groups]) => floorOf(cat, groups))
+   .filter((x): x is NoiseSegment => x != null)
+   .sort((a, b) => b.n - a.n),
+  note: "Deviation of each sale from the median of comparable sales (same brand x category). An oracle predicting the group median would still miss by this much — compare with the eval's medianErrorPct to see how much of the gap is actually ours.",
+ };
 }

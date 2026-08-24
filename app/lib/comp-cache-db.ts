@@ -150,14 +150,20 @@ export async function newestCompAgeDays(query: string): Promise<number | null> {
  *    AI-pricing-off-its-own-AI-prices echo chamber).
  * Prices are converted to USD. Empty when brand is unknown.
  */
-export async function getVyaComps(opts: { brand: string | null; limit?: number }): Promise<Comp[]> {
+export async function getVyaComps(opts: { brand: string | null; limit?: number; excludeSoldId?: number | null }): Promise<Comp[]> {
  const brand = (opts.brand ?? "").trim();
  if (!brand) return [];
  const limit = opts.limit ?? 15;
+ // excludeSoldId: leave one sale OUT of the comp set. Only the accuracy eval passes it, and it is
+ // the difference between measuring and cheating — grading a sold piece pulls VYA comps for its
+ // brand, which returns THAT SALE at exactly its sold price, labelled as a trusted transaction.
+ // The pricer anchors on it and scores a perfect zero, which is why title mode reported a median
+ // error of 0 across roughly half its rows.
+ const exclude = opts.excludeSoldId ?? -1;
  try {
  const sql = db();
  const [sold, listed] = (await Promise.all([
-  sql`SELECT title, final_price, currency FROM sold_items WHERE designer ILIKE ${brand} AND final_price > 0 ORDER BY sold_at DESC LIMIT ${limit}`,
+  sql`SELECT title, final_price, currency FROM sold_items WHERE designer ILIKE ${brand} AND final_price > 0 AND id <> ${exclude} ORDER BY sold_at DESC LIMIT ${limit}`,
   sql`SELECT title, price, currency FROM products WHERE brand ILIKE ${brand} AND price > 0 ORDER BY created_at DESC NULLS LAST LIMIT ${limit}`,
  ])) as [Array<Record<string, unknown>>, Array<Record<string, unknown>>];
  const comps: Comp[] = [];

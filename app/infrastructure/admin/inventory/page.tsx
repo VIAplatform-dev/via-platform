@@ -6,7 +6,7 @@ import { Package, Search } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, cn } from "../ui";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
-import { PriceGuidance, type PriceContext } from "../PriceGuidance";
+import { PriceGuidance, RepriceForMargin, type PriceContext } from "../PriceGuidance";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 type Item = {
  id: string;
@@ -71,6 +71,13 @@ export default function ItemsPage() {
  // The AI pricing context for the item being edited (market value, band, rationale). Bulk-drafted
  // items carry this now, so their editor shows the same guidance the one-at-a-time flow shows.
  const [priceCtx, setPriceCtx] = useState<PriceContext | null>(null);
+ // The store's minimum markup over cost, for "Reprice for your margin". The add-listing page reads
+ // the same setting to auto-fill price from cost; this editor had no equivalent, which is why a
+ // cost entered after the AI ran left the price stranded below it.
+ const [markupPct, setMarkupPct] = useState<number | null>(null);
+ useEffect(() => {
+  fetch("/api/store/pricing").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.minMarkupPct === "number") setMarkupPct(d.minMarkupPct); }).catch(() => {});
+ }, []);
  const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
@@ -670,6 +677,13 @@ export default function ItemsPage() {
  </Field>
  </div>
  <PriceGuidance ctx={priceCtx} priceUsd={Number(editForm.price) || 0} />
+ <RepriceForMargin
+  priceUsd={Number(editForm.price) || 0}
+  costUsd={editForm.cost.trim() === "" ? null : Number(editForm.cost) || 0}
+  markupPct={markupPct}
+  marketUsd={priceCtx?.marketCents != null ? Math.round(priceCtx.marketCents / 100) : null}
+  onApply={(next) => setEditForm((f) => ({ ...f, price: String(next) }))}
+ />
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>

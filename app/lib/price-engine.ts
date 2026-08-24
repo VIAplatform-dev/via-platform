@@ -302,6 +302,7 @@ export async function estimatePrice(opts: {
  minMarkupBps: number;
  knowledgeHintCents?: number | null;
  extraComps?: Comp[]; // reverse-image (visually-identical) matches — the strongest comps
+ excludeSoldId?: number | null; // accuracy eval only: keep the sale being graded out of its own comps
  context?: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; trend?: string | null }; // the identified piece + condition + live demand signal, for knowledge/trend-aware valuation
 }): Promise<PriceEstimate> {
  // Fetch external comps and THIS platform's own realized-price benchmark together. The
@@ -326,7 +327,7 @@ export async function estimatePrice(opts: {
  const [cached, benchmark, vyaComps, cacheAgeDays] = await Promise.all([
  getCachedComps({ query: query, brand, category, maxAgeDays: 45, limit: 40 }).catch(() => []),
  getInternalPriceBenchmark({ brand, category }).catch(() => null),
- getVyaComps({ brand, limit: 15 }).catch(() => []),
+ getVyaComps({ brand, limit: 15, excludeSoldId: opts.excludeSoldId ?? null }).catch(() => []),
  newestCompAgeDays(query).catch(() => null),
  ]);
  // Go live when the cache is thin OR stale (newest cached comp older than COMP_FRESH_DAYS), so a
@@ -407,6 +408,38 @@ export async function estimatePrice(opts: {
  if (marketCents != null) {
  if (low == null) low = Math.round(marketCents * 0.85);
  if (high == null) high = Math.round(marketCents * 1.2);
+ }
+
+ // ── The band must reflect the comps, not a fixed cushion ────────────────────
+ // Measured: only ~19% of realized sales landed inside the predicted range. The band was a tight
+ // ±15%/+20% around the point estimate — so whenever the point was wrong, the band was wrong with
+ // it, and it carried no information about how uncertain the answer actually was.
+ //
+ // A one-of-one piece genuinely sells across a spread; the kept comps ARE the observation of that
+ // spread. So widen the band to at least cover the middle of them (p25–p75). A tight cluster still
+ // yields a tight band — this only widens where the evidence is genuinely scattered, which is
+ // exactly where a confident-looking narrow range was misleading the seller.
+ if (marketCents != null && kept.length >= 3) {
+ const prices = kept.map((c) => c.priceCents).filter((v) => v > 0).sort((a, b) => a - b);
+ if (prices.length >= 3) {
+  const at = (q: number) => prices[Math.min(prices.length - 1, Math.max(0, Math.round((prices.length - 1) * q)))];
+  const p25 = at(0.25), p75 = at(0.75);
+  // Widen toward the comps — but a band is only useful if a seller can act on it. Taking the raw
+  // p25–p75 produced ranges averaging 311% of the price ("worth $700, somewhere between $200 and
+  // $2,400"): right 65% of the time and worth nothing. Cap it at roughly the market's own spread
+  // (the measured noise floor is ~25% median deviation), so the band stays honest AND usable.
+  // When the comps disagree by more than this, the answer is lower confidence and better comp
+  // filtering — not a range wide enough to contain any outcome.
+  const FLOOR_MULT = 0.7, CEIL_MULT = 1.5;
+  const minLow = Math.round(marketCents * FLOOR_MULT);
+  const maxHigh = Math.round(marketCents * CEIL_MULT);
+  if (low != null && p25 < low) low = Math.max(p25, minLow);
+  if (high != null && p75 > high) high = Math.min(p75, maxHigh);
+  // Keep the point estimate inside its own band — a comp spread skewed to one side can otherwise
+  // leave marketCents sitting outside the range we just derived.
+  if (low != null && marketCents < low) low = marketCents;
+  if (high != null && marketCents > high) high = marketCents;
+ }
  }
 
  const floorCents = opts.costCents && opts.costCents > 0 ? Math.round(opts.costCents * (1 + opts.minMarkupBps / 10000)) : null;

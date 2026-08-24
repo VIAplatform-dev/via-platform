@@ -106,5 +106,5 @@ export async function getBetaReadiness(): Promise<BetaReadiness> {
 }
 
 function emptyScore(segment: string): PriceScore {
- return { segment, n: 0, within10: 0, within20: 0, within10Pct: null, within20Pct: null, ci95: null, medianErrorPct: null, verdict: "insufficient" };
+ return { segment, n: 0, within10: 0, within20: 0, within10Pct: null, within20Pct: null, ci95: null, medianErrorPct: null, medianSignedPct: null, overCount: 0, underCount: 0, inBandPct: null, inBandN: 0, verdict: "insufficient" };
 }

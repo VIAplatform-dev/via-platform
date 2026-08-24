@@ -77,6 +77,47 @@ export type PriceContext = {
 };
 
 /**
+ * "Reprice for your margin" — the repair for costs entered AFTER the AI ran.
+ *
+ * estimatePrice applies the seller's cost floor at suggestion time, so a piece priced before its
+ * cost was recorded keeps a number that can sit below what the seller paid. Nothing recomputed it;
+ * the margin column just showed red. This does, from the values already on screen — no AI call, no
+ * comp search, no spend, because the market read was stored with the suggestion.
+ *
+ *   floor = cost x (1 + markup)      new price = max(market, floor)
+ *
+ * When the floor lands ABOVE the market read it says so rather than quietly repricing. That
+ * tension belongs to the seller — hiding it just moves the surprise to the piece not selling.
+ */
+export function RepriceForMargin({ priceUsd, costUsd, markupPct, marketUsd, onApply }: {
+ priceUsd: number; costUsd: number | null; markupPct: number | null; marketUsd: number | null;
+ onApply: (nextUsd: number) => void;
+}) {
+ if (!costUsd || costUsd <= 0 || markupPct == null) return null;
+ const floor = Math.round(costUsd * (1 + markupPct / 100));
+ const next = Math.max(marketUsd ?? 0, floor);
+ if (priceUsd > 0 && priceUsd >= floor) return null; // the price already clears the floor
+ const aboveMarket = marketUsd != null && floor > marketUsd;
+ return (
+  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5">
+   <div className="flex items-center justify-between gap-3">
+    <p className="text-[12px] leading-snug text-amber-900">
+     {priceUsd > 0
+      ? <>This price is below your cost plus {markupPct}% margin (<span className="tabular-nums font-semibold">${floor.toLocaleString()}</span>).</>
+      : <>Your cost plus {markupPct}% margin is <span className="tabular-nums font-semibold">${floor.toLocaleString()}</span>.</>}
+     {aboveMarket && <> The market read is <span className="tabular-nums">${marketUsd!.toLocaleString()}</span>, so this may sit longer.</>}
+    </p>
+    <button
+     type="button"
+     onClick={() => onApply(next)}
+     className="shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-[12px] font-semibold text-amber-50 transition hover:bg-amber-800"
+    >Reprice to ${next.toLocaleString()}</button>
+   </div>
+  </div>
+ );
+}
+
+/**
  * The whole block, for an editor that has a stored price context. Renders nothing when there is
  * no market value to anchor on, so a manually-created listing simply shows its plain price box.
  *
