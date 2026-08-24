@@ -1,6 +1,6 @@
-import { getTemplate, STOREFRONT_TEMPLATES } from "./storefront-templates";
-import { makeBlock } from "./storefront-blocks";
-import type { StorefrontTheme } from "./store-import";
+import { getTemplate, STOREFRONT_TEMPLATES } from "./storefront-templates.ts";
+import { makeBlock } from "./storefront-blocks.ts";
+import type { StorefrontTheme } from "./store-import.ts";
 
 // The polished base every store starts with — instant, no AI. A complete homepage
 // (announcement → hero → new arrivals → story → newsletter) + About / FAQ / Shipping

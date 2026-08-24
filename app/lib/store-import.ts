@@ -1,10 +1,12 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
-import { fetchShopifyProductsPublic } from "@/app/lib/shopifyClient";
-import { formatPrice } from "@/app/lib/formatPrice";
-import { assertPublicUrl, safeFetch } from "@/app/lib/safe-url";
-import { makeBlock, type BlockType } from "@/app/lib/storefront-blocks";
-import type { StoreProfile } from "@/app/lib/store-profile";
+import { fetchShopifyProductsPublic, parseLooseJson } from "./shopifyClient.ts";
+import { formatPrice } from "./formatPrice.ts";
+import { assertPublicUrl, safeFetch } from "./safe-url.ts";
+import { makeBlock, type BlockType } from "./storefront-blocks.ts";
+import type { StoreProfile } from "./store-profile.ts";
+import { detectPlatform, declineMessage } from "./import-engine/detect.ts";
+import { fetchWooProducts, fetchViaJsonLd, BlockedByStoreError } from "./import-engine/rungs.ts";
 
 /** One storefront section as an editable studio block (matches StorefrontTheme.blocks). */
 type HomeBlock = { id: string; type: string; props: Record<string, string>; style?: { bg?: string } };
@@ -17,13 +19,26 @@ type HomeBlock = { id: string; type: string; props: Record<string, string>; styl
 
 export type ImportedProduct = {
  name: string;
+ /** Display price, pre-formatted for the demo/preview UI. NOT a source of truth for money —
+  *  anything that stores or compares a price must use `priceCents` + `currency` (parsing digits
+  *  back out of "£120.00" is how imported GBP catalogues ended up labelled USD). */
  price: string;
+ priceCents?: number | null;
+ currency?: string | null; // ISO code read from the platform, never guessed from a £/€ glyph
  image: string;
  images?: string[];
  description?: string | null;
  size?: string | null;
  available?: boolean; // false = sold out on the source site
  tags?: string[]; // category/collection tags (for the Shop dropdown filter)
+ // ── Source identity: what makes re-import a MERGE instead of a duplicate ──
+ sourcePlatform?: string | null;
+ sourceId?: string | null; // platform's own stable id/handle — survives a rename
+ sourceUrl?: string | null;
+ variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
+ /** Collections this product belongs to, when the source tells us directly (a connected store's
+  *  API does; a scraped one needs a separate per-collection crawl to work it out). */
+ collectionHandles?: string[];
 };
 
 /** A storefront's visual identity + cloned structure, pulled from the source site. */
@@ -93,6 +108,12 @@ export type ImportResult = {
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
 }
+
+// One User-Agent for every outbound import fetch, matching site-capture and import-engine/rungs.
+// A "VYA-Importer/1.0" UA is 403'd by common WordPress/Cloudflare bot rules, and a blocked response
+// looks like an empty page — which made a perfectly importable WooCommerce store get detected as a
+// client-rendered shell and declined. Identify the same way the capture crawler does.
+const BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
 const titleCase = (s: string) => s.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
 
@@ -275,6 +296,16 @@ export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
   if (image) { push("image", { image, caption: heading || "" }); continue; }
   if (heading && paras.length) { push("text", { heading, body }); continue; }
   if (heading) { push("statement", { quote: heading, attribution: "" }); continue; }
+
+  // ── Lossless fallback ──────────────────────────────────────────────────────────────────
+  // Anything the rules above can't name used to fall off the end of this loop and vanish, so a
+  // section the seller had built — a size guide, an authentication promise, a press strip — was
+  // simply missing from the imported storefront with nothing to say so. Keep it verbatim as a
+  // `custom` block instead: it renders as its own markup (sanitized on save, inheriting the
+  // store's colours and type), and the seller can edit, reorder or delete it like any other
+  // section. Classification failure is now a fidelity choice, not data loss.
+  const verbatim = verbatimHtml($, el);
+  if (verbatim) push("custom", { html: verbatim, mode: "inline" });
  }
 
  // Always give the seller their catalog: ensure a product grid is present.
@@ -282,11 +313,54 @@ export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
  return blocks;
 }
 
+/** How much source markup one kept-verbatim section may contribute. Generous enough for a real
+ *  section, small enough that a runaway page can't bloat the stored theme. */
+const VERBATIM_MAX_CHARS = 20000;
+
+/** A section's own markup, stripped of anything that can't survive re-hosting.
+ *
+ *  Scripts and inline handlers go (the same rule the capture applies — we never execute a third
+ *  party's JS on our origin), as do form actions that would POST back to the old platform. What's
+ *  left is inert, styled markup. Returns "" when there's nothing meaningful to keep. */
+function verbatimHtml($: cheerio.CheerioAPI, el: Element): string {
+ const $clone = $(el).clone();
+ $clone.find("script, noscript, iframe, object, embed, link[rel='stylesheet']").remove();
+ $clone.find("*").each((_, node) => {
+  const attribs = (node as Element).attribs || {};
+  for (const name of Object.keys(attribs)) {
+   if (/^on/i.test(name)) $(node).removeAttr(name); // inline event handlers
+   if ((name === "href" || name === "src") && /^\s*javascript:/i.test(attribs[name] || "")) $(node).removeAttr(name);
+  }
+ });
+ // A form pointing at the source platform would silently fail (or worse, leave the store).
+ $clone.find("form").each((_, f) => { $(f).removeAttr("action").attr("data-vya-inert", "1"); });
+ const html = ($clone.html() || "").trim();
+ // Ignore sections that are only whitespace/markup with no substance.
+ if (!html || ($clone.text() || "").replace(/\s+/g, " ").trim().length < 2) return "";
+ return html.length > VERBATIM_MAX_CHARS ? html.slice(0, VERBATIM_MAX_CHARS) : html;
+}
+
+/** The shop's OWN currency, read from the storefront rather than assumed.
+ *  Shopify's public products.json carries bare price strings with no currency, so importing a UK
+ *  store used to label its GBP prices as USD. The shop states it in `Shopify.currency` (and most
+ *  platforms in an og/meta/JSON-LD field); everything else is a guess and we'd rather have none. */
+function readCurrency(html: string): string | null {
+ const pats = [
+  /Shopify\.currency\s*=\s*\{[^}]*"active"\s*:\s*"([A-Z]{3})"/,
+  /"currencyCode"\s*:\s*"([A-Z]{3})"/,
+  /"priceCurrency"\s*:\s*"([A-Z]{3})"/,
+  /itemprop=["']priceCurrency["'][^>]*content=["']([A-Z]{3})["']/i,
+  /property=["']og:price:currency["'][^>]*content=["']([A-Z]{3})["']/i,
+ ];
+ for (const re of pats) { const m = html.match(re); if (m) return m[1].toUpperCase(); }
+ return null;
+}
+
 async function readHomepage(origin: string) {
- const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string, blocks: [] as HomeBlock[] };
+ const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string, blocks: [] as HomeBlock[], currency: null as string | null, html: "" };
  try {
  const res = await safeFetch(origin, {
- headers: { "User-Agent": "Mozilla/5.0 (compatible; VYA-Importer/1.0)" },
+ headers: { "User-Agent": BROWSER_UA },
  signal: AbortSignal.timeout(8000),
  });
  const html = await res.text();
@@ -317,7 +391,11 @@ async function readHomepage(origin: string) {
  ? "bigcommerce"
  : "unknown";
  const blocks = extractHomeBlocks(html, origin);
- return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint, blocks };
+ // Currency is searched across the WHOLE document, not just the 80KB head slice — themes print
+ // Shopify.currency in a footer script.
+ // `html` rides along so platform detection can run on the SAME response we already fetched —
+ // a second request could be served a different market/variant of the page.
+ return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint, blocks, currency: readCurrency(html), html };
  } catch {
  return empty;
  }
@@ -337,7 +415,7 @@ function sizeFromVariant(variant: any): string | null {
 /** Find a Squarespace store's *fullest* product collection — read the nav + sitemap,
  * score every commerce page, and prefer the biggest non-"sold" catalog. */
 async function pickSquarespaceCollection(origin: string, startUrl: string): Promise<string | null> {
- const UA = { "User-Agent": "Mozilla/5.0 (compatible; VYA-Importer/1.0)" };
+ const UA = { "User-Agent": BROWSER_UA };
  const candidates = new Set<string>(["/shop", "/shopall", "/shop-all", "/store", "/products", "/collections", "/all", "/catalog", ""]);
  try {
  const sp = new URL(startUrl).pathname.replace(/\/$/, "");
@@ -403,7 +481,7 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  for (let page = 0; page < 40 && out.length < max; page++) {
  const url = base + "?format=json" + (offset ? "&offset=" + offset : "");
  const res = await safeFetch(url, {
- headers: { "User-Agent": "Mozilla/5.0 (compatible; VYA-Importer/1.0)", Accept: "application/json" },
+ headers: { "User-Agent": BROWSER_UA, Accept: "application/json" },
  signal: AbortSignal.timeout(8000),
  });
  if (!res.ok) break;
@@ -438,9 +516,14 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  return out;
 }
 
-/** Exact category membership from Shopify's PUBLIC collection endpoints — maps each
- * product title to the collection slugs it belongs to. This is the accurate way to
- * power the Shop dropdown filter (vs guessing from tags). */
+/** Exact category membership from Shopify's PUBLIC collection endpoints — maps each product
+ * HANDLE to the collection slugs it belongs to. Handles (not titles) because the handle is the
+ * product's stable identity: it survives retitling, and two different one-of-one pieces that
+ * happen to share a title stay distinct. This is the accurate way to fill collections (and the
+ * Shop dropdown filter) rather than guessing from tags.
+ *
+ * Bounded on purpose: at most 25 collections × 6 pages, so a huge catalog can't turn one import
+ * into thousands of outbound requests. */
 export async function getShopifyCollectionMembership(domain: string, slugs: string[]): Promise<Map<string, string[]>> {
  const host = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
  const membership = new Map<string, Set<string>>();
@@ -449,11 +532,11 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
  for (let page = 1; page <= 6; page++) {
  const r = await safeFetch(`https://${host}/collections/${slug}/products.json?limit=250&page=${page}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
  if (!r.ok) break;
- const d = await r.json();
+ const d = parseLooseJson(await r.text()); // storefront feeds carry raw control chars
  const prods: any[] = Array.isArray(d.products) ? d.products : [];
  if (!prods.length) break;
  for (const p of prods) {
- const key = String(p.title || "").toLowerCase().trim();
+ const key = String(p.handle || "").trim();
  if (!key) continue;
  if (!membership.has(key)) membership.set(key, new Set());
  membership.get(key)!.add(slug);
@@ -480,25 +563,36 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
  const domain = u.hostname.replace(/^www\./, "");
  const meta = await readHomepage(origin);
  const storeName = meta.name || titleCase(domain.split(".")[0]);
+ // One live detection drives which rungs are worth trying (and whether to try at all).
+ const detection = detectPlatform(meta.html || "", u.href);
 
  let products: ImportedProduct[] = [];
  let platform: "shopify" | "squarespace" | "unknown" = "unknown";
 
  // 1) Shopify public products.json (no token needed)
  try {
- const r = await withTimeout(fetchShopifyProductsPublic(domain, storeName, max, "USD", true), 25000, { products: [], skippedCount: 0 });
+ // Pass the shop's REAL currency (read from its storefront) instead of assuming USD.
+ const shopCurrency = meta.currency || "USD";
+ const r = await withTimeout(fetchShopifyProductsPublic(domain, storeName, max, shopCurrency, true), 25000, { products: [], skippedCount: 0 });
  const mapped = r.products
  .filter((p) => p.image)
  .slice(0, max)
  .map((p) => ({
  name: p.title,
  price: p.price != null ? formatPrice(p.price, p.currency) : "",
+ priceCents: p.price != null ? Math.round(p.price * 100) : null,
+ currency: p.currency || shopCurrency,
  image: p.image as string,
  images: p.images?.length ? p.images : p.image ? [p.image] : [],
  description: p.description || null,
  size: p.size || null,
  available: p.availableForSale !== false,
  tags: p.tags || [],
+ // Identity: prefer the handle (stable, human-readable, survives retitling) then the numeric id.
+ sourcePlatform: "shopify",
+ sourceId: p.handle || p.shopifyProductId || null,
+ sourceUrl: p.externalUrl || null,
+ variants: p.variants || [],
  }));
  if (mapped.length) {
  platform = "shopify";
@@ -520,7 +614,35 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
  }
  }
 
+ // 3) WooCommerce — its public Store API is as clean as Shopify's feed (prices in minor units
+ // with an explicit currency), it just was never wired up.
+ let blocked: BlockedByStoreError | null = null;
+ if (!products.length && (detection.platform === "woocommerce" || detection.platform === "wordpress")) {
+ try {
+ const woo = await fetchWooProducts(origin, max);
+ if (woo.length) { platform = "unknown"; products = woo; }
+ } catch (e) { if (e instanceof BlockedByStoreError) blocked = e; }
+ }
+
+ // 4) Generic rung: sitemap → product pages → schema.org JSON-LD. No feed required, so it covers
+ // BigCommerce, Webflow and most custom server-rendered stores. Slower (a request per product),
+ // hence the caps inside fetchViaJsonLd.
+ if (!products.length && !detection.shell.isShell && detection.platform !== "wix") {
+ try {
+ const viaLd = await fetchViaJsonLd(origin, detection.platform, Math.min(max, 400));
+ if (viaLd.length) { platform = "unknown"; products = viaLd; }
+ } catch (e) { if (e instanceof BlockedByStoreError) blocked = e; }
+ }
+
  if (!products.length) {
+ // An honest, specific explanation beats a generic failure: say WHAT the site is and what the
+ // seller can do instead (see declineMessage), rather than implying we simply couldn't be bothered.
+ const decline = blocked
+  ? "This store is refusing automated requests, so we couldn't read its catalog. You can upload your inventory as a CSV, or connect the store's platform directly."
+  : declineMessage(detection);
+ if (decline) {
+ return { ok: false, storeName, platform, brandColor: meta.color, hero: meta.hero, theme: meta.theme, products: [], error: decline };
+ }
  const messages: Record<string, string> = {
  wix: "This looks like a Wix store. Automatic import for Wix isn’t supported yet — you can add your items manually for now.",
  square: "This looks like a Square Online store. Automatic import for Square isn’t supported yet — you can add your items manually for now.",

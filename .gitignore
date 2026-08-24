@@ -50,3 +50,4 @@ next-env.d.ts
 /SECURITY_AUDIT_2026-08.md
 /docs/architecture.md
 /.vscode
+.eval-cache/

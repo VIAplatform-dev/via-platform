@@ -31,7 +31,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  });
  // Match this product to its VYA item → buy button runs VYA's Stripe checkout.
  const title = cheerio.load(cap.html)("h1").first().text().replace(/\s+/g, " ").trim();
- const itemId = await matchItemId(slug, title).catch(() => null);
+ // The handle IS the source's product id, so this matches exactly rather than guessing by title.
+ const itemId = await matchItemId(slug, title, handle).catch(() => null);
  const buyHref = itemId ? `/checkout?item=${itemId}` : null;
  html = rewireCommerce(cap.html, buyHref);
  await saveCapturePage(slug, path, html, `${origin}${path}`);

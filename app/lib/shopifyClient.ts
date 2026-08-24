@@ -6,6 +6,18 @@
  * - storeDomain: The Shopify store domain (e.g., "mystore.myshopify.com" or custom domain)
  * - storefrontAccessToken: Public Storefront API access token
  */
+import { safeFetch } from "./safe-url.ts";
+
+/** JSON.parse that tolerates the raw control characters real storefronts embed in product
+ *  descriptions (every Shopify feed profiled had them; strict parsing rejects the whole payload).
+ *  Only the illegal C0 range is stripped — \t, \n and \r are left for JSON's own escaping. */
+export function parseLooseJson(text: string): any { // eslint-disable-line @typescript-eslint/no-explicit-any
+ try {
+  return JSON.parse(text);
+ } catch {
+  return JSON.parse(text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ""));
+ }
+}
 
 export type ShopifyProduct = {
  title: string;
@@ -25,6 +37,9 @@ export type ShopifyProduct = {
  shopifyProductId: string | null;
  size: string | null;
  tags?: string[];
+ /** Source identity for the import engine: the product's stable handle, and its full size run. */
+ handle?: string | null;
+ variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
  // Captured from the product page (scrapeProductPage stores) — the seller's own words.
  condition?: string | null;
  materials?: string | null;
@@ -735,6 +750,13 @@ export async function fetchShopifyProductsPublic(
  const products: ShopifyProduct[] = [];
  let skippedCount = 0;
  let page = 1;
+ // The currency the FEED is actually priced in. Shopify Markets serves a storefront in different
+ // presentment currencies depending on how it reads the request, and products.json carries bare
+ // price strings with no currency at all — so the same URL can return "245.00" (GBP) or "341.00"
+ // (USD converted). It does tell us which, via the `cart_currency` cookie on that same response.
+ // Reading it HERE keeps price and currency from the same response; taking currency from a
+ // separately-fetched homepage can disagree with the feed and mislabel every price in the import.
+ let feedCurrency: string | null = null;
  // Use 50 per page — some stores cap their public API at 50 regardless of the
  // limit param, so requesting 50 ensures correct page-based pagination.
  const limit = 50;
@@ -744,7 +766,11 @@ export async function fetchShopifyProductsPublic(
 
  let response: Response | null = null;
  for (let attempt = 0; attempt < 4; attempt++) {
- response = await fetch(url, { headers: { Accept: "application/json" } });
+ // safeFetch, not bare fetch: `storeDomain` is user-supplied on the import path, so this call
+ // has to go through the same SSRF guard (DNS resolution + private-IP rejection + per-hop
+ // redirect revalidation) as every other outbound request. The timeout also means a hung store
+ // can't pin the invocation open — the outer Promise.race can't cancel this work on its own.
+ response = await safeFetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
  if (response.status !== 429) break;
  const retryAfter = parseInt(response.headers.get("Retry-After") ?? "5", 10);
  const waitMs = Math.min(retryAfter * 1000, 30_000);
@@ -763,7 +789,17 @@ export async function fetchShopifyProductsPublic(
  );
  }
 
- const data = await response!.json();
+ // Which currency THIS response is priced in (see feedCurrency above).
+ if (!feedCurrency) {
+ const setCookie = response!.headers.get("set-cookie") || "";
+ const m = setCookie.match(/cart_currency=([A-Z]{3})/);
+ if (m) feedCurrency = m[1];
+ }
+
+ // Real storefronts ship raw control characters inside product descriptions, which strict
+ // JSON.parse rejects outright — every one of the 13 Shopify feeds profiled did it. Strip the
+ // C0 range (except the legal \t\n\r escapes) so one bad description can't fail a whole import.
+ const data = parseLooseJson(await response!.text());
 
  if (!data.products || data.products.length === 0) {
  break;
@@ -865,7 +901,7 @@ export async function fetchShopifyProductsPublic(
  title: product.title,
  price: isNaN(price as number) ? null : price,
  compareAtPrice: compareAtPricePublic,
- currency: defaultCurrency, // Public endpoint doesn't include currency; use store's configured currency
+ currency: feedCurrency || defaultCurrency, // what THIS feed response was priced in (cart_currency cookie)
  image: imageUrl,
  images: allImageUrls,
  videoUrl: null,
@@ -879,6 +915,19 @@ export async function fetchShopifyProductsPublic(
  shopifyProductId,
  size,
  tags: productTags,
+ // Stable identity + the full size run, so the importer can match on re-sync instead of
+ // guessing by title, and multi-size listings survive as more than their first variant.
+ handle: product.handle || null,
+ variants: variants.map((v: { id?: unknown; title?: string; option1?: string | null; option2?: string | null; price?: string; available?: boolean }) => {
+ const vPrice = v.price ? parseFloat(v.price) : null;
+ return {
+ sourceVariantId: v.id != null ? String(v.id) : null,
+ size: v.title && v.title !== "Default Title" ? v.title : (v.option1 ?? null),
+ color: v.option2 ?? null,
+ priceCents: vPrice != null && !isNaN(vPrice) ? Math.round(vPrice * 100) : null,
+ available: v.available !== false,
+ };
+ }),
  });
  }
 

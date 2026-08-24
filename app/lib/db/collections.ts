@@ -164,6 +164,40 @@ export async function getItemCollectionIds(itemId: string): Promise<string[]> {
 }
 
 /** Active items in a collection (sold/removed drop out automatically). */
+/**
+ * What a captured collection page should actually show: items explicitly assigned to the
+ * collection, PLUS any of the seller's live items whose category or brand matches the collection's
+ * handle.
+ *
+ * The assignment-only view left new listings invisible. Imported products get assigned from the
+ * source's own collection endpoints, but anything the seller adds in the portal afterwards —
+ * which is most of a vintage store's week-to-week inventory — belongs to no collection, so a
+ * "Bags" page would silently omit a bag they'd just listed. Matching on category/brand mirrors
+ * what a shopper expects that page to mean, and explicit assignments still take precedence in
+ * ordering. Handles are compared loosely ("alexander-mcqueen" → "alexander mcqueen").
+ */
+export async function listCollectionItemsForStorefront(
+ sellerId: string,
+ collectionId: string | null,
+ handle: string,
+): Promise<Item[]> {
+ await ensureOrderColumn();
+ const db = getDb();
+ const assigned = collectionId ? await listCollectionItems(collectionId) : [];
+ const term = handle.replace(/[-_]+/g, " ").trim().toLowerCase();
+ if (!term) return assigned;
+ const matches = await db
+  .select()
+  .from(items)
+  .where(and(
+   eq(items.sellerId, sellerId),
+   eq(items.status, "active"),
+   dsql`(lower(coalesce(${items.category}, '')) = ${term} OR lower(coalesce(${items.brand}, '')) = ${term})`,
+  ));
+ const seen = new Set(assigned.map((i) => i.id));
+ return [...assigned, ...matches.filter((m) => !seen.has(m.id))];
+}
+
 export async function listCollectionItems(collectionId: string, opts?: { manage?: boolean }): Promise<Item[]> {
  await ensureOrderColumn();
  const db = getDb();

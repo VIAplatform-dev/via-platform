@@ -54,6 +54,23 @@ export const items = pgTable(
  heightIn: integer("height_in"),
  source: text("source").notNull().default("manual"), // manual | imported | ai
  externalUrl: text("external_url"),
+ // ── Source identity (import engine) ────────────────────────────────────────────────────────
+ // Where an imported item came from, so re-imports can MATCH rather than guess. Everything used
+ // to key off the title, which breaks two ways on one-of-one vintage: two listings with the same
+ // name collapse into one, and a rename re-imports as a duplicate. `sourceId` is the platform's
+ // own id/handle (Shopify handle, Squarespace item id, Woo product id) — stable across renames.
+ sourcePlatform: text("source_platform"), // shopify | squarespace | woocommerce | …
+ sourceId: text("source_id"),
+ sourceUrl: text("source_url"),
+ // Hash of the source's meaningful fields (title/price/images/availability). A changed hash means
+ // the source listing actually changed, so a re-sync can skip untouched items cheaply.
+ contentHash: text("content_hash"),
+ // Size/colour runs. Vintage is usually one-of-one (empty), but reproduction-vintage sellers list
+ // full size runs (Unique Vintage: 227 of 250 products) that a single price+size can't represent.
+ variants: jsonb("variants").$type<ItemVariant[]>().default([]),
+ // Who last set this item's values. `source` = the importer owns it and a re-sync may update it;
+ // `user` = a human edited it, so the importer must never overwrite their work.
+ origin: text("origin").notNull().default("source"), // source | user
  // Scheduled publish: a draft with publish_at in the future is "scheduled" — the cron flips it to
  // active at that time. NULL = not scheduled (a normal draft or an already-live item).
  publishAt: timestamp("publish_at", { withTimezone: true }),
@@ -160,6 +177,17 @@ export const itemCollections = pgTable(
  },
  (t) => [primaryKey({ columns: [t.itemId, t.collectionId] })],
 );
+
+/** One size/colour option of an imported product. Vintage one-of-ones have none; reproduction and
+ *  multi-size sellers have many. Prices stay in CENTS (never a formatted string) so no downstream
+ *  code has to parse money back out of "£120.00". */
+export type ItemVariant = {
+ sourceVariantId?: string | null;
+ size?: string | null;
+ color?: string | null;
+ priceCents?: number | null;
+ available: boolean;
+};
 
 export type Seller = typeof sellers.$inferSelect;
 export type Collection = typeof collections.$inferSelect;

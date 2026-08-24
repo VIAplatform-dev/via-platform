@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "node --test \"app/**/*.test.ts\"",
     "db:generate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs generate",
-    "db:push": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs push"
+    "db:push": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs push",
+    "eval:import": "node --experimental-strip-types scripts/eval-import.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

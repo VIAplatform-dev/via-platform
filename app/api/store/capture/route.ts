@@ -3,7 +3,7 @@ import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { crawlAndStore } from "@/app/lib/site-capture";
 import { listCapturePaths, getCapturePage, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
 import { importStoreFromUrl, importStoreBlocks, importStoreThemeAndBlocks, type ImportedProduct } from "@/app/lib/store-import";
-import { importProductsAsItems } from "@/app/lib/capture-commerce";
+import { importProductsAsItems, syncCollectionMembership } from "@/app/lib/capture-commerce";
 import { getConnection } from "@/app/lib/store-connections-db";
 import { getPlatform } from "@/app/lib/platforms";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
@@ -11,6 +11,7 @@ import { deleteAllItems } from "@/app/lib/db/inventory";
 import { ensureCollection } from "@/app/lib/db/collections";
 import { isJunkCollection } from "@/app/lib/collections-sync";
 import { getStorefrontBySlug, setStorefrontTheme } from "@/app/lib/storefront-db";
+import { buildStorefrontFromUrl } from "@/app/lib/storefront-from-brand";
 
 // The captured site is served by the MARKETPLACE app (vyaplatform.com/site/{slug}) or the
 // store's own connected domain — NOT the getvya.ai OS host the seller is viewing this from.
@@ -75,9 +76,31 @@ export async function POST(request: NextRequest) {
 
  try {
  const r = await crawlAndStore(slug, url, 100);
+ // A site that renders in the browser (Wix, a single-page app) returns almost nothing to crawl.
+ // Rather than leave the seller with a broken copy or a blank starter, build them a VYA storefront
+ // from their BRAND — the colours, fonts, logo, name and menu labels survive in the HTML even when
+ // the layout doesn't. Inventory then comes from the CSV upload or a platform connection.
+ if (r.pages <= 1) {
+  const built = await buildStorefrontFromUrl(url).catch(() => null);
+  if (built) {
+   await setStorefrontTheme(slug, built.theme).catch(() => {});
+   return NextResponse.json({
+    ok: true, mode: "brand", pages: 0, items: 0,
+    url: await siteViewUrl(slug),
+    brand: built.brand.found,
+    note: `We couldn't copy this site's pages — it builds them in the browser. We've set up your VYA storefront using your ${built.brand.found.join(", ")} instead. Add your inventory by uploading a CSV or connecting your store.`,
+   });
+  }
+ }
  // Products come in as checkout-able items regardless of design capture (the
  // connected-store API path works even when the public site is locked).
- const items = await importProductsAsItems(slug, await pullProducts(slug, url)).catch(() => 0);
+ // Products are matched by SOURCE IDENTITY, so a re-run updates the store's catalog in place
+ // (added / updated / removed) instead of wiping and re-adding it — that's what lets inventory
+ // stay in sync without a destructive re-crawl.
+ const pulled = await pullProducts(slug, url);
+ const stats = await importProductsAsItems(slug, pulled)
+  .catch(() => ({ added: 0, updated: 0, unchanged: 0, skipped: 0, removed: 0 }));
+ const items = stats.added + stats.updated + stats.unchanged;
 
  // Pre-create VYA collections that mirror the store's captured collection pages, so the
  // seller can assign items to them (slug = the Shopify handle → items render on that page).
@@ -92,6 +115,12 @@ export async function POST(request: NextRequest) {
   for (const h of handles) { const title = titleize(h); if (!isJunkCollection(title)) await ensureCollection(seller.id, h, title).catch(() => {}); }
  }
  } catch { /* non-fatal — assignment can create collections on demand too */ }
+
+ // …then actually PUT the imported items in those collections. Without this the collections stay
+ // empty, and a captured /collections/{handle} page silently falls back to the frozen source grid
+ // instead of the store's live VYA inventory — which is the whole point of the swap.
+ const membership = await syncCollectionMembership(slug, new URL(url.startsWith("http") ? url : `https://${url}`).hostname, pulled)
+  .catch(() => ({ collections: 0, links: 0 }));
 
  // Seed the visual studio with a section-by-section replica of the real homepage, so
  // the builder mirrors the seller's actual layout instead of a generic starter template.
@@ -126,7 +155,7 @@ export async function POST(request: NextRequest) {
  if (items > 0) return NextResponse.json({ ok: true, pages: 0, items, url: await siteViewUrl(slug), note: `${base} (We did import your ${items} products.)` });
  return NextResponse.json({ error: `${base} Or connect your store above to import just your products.` }, { status: 400 });
  }
- return NextResponse.json({ ok: true, pages: r.pages, items, url: await siteViewUrl(slug) });
+ return NextResponse.json({ ok: true, pages: r.pages, items, products: stats, collections: membership, url: await siteViewUrl(slug) });
  } catch (e) {
  console.error("site capture error:", e);
  return NextResponse.json({ error: e instanceof Error ? e.message : "Capture failed." }, { status: 502 });

@@ -5,7 +5,12 @@
 // the VYA-hosted copy — so the whole site can be navigated on VYA, pixel-faithful.
 // (JS is stripped for v1: looks identical; interactivity + cart + AI editing next.)
 import * as cheerio from "cheerio";
-import { assertPublicUrl, safeFetch } from "@/app/lib/safe-url";
+// domhandler's Element, not the DOM one — these helpers operate on cheerio nodes.
+import type { Element as DomElement } from "domhandler";
+// Relative, not the "@/app" alias: Node's native TS test runner doesn't read tsconfig paths
+// (this file's own test — site-capture.test.ts — otherwise fails to load under `node --test`).
+import { assertPublicUrl, safeFetch } from "./safe-url.ts";
+import { CAPTURE_SHIM } from "./capture-shim.ts";
 // The DB helpers are imported lazily inside crawlAndStore (the only consumer) so that
 // the pure HTML functions here — applyEdits/prepareEditMode/captureSite — can be used
 // (and unit-tested) without pulling in the database layer.
@@ -38,14 +43,45 @@ function sameSite(a: string, base: string): boolean {
 // Strip Shopify-platform chrome so a captured page reads as the store's OWN site on VYA —
 // not "Powered by Shopify", the Shop Pay "Follow on shop" button, or the checkout card badges.
 // (These are Shopify features, not the seller's brand; they don't belong on a VYA-hosted mirror.)
+/** Remove matches of `selector`, but NEVER a page landmark or anything wrapping the site's own
+ * navigation. Themes flag which features a section has with MODIFIER classes on the container
+ * itself — Dawn puts `header--has-localization` on the whole <header> — so a substring selector
+ * aimed at a small widget (`[class*="localization"]`) otherwise matches that flag and deletes the
+ * entire header, nav and logo with it. (That was a real bug: captured Dawn stores lost their whole
+ * nav row.) Widgets we actually want gone are still removed by their own precise selectors, since
+ * they're descendants of the landmark rather than the landmark itself. */
+function removeChrome($: cheerio.CheerioAPI, selector: string): void {
+ $(selector).each((_: number, el: any) => {
+  const tag = String(el.tagName || "").toLowerCase();
+  // Never delete a structural landmark…
+  if (tag === "html" || tag === "body" || tag === "header" || tag === "main" || tag === "footer" || tag === "nav") return;
+  // …nor any wrapper that contains the store's navigation…
+  if ($(el).find('nav, [class*="inline-menu"], [class*="header__menu"], [class*="menu-drawer"]').length) return;
+  // …nor a SHARED container that also holds real storefront controls. Blummier's theme hangs
+  // `header-localization` on the same <div class="header__icons"> that carries search, account,
+  // wishlist and cart — deleting it took the whole icon bar with it. Only the currency/locale
+  // widget itself should go; anything hosting other controls stays.
+  // (Match real destinations — cart/account links, a search FORM — not a bare "icon-search" class:
+  // Shopify's own country picker ships a search icon for filtering the country list, so a looser
+  // check would protect the very widget we're trying to remove.)
+  if ($(el).find('[class*="icon-cart"], [class*="icon-account"], a[href*="/cart"], a[href*="/account"], form[action*="/search"], predictive-search').length) return;
+  $(el).remove();
+ });
+}
+
 export function deShopify($: cheerio.CheerioAPI): void {
- // Footer payment-method badges (Visa/Amex/Shop Pay/etc.) — a Shopify checkout artifact.
- $('.list-payment, ul.list-payment, [class*="payment-icons"], [class*="payment_icons"], .footer__payment, [class*="footer-payment"], [class*="payment-list"]').remove();
+ // Footer payment-method badges (Visa/Amex/etc.) are KEPT: they're part of the store's own footer
+ // design, and dropping them left an obviously empty strip where the source has a row of cards.
+ // (They're decorative images, not a live Shopify checkout — VYA's Stripe checkout is what actually
+ // runs. If the badge row ever needs to match VYA's real accepted methods, do that as a swap here
+ // rather than by deleting the row.)
  // "Follow on shop" / Shop Pay follow / Shop login buttons.
- $('shop-follow-button, [class*="follow-on-shop"], [class*="follow_on_shop"], .shopify-follow-on-shop, .shop-login-button, [class*="shop-follow"]').remove();
+ removeChrome($, 'shop-follow-button, [class*="follow-on-shop"], [class*="follow_on_shop"], .shopify-follow-on-shop, .shop-login-button, [class*="shop-follow"]');
  // Shopify "Markets" country/region + language selector — it clones onto VYA but has no
  // currency/geo backend behind it, so it's dead UI that implies a feature we don't have. Remove it.
- $('localization-form, .shopify-localization-form, [class*="localization"], form[action*="/localization"], .footer__localization, [class*="country-selector"], [class*="currency-selector"], [class*="language-selector"], [data-disclosure]').remove();
+ // Target the WIDGET classes ("localization-form__…", "localization-selector", the wrappers Dawn
+ // gives the picker) — never a bare `*="localization"`, which also matches `header--has-localization`.
+ removeChrome($, 'localization-form, .shopify-localization-form, form[action*="/localization"], .footer__localization, .localization-wrapper, .desktop-localization-wrapper, .header-localization, .menu-drawer__localization, [class*="localization-form"], [class*="localization-selector"], [class*="localization-toggle"], [class*="header__icons--localization"], [class*="country-selector"], [class*="currency-selector"], [class*="language-selector"], [data-disclosure]');
  // "Powered by Shopify" link — remove it entirely. We show our own fixed "Powered by VYA" badge
  // (injectPoweredBy) instead, so no inline credit is needed in the seller's footer.
  $('a[href*="shopify.com"]').each((_: number, el: any) => { const $el = $(el); if (/shopify/i.test($el.text() || "")) $el.remove(); });
@@ -226,7 +262,7 @@ function includePath(p: string): boolean {
 export async function crawlAndStore(slug: string, startUrl: string, maxPages = 80): Promise<{ pages: number; paths: string[] }> {
  const safe = await assertPublicUrl(startUrl); // DNS-resolves + rejects internal IPs (SSRF)
  if (!safe) throw new Error("That URL isn’t a valid public website.");
- const { saveCapturePage, deleteCaptures, getSiteCss, setSiteCss } = await import("./site-capture-db");
+ const { saveCapturePage, deleteCaptures, getSiteCss, setSiteCss } = await import("./site-capture-db.ts");
  const start = safe.href;
  const origin = new URL(start).origin;
  // Never mirror VYA's own app. Importing a getvya.ai / vyaplatform.com URL (including a store's own
@@ -369,7 +405,7 @@ window.addEventListener("load",function(){VYACart.refresh();document.querySelect
 // products. This replaces that static grid with a live grid of the store's VYA
 // items assigned to the collection — styled to inherit the theme (transparent,
 // inherited font/colour) so it looks native. Cards add to the injected VYA cart.
-export type CollectionCardItem = { id: string; title: string; priceCents: number | null; currency: string | null; images: unknown };
+export type CollectionCardItem = { id: string; title: string; priceCents: number | null; currency: string | null; images: unknown; sourceId?: string | null };
 // Common Shopify/theme selectors for the collection product grid.
 const GRID_SELECTORS = "#product-grid,ul#product-grid,ul.product-grid,.product-grid,ul.grid--view-items,.grid--view-items,.collection ul.grid,ul.collection__products,.product-list,.collection-products,[class*='product-grid'],[id*='ProductGridContainer'] ul";
 
@@ -378,25 +414,265 @@ function money(cents: number | null, currency: string | null): string {
  try { return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(cents / 100); } catch { return `$${Math.round(cents / 100)}`; }
 }
 
-export function injectCollectionItems(html: string, items: CollectionCardItem[]): string {
- if (!items.length) return html;
+const CARD_CHILD_SELECTOR = "li, .grid__item, .card-wrapper, [class*='product-card']";
+
+/** Does this element look like ONE product card? Structure, not class names: a card shows a
+ *  picture, links somewhere, and says something. */
+function looksLikeCard($: cheerio.CheerioAPI, el: DomElement): boolean {
+ const $el = $(el);
+ if ($el.find("img").length === 0) return false;
+ if ($el.find("a[href]").length === 0) return false;
+ return ($el.text() || "").trim().length > 0;
+}
+
+/**
+ * The page's REAL product grids, in document order — found STRUCTURALLY.
+ *
+ * The first version of this matched Shopify/Dawn class names (`product-grid`, `grid--view-items`,
+ * `collection__products`…). Measured against a corpus of 20 live storefronts it found a grid on
+ * only 6 — every non-Dawn theme (Prestige, Editions, Exhibit, Vessel, Dwell, Squarespace,
+ * BigCommerce, WooCommerce) fell through to a generic substitute grid that looked nothing like the
+ * store it was mirroring. Class names are a per-theme detail; what every product grid has in common
+ * is its SHAPE: a container whose children are mostly little blocks that each hold an image, a link
+ * and some text. So that's what we look for, and the class list survives only as a tie-breaker.
+ */
+function productGrids($: cheerio.CheerioAPI): DomElement[] {
+ const candidates: { el: DomElement; cards: number }[] = [];
+ $("ul, ol, div, section").each((_, el) => {
+  const $el = $(el);
+  const cls = `${$el.attr("class") || ""} ${$el.attr("id") || ""}`.toLowerCase();
+  // Navigation, pagination and social rows are lists of links-with-icons — structurally very close
+  // to a product grid, so they're excluded by name AND by where they sit. Checking only the
+  // element's own class missed a bare <ul> inside <nav>, which would have had the store's menu
+  // replaced with products.
+  if (/pagination|breadcrumb|menu|nav|social|footer|header|announcement/.test(cls)) return;
+  if ($el.closest("nav, header, footer, [role='navigation']").length > 0) return;
+  const kids = $el.children().toArray() as DomElement[];
+  const named = $el.is(GRID_SELECTORS);
+  // An unnamed container needs at least two children before it can plausibly be a grid; a
+  // container that literally calls itself a product grid is trusted with one, so a collection
+  // holding a single piece — normal for one-of-one vintage — still renders in the theme's layout.
+  if (kids.length < (named ? 1 : 2)) return;
+  const cards = kids.filter((k) => looksLikeCard($, k)).length;
+  // Most of the container's children must be cards, so a page wrapper that happens to contain a
+  // grid doesn't qualify on the strength of its one grid child. Three is the confident threshold;
+  // two is accepted only when the container also NAMES itself a product grid, which keeps small
+  // collections working without letting any two-image row qualify.
+  const enough = cards >= 3 || (cards >= 1 && named);
+  if (enough && cards >= kids.length * 0.6) candidates.push({ el, cards });
+ });
+ // Keep only the innermost matches: if one candidate contains another, the child is the real grid.
+ return candidates
+  .filter(({ el }) => !candidates.some((o) => o.el !== el && $(el).find(o.el).length > 0))
+  .map((c) => c.el);
+}
+
+/** Which collection each product grid on a captured page belongs to, in document order.
+ *
+ *  A homepage typically carries several grids ("New in", "Archive", "Shop bags"), and replacing
+ *  only the first would leave the rest frozen — still advertising pieces that have since sold.
+ *  Shopify sections almost always sit next to a "View all" link pointing at the collection they
+ *  render, so we read the handle from that. `null` means "couldn't tell" and the caller should
+ *  fall back to the store's live inventory. */
+export function detectGridHandles(html: string): (string | null)[] {
  const $ = cheerio.load(html);
+ return productGrids($).map((el) => {
+  // Look at the grid's own section wrapper for a link to /collections/{handle}.
+  const $section = $(el).closest("section, .shopify-section, [id^='shopify-section']");
+  const scope = $section.length ? $section : $(el).parent();
+  for (const a of scope.find('a[href*="/collections/"]').toArray()) {
+   const href = $(a).attr("href") || "";
+   const m = href.match(/\/collections\/([^/?#]+)/);
+   if (m && m[1] && m[1] !== "all") return m[1];
+  }
+  return null;
+ });
+}
+
+/** Replace EVERY product grid on the page, each with its own list of live items (index-matched to
+ *  detectGridHandles). Grids whose list is empty are left alone rather than emptied. */
+export function injectLiveGrids(html: string, perGrid: CollectionCardItem[][], hrefFor: HrefFor): string {
+ if (!perGrid.some((g) => g.length)) return html;
+ const $ = cheerio.load(html);
+ const grids = productGrids($);
+ grids.forEach((el, i) => {
+  const items = perGrid[i] || [];
+  if (items.length) fillGrid($, el, items, hrefFor);
+ });
+ return $.html();
+}
+
+/**
+ * Put live items into a captured grid by REUSING THE THEME'S OWN CARD as a template.
+ *
+ * Replacing the grid with markup of our own threw away everything the theme knew about it: the
+ * source rendered four across with its own type, badges and spacing, and our substitute rendered
+ * six cramped columns with a generic "Add to cart" button under each — recognisably not the same
+ * shop. Cloning the theme's first product card and swapping its image, title, price and link keeps
+ * every class the theme styles against, so the live grid is visually identical to the frozen one it
+ * replaces. Falls back to our own simple cards only when a theme card can't be found.
+ */
+function fillGrid($: cheerio.CheerioAPI, gridEl: DomElement, items: CollectionCardItem[], hrefFor: HrefFor): void {
+ const $grid = $(gridEl);
+ // The first child that actually looks like a card (some grids lead with a promo tile).
+ const templateEl = ($grid.children().toArray() as DomElement[]).find((k) => looksLikeCard($, k));
+ const $template = (templateEl ? $(templateEl) : $grid.children(CARD_CHILD_SELECTOR).first()) as cheerio.Cheerio<DomElement>;
+ if (!$template.length) {
+  $grid.replaceWith(liveGridHtml(items, hrefFor));
+  return;
+ }
+ // Capture inlines each stylesheet where its <link> was — sometimes INSIDE a product card. Cloning
+ // the card would then duplicate a whole stylesheet per product (314 cards turned one page into
+ // 6MB). Hoist those out of the card once, then strip them from every clone.
+ const $hoisted = $template.find("style, link").remove();
+ if ($hoisted.length) $grid.before($hoisted);
+ // Mirror the theme's own price formatting (e.g. "$550.00 USD" vs "$550") rather than imposing ours.
+ const samplePrice = findPriceText($, $template);
+ const decimals = /[.,]\d{2}\b/.test(samplePrice) ? 2 : 0;
+ const showCode = /\b[A-Z]{3}\b/.test(samplePrice);
+
+ const cards = items.map((it) => renderThemeCard($, $template, it, decimals, showCode, hrefFor));
+ $grid.empty();
+ $grid.attr("data-vya-collection", "1"); // marker: this grid is live, not captured
+ for (const c of cards) $grid.append(c);
+}
+
+/** Clone one theme card and substitute a live item's content into it. */
+function renderThemeCard(
+ $: cheerio.CheerioAPI,
+ $template: cheerio.Cheerio<DomElement>,
+ it: CollectionCardItem,
+ decimals: number,
+ showCode: boolean,
+ hrefFor: HrefFor,
+): cheerio.Cheerio<DomElement> {
+ const $card = $template.clone() as cheerio.Cheerio<DomElement>;
+ $card.find("style, link, script").remove(); // never duplicate a stylesheet per card
+ const imgs = Array.isArray(it.images) ? (it.images as unknown[]) : [];
+ const img = typeof imgs[0] === "string" ? (imgs[0] as string) : "";
+ const href = hrefFor(it);
+
+ // ids would be duplicated across every cloned card, and the theme's own animation hooks would
+ // re-run per card; strip both.
+ $card.find("[id]").removeAttr("id");
+ $card.removeAttr("id").removeAttr("data-cascade").removeAttr("style");
+
+ // Image: keep the theme's <img> (and its classes/sizing), just point it at the live photo.
+ const $img = $card.find("img").first();
+ if ($img.length && img) {
+  $img.attr("src", img).attr("alt", it.title || "").removeAttr("srcset").removeAttr("data-srcset").removeAttr("sizes").removeAttr("loading");
+ } else if (!img) {
+  $img.remove();
+ }
+ // Any second image (the theme's hover swap) has no live equivalent — drop it so hover doesn't
+ // reveal a different product's photo.
+ $card.find("img").slice(1).remove();
+
+ // Title + link.
+ // Title: the theme's heading if it has one, else the longest text-bearing link in the card —
+ // themes that render the product name as a bare <a> (Prestige, Exhibit, Vessel) have no heading.
+ let $title = $card.find("[class*='card__heading'], [class*='card-title'], [class*='product-title'], h2, h3, h4").first();
+ if (!$title.length) {
+  const links = $card.find("a[href]").toArray() as DomElement[];
+  const best = links.map((a) => $(a)).filter(($a) => ($a.text() || "").trim().length > 1)
+   .sort((a, b) => (b.text() || "").trim().length - (a.text() || "").trim().length)[0];
+  if (best) $title = best;
+ }
+ if ($title.length) {
+  const $link = $title.find("a").first();
+  if ($link.length) $link.attr("href", href).text(it.title || "");
+  else $title.text(it.title || "");
+ }
+ // Every other link in the card should also go to the live product, not the frozen source page.
+ $card.find("a[href]").attr("href", href);
+
+ // Price.
+ // Price: a class hint if the theme gives one, otherwise the deepest element whose text actually
+ // reads as money. Class names differ per theme; a currency amount looks the same everywhere.
+ const $price = findPriceEl($, $card);
+ const priceText = moneyLike(it.priceCents, it.currency, decimals, showCode);
+ if ($price.length) $price.text(priceText);
+ else $card.append(`<div class="vya-price">${escHtml(priceText)}</div>`);
+ // Sale/compare-at markup has no live equivalent and would show a phantom discount.
+ $card.find("[class*='price__sale'], [class*='compare-at'], s, del").remove();
+
+ // Quick-add forms would POST to the old platform; the card links to the product page instead.
+ $card.find("form").remove();
+ $card.find("[class*='quick-add'], quick-add-modal, [class*='badge']").remove();
+
+ return $card;
+}
+
+/** Fallback grid for pages where the theme gives us no card to clone — plain, inherits the store's
+ *  font and colour so it still reads as part of the site. */
+/** Where a live product card should link. Captured sites keep the shopper on the mirrored site
+ *  (/site/{slug}/products/{handle}); elsewhere we fall back to VYA's own product page. */
+export type HrefFor = (it: CollectionCardItem) => string;
+
+function liveGridHtml(items: CollectionCardItem[], hrefFor: HrefFor): string {
  const cards = items.map((it) => {
   const imgs = Array.isArray(it.images) ? (it.images as unknown[]) : [];
   const img = typeof imgs[0] === "string" ? (imgs[0] as string) : "";
-  const bg = img ? `background:#f2f0eb url('${img.replace(/'/g, "%27")}') center/cover;` : "background:#f2f0eb;";
-  return `<div style="font-family:inherit;color:inherit"><div style="aspect-ratio:3/4;${bg}"></div><div style="font-size:14px;margin-top:9px;line-height:1.3">${escHtml(it.title || "")}</div><div style="font-size:14px;opacity:.7;margin:2px 0 9px">${money(it.priceCents, it.currency)}</div><a href="#" data-vya-add="${escHtml(it.id)}" style="display:inline-block;font-size:11px;text-transform:uppercase;letter-spacing:.08em;border:1px solid currentColor;padding:8px 15px;text-decoration:none;color:inherit">Add to bag</a></div>`;
+  // A real <img>, NOT an empty div with a background image. Dawn (and other themes) ship
+  // `div:empty,section:empty,…{display:none}`, which silently hid the childless div we used to
+  // render — the cards showed a title and price with a blank space where the photo belonged.
+  const media = img
+   ? `<img src="${escHtml(img)}" alt="${escHtml(it.title || "")}" loading="lazy" style="display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:#f2f0eb">`
+   : `<div style="aspect-ratio:3/4;background:#f2f0eb">&nbsp;</div>`;
+  return `<div style="font-family:inherit;color:inherit"><a href="${escHtml(hrefFor(it))}" style="text-decoration:none;color:inherit">${media}<div style="font-size:14px;margin-top:9px;line-height:1.3">${escHtml(it.title || "")}</div><div style="font-size:14px;opacity:.7;margin:2px 0 9px">${money(it.priceCents, it.currency)}</div></a></div>`;
  }).join("");
- const grid = `<div data-vya-collection="1" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:26px;padding:26px 0;font-family:inherit;color:inherit">${cards}</div>`;
- const $grid = $(GRID_SELECTORS).first();
- if ($grid.length) {
-  $grid.replaceWith(grid);
+ return `<div data-vya-collection="1" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:26px;padding:26px 0;font-family:inherit;color:inherit">${cards}</div>`;
+}
+
+/** Text that reads as a price: a currency symbol or code next to a number. */
+const MONEY_RE = /(?:[$£€¥₹]|\b(?:USD|GBP|EUR|CAD|AUD|JPY)\b)\s?\d[\d.,]*|\d[\d.,]*\s?(?:USD|GBP|EUR|CAD|AUD)\b/;
+
+/** The element inside a card that holds its price — class hint first, then the deepest node whose
+ *  text actually looks like money. Themes name this element a dozen different ways; the money
+ *  itself looks the same everywhere. */
+function findPriceEl($: cheerio.CheerioAPI, $card: cheerio.Cheerio<DomElement>): cheerio.Cheerio<DomElement> {
+ const hinted = $card.find("[class*='price']").not("style, script, link").filter((_, el) => MONEY_RE.test($(el).text() || "")).first();
+ if (hinted.length) return hinted as cheerio.Cheerio<DomElement>;
+ const all = $card.find("*").not("style, script, link, img").toArray() as DomElement[];
+ // Deepest match wins, so we write into the <span> holding the amount rather than a wrapper.
+ const matches = all.filter((el) => MONEY_RE.test(($(el).text() || "").trim()) && $(el).children().length === 0);
+ return (matches.length ? $(matches[matches.length - 1]) : $()) as cheerio.Cheerio<DomElement>;
+}
+
+/** The price text of a sample card, used to copy the theme's own money formatting. */
+function findPriceText($: cheerio.CheerioAPI, $card: cheerio.Cheerio<DomElement>): string {
+ const $el = findPriceEl($, $card);
+ return $el.length ? ($el.text() || "").trim() : "";
+}
+
+/** Money formatted the way the source theme formats it. */
+function moneyLike(cents: number | null, currency: string | null, decimals: number, showCode: boolean): string {
+ if (cents == null) return "";
+ const code = currency || "USD";
+ let out: string;
+ try {
+  out = new Intl.NumberFormat("en-US", { style: "currency", currency: code, minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(cents / 100);
+ } catch {
+  out = `$${(cents / 100).toFixed(decimals)}`;
+ }
+ return showCode ? `${out} ${code}` : out;
+}
+
+export function injectCollectionItems(html: string, items: CollectionCardItem[], hrefFor: HrefFor = (it) => `/products/${it.id}`): string {
+ if (!items.length) return html;
+ const $ = cheerio.load(html);
+ const grid = productGrids($)[0];
+ if (grid) {
+  // Same treatment as the homepage grids: keep the theme's grid container and clone its own card,
+  // so a collection page renders four across in the store's own type rather than in ours.
+  fillGrid($, grid, items, hrefFor);
  } else {
+  const fallback = liveGridHtml(items, hrefFor);
   // Fallback: remove any static product grids, drop the live grid after the page heading.
   $(GRID_SELECTORS).remove();
   const $host = $("main").first().length ? $("main").first() : $("body").first();
   const $h = $host.find("h1,h2").first();
-  if ($h.length) $h.after(grid); else $host.prepend(grid);
+  if ($h.length) $h.after(fallback); else $host.prepend(fallback);
  }
  return $.html();
 }
@@ -416,6 +692,14 @@ export function injectCart(html: string): string {
  html = html.replace(/<meta[^>]*http-equiv=["']?content-security-policy["']?[^>]*>/gi, "");
  if (html.indexOf("vya-cart-drawer") !== -1) return html;
  return html.indexOf("</body>") !== -1 ? html.replace("</body>", CART_UI + "</body>") : html + CART_UI;
+}
+
+/** Re-hydrate the interactivity that stripping the source's JS took away (slideshow/slider
+ * carousels, dropdown nav) — a small VYA-authored script + CSS fallback, never the seller's own
+ * JS. See capture-shim.ts for exactly what it targets and why. Idempotent, like injectCart. */
+export function injectShim(html: string): string {
+ if (html.indexOf("vya-shim") !== -1) return html;
+ return html.indexOf("</body>") !== -1 ? html.replace("</body>", CAPTURE_SHIM + "</body>") : html + CAPTURE_SHIM;
 }
 
 /** A subtle "Powered by VYA" badge, fixed bottom-right, on the buyer-facing captured site. Links to

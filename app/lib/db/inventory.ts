@@ -30,6 +30,16 @@ export async function ensurePublishAtColumn(): Promise<void> {
  try {
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS publish_at timestamptz`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements text`);
+ // Source identity for the import engine (see schema.ts). Additive + nullable, so existing rows
+ // and any code that doesn't know about them keep working untouched.
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_platform text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_id text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_url text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS content_hash text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS variants jsonb DEFAULT '[]'::jsonb`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS origin text NOT NULL DEFAULT 'source'`);
+ // Identity lookup for re-sync: "does this store already have the source's product X?"
+ await getDb().execute(sql`CREATE INDEX IF NOT EXISTS items_source_idx ON items (seller_id, source_platform, source_id)`);
  publishAtEnsured = true;
  } catch { /* db:push covers it; ignore if we lack DDL rights */ }
 }
@@ -78,6 +88,51 @@ export async function deleteItemsBySource(sellerId: string, source: string, incl
  : and(eq(items.sellerId, sellerId), eq(items.source, source), ne(items.status, "sold"));
  const rows = await db.delete(items).where(where).returning({ id: items.id });
  return rows.length;
+}
+
+// ── Source-identity helpers (import engine) ─────────────────────────────────────────────────
+// These let an import MATCH what it previously created instead of wiping and re-adding it, which
+// is what makes a re-import safe to run repeatedly (and keeps seller edits intact).
+
+/** Every item this store imported from a given source, with the identity columns needed to match. */
+export async function listItemsBySource(sellerId: string, source: string): Promise<Item[]> {
+ await ensurePublishAtColumn();
+ const db = getDb();
+ return db.select().from(items).where(and(eq(items.sellerId, sellerId), eq(items.source, source)));
+}
+
+/** Refresh a source-owned item from the source. Never call this for `origin = 'user'` rows —
+ *  the caller checks that, because a seller's own edit must outlive any re-sync. */
+export async function updateItemFromSource(
+ id: string,
+ patch: Partial<Pick<Item, "title" | "priceCents" | "currency" | "images" | "description" | "size" | "status" | "variants" | "contentHash" | "sourcePlatform" | "sourceId" | "sourceUrl">>,
+): Promise<void> {
+ await ensurePublishAtColumn();
+ const db = getDb();
+ // `origin` guard in SQL too, so a race can't clobber an edit made mid-import.
+ await db.update(items)
+  .set({ ...patch, updatedAt: new Date() })
+  .where(and(eq(items.id, id), eq(items.origin, "source")));
+}
+
+/** Items the source stopped listing: mark sold (real history, and the captured product page still
+ *  links to them) rather than deleting. Already-sold and seller-edited rows are left untouched. */
+export async function markItemsMissingFromSource(ids: string[]): Promise<number> {
+ if (!ids.length) return 0;
+ await ensurePublishAtColumn();
+ const db = getDb();
+ const rows = await db.update(items)
+  .set({ status: "sold", soldAt: new Date(), updatedAt: new Date() })
+  .where(and(inArray(items.id, ids), eq(items.origin, "source"), ne(items.status, "sold")))
+  .returning({ id: items.id });
+ return rows.length;
+}
+
+/** Mark an item as seller-owned so future imports leave it alone. Called from the portal's edit
+ *  paths — once a human touches an imported item, the importer stops managing it. */
+export async function markItemUserEdited(id: string): Promise<void> {
+ await ensurePublishAtColumn();
+ await getDb().update(items).set({ origin: "user", updatedAt: new Date() }).where(eq(items.id, id));
 }
 
 /** Full owner reset: wipe ALL of a seller's inventory, SOLD included. The payouts

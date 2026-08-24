@@ -2,7 +2,7 @@
 // tasteful starter layout built from the section types. Picking one restyles the store and lays
 // out a real home page the seller can then edit or ask VYA to change. Grounded in real VYA stores.
 
-import { makeBlock, type Block, type BlockType, type BlockStyle } from "./storefront-blocks";
+import { makeBlock, type Block, type BlockType, type BlockStyle } from "./storefront-blocks.ts";
 
 export type HeroStyle = "carousel" | "text-over-image" | "logo-masthead" | "drop-banner" | "minimal";
 type Spec = { type: BlockType; props?: Record<string, string>; style?: BlockStyle };
