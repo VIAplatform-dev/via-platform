@@ -1,4 +1,5 @@
 import { estimatePrice, getMarketReferenceFast, computePriceFlag, type PriceEstimate, type PriceFlag } from "./price-engine.ts";
+import { applyGarmentCorrection } from "./query-clean.ts";
 import { getMinMarkupBps } from "./store-pricing-db.ts";
 import { getStorePricingSignal, getVisualVyaComps, RECALL_STALE_DAYS } from "./intake-memory-db.ts";
 import { getStoreBrief, briefPricingTarget } from "./store-brief-db.ts";
@@ -108,7 +109,12 @@ export async function computeListingPricing(opts: {
  // A tight AI search phrase (brand + specific model + era) finds SAME-PIECE comps far better than
  // the SEO title — prefer it, but only when it actually carries the (authoritative) brand.
  const sq = (opts.searchQuery || "").trim();
- const query = sq && (!brandVal || sq.toLowerCase().includes(brandVal.toLowerCase())) ? sq : brandTitle;
+ const chosen = sq && (!brandVal || sq.toLowerCase().includes(brandVal.toLowerCase())) ? sq : brandTitle;
+ // The seller's garment choice overrides the noun the model wrote into the title. Correcting the
+ // category alone changed the label on screen and nothing else, because every comp search is built
+ // from the TITLE: a top the model called a "strapless mini dress" kept searching dresses even
+ // after the category was fixed, and the price stayed a dress price.
+ const query = applyGarmentCorrection(chosen, opts.category || null);
  const needPrice = !opts.price || !opts.price.trim();
 
  // VYA pieces that LOOK like this one → strong comps, even when the brand is unknown/wrong.

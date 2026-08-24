@@ -15,6 +15,8 @@ const PUBLIC_ROUTES = [
   "/admin/login",
   "/admin/set-password",
   "/api/admin/auth",
+  // Local-development sign-in. 404s unless NODE_ENV is development AND the Host is loopback.
+  "/api/admin/dev-login",
   "/api/admin/set-password",
   "/terms",
   "/privacy",

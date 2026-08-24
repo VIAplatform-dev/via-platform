@@ -116,15 +116,44 @@ export type PriceEvalRun = { requested: number; graded: number; skipped: number;
  *    this mirrors a real seller upload and is the honest test of "can VYA price from a photo?".
  * Costs SerpApi (reverse-image + comps) per item; keep the sample small. Accumulates per (sale, mode).
  */
-export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; withContext?: boolean; confirmedOnly?: boolean }): Promise<PriceEvalRun> {
+export async function runPriceEval(opts: {
+ sample: number;
+ photoOnly?: boolean;
+ withContext?: boolean;
+ confirmedOnly?: boolean;
+ /**
+  * Grade THESE sales specifically, instead of the newest ungraded ones. The default selection
+  * deliberately prefers items it hasn't seen (grow coverage), which is right for building the
+  * dataset and wrong for an A/B: it hands you a different, easier slice of the catalogue and the
+  * comparison measures the sample rather than the change.
+  */
+ soldIds?: number[];
+ /**
+  * Store the results under a different mode label while GRADING identically. Re-running the same
+  * mode would overwrite the baseline rows (ON CONFLICT (sold_id, mode) DO UPDATE), destroying the
+  * "before" side of the very comparison being run. A separate label keeps both and makes the pair
+  * readable by comparePriceAccuracy.
+  */
+ modeLabel?: string;
+}): Promise<PriceEvalRun> {
  await ensureTable();
  const sample = Math.max(1, Math.min(40, Math.round(opts.sample) || 12));
- const mode = opts.photoOnly ? "photo" : opts.withContext ? "title-ctx" : "title";
+ // `behaviour` decides HOW an item is graded; `mode` is only the label it is stored under.
+ const behaviour = opts.photoOnly ? "photo" : opts.withContext ? "title-ctx" : "title";
+ const mode = opts.modeLabel || behaviour;
  const sql = db();
 
  // Prefer sales not yet graded IN THIS MODE (grow coverage), newest first. `confirmedOnly` grades
  // against ONLY real confirmed order prices (the receipts) — the truest answer key, once we have them.
- const rows = (await (opts.confirmedOnly
+ const rows = (await (opts.soldIds?.length
+ ? sql`
+  SELECT s.id, s.title, s.designer, s.store_name, s.final_price, s.image, s.embedding
+  FROM sold_items s
+  WHERE s.id = ANY(${opts.soldIds}::int[]) AND s.image IS NOT NULL AND s.image <> '' AND s.final_price > 0
+  ORDER BY s.sold_at DESC
+  LIMIT ${sample}
+ `
+ : opts.confirmedOnly
  ? sql`
   SELECT s.id, s.title, s.designer, s.store_name, s.final_price, s.image, s.embedding
   FROM sold_items s
@@ -161,7 +190,7 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  const matches = isCompsConfigured() ? (await reverseImageBestOf([image], { maxFrames: 1 })).matches : [];
  let query: string;
  let specificResolved: boolean | null = null;
- if (mode === "photo") {
+ if (behaviour === "photo") {
  // Photo-only: identify the piece from the photo via the reference index — NO human title.
  // excludeNearIdentical stops the item matching a copy of itself in the index (cheating).
  let emb: number[] = [];
@@ -177,11 +206,18 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  // era/material/condition from the title via the same canonical inference production imports use —
  // sold_items never stored those columns — so the engine runs with production-shaped context. When
  // the title carries no condition, none is passed and no condition multiplier skews the read.
- const inferred = mode === "title-ctx" ? inferItemFields(title, title) : null;
+ const inferred = behaviour === "title-ctx" ? inferItemFields(title, title) : null;
  const context = inferred
  ? { brand: brand ?? inferred.brand, era: inferred.era, material: inferred.material, condition: inferred.condition, conditionGrade: inferred.condition }
  : { brand };
- const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context, excludeSoldId: Number(r.id) }).catch(() => null);
+ const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context, excludeSoldId: Number(r.id), storeName: r.store_name }).catch(() => null);
+ // REFUSE to grade a price the valuation model did not produce. When the model is unreachable the
+ // pricer substitutes a raw comp median — a perfectly plausible-looking number that measures the
+ // fallback, not the pricer. Two full runs were spent reporting exactly that as accuracy (once with
+ // SERPAPI_ENABLED off, once with ANTHROPIC_API_KEY holding the literal string "[SENSITIVE]"), and
+ // nothing downstream could tell: same shape, same src='comps'. A run that cannot measure the thing
+ // it claims to measure must produce NO rows rather than misleading ones.
+ if (est?.modelFallback) throw new Error("MODEL_FALLBACK: the valuation model did not answer — check ANTHROPIC_API_KEY (scripts/preflight.ts). Refusing to grade.");
  const predCents = est?.marketCents && est.marketCents > 0 ? est.marketCents : null;
  const absErr = predCents != null ? Math.abs(predCents - soldCents) : null;
  const errorPct = predCents != null ? Math.round(((absErr as number) / soldCents) * 100) : null;
@@ -224,7 +260,7 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  within10Pct: ok.length ? Math.round((within10 / ok.length) * 100) : null,
  medianErrorPct: errs.length ? errs[Math.floor(errs.length / 2)] : null,
  mode,
- specificResolvedPct: mode === "photo" && ok.length ? Math.round((resolved / ok.length) * 100) : null,
+ specificResolvedPct: behaviour === "photo" && ok.length ? Math.round((resolved / ok.length) * 100) : null,
  };
 }
 

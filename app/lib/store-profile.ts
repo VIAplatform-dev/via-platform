@@ -5,6 +5,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import { AI_MODELS } from "./ai-models";
+import { extractFirstJsonObject } from "./json-extract.ts";
 
 export type StoreProfile = {
  summary: string; // 2–3 sentence positioning
@@ -132,9 +133,9 @@ Return ONLY JSON, no prose. Keep it tight so it fits: each text field ≤ 2 sent
  });
  const data = (await res.json()) as any;
  const text = data?.content?.find((c: any) => c.type === "text")?.text ?? "";
- const m = text.match(/\{[\s\S]*\}/);
+ const m = extractFirstJsonObject(text);
  if (!m) return statsOnly;
- const raw = JSON.parse(m[0]);
+ const raw = JSON.parse(m);
  return {
  summary: typeof raw.summary === "string" ? raw.summary : "",
  voice: typeof raw.voice === "string" ? raw.voice : "",

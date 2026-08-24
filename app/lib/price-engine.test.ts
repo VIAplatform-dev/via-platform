@@ -77,3 +77,30 @@ test("compLine renders whole-dollar prices with the comp index", () => {
  assert.match(compLine(c({ priceCents: 145927, source: "VYA" }), 7), /^7\. /);
  assert.match(compLine(c({ priceCents: 145927, source: "VYA" }), 7), /\$1459/);
 });
+
+// ── retail is not a resale comp ─────────────────────────────────────────────────────────────────
+
+test("sites that sell NEW are tiered as retail, not as specialist resale", async () => {
+ const { sourceTier } = await import("./comps.ts");
+ // These were all falling through to "specialist" — quoted to the model as authoritative resale.
+ for (const s of ["Editorialist", "FWRD", "Net-a-Porter", "Nordstrom", "H&M", "Revolve", "SSENSE", "Farfetch"]) {
+  assert.equal(sourceTier(s), "retail", `${s} should be retail`);
+ }
+});
+
+test("genuine resale keeps its tier", async () => {
+ const { sourceTier } = await import("./comps.ts");
+ for (const s of ["The RealReal", "Vestiaire Collective", "1stDibs", "Fashionphile"]) {
+  assert.equal(sourceTier(s), "specialist", `${s} should stay specialist`);
+ }
+ for (const s of ["eBay (sold)", "Depop", "Grailed", "Poshmark"]) {
+  assert.equal(sourceTier(s), "marketplace", `${s} should stay marketplace`);
+ }
+ assert.equal(sourceTier("VYA (sold)"), "vya");
+});
+
+test("an unknown independent dealer is still treated as a specialist", async () => {
+ const { sourceTier } = await import("./comps.ts");
+ // The fallback has to stay generous — most archival dealers are small sites we've never seen.
+ assert.equal(sourceTier("somevintagearchive.com"), "specialist");
+});

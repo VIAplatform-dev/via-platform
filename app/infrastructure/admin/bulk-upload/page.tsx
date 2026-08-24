@@ -194,7 +194,7 @@ export default function BulkUploadPage() {
     const S = (k: string) => (typeof dr[k] === "string" ? dr[k] : "");              // plain-string field
     const F = (k: string) => (dr[k] && typeof dr[k].value === "string" ? dr[k].value : ""); // {value} field
     const fields = {
-     title: S("title"), description: S("description"), category: S("category"),
+     title: S("title"), description: S("description"), category: F("category"),
      brand: F("brand"), era: F("era"), material: F("material"), condition: F("condition"), size: F("size"),
     };
     // The intake also estimates a shipping parcel from the photos. Blank when it couldn't.

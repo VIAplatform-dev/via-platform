@@ -25,7 +25,7 @@ const SERPAPI_URL = "https://serpapi.com/search.json";
 // from an auction close (whatever the bidding happened to reach). Conflating them let a $900
 // auction close anchor a piece whose asking cluster sat at $1,459–$2,082.
 export type SaleType = "bin" | "auction" | null;
-export type SourceTier = "vya" | "specialist" | "marketplace";
+export type SourceTier = "vya" | "specialist" | "marketplace" | "retail";
 // exactPiece: this listing was VISUALLY confirmed to be the same garment as the seller's photo.
 // It is the strongest comp there is and outranks every keyword match, sold or not — nine listings
 // of one Versace runway dress ($1,733–$3,200) once lost to two unrelated sold dresses at $350–$500
@@ -54,7 +54,9 @@ async function checkSerpQuota(): Promise<void> {
  } catch { /* best-effort */ }
 }
 
-async function serp(params: Record<string, string>): Promise<any | null> {
+/** Raw SerpApi call. Exported so price-via-search can ask Google for the price of a listing whose
+ *  own site refuses us — SerpApi is never blocked, and Google has already crawled the page. */
+export async function serp(params: Record<string, string>): Promise<any | null> {
  const apiKey = process.env.SERPAPI_API_KEY;
  if (!apiKey) return null;
  const url = new URL(SERPAPI_URL);
@@ -377,7 +379,33 @@ export function matchesToComps(matches: VisualMatch[]): Comp[] {
 
 // Authenticated-luxury resellers — the truest comps for designer pieces; surfaced first so
 // they survive any downstream truncation before the valuation step sees them.
-const PREMIUM_SOURCE = /real\s?real|vestiaire|fashionphile|rebag|luxury\s?closet|1st\s?dibs|farfetch/i;
+const PREMIUM_SOURCE = /real\s?real|vestiaire|fashionphile|rebag|luxury\s?closet|1st\s?dibs/i;
+
+// RETAIL: sites selling the item NEW, at full price. Not a resale market at all.
+//
+// This tier exists because sourceTier's fallback was "anything unrecognized is a SPECIALIST" — so
+// Editorialist, FWRD and a brand's own store were being treated as authoritative resale dealers.
+// A real case: a used black Saint Laurent blouse drew comps of $2,190 (Editorialist) and $1,100
+// (FWRD), both current-season retail, and priced at ~$400. Those are the ORIGINAL price of a new
+// garment, which caps what a used one fetches — it never sets it.
+//
+// Farfetch moved OUT of PREMIUM for the same reason: it is overwhelmingly a new-retail platform,
+// and treating its asks as resale evidence pulls every in-production brand upward.
+const RETAIL_SOURCE = new RegExp(
+ [
+  // luxury e-tail
+  "net-?a-?porter", "mytheresa", "matchesfashion", "ssense", "farfetch", "luisaviaroma", "moda\\s?operandi",
+  "editorialist", "\\bfwrd\\b", "browns", "selfridges", "harrods", "shopbop", "\\bmr\\s?porter\\b",
+  // department stores
+  "saks", "neiman", "bergdorf", "nordstrom", "bloomingdale", "\\bmacy", "harvey\\s?nichols",
+  // mass & fast fashion
+  "\\bh&m\\b", "\\bhm\\.com", "\\bzara\\b", "shein", "\\basos\\b", "uniqlo", "\\bmango\\b", "\\bcos\\b",
+  "revolve", "princess\\s?polly", "\\blulus\\b", "na-?kd", "boohoo", "prettylittlething", "forever\\s?21",
+  "urban\\s?outfitters", "free\\s?people", "anthropologie", "abercrombie", "\\bedikted\\b", "white\\s?fox",
+  "\\btarget\\b", "walmart", "\\bwindsor\\b", "\\boh\\s?polly\\b",
+ ].join("|"),
+ "i",
+);
 // General marketplaces: anyone can list anything, so caliber and authentication vary wildly.
 const MARKETPLACE_SOURCE = /ebay|depop|etsy|poshmark|mercari|grailed|vinted|shopozz|aliexpress|amazon|google shopping|visual match/i;
 
@@ -389,6 +417,10 @@ const MARKETPLACE_SOURCE = /ebay|depop|etsy|poshmark|mercari|grailed|vinted|shop
 export function sourceTier(source: string): SourceTier {
  const s = (source || "").trim();
  if (/^vya\b/i.test(s)) return "vya";
+ // Retail is checked BEFORE marketplace and before the specialist fallback: these sell new, so
+ // their price is the original, not a comparable. Previously they fell through to "specialist" and
+ // were quoted to the valuation model as authoritative resale evidence.
+ if (RETAIL_SOURCE.test(s)) return "retail";
  if (MARKETPLACE_SOURCE.test(s)) return "marketplace";
  return "specialist"; // PREMIUM_SOURCE and independent curated dealers alike
 }

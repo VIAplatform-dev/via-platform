@@ -17,7 +17,9 @@ type Draft = {
  condition: Field;
  conditionGrade: string | null;
  flaws: string[];
- category: string | null;
+ // {value, confidence} like the other risky fields — the garment type drives every comp search, so
+ // the intake now reports how sure it is (see ai-intake.ts).
+ category: Field;
  searchQuery: string | null;
  careTag: string | null;
  runway: string | null;
@@ -80,6 +82,15 @@ export default function IntakePage() {
  const [err, setErr] = useState<string | null>(null);
  const [form, setForm] = useState<Form>(BLANK);
  const [flagged, setFlagged] = useState<string[]>([]);
+ // A question the intake wants to put to the seller, when the brand genuinely couldn't be pinned
+ // down. Distinct from `flagged`: flagged means "we guessed, please confirm"; this means "we
+ // deliberately did NOT guess". Empty on most items.
+ // Everything /api/store/intake/pricing needs, kept from the first run so answering a question can
+ // re-price WITHOUT paying for another reverse-image search. Without this the questions were purely
+ // cosmetic: the seller typed the brand, the field changed, and the price never moved.
+ const priceCtx = useRef<{ searchQuery: string | null; reverseComps: unknown[]; reverseTitles: unknown[]; editorialTitles: unknown[]; knowledgeHintCents: number | null; draftRanFull: boolean } | null>(null);
+ const [repricing, setRepricing] = useState(false);
+ const [questions, setQuestions] = useState<{ field: string; prompt: string; hint: string; why: string; options?: string[] }[]>([]);
  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
  const [careTag, setCareTag] = useState<string | null>(null);
  const [reverseImage, setReverseImage] = useState<{ matches: number; brand: string | null; hits: number; sampleTitles: string[] } | null>(null);
@@ -274,6 +285,63 @@ export default function IntakePage() {
 
  // Fill ONLY the blank fields with AI — whatever the seller typed is kept. Pricing always
  // runs now (cheaply, off our own data), so a typed price still gets an over/under-market flag.
+ /**
+  * Re-run pricing against the CURRENT form values.
+  *
+  * This is what makes a question worth asking. Answering "it's a Valentino, and it's a top" has to
+  * change the price, or the seller has done work for nothing — and on the Valentino that answer was
+  * worth the difference between $42 and $257.
+  *
+  * Reuses the reverse-image results from the first pass (priceCtx), so a correction costs one
+  * pricing call rather than a whole fresh intake.
+  */
+ async function reprice(overrides?: Partial<Form>) {
+ const ctx = priceCtx.current;
+ if (!ctx || !photos.length) return;
+ const f = { ...form, ...(overrides || {}) };
+ setRepricing(true);
+ try {
+ const r = await fetch("/api/store/intake/pricing", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({
+ imageUrls: photos,
+ fields: {
+ brand: f.brand || "", title: f.title || "", era: f.era || "", material: f.material || "",
+ category: f.category || "", condition: f.condition || "", conditionGrade: f.condition || "",
+ price: "", runway: runway || "", celebrity: celebrity || "",
+ },
+ // The old searchQuery was built from the WRONG brand/garment, so it must not be reused —
+ // sending it would re-run the same bad search and the price would not move.
+ searchQuery: null,
+ reverseComps: ctx.reverseComps, reverseTitles: ctx.reverseTitles,
+ editorialTitles: ctx.editorialTitles, knowledgeHintCents: ctx.knowledgeHintCents,
+ draftRanFull: ctx.draftRanFull,
+ }),
+ });
+ const d = await r.json().catch(() => null);
+ if (r.ok && d) {
+ const est = d.estimate;
+ if (est?.suggestedCents) setMarketPrice(Math.round(est.suggestedCents / 100));
+ if (typeof est?.confidence === "number") setAiConfidence(est.confidence);
+ if (typeof est?.marketCents === "number") setRawMarketCents(est.marketCents);
+ if (typeof est?.rationale === "string") setPriceNote(est.rationale);
+ setPriceLow(typeof est?.lowCents === "number" ? Math.round(est.lowCents / 100) : null);
+ setPriceHigh(typeof est?.highCents === "number" ? Math.round(est.highCents / 100) : null);
+ setPriceFlag(d.priceFlag ?? null);
+ setLowConf(!!d.lowConfidence);
+ // Overwrite the price ONLY while it is still the machine's own suggestion. A number the
+ // seller typed is theirs and survives a re-price.
+ if (est?.suggestedCents) {
+ setForm((cur) => (String(cur.price).trim() === "" || String(cur.price) === String(marketPrice)
+ ? { ...cur, price: String(Math.round(est.suggestedCents / 100)) }
+ : cur));
+ }
+ }
+ } catch { /* leave the existing price alone on failure */ }
+ setRepricing(false);
+ }
+
  async function fillWithAI() {
  if (!photos.length) { setErr("Add at least one photo first."); return; }
  // Brand sharpens the comps/price/description, but it's no longer required — the intake's
@@ -315,10 +383,11 @@ export default function IntakePage() {
  });
  setFlagged(flags);
  setConfirmed({});
+ setQuestions(Array.isArray(d.questions) ? d.questions : []);
  // Record the AI's proposal ONLY for fields the seller left blank (a genuine prediction).
  // Pre-typed fields aren't the AI's guess → excluded, keeping the accuracy metric honest.
  { const predicted: Record<string, string | null> = {};
- ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["condition", dr.condition?.value], ["category", dr.category], ["description", dr.description]] as [keyof Form, string | null | undefined][])
+ ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["condition", dr.condition?.value], ["category", dr.category?.value], ["description", dr.description]] as [keyof Form, string | null | undefined][])
  .forEach(([k, aiVal]) => { if (!String(form[k]).trim() && aiVal) predicted[k] = aiVal; });
  setAiDraft(predicted); }
  }
@@ -335,7 +404,7 @@ export default function IntakePage() {
  fill("era", dr.era?.value);
  fill("material", dr.material?.value);
  fill("condition", dr.condition?.value);
- fill("category", toCategorySlug(dr.category) ?? dr.category);
+ fill("category", toCategorySlug(dr.category?.value) ?? dr.category?.value);
  fill("description", dr.description);
  if (dr.parcel) { fill("weightOz", String(dr.parcel.weightOz)); fill("lengthIn", String(dr.parcel.lengthIn)); fill("widthIn", String(dr.parcel.widthIn)); fill("heightIn", String(dr.parcel.heightIn)); }
  }
@@ -349,12 +418,20 @@ export default function IntakePage() {
  title: filled.title || dr?.title || "",
  era: filled.era || dr?.era?.value || "",
  material: filled.material || dr?.material?.value || "",
- category: filled.category || dr?.category || "",
+ category: filled.category || dr?.category?.value || "",
  condition: filled.condition || dr?.condition?.value || "",
  conditionGrade: filled.condition || dr?.conditionGrade || dr?.condition?.value || "",
  price: filled.price || "",
  runway: (d.runway ?? dr?.runway) || "",
  celebrity: d.celebrity || "",
+ };
+ priceCtx.current = {
+ searchQuery: d.searchQuery ?? dr?.searchQuery ?? null,
+ reverseComps: d.reverseComps ?? [],
+ reverseTitles: d.reverseTitles ?? [],
+ editorialTitles: d.editorialTitles ?? [],
+ knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null,
+ draftRanFull: d.needDraft === true,
  };
  const r2 = await fetch("/api/store/intake/pricing", {
  method: "POST",
@@ -590,6 +667,70 @@ export default function IntakePage() {
  <input className={input} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. 1990s Prada nylon shoulder bag" />
  </div>
  <div className="grid grid-cols-2 gap-3">{riskyField("brand", "Brand")}{riskyField("era", "Era")}</div>
+ {/* The intake couldn't identify the brand and is saying so rather than inventing one. Sits
+     directly under the field it is about, and is answered by typing into that field — no extra
+     step, no modal. Dismissable, because a piece with no label genuinely has no answer. */}
+ {/* Shown whenever the API asked — including when a LOW-CONFIDENCE guess is already sitting in
+     the field, which is precisely when it needs checking. Hiding it on a non-empty field meant a
+     "2 of 25 web matches" guess for Ralph Lauren was stated with no question at all. */}
+ {questions.map((question) => (
+ <div key={question.field} className="mt-2 rounded-lg border border-sky-200 bg-sky-50/70 px-3.5 py-3">
+ <p className="text-[13px] font-medium text-sky-900">
+ {question.field === "brand" && form.brand.trim()
+  ? `Is this really ${form.brand.trim()}?`
+  : question.prompt}
+ </p>
+ <p className="mt-1 text-[12px] leading-relaxed text-sky-800/80">{question.hint}</p>
+ <p className="mt-1.5 text-[11px] text-sky-700/60">{question.why}</p>
+ {/* A closed choice for the garment type — one tap, and the answer lands inside our own
+     taxonomy so it can drive the comp search directly. */}
+ {!!question.options?.length && (
+ <div className="mt-2 flex flex-wrap gap-1.5">
+ {question.options.map((opt) => (
+ <button
+ key={opt}
+ type="button"
+ onClick={() => {
+ set("category" as keyof Form, opt);
+ setQuestions((qs) => qs.filter((x) => x.field !== question.field));
+ // The whole point of asking: the answer re-prices. Every comp search is built from the
+ // garment word, so a corrected category has to produce a corrected price.
+ void reprice({ category: opt } as Partial<Form>);
+ }}
+ className="rounded-full border border-sky-300 bg-white px-3 py-1 text-[12px] font-medium text-sky-900 hover:bg-sky-100"
+ >
+ {opt}
+ </button>
+ ))}
+ </div>
+ )}
+ <div className="mt-2 flex items-center gap-3">
+ {question.field === "brand" && (
+ <button
+ type="button"
+ disabled={!form.brand.trim() || repricing}
+ onClick={() => { setQuestions((qs) => qs.filter((x) => x.field !== question.field)); void reprice(); }}
+ className="rounded-full bg-sky-700 px-3.5 py-1.5 text-[12px] font-medium text-white transition enabled:hover:bg-sky-800 disabled:opacity-40"
+ >
+ {repricing ? "Repricing…" : form.brand.trim() ? "Yes — use this" : "Update price"}
+ </button>
+ )}
+ <button
+ type="button"
+ onClick={() => {
+ const clearing = question.field === "brand" && !!form.brand.trim();
+ if (clearing) set("brand", "");
+ setQuestions((qs) => qs.filter((x) => x.field !== question.field));
+ // A wrong brand in the query is worse than none — re-price without it.
+ if (clearing) void reprice({ brand: "" } as Partial<Form>);
+ }}
+ className="text-[11px] font-medium text-sky-700 underline underline-offset-2 hover:text-sky-900"
+ >
+ {question.field !== "brand" ? "Skip" : form.brand.trim() ? "No — clear it" : "No label on this piece"}
+ </button>
+ </div>
+ </div>
+ ))}
  <div className="grid grid-cols-2 gap-3">{riskyField("material", "Material")}
  <div>
  <label className={label}>Condition</label>
@@ -603,7 +744,7 @@ export default function IntakePage() {
  <div><label className={label}>Size</label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="M / US 8" /></div>
  <div>
  <label className={label}>Category</label>
- <div className="pt-1"><CategoryBreadcrumb value={form.category || null} onChange={(v) => set("category", v || "")} /></div>
+ <div className="pt-1"><CategoryBreadcrumb value={form.category || null} onChange={(v) => { set("category", v || ""); if (priceCtx.current && v) void reprice({ category: v } as Partial<Form>); }} /></div>
  </div>
  </div>
  <div>

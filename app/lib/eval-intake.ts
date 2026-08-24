@@ -108,7 +108,9 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  }
  let priceOk: boolean | null = null;
  if (opts.withPrice && Number(r.price_cents) > 0) {
- const query = [brand, draft.category].filter(Boolean).join(" ") || draft.title;
+ // .value, not the field object — `.join()` accepts anything, so the old line would have silently
+ // built the query "Chanel [object Object]" and quietly wrecked every intake-eval comp search.
+ const query = [brand, draft.category?.value].filter(Boolean).join(" ") || draft.title;
  const est = await estimatePrice({ query, photoUrl: imageUrl, minMarkupBps: 3000, context: { brand, era: draft.era?.value ?? null } }).catch(() => null);
  if (est?.suggestedCents) priceOk = Math.abs(est.suggestedCents - Number(r.price_cents)) / Number(r.price_cents) <= 0.2;
  }
@@ -117,7 +119,7 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  image: imageUrl,
  brand: { guess: brand, truth: r.brand as string, ok: brandMatch(brand, r.brand) },
  era: { guess: draft.era?.value ?? null, truth: r.era as string | null, ok: r.era ? norm(draft.era?.value) === norm(r.era) : null },
- category: { guess: draft.category ?? null, truth: r.category as string | null, ok: r.category ? norm(draft.category) === norm(r.category) : null },
+ category: { guess: draft.category?.value ?? null, truth: r.category as string | null, ok: r.category ? norm(draft.category?.value ?? null) === norm(r.category) : null },
  material: { guess: draft.material?.value ?? null, truth: r.material as string | null, ok: r.material ? norm(draft.material?.value) === norm(r.material) : null },
  condition: { guess: draft.condition?.value ?? null, truth: r.condition as string | null, ok: r.condition ? gradeWord(draft.condition?.value) === gradeWord(r.condition) : null },
  // Did the AI's own title/query name the right model? truth is null when the answer key

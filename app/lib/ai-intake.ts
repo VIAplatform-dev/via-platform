@@ -7,6 +7,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 
 import { AI_MODELS } from "./ai-models.ts";
+import { extractFirstJsonObject } from "./json-extract.ts";
 import { recordAnthropic } from "./cost-tracker.ts";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -26,7 +27,13 @@ export type ListingDraft = {
  condition: DraftField;
  conditionGrade: string | null; // canonical resale grade (Deadstock/NWT…Fair) from VISIBLE wear
  flaws: string[]; // specific visible flaws (pilling, scuffs, tarnish…) — [] if none seen
- category: string | null;
+ /**
+  * The garment type. Carries a confidence because EVERY comp search is built from this word: a top
+  * read as a "strapless mini dress" searched for dresses, priced against dresses, and came out at
+  * $689. Tops measured 44% off in the accuracy eval — the worst category — and misreads like that
+  * are a plausible share of it.
+  */
+ category: DraftField;
  searchQuery: string | null; // tightest brand+model+era phrase to find THIS piece's comps
  careTag: string | null; // verbatim care/composition label text, if legible
  tag: { brandText: string | null; rn: string | null; madeIn: string | null; styleCode: string | null } | null; // OCR of the brand/RN label — transcribed, not inferred
@@ -36,7 +43,7 @@ export type ListingDraft = {
 };
 
 // Fields where a wrong guess is costly — gated for confirmation when low-confidence.
-export const RISKY_FIELDS = ["brand", "era", "material"] as const;
+export const RISKY_FIELDS = ["brand", "era", "material", "category"] as const;
 export const CONFIDENCE_THRESHOLD = 0.75;
 export function needsReview(field: DraftField): boolean {
  return !field.value || field.confidence < CONFIDENCE_THRESHOLD;
@@ -59,7 +66,7 @@ const INSTRUCTION = `Return ONLY a JSON object (no prose, no markdown) with exac
  "condition": {"value": string|null, "confidence": number},   // a short, honest customer-facing condition note (e.g. "Excellent — light wear to the sole")
  "conditionGrade": string|null,                    // EXACTLY one of: "Deadstock/NWT","Excellent","Very Good","Good","Fair". Grade STRICTLY from VISIBLE wear only. Inspect closely for: pilling, stains, fading, sole/heel wear, scuffs, tarnished or missing hardware, holes, loose threads, pulls, stretched/misshapen areas, yellowing. A clean piece with NO visible flaws is "Excellent" (or "Deadstock/NWT" only if tags/deadstock are visible) — do NOT default to "Good". Only grade down for wear you can actually see.
  "flaws": string[],                                // the specific visible flaws behind the grade, e.g. ["light pilling at cuffs","scuffed toe","tarnished zipper pull"]. [] if none are visible. NEVER invent a flaw you cannot clearly see in the photos.
- "category": string|null,                          // e.g. "bags","dresses","shoes","tops"
+ "category": {"value": string|null, "confidence": number}, // e.g. "bags","dresses","shoes","tops". CONFIDENCE MATTERS: a garment photographed flat or bunched can read as a dress when it is a top (or the reverse), and the whole price follows this word — every comp search is built from it. Be honest: if the hem/length isn't clearly visible, say so with a low confidence rather than committing.
  "searchQuery": string|null,                       // The TIGHTEST phrase to find THIS EXACT piece's resale comps: the KNOWN brand + the specific model/line/collection + one key attribute (material or silhouette) + era ONLY if it narrows it. No adjectives, no condition, no fluff. e.g. "Prada Re-Nylon shoulder bag", "Levi's 501 big E", "Cavalli S/S 2003 poppy print gown", "Coach Willis crossbody". Getting to the SPECIFIC model — not just the brand — is what makes the price accurate. null only if you genuinely can't get more specific than the brand.
  "careTag": string|null,                           // verbatim text legible on the care/composition label, else null
  "tag": {"brandText": string|null, "rn": string|null, "madeIn": string|null, "styleCode": string|null}, // READ THE LABEL — transcribe EXACTLY as printed, never inferred: the brand/maker name on the brand label; the RN number (US "RN 12345" → digits only); "Made in ___"; any style/article/model number printed. null anything not clearly legible. The printed brand name and RN are the STRONGEST brand evidence there is — much stronger than silhouette or vibe.
@@ -85,10 +92,10 @@ function toField(f: any): DraftField {
 }
 
 function parseDraft(text: string): ListingDraft {
- const m = text.match(/\{[\s\S]*\}/);
+ const m = extractFirstJsonObject(text);
  let raw: any = {};
  try {
- raw = m ? JSON.parse(m[0]) : {};
+ raw = m ? JSON.parse(m) : {};
  } catch {
  raw = {};
  }
@@ -101,7 +108,12 @@ function parseDraft(text: string): ListingDraft {
  condition: toField(raw.condition),
  conditionGrade: typeof raw.conditionGrade === "string" && raw.conditionGrade.trim() ? raw.conditionGrade.trim().slice(0, 40) : null,
  flaws: Array.isArray(raw.flaws) ? raw.flaws.filter((f: any) => typeof f === "string" && f.trim()).map((f: string) => f.trim().slice(0, 120)).slice(0, 8) : [],
- category: typeof raw.category === "string" ? raw.category.trim() : null,
+ // Accepts the new {value, confidence} shape AND the old bare string, so an older cached draft or
+ // a model that ignores the schema change degrades to "stated, unknown confidence" rather than null.
+ category: typeof raw.category === "string"
+  ? { value: raw.category.trim() || null, confidence: 0.8 }
+  : { value: typeof raw.category?.value === "string" ? raw.category.value.trim() || null : null,
+      confidence: typeof raw.category?.confidence === "number" ? Math.max(0, Math.min(1, raw.category.confidence)) : 0.5 },
  searchQuery: typeof raw.searchQuery === "string" && raw.searchQuery.trim() ? raw.searchQuery.trim().slice(0, 160) : null,
  careTag: typeof raw.careTag === "string" && raw.careTag.trim() ? raw.careTag.trim() : null,
  tag: parseTag(raw.tag),
@@ -263,9 +275,9 @@ export async function identifyRunway(
  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
  await recordAnthropic(INTAKE_MODEL, "runway", data);
  const text = data.content?.find((c) => c.type === "text")?.text ?? "";
- const m = text.match(/\{[\s\S]*\}/);
+ const m = extractFirstJsonObject(text);
  if (!m) return null;
- const parsed = JSON.parse(m[0]) as { runway?: unknown; confidence?: unknown };
+ const parsed = JSON.parse(m) as { runway?: unknown; confidence?: unknown };
  const runway = typeof parsed.runway === "string" && parsed.runway.trim() ? parsed.runway.trim().slice(0, 120) : null;
  const conf = typeof parsed.confidence === "number" ? parsed.confidence : 0;
  // Require HIGH confidence to assert a runway — it's shown to buyers and lifts the price, so a
@@ -309,9 +321,9 @@ export async function identifyCelebrity(
  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
  await recordAnthropic(INTAKE_MODEL, "celebrity", data);
  const text = data.content?.find((c) => c.type === "text")?.text ?? "";
- const m = text.match(/\{[\s\S]*\}/);
+ const m = extractFirstJsonObject(text);
  if (!m) return null;
- const parsed = JSON.parse(m[0]) as { name?: unknown; context?: unknown; confidence?: unknown };
+ const parsed = JSON.parse(m) as { name?: unknown; context?: unknown; confidence?: unknown };
  const name = typeof parsed.name === "string" && parsed.name.trim() ? parsed.name.trim().slice(0, 80) : null;
  const context = typeof parsed.context === "string" && parsed.context.trim() ? parsed.context.trim().slice(0, 120) : null;
  const conf = typeof parsed.confidence === "number" ? parsed.confidence : 0;

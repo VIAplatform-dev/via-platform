@@ -3,6 +3,7 @@
 // Claude designs a complete boutique storefront — template, colors, fonts, homepage
 // sections, and About / FAQ / Shipping pages — from the store's products + brand.
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront } from "./storefront-db";
+import { extractFirstJsonObject } from "./json-extract.ts";
 import { getListingsByStore } from "./listings-db";
 import { STOREFRONT_TEMPLATES, getTemplate, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
 import { sanitizeBlocks, sanitizePages } from "./storefront-blocks";
@@ -57,8 +58,8 @@ Homepage order: announcement, hero, featured, an about/story text section (use s
  try {
  const r = await anthropic({ model: MODEL, max_tokens: 4000, system: sys, messages: [{ role: "user", content: prompt }] });
  const text = (r.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
- const m = text.match(/\{[\s\S]*\}/);
- gen = JSON.parse(m ? m[0] : text);
+ const m = extractFirstJsonObject(text);
+ gen = JSON.parse(m ?? text);
  } catch {
  return { ok: false, blocks: 0, pages: 0, error: "Generation failed — please try again." };
  }

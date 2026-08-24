@@ -3,6 +3,7 @@ import { put } from "@vercel/blob";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { draftListing, isIntakeConfigured, PROMPT_VERSION } from "@/app/lib/ai-intake";
 import { rnToBrand, learnRnBrand } from "@/app/lib/rn-lookup";
+import { reconcileBrand, brandQuestion, reconcileGarment, garmentQuestion, garmentFromMatches, type BrandCandidate } from "@/app/lib/brand-reconcile";
 import { titleHasBrand, computeListingPricing } from "@/app/lib/intake-pricing";
 import { ghostMannequinFromUrl, isPhotoroomConfigured } from "@/app/lib/photoroom";
 import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
@@ -11,6 +12,7 @@ import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, re
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
 import { reverseImageBestOf, reverseImageTiered, matchesToComps, editorialCaptions, partitionByVisualMatch, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { verifyMatchPrices } from "@/app/lib/comp-price-verify";
+import { recoverBlockedPrices } from "@/app/lib/price-via-search";
 import { getCachedLinkPrice, saveCachedLinkPrice } from "@/app/lib/link-price-cache-db";
 import { recordSuggestion } from "@/app/lib/price-suggestions-db";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
@@ -27,7 +29,7 @@ const AI_GATE = () => gate("intake-ai", Number(process.env.INTAKE_AI_CONCURRENCY
 // The reverse-image matches are the same piece found across the web, so their titles
 // carry the real brand. Run each through the canonical brand matcher and take the
 // consensus — deterministic, so we don't depend on the model choosing to trust them.
-function brandFromMatches(matches: VisualMatch[]): { brand: string | null; hits: number } {
+function brandFromMatches(matches: VisualMatch[]): { brand: string | null; hits: number; verified: number } {
  const tally = new Map<string, number>();
  for (const m of matches) {
  const b = inferBrandFromTitle(m.title);
@@ -35,7 +37,15 @@ function brandFromMatches(matches: VisualMatch[]): { brand: string | null; hits:
  }
  let brand: string | null = null, hits = 0;
  for (const [b, n] of tally) if (n > hits) { brand = b; hits = n; }
- return { brand, hits };
+ // How many of those matches are actually THIS GARMENT rather than one that looks like it.
+ // Lens agreeing with itself is not corroboration when it is matching a SILHOUETTE: a Valentino
+ // scallop-hem tube top returned several Staud tube tops, "consensus" said Staud at high
+ // confidence, and no question fired — while the valuation's own rationale on the same screen read
+ // "No same-piece evidence exists". Unverified agreement is a look-alike cluster, not evidence.
+ const verified = brand
+  ? matches.filter((m) => inferBrandFromTitle(m.title) === brand && (m.visuallyVerified === true || (m.similarity ?? 0) >= 0.9)).length
+  : 0;
+ return { brand, hits, verified };
 }
 
 // titleHasBrand + extractRunway now live in ./intake-pricing (shared with the phase-2 endpoint).
@@ -204,7 +214,7 @@ export async function POST(request: NextRequest) {
  if (exact.era && !has("era")) draft.era = { value: exact.era, confidence: 0.95 };
  if (exact.material && !has("material")) draft.material = { value: exact.material, confidence: 0.9 };
  if (exact.condition && !has("condition")) { draft.condition = { value: exact.condition, confidence: 0.9 }; if (!draft.conditionGrade) draft.conditionGrade = exact.condition; }
- if (exact.category && !has("category")) draft.category = exact.category;
+ if (exact.category && !has("category")) draft.category = { value: exact.category, confidence: 0.9 };
  if (exact.brand && !has("brand")) draft.brand = { value: exact.brand, confidence: 0.95 };
  }
 
@@ -224,18 +234,65 @@ export async function POST(request: NextRequest) {
  //   2. reverse-image (Lens) consensus — overrides the model's uncertainty.
  //   3. the model's own visual inference (already in draft.brand).
  const idBrand = brandFromMatches(matches);
- let labelBrand: string | null = null;
- if (draft && !has("brand")) {
- const tagBrand = draft.tag?.brandText?.trim() || null;
- const rnBrand = !tagBrand && draft.tag?.rn ? await rnToBrand(draft.tag.rn).catch(() => null) : null;
- labelBrand = tagBrand || rnBrand;
- if (labelBrand) draft.brand = { value: labelBrand, confidence: 0.92 }; // printed label = high confidence
+ // Each source is captured SEPARATELY and reconciled below — nothing overwrites anything here.
+ // The model's own read has to be read off first, because the reconciliation writes draft.brand.
+ const visionBrand = draft?.brand?.value?.trim() || null;
+ const visionConf = draft?.brand?.confidence ?? 0;
+ const tagBrandText = draft?.tag?.brandText?.trim() || null;
+ const rnResolved = !tagBrandText && draft?.tag?.rn ? await rnToBrand(draft.tag.rn).catch(() => null) : null;
+ const labelBrand = tagBrandText || rnResolved;
+ // ── Reconcile every brand guess into ONE answer ──
+ // Previously each source overwrote the last and the survivor was stated at full confidence, which
+ // is how a single dress came back labelled Dior in the field, Sue Wong in the title and Prada in
+ // the match banner. Now they are weighed together: physical evidence (label, RN) wins outright,
+ // agreeing inferences earn a lift, and DISAGREEING inferences produce a question instead of a
+ // winner. See brand-reconcile.ts.
+ let brandQ: ReturnType<typeof brandQuestion> = null;
+ let garmentQ: ReturnType<typeof garmentQuestion> = null;
+ if (draft) {
+ const candidates: BrandCandidate[] = [];
+ if (has("brand")) candidates.push({ source: "seller", value: val("brand"), confidence: 1 });
+ if (tagBrandText) candidates.push({ source: "label", value: tagBrandText, confidence: 0.92 });
+ if (rnResolved) candidates.push({ source: "rn", value: rnResolved, confidence: 0.9 });
+ if (idBrand.brand) {
+  // Only same-piece-confirmed agreement earns real confidence. Without it, however many titles
+  // name the brand, all we know is that the garment RESEMBLES that label's work — which is exactly
+  // how a Valentino top was stated as Staud without a question.
+  const lensConf = idBrand.verified >= 1 ? (idBrand.hits >= 2 ? 0.85 : 0.7) : 0.55;
+  candidates.push({ source: "lens", value: idBrand.brand, confidence: lensConf, hits: idBrand.hits });
  }
- // Lens consensus only when the label didn't already pin the brand.
- if (draft && idBrand.brand && !has("brand") && !labelBrand) {
- const cur = draft.brand?.value || "";
- const disagrees = !cur || draft.brand.confidence < 0.7 || !cur.toLowerCase().includes(idBrand.brand.toLowerCase());
- if (disagrees) draft.brand = { value: idBrand.brand, confidence: idBrand.hits >= 2 ? 0.85 : 0.6 };
+ if (visionBrand) candidates.push({ source: "vision", value: visionBrand, confidence: visionConf });
+
+ const decision = reconcileBrand(candidates);
+ // A brand we are not confident enough to state is left BLANK rather than filled in. An empty
+ // field the seller completes beats a confident wrong label — which is what the intake system
+ // prompt already instructs, and what this code used to undo.
+ draft.brand = decision.needsQuestion && decision.confidence < 0.5
+  ? { value: null, confidence: decision.confidence }
+  : { value: decision.value, confidence: decision.confidence };
+ brandQ = brandQuestion(decision);
+
+ // ── Same treatment for the GARMENT TYPE ──
+ // This word drives every comp search, so a wrong one prices a different product: a top read as a
+ // "strapless mini dress" searched dresses four times and came back $689. The reverse-image titles
+ // are a second, independent opinion on what the thing is — bucketed through the same canonical
+ // taxonomy the rest of the platform uses.
+ const gDecision = reconcileGarment({
+  seller: has("category") ? val("category") : null,
+  vision: draft.category?.value ?? null,
+  visionConfidence: draft.category?.confidence ?? 0.5,
+  lens: garmentFromMatches(matches.map((m) => String(m.title || ""))),
+ });
+ if (gDecision.value && !has("category")) {
+  draft.category = { value: gDecision.value, confidence: gDecision.confidence };
+ }
+ garmentQ = garmentQuestion(gDecision);
+ if (gDecision.conflict) {
+  console.log(`[intake ${slug}] garment unresolved — ${gDecision.reason}`);
+ }
+ if (decision.conflict || decision.needsQuestion) {
+  console.log(`[intake ${slug}] brand unresolved — ${decision.reason}; considered ${decision.considered.map((x) => `${x.source}:${x.value}`).join(", ")}`);
+ }
  }
  // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label —
  // learn it so a later faded-name/legible-RN tag can still resolve. (Not circular: two OCR'd facts.)
@@ -285,7 +342,15 @@ export async function POST(request: NextRequest) {
  const linkVerified = process.env.VYA_LINK_VERIFY_ENABLED === "true"
  ? await verifyMatchPrices(finalPricingMatches, { getCached: getCachedLinkPrice, saveCached: saveCachedLinkPrice }).catch(() => finalPricingMatches)
  : finalPricingMatches;
- const reverseComps = matchesToComps(linkVerified);
+ // Last resort for the strongest comps: a same-piece listing we could not READ. Vestiaire returns
+ // 403 on both subdomains, gem.app returns an empty 202, Depop serves a block page — and those are
+ // exactly where the right garment tends to be listed. SerpApi is never blocked and Google has
+ // already crawled those pages, so ask Google for the price instead of fighting the site.
+ // Measured on the case that prompted it: a Vestiaire koi top we could not open came back $580.
+ const priceRecovered = process.env.VYA_LINK_VERIFY_ENABLED === "true"
+ ? await recoverBlockedPrices(linkVerified).catch(() => linkVerified)
+ : linkVerified;
+ const reverseComps = matchesToComps(priceRecovered);
  const reverseTitles = finalPricingMatches.map((m) => m.title);
  // Editorial/Getty captions from the FULL match set (not brand-filtered) — provenance evidence
  // for runway season + celebrity "worn by", which rarely repeat the brand in the caption.
@@ -297,7 +362,7 @@ export async function POST(request: NextRequest) {
  title: has("title") ? val("title") : (draft?.title || ""),
  era: has("era") ? val("era") : (draft?.era?.value || ""),
  material: has("material") ? val("material") : (draft?.material?.value || ""),
- category: has("category") ? val("category") : (draft?.category || ""),
+ category: has("category") ? val("category") : (draft?.category?.value || ""),
  condition: has("condition") ? val("condition") : (draft?.condition?.value || ""),
  conditionGrade: has("condition") ? val("condition") : (draft?.conditionGrade || draft?.condition?.value || ""),
  searchQuery: specific?.query || draft?.searchQuery || null,
@@ -330,7 +395,7 @@ export async function POST(request: NextRequest) {
   storeSlug: slug,
   title: has("title") ? val("title") : (draft?.title || null),
   brand: resolvedBrand || null,
-  category: has("category") ? val("category") : (draft?.category || null),
+  category: has("category") ? val("category") : (draft?.category?.value || null),
   suggestedCents: estimate.suggestedCents,
   marketCents: estimate.marketCents,
   lowCents: estimate.lowCents,
@@ -358,7 +423,7 @@ export async function POST(request: NextRequest) {
  era: (has("era") ? val("era") : (draft?.era?.value || exact?.era)) || null,
  material: (has("material") ? val("material") : (draft?.material?.value || exact?.material)) || null,
  condition: (has("condition") ? val("condition") : (draft?.condition?.value || exact?.condition)) || null,
- category: (has("category") ? val("category") : (draft?.category || exact?.category)) || null,
+ category: (has("category") ? val("category") : (draft?.category?.value || exact?.category)) || null,
  priceCents: estimate?.suggestedCents ?? null,
  marketCents: estimate?.marketCents ?? null,
  promptVersion: PROMPT_VERSION,
@@ -367,6 +432,11 @@ export async function POST(request: NextRequest) {
 
  return NextResponse.json({
  ok: true, draft, ghostUrl, photoroom: isPhotoroomConfigured(), estimate, priceFlag, runway, celebrity, embedding, promptVersion: PROMPT_VERSION,
+ // One question, only when the brand genuinely couldn't be pinned down. null the rest of the time —
+ // most items should never see it. The client renders it under the brand field.
+ // Garment type first: it drives every comp search, so getting it wrong prices a different
+ // product entirely. At most two, usually none.
+ questions: [garmentQ, brandQ].filter(Boolean),
  // Near-duplicate recall marker — for a "✓ Recognized — same piece you listed" cue in the UI.
  recalled: exact ? { title: exact.title, similarity: exact.similarity, ageDays: exact.ageDays, ownStore: exact.ownStore, source: exact.source } : null,
  // For phase 2 (/api/store/intake/pricing): the reverse-image comps/titles + whether the draft ran.

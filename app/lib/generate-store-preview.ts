@@ -1,4 +1,5 @@
 import { AI_MODELS } from "./ai-models";
+import { extractFirstJsonObject } from "./json-extract.ts";
 import { STOREFRONT_TEMPLATES } from "./storefront-templates";
 
 // Powers the landing-page "Describe it → build my store" trial. Turns a one-sentence shop
@@ -75,7 +76,7 @@ Match the template to the vibe. Make the name and tagline specific and true to t
  let ai: { storeName?: string; tagline?: string; template?: string } = {};
  const raw = await anthropic({ model: MODEL, max_tokens: 300, system: sys, messages: [{ role: "user", content: prompt }] });
  if (raw) {
- try { const m = raw.match(/\{[\s\S]*\}/); ai = JSON.parse(m ? m[0] : raw); } catch { /* fall through */ }
+ try { const m = extractFirstJsonObject(raw); ai = JSON.parse(m ?? raw); } catch { /* fall through */ }
  }
 
  // A name the seller explicitly wrote wins over anything the model invented.

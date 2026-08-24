@@ -120,8 +120,12 @@ const BY_LABEL = new Map<string, CategorySlug>(
  * or a synonym. Returns null when there's nothing recognisable (so callers can show "Uncategorised"
  * rather than guessing).
  */
-export function toCategorySlug(raw: string | null | undefined): CategorySlug | null {
- const lower = (raw || "").toLowerCase().trim();
+export function toCategorySlug(raw: unknown): CategorySlug | null {
+ // Defensive on TYPE, not just on null. This threw "toLowerCase is not a function" in production
+ // when `draft.category` changed from a bare string to {value, confidence}: several callers pass
+ // API payloads straight in, and one of them cast the array to `string[]`, which hid the mismatch
+ // from the compiler entirely. A tag helper should never be the thing that takes a page down.
+ const lower = (typeof raw === "string" ? raw : "").toLowerCase().trim();
  if (!lower) return null;
  if (Object.prototype.hasOwnProperty.call(categoryMap, lower)) return lower as CategorySlug;
  const byLabel = BY_LABEL.get(lower);
