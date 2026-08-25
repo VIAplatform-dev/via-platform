@@ -458,12 +458,18 @@ const BAG_MODELS = [
  *  sold listing, so eBay returns nothing and the pricer falls back to inflated asking prices. */
 export function compactQuery(query: string): string {
  let q = " " + query.toLowerCase() + " ";
+ // "bag"/"purse"/"tote" is noise ONLY when the query already names a distinctive model — the case
+ // this strip was written for, where "Chanel Classic Flap Bag" searches better as "chanel classic
+ // flap". On a piece with no model name the noun IS the item, and stripping it turned
+ // "Y2K martini bag" into a search for a cocktail and "Vintage NYC Cigar Box purse" into a search
+ // for a cigar box. Every unbranded bag in the catalogue was being priced off the wrong query.
+ const namesAModel = BAG_MODELS.some((m) => q.includes(` ${m} `) || q.includes(` ${m}s `));
  q = q
   .replace(/\b(ruthenium|gunmetal|palladium|brushed|antiqued?|aged|light\s+gold|gold|silver)\s+hardware\b/g, " ")
   .replace(/\bhardware\b/g, " ")
   .replace(/\b(vertical|diagonal|horizontal)\s+stitch(ing)?\b/g, " ")
   .replace(/\b(authentic|genuine|pre[-\s]?owned|preowned|nwt|nwot|brand\s+new|excellent|very\s+good|good\s+condition|mint|rare|iconic|stunning|beautiful|gorgeous)\b/g, " ")
-  .replace(/\b(bag|handbag|purse|pouch|tote)\b/g, " ")
+  .replace(/\b(bag|handbag|purse|pouch|tote)\b/g, (w) => (namesAModel ? " " : w))
   .replace(/\b(with|and|the|a|an|in|for|of|by)\b/g, " ")
   .replace(/[^\w\s&-]/g, " ")
   .replace(/\s+/g, " ")
@@ -621,6 +627,23 @@ async function _fetchResaleTrendUncached(query: string): Promise<ResaleTrend | n
 // Cache by query (brand+category) for a week: a brand's search-trend momentum barely moves
 // week to week and is shared across every listing of that brand — so this collapses the cost
 // from one SerpApi call per listing to roughly one call per brand per week.
-export const fetchResaleTrend = unstable_cache(_fetchResaleTrendUncached, ["resale-trend"], {
+const _cachedResaleTrend = unstable_cache(_fetchResaleTrendUncached, ["resale-trend"], {
  revalidate: 604800, // 7 days
 });
+
+// Same trap as the golden set: outside a Next request `unstable_cache` throws, the caller's
+// `.catch(() => null)` swallows it, and the trend signal vanishes from every script-run eval
+// without a word. In-process memo for the same week.
+const TREND_MEMO_MS = 604800_000;
+const trendMemo = new Map<string, { at: number; value: ResaleTrend | null }>();
+export async function fetchResaleTrend(query: string): Promise<ResaleTrend | null> {
+ try {
+  return await _cachedResaleTrend(query);
+ } catch {
+  const hit = trendMemo.get(query);
+  if (hit && Date.now() - hit.at < TREND_MEMO_MS) return hit.value;
+  const value = await _fetchResaleTrendUncached(query);
+  trendMemo.set(query, { at: Date.now(), value });
+  return value;
+ }
+}

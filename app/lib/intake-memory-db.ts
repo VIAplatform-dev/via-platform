@@ -324,21 +324,32 @@ export async function getBrandPrior(brand: string | null | undefined): Promise<s
 const parseVec = (s: string): number[] => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; } };
 const VISUAL_MATCH_MIN = 0.72; // tighter than the label-hint threshold — pricing needs close matches
 
-export async function getVisualVyaComps(embedding: number[], limit = 8): Promise<Comp[]> {
+export async function getVisualVyaComps(
+ embedding: number[],
+ limit = 8,
+ // Leak guards, for the price eval only. Corpus 1 IS the eval's answer key (sold_items), so
+ // without these an item is handed its own realized price as a comp and scores a perfect hit.
+ opts?: { excludeSoldId?: number | null; excludeNearIdentical?: boolean },
+): Promise<Comp[]> {
  if (!embedding || embedding.length === 0) return [];
  await ensureItemsTable();
  await ensureSoldEmbeddingCol();
  const scored: { score: number; comp: Comp }[] = [];
+ const excludeId = opts?.excludeSoldId ?? null;
 
  // Corpus 1 — REAL sold pieces (actual realized price + how fast it sold). The strongest comp.
  const sold = (await db()`
-  SELECT designer, final_price, embedding FROM sold_items
+  SELECT id, designer, final_price, embedding FROM sold_items
   WHERE embedding IS NOT NULL AND embedding <> '[]' AND final_price > 0
   ORDER BY sold_at DESC LIMIT 1500
- `.catch(() => [])) as { designer: string | null; final_price: number; embedding: string }[];
+ `.catch(() => [])) as { id: number; designer: string | null; final_price: number; embedding: string }[];
  for (const r of sold) {
+ if (excludeId != null && Number(r.id) === excludeId) continue; // never comp an item against itself
  const v = parseVec(r.embedding); if (!v.length) continue;
  const score = cosine(embedding, v); if (score < VISUAL_MATCH_MIN) continue;
+ // A near-duplicate photo is the SAME physical piece re-listed, not a comparable one. In production
+ // that is a feature (recall); in the eval it is the answer key wearing a disguise.
+ if (opts?.excludeNearIdentical && score >= NEAR_DUP_MIN) continue;
  scored.push({ score, comp: { title: r.designer || "similar VYA piece", priceCents: Math.round(Number(r.final_price) * 100), currency: "USD", sold: true, source: "VYA (sold)" } });
  }
 

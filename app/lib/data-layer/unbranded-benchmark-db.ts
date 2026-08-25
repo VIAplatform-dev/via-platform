@@ -53,7 +53,7 @@ function categoryOf(title: string, stored: string | null): string {
 // richer than the pilot OS `items` table. Cached for an hour: the set barely moves minute-to-minute
 // and this scan feeds both the report and the per-price benchmark lookup. Prices are ASKING (live
 // listings), which is exactly "how the stores price these pieces".
-const fetchGoldenRows = unstable_cache(
+const loadGoldenRows = (
  async (): Promise<Row[]> => {
  const sql = db();
  const rows = (await sql`
@@ -75,10 +75,77 @@ const fetchGoldenRows = unstable_cache(
  });
  }
  return out;
- },
- ["unbranded-golden-rows-v1"],
- { revalidate: 3600 },
+ }
 );
+
+const cachedGoldenRows = unstable_cache(loadGoldenRows, ["unbranded-golden-rows-v1"], { revalidate: 3600 });
+
+// `unstable_cache` only works inside a Next request. Called from a script — the price eval, a cron,
+// anything on the CLI — it THROWS, and every caller here wraps the lookup in `.catch(() => null)`.
+// The result was silent: the golden set, the single strongest anchor for an unbranded piece, was
+// simply absent from every measurement ever taken, while production had it the whole time. So:
+// fall back to an in-process memo with the same hour-long life.
+const MEMO_MS = 3600_000;
+let memo: { at: number; rows: Row[] } | null = null;
+async function fetchGoldenRows(): Promise<Row[]> {
+ try {
+  return await cachedGoldenRows();
+ } catch {
+  if (memo && Date.now() - memo.at < MEMO_MS) return memo.rows;
+  const rows = await loadGoldenRows();
+  memo = { at: Date.now(), rows };
+  return rows;
+ }
+}
+
+type SoldRow = Row & { soldId: number };
+
+// ── THE SECOND CORPUS: what buyers actually PAID ──
+// The golden set above is built from live listings, i.e. asking prices — what stores hope to get.
+// Measured against the eval's realized sales it anchors ~31% low, which is the same direction as
+// the bias it is supposed to correct. VYA now has ~1,400 real sales with known prices, ~550 of them
+// unbranded, so the anchor can be built from money that actually changed hands instead.
+// Answer-key hygiene matches eval-price.ts: nothing under $15, no deep-markdown blowouts.
+const loadSoldRows = async (): Promise<SoldRow[]> => {
+ const sql = db();
+ const rows = (await sql`
+  SELECT id, store_slug, store_name, title, designer, product_type, final_price
+  FROM sold_items
+  WHERE final_price > 0 AND final_price * 100 >= 1500
+    AND (original_price IS NULL OR original_price <= 0 OR final_price >= original_price * 0.5)
+ `.catch(() => [])) as Array<Record<string, unknown>>;
+ const out: SoldRow[] = [];
+ for (const r of rows) {
+  const title = (r.title as string) || "";
+  // Shopify feeds default `vendor` to the STORE's own name — the same guard the pricer uses.
+  const stored = ((r.designer as string) || "").trim();
+  const isStoreName = stored.toLowerCase() === String(r.store_name || "").trim().toLowerCase();
+  const effBrand = inferBrandFromTitle(title) || (isStoreName ? null : stored || null);
+  if (classifyBrand(effBrand) === "known") continue;
+  out.push({
+   soldId: Number(r.id),
+   brand: effBrand,
+   material: null, // sold_items carries no fibre column, so this corpus buckets by category alone
+   category: categoryOf(title, (r.product_type as string) ?? null),
+   priceCents: Math.round(Number(r.final_price) * 100),
+   sellerId: String(r.store_slug),
+  });
+ }
+ return out;
+};
+
+const cachedSoldRows = unstable_cache(loadSoldRows, ["unbranded-sold-rows-v1"], { revalidate: 3600 });
+let soldMemo: { at: number; rows: SoldRow[] } | null = null;
+async function fetchSoldRows(): Promise<SoldRow[]> {
+ try {
+  return await cachedSoldRows();
+ } catch {
+  if (soldMemo && Date.now() - soldMemo.at < MEMO_MS) return soldMemo.rows;
+  const rows = await loadSoldRows();
+  soldMemo = { at: Date.now(), rows };
+  return rows;
+ }
+}
 
 export type UnbrandedSegment = {
  category: string;
@@ -129,34 +196,40 @@ export async function getUnbrandedPricingReport(): Promise<{
  };
 }
 
-export type UnbrandedBenchmark = { segment: string; medianCents: number; p25Cents: number; p75Cents: number; count: number; storeCount: number };
+export type UnbrandedBenchmark = { segment: string; medianCents: number; p25Cents: number; p75Cents: number; count: number; storeCount: number;
+ /** "sold" = realized prices (preferred); "asking" = live-listing prices, the weaker fallback. */
+ basis: "sold" | "asking" };
 
 /** Golden-set anchor for pricing a NEW unbranded piece: the median + range of comparable VYA
  *  unbranded pieces in the same category × material tier. Falls back to the category across all
  *  tiers when the tiered segment is thin, then to null (caller keeps its material-reasoning path). */
-export async function getUnbrandedBenchmark(opts: { category: string | null; material: string | null }): Promise<UnbrandedBenchmark | null> {
+export async function getUnbrandedBenchmark(opts: { category: string | null; material: string | null; excludeSoldId?: number | null }): Promise<UnbrandedBenchmark | null> {
  const cat = (opts.category || "").toLowerCase().trim();
  if (!cat) return null;
+ const storesOf = (rs: { sellerId: string }[]) => new Set(rs.map((r) => r.sellerId)).size;
+ const summarise = (rows: { priceCents: number; sellerId: string }[], seg: string, basis: "sold" | "asking"): UnbrandedBenchmark => {
+  const s = rows.map((r) => r.priceCents).sort((a, z) => a - z);
+  return { segment: seg, medianCents: quantile(s, 0.5), p25Cents: quantile(s, 0.25), p75Cents: quantile(s, 0.75), count: s.length, storeCount: storesOf(rows), basis };
+ };
+
+ // ── Preferred: what the market actually PAID for comparable unbranded pieces. ──
+ // excludeSoldId keeps the price eval honest: an item must never sit inside its own anchor.
+ const soldRows = (await fetchSoldRows().catch(() => [] as SoldRow[]))
+  .filter((r) => r.category === cat && (opts.excludeSoldId == null || r.soldId !== opts.excludeSoldId));
+ if (soldRows.length >= MIN_ITEMS && storesOf(soldRows) >= MIN_STORES) {
+  return summarise(soldRows, `unbranded ${cat} · sold on VYA`, "sold");
+ }
+
+ // ── Fallback: asking prices on live inventory. Deeper, but it measures hope, not transactions. ──
  const tier = materialTier(opts.material).tier ?? "unknown";
  const rows = await fetchGoldenRows();
  const inCat = rows.filter((r) => r.category === cat);
  const tiered = inCat.filter((r) => (materialTier(r.material).tier ?? "unknown") === tier);
- const storesOf = (rs: Row[]) => new Set(rs.map((r) => r.sellerId)).size;
- // Prefer the material-tiered segment, then the whole category — each only if it's both deep
- // enough AND spans >1 store (else it's just one store's pricing, not a market anchor).
  const pick = tiered.length >= MIN_ITEMS && storesOf(tiered) >= MIN_STORES
- ? { rows: tiered, seg: `unbranded ${cat} · ${tier === "unknown" ? "unspecified fiber" : `${tier} fiber`}` }
- : inCat.length >= MIN_ITEMS && storesOf(inCat) >= MIN_STORES
- ? { rows: inCat, seg: `unbranded ${cat}` }
- : null;
+  ? { rows: tiered, seg: `unbranded ${cat} · ${tier === "unknown" ? "unspecified fiber" : `${tier} fiber`}` }
+  : inCat.length >= MIN_ITEMS && storesOf(inCat) >= MIN_STORES
+  ? { rows: inCat, seg: `unbranded ${cat}` }
+  : null;
  if (!pick) return null;
- const s = pick.rows.map((r) => r.priceCents).sort((a, z) => a - z);
- return {
- segment: pick.seg,
- medianCents: quantile(s, 0.5),
- p25Cents: quantile(s, 0.25),
- p75Cents: quantile(s, 0.75),
- count: s.length,
- storeCount: new Set(pick.rows.map((r) => r.sellerId)).size,
- };
+ return summarise(pick.rows, pick.seg, "asking");
 }

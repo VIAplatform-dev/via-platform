@@ -10,10 +10,8 @@ import { getVoice, buildStoreVoice } from "@/app/lib/store-voice";
 import { getStoreBrief, briefVoiceDirectives } from "@/app/lib/store-brief-db";
 import { getIntakeHints, getVisualHints, getCrossStoreSimilar, getBrandPrior, resolveSpecificPiece, resolveExactPiece, rememberDraftResolution } from "@/app/lib/intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
-import { reverseImageBestOf, reverseImageTiered, matchesToComps, editorialCaptions, partitionByVisualMatch, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
-import { verifyMatchPrices } from "@/app/lib/comp-price-verify";
-import { recoverBlockedPrices } from "@/app/lib/price-via-search";
-import { getCachedLinkPrice, saveCachedLinkPrice } from "@/app/lib/link-price-cache-db";
+import { reverseImageBestOf, reverseImageTiered, matchesToComps, editorialCaptions, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
+import { researchComps, describeResearch } from "@/app/lib/comp-research";
 import { recordSuggestion } from "@/app/lib/price-suggestions-db";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
@@ -317,40 +315,14 @@ export async function POST(request: NextRequest) {
  // dress lost all 8 of its priced matches because their titles ("Pink Polka Dot Swing Dress")
  // never said Valentino, even though they were the same dress. A visual match outranks a title
  // match; a title match is only the fallback for matches with no thumbnail to compare.
- const vis = await partitionByVisualMatch(matches, { queryEmbedding: embedding }).catch(
-  () => ({ verified: [], rejected: [], unchecked: matches, ran: false }),
- );
- const brandOf = (ms: VisualMatch[]) => (resolvedBrand ? ms.filter((m) => titleHasBrand(m.title, resolvedBrand)) : []);
- let finalPricingMatches: VisualMatch[];
- if (vis.ran) {
- // Visually-confirmed same-piece matches are kept on their own merit, brand text or not.
- // Everything unscoreable still has to earn its place via the brand filter. Rejected = dropped.
- const uncheckedKept = brandOf(vis.unchecked);
- finalPricingMatches = [...vis.verified, ...uncheckedKept];
- // If the image check cleared nothing and brand text cleared nothing, don't price off an empty
- // set — fall back to the old behaviour rather than losing every comp.
- if (!finalPricingMatches.length) finalPricingMatches = brandOf(matches).length ? brandOf(matches) : relevantMatches;
- console.log(`[intake] visual-first: verified=${vis.verified.length} unchecked-kept=${uncheckedKept.length} rejected=${vis.rejected.length}`);
- } else {
- // No embedding signal (key missing/invalid, no thumbnails) — brand text is all we have.
- const brandFiltered = brandOf(matches);
- finalPricingMatches = brandFiltered.length ? brandFiltered : relevantMatches;
- }
- // Link price-verify (flag-gated): Lens returns many true matches with NO price (Google simply
- // lacks merchant data for boutique stores) — fetch those product pages and recover price +
- // currency + sold status from their structured data. Best-effort: failures leave matches as-is.
- const linkVerified = process.env.VYA_LINK_VERIFY_ENABLED === "true"
- ? await verifyMatchPrices(finalPricingMatches, { getCached: getCachedLinkPrice, saveCached: saveCachedLinkPrice }).catch(() => finalPricingMatches)
- : finalPricingMatches;
- // Last resort for the strongest comps: a same-piece listing we could not READ. Vestiaire returns
- // 403 on both subdomains, gem.app returns an empty 202, Depop serves a block page — and those are
- // exactly where the right garment tends to be listed. SerpApi is never blocked and Google has
- // already crawled those pages, so ask Google for the price instead of fighting the site.
- // Measured on the case that prompted it: a Vestiaire koi top we could not open came back $580.
- const priceRecovered = process.env.VYA_LINK_VERIFY_ENABLED === "true"
- ? await recoverBlockedPrices(linkVerified).catch(() => linkVerified)
- : linkVerified;
- const reverseComps = matchesToComps(priceRecovered);
+ const research = await researchComps(matches, {
+  queryEmbedding: embedding,
+  brand: resolvedBrand,
+  fallback: relevantMatches,
+ });
+ const finalPricingMatches = research.matches;
+ console.log(`[intake ${slug}] comps: ${describeResearch(research)}`);
+ const reverseComps = matchesToComps(finalPricingMatches);
  const reverseTitles = finalPricingMatches.map((m) => m.title);
  // Editorial/Getty captions from the FULL match set (not brand-filtered) — provenance evidence
  // for runway season + celebrity "worn by", which rarely repeat the brand in the caption.

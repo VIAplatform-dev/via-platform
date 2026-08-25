@@ -5,7 +5,11 @@
 class Semaphore {
  private active = 0;
  private queue: Array<() => void> = [];
- constructor(private max: number) {}
+ // Written out longhand rather than as a constructor parameter property: Node's built-in TS
+ // support is strip-only, and a parameter property makes every module that transitively imports
+ // this one unloadable under `node --test` — which is the whole test suite for the pricing path.
+ private max: number;
+ constructor(max: number) { this.max = max; }
 
  async run<T>(fn: () => Promise<T>): Promise<T> {
  if (this.active >= this.max) await new Promise<void>((resolve) => this.queue.push(resolve));

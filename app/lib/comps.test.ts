@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verifyMatchesByImage, matchesToComps, priceToCents, pickRetailerRows, VESTIAIRE_SOURCE, parseEbayRows, sourceTier, partitionByVisualMatch, reverseImageTiered } from "./comps.ts";
+import { verifyMatchesByImage, matchesToComps, priceToCents, pickRetailerRows, VESTIAIRE_SOURCE, parseEbayRows, sourceTier, partitionByVisualMatch, reverseImageTiered, compactQuery } from "./comps.ts";
 
 // ── exact-piece comps ──
 // A Versace S/S 2005 runway dress had NINE listings of itself at $1,733–$3,200, and priced at
@@ -243,4 +243,17 @@ test("reverseImageTiered falls back to category + material when there is no bran
  const search = async (_u: string, q?: string) => { queries.push(q); return [vm("x", 1)]; };
  await reverseImageTiered("https://img", { brand: null, category: "dresses", material: "silk", search, verifyAll: true });
  assert.deepEqual(queries, [undefined, "silk dress"], "unbranded pieces skip the brand tier entirely");
+});
+
+// ── eBay query compaction ──
+test("the garment noun survives when the query names no bag model", () => {
+ // Stripping "bag" here left "y2k martini" — VYA paid for that eBay search on a real listing.
+ assert.equal(compactQuery("Y2K martini bag"), "y2k martini bag");
+ assert.equal(compactQuery("Vintage NYC Cigar Box purse"), "vintage nyc cigar box purse");
+});
+
+test("the generic noun is still dropped when a distinctive model carries the query", () => {
+ // The case the strip was written for: the model name is what matches a sold listing.
+ assert.equal(compactQuery("Chanel Classic Flap Bag"), "chanel classic flap");
+ assert.equal(compactQuery("Louis Vuitton Neverfull tote"), "louis vuitton neverfull");
 });

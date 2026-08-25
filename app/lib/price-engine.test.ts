@@ -104,3 +104,23 @@ test("an unknown independent dealer is still treated as a specialist", async () 
  // The fallback has to stay generous — most archival dealers are small sites we've never seen.
  assert.equal(sourceTier("somevintagearchive.com"), "specialist");
 });
+
+// ── query construction ──
+// These two bugs were found by reading the SerpApi log, not the code: every search VYA had ever
+// paid for on an unbranded piece was built from a query no shopper would type.
+
+test("a database category slug is never pasted into a search query", () => {
+ // "Emilio Pucci blue and white tshirt other-clothing" was a real, paid-for Google Shopping search.
+ assert.equal(brandFirstQuery("blue and white tshirt", "Emilio Pucci", "other-clothing"), "Emilio Pucci blue and white tshirt");
+ assert.equal(brandFirstQuery("1990s silk piece", null, "uncategorized"), "1990s silk piece");
+});
+
+test("a compound category slug contributes a real word, not the hyphenated label", () => {
+ assert.equal(brandFirstQuery("Burberry 1980s check", "Burberry", "coats-jackets"), "Burberry 1980s check coat");
+});
+
+test("a garment word already in the query stops the category being appended", () => {
+ assert.equal(brandFirstQuery("Valentino polka dot dress", "Valentino", "dresses"), "Valentino polka dot dress");
+ // "tshirt" without the hyphen used to fail the garment-word check, so the slug got appended anyway.
+ assert.equal(brandFirstQuery("Pucci tshirt", "Pucci", "tops"), "Pucci tshirt");
+});

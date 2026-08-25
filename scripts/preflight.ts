@@ -48,6 +48,24 @@ async function main() {
   if (typeof left === "number" && left < 200) add("SERPAPI quota", false, `only ${left} searches left — a 40-item run needs ~120`);
  }
 
+ // ── VOYAGE — same-piece detection. A dead key here does not error: partitionByVisualMatch
+ // reports ran=false, every look-alike survives, and the pricer values the item off whatever
+ // Lens happened to return. This key was revoked for a full day before anyone noticed. ──
+ const voyage = present("VOYAGE_API_KEY");
+ if (voyage) {
+  const r = await fetch("https://api.voyageai.com/v1/multimodalembeddings", {
+   method: "POST",
+   headers: { Authorization: `Bearer ${voyage}`, "content-type": "application/json" },
+   body: JSON.stringify({ model: "voyage-multimodal-3", inputs: [{ content: [{ type: "text", text: "preflight" }] }] }),
+  }).catch((e) => ({ ok: false, status: 0, statusText: String(e) }) as Response);
+  add("VOYAGE_API_KEY", r.ok, r.ok ? "authenticates" : `HTTP ${r.status} — same-piece detection is DEAD; look-alikes will price the item`);
+ }
+
+ // ── LINK VERIFY — the flag that decides whether we ever open a listing to read its price, and
+ // whether a blocked host gets its price recovered via search. Unset = both steps silently skipped. ──
+ const lv = (process.env.VYA_LINK_VERIFY_ENABLED || "").trim() === "true";
+ add("VYA_LINK_VERIFY_ENABLED", lv, lv ? 'is "true"' : `is ${JSON.stringify(process.env.VYA_LINK_VERIFY_ENABLED ?? "")} — listing pages will not be opened and blocked prices will not be recovered`);
+
  // ── DATABASE ──
  const dbUrl = present("DATABASE_URL");
  if (dbUrl) {

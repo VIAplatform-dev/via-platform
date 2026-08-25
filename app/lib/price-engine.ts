@@ -4,7 +4,7 @@ import { cleanQuery, explainClean } from "./query-clean.ts";
 import { getCachedComps, saveComps, getVyaComps, newestCompAgeDays } from "./comp-cache-db.ts";
 import { inferCategoryFromTitle } from "./loadStoreProducts.ts";
 import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db.ts";
-import { getUnbrandedBenchmark } from "./data-layer/unbranded-benchmark-db.ts";
+import { getUnbrandedBenchmark, type UnbrandedBenchmark } from "./data-layer/unbranded-benchmark-db.ts";
 import { CONDITION_MULTIPLIERS, normalizeConditionGrade } from "./data-layer/config.ts";
 import { materialTier } from "./material-tier.ts";
 import { AI_MODELS } from "./ai-models.ts";
@@ -38,7 +38,7 @@ export type PriceEstimate = {
 // category adds nothing; if it has none, the category is what stops a bare model name from
 // matching the wrong product entirely.
 // Compound forms matter: "sundress" must count as a garment or we append a redundant "dress".
-const GARMENT_NOUN = /\b(?:(?:sun|shirt|slip|shift|wrap|tea|maxi|midi|mini|sweater|smock)?dress(?:es)?|gown|skirt|top|blouse|shirt|tee|t-shirt|sweater|cardigan|knit|jacket|coat|blazer|trousers|pants|jeans|shorts|suit|jumpsuit|romper|bodysuit|corset|bra|lingerie|slip|robe|kimono|vest|bag|handbag|purse|clutch|tote|backpack|belt|scarf|hat|shoes?|boots?|heels?|sandals?|sneakers?|loafers?|flats?|pumps?|jewellery|jewelry|necklace|bracelet|earrings?|ring|watch|sunglasses)\b/i;
+const GARMENT_NOUN = /\b(?:(?:sun|shirt|slip|shift|wrap|tea|maxi|midi|mini|sweater|smock)?dress(?:es)?|gown|skirt|top|blouse|shirt|tee|t-shirt|tshirt|tank|sweater|cardigan|knit|jacket|coat|blazer|trousers|pants|jeans|shorts|suit|jumpsuit|romper|bodysuit|corset|bra|lingerie|slip|robe|kimono|vest|bag|handbag|purse|clutch|tote|backpack|belt|scarf|hat|shoes?|boots?|heels?|sandals?|sneakers?|loafers?|flats?|pumps?|jewellery|jewelry|necklace|bracelet|earrings?|ring|watch|sunglasses)\b/i;
 
 /** "dresses" → "dress", "accessories" → "accessory", "bags" → "bag". A bare /s$/ strip turns
  *  "dresses" into "dresse", which then reads as a different word entirely. */
@@ -66,9 +66,19 @@ export function brandFirstQuery(query: string, brand?: string | null, category?:
  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
  let out = b && norm(b).length >= 3 && !norm(q).includes(norm(b)) ? `${b} ${q}` : q;
  // Category is a garment word ("dresses" → "dress"); only add it when the query lacks one.
- const cat = singular((category || "").trim());
+ const cat = categoryWord(category || "");
  if (cat && !GARMENT_NOUN.test(out)) out = `${out} ${cat}`;
  return out.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+/** The category arrives as a DATABASE slug — "other-clothing", "coats-jackets" — not a word a
+ *  shopper would ever type. These were being pasted straight into Google Shopping, producing
+ *  searches like "Emilio Pucci blue and white tshirt other-clothing". A slug that names no garment
+ *  ("other", "uncategorized") adds nothing and is dropped; a compound slug keeps its first word. */
+function categoryWord(category: string): string {
+ const c = category.toLowerCase().trim();
+ if (!c || /^(other|misc|uncategori[sz]ed|unknown|general)\b/.test(c)) return "";
+ return singular(c.split(/[-/,]/)[0].trim());
 }
 
 /**
@@ -107,7 +117,7 @@ export async function valueFromComps(
  query: string,
  photoUrl: string | undefined,
  comps: Comp[],
- ctx?: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null; unbrandedBenchmark?: { segment: string; medianCents: number; p25Cents: number; p75Cents: number; count: number; storeCount: number } | null },
+ ctx?: { brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; conditionGrade?: string | null; runway?: string | null; celebrity?: string | null; knowledgeHintCents?: number | null; trend?: string | null; internalBenchmark?: InternalPriceBenchmark | null; unbrandedBenchmark?: UnbrandedBenchmark | null },
 ) {
  const fallback = () => {
  // Prefer same-piece listings over anything else — that ordering is the whole point. Sold
@@ -180,7 +190,7 @@ export async function valueFromComps(
  // For an unbranded item this is the real anchor — actual prices set by curated stores, not a guess.
  const ub = ctx?.unbrandedBenchmark;
  const goldenLine = isUnbranded && ub
- ? `\n\nVYA GOLDEN SET (your strongest anchor for this unbranded piece): comparable unbranded VYA pieces — "${ub.segment}" — price at a median of $${Math.round(ub.medianCents / 100)} (typical $${Math.round(ub.p25Cents / 100)}–$${Math.round(ub.p75Cents / 100)}), across ${ub.count} listed/sold pieces from ${ub.storeCount}+ stores. These are real prices curated stores set for the SAME garment + material, so ANCHOR to this median — move off it only for clearly better/worse material or construction than the typical piece in that set.`
+ ? `\n\nVYA GOLDEN SET (your strongest anchor for this unbranded piece): comparable unbranded VYA pieces — "${ub.segment}" — ${ub.basis === "sold" ? "SOLD FOR" : "are listed at"} a median of $${Math.round(ub.medianCents / 100)} (typical $${Math.round(ub.p25Cents / 100)}–$${Math.round(ub.p75Cents / 100)}), across ${ub.count} ${ub.basis === "sold" ? "completed sales" : "live listings"} from ${ub.storeCount}+ stores. ${ub.basis === "sold" ? "These are prices buyers ACTUALLY PAID for the same kind of piece — the strongest evidence available for an unbranded garment. ANCHOR to this median" : "These are asking prices, so they run ahead of what pieces realize; treat the median as an upper reference rather than the expected price"} — move off it only for clearly better/worse material or construction than the typical piece in that set.`
  : "";
  const unbrandedLine = isUnbranded
  ? `\n\nUNBRANDED PIECE — no brand to anchor to, so value it from INTRINSIC qualities in this order:\n- MATERIAL (primary): for the SAME garment, natural/luxury fibers (silk, leather, suede, cashmere, wool, linen) resell WELL ABOVE synthetics (polyester, acrylic, nylon). ${materialGuide}\n- CONSTRUCTION/QUALITY: bias cut, French seams, full lining, hand-finishing, quality hardware read as a better piece — nudge up only when visibly present in the photo.\n- ERA: genuine age adds a MODEST rarity premium, but you CANNOT reliably date a garment from photos (a bias-cut silk slip could be 1930s OR a 1990s revival). Do NOT price up on a guessed decade — only apply an age premium when the era is genuinely corroborated (a datable union label / metal zipper, or a seller-stated era). When the era is uncertain, treat it as UNCERTAINTY: WIDEN the low–high band and keep confidence ≤ 0.45.\n- Anchor to what this GARMENT TYPE in this MATERIAL realistically resells for UNBRANDED — realistic, not a designer wish-price. In the rationale, name the material as the driver, and if the era would change the value, say it's worth confirming.`
@@ -349,7 +359,7 @@ export async function estimatePrice(opts: {
  if (query !== opts.query) console.log(`[pricing] query rewritten brand-first: "${opts.query}" → "${query}"`);
  // For an UNBRANDED piece, anchor to VYA's own golden set (how comparable unbranded pieces price,
  // by category × material tier) instead of guessing — real prices from curated stores.
- const unbrandedBenchmark = !brand ? await getUnbrandedBenchmark({ category, material }).catch(() => null) : null;
+ const unbrandedBenchmark = !brand ? await getUnbrandedBenchmark({ category, material, excludeSoldId: opts.excludeSoldId ?? null }).catch(() => null) : null;
  // Owned-data-first: reuse recently-cached comps (from past PAID lookups) before spending on a
  // new SerpApi basket. Only hit the live full basket (reverse-image + eBay + Shopping + RealReal)
  // on a cold/thin cache, then write every fresh comp back so the next similar item is free.
@@ -423,7 +433,9 @@ export async function estimatePrice(opts: {
  low = unbrandedBenchmark.p25Cents;
  high = unbrandedBenchmark.p75Cents;
  confidence = 0.5;
- rationale = `Anchored to VYA's golden set — how comparable unbranded pieces (${unbrandedBenchmark.segment}) price across ${unbrandedBenchmark.count} listed/sold items from ${unbrandedBenchmark.storeCount}+ stores.`;
+ rationale = unbrandedBenchmark.basis === "sold"
+   ? `Anchored to what comparable unbranded pieces (${unbrandedBenchmark.segment}) actually sold for — ${unbrandedBenchmark.count} completed sales across ${unbrandedBenchmark.storeCount}+ stores.`
+   : `Anchored to VYA's golden set — how comparable unbranded pieces (${unbrandedBenchmark.segment}) are priced across ${unbrandedBenchmark.count} live listings from ${unbrandedBenchmark.storeCount}+ stores.`;
  } else if (benchmark) {
  // No external comps — anchor to our own realized sold prices for this brand/category.
  marketCents = benchmark.medianCents;

@@ -1,7 +1,8 @@
 import { neon } from "@neondatabase/serverless";
 import { estimatePrice } from "./price-engine";
-import { reverseImageBestOf, matchesToComps, isCompsConfigured } from "./comps";
-import { resolveSpecificPiece } from "./intake-memory-db";
+import { reverseImageBestOf, matchesToComps, isCompsConfigured, fetchResaleTrend } from "./comps";
+import { researchComps, describeResearch } from "./comp-research.ts";
+import { resolveSpecificPiece, getVisualVyaComps } from "./intake-memory-db";
 import { embedImage, isEmbeddingConfigured } from "./embeddings";
 import { normalizeCategory } from "./market-data-db";
 import { inferItemFields, sanitizeStoredBrand } from "./infer-item-fields";
@@ -188,14 +189,18 @@ export async function runPriceEval(opts: {
  try {
  // Reverse-image the sold photo → the same-piece comps production would use. One Lens call.
  const matches = isCompsConfigured() ? (await reverseImageBestOf([image], { maxFrames: 1 })).matches : [];
+ // The query photo's fingerprint, for EVERY mode — not just photo-only. Without it the comp
+ // researcher cannot image-verify anything, and the eval silently grades a thinner pipeline than
+ // production runs: look-alikes never rejected, blocked listings never priced. That gap is the
+ // reason an A/B of the intake fixes read as "no change".
+ let emb: number[] = [];
+ try { emb = Array.isArray(r.embedding) ? r.embedding : JSON.parse(r.embedding || "[]"); } catch { emb = []; }
+ if ((!emb || !emb.length) && isEmbeddingConfigured()) emb = (await embedImage(image).catch(() => null)) || [];
  let query: string;
  let specificResolved: boolean | null = null;
  if (behaviour === "photo") {
  // Photo-only: identify the piece from the photo via the reference index — NO human title.
  // excludeNearIdentical stops the item matching a copy of itself in the index (cheating).
- let emb: number[] = [];
- try { emb = Array.isArray(r.embedding) ? r.embedding : JSON.parse(r.embedding || "[]"); } catch { emb = []; }
- if ((!emb || !emb.length) && isEmbeddingConfigured()) emb = (await embedImage(image).catch(() => null)) || [];
  const specific = emb && emb.length ? await resolveSpecificPiece(emb, brand, { excludeNearIdentical: true }).catch(() => null) : null;
  specificResolved = !!specific;
  query = specific?.query || brand || title; // fall back to brand (then title) when nothing matches
@@ -210,7 +215,24 @@ export async function runPriceEval(opts: {
  const context = inferred
  ? { brand: brand ?? inferred.brand, era: inferred.era, material: inferred.material, condition: inferred.condition, conditionGrade: inferred.condition }
  : { brand };
- const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: matchesToComps(matches), context, excludeSoldId: Number(r.id), storeName: r.store_name }).catch(() => null);
+ // Same researcher production uses — verify same-piece by image, brand-filter only what the
+ // image couldn't score, open the listings for their price, recover the blocked ones via search.
+ const research = await researchComps(matches, { queryEmbedding: emb.length ? emb : null, brand });
+ console.log(`[eval ${r.id}] comps: ${describeResearch(research)}`);
+ // VYA's OWN visually-similar pieces — production's strongest comp source for an item whose brand
+ // is unknown, and until now absent from every measurement. Leak-guarded: the item itself is
+ // excluded, and so is any near-duplicate photo (that is the same physical piece re-listed, i.e.
+ // the answer key, not a comparable).
+ const visualComps = emb.length
+  ? await getVisualVyaComps(emb, 8, { excludeSoldId: Number(r.id), excludeNearIdentical: true }).catch(() => [])
+  : [];
+ // Demand trend, the same signal production passes into the valuation. Gated so its worth can be
+ // measured: it costs ~1 SerpApi call per brand+category per week and has never been shown to
+ // change a single price. VYA_TREND_SIGNAL=false runs the pipeline without it.
+ const evalCategory = normalizeCategory(title) || "";
+ const trendQuery = brand && process.env.VYA_TREND_SIGNAL !== "false" ? (evalCategory ? `${brand} ${evalCategory}` : brand) : "";
+ const trend = trendQuery ? await fetchResaleTrend(trendQuery).catch(() => null) : null;
+ const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: [...matchesToComps(research.matches), ...visualComps], context: { ...context, trend: trend?.trending ? `${brand} has rising demand across the resale market (${trend.note})` : null }, excludeSoldId: Number(r.id), storeName: r.store_name }).catch(() => null);
  // REFUSE to grade a price the valuation model did not produce. When the model is unreachable the
  // pricer substitutes a raw comp median — a perfectly plausible-looking number that measures the
  // fallback, not the pricer. Two full runs were spent reporting exactly that as accuracy (once with
