@@ -98,7 +98,48 @@ async function fetchGoldenRows(): Promise<Row[]> {
  }
 }
 
-type SoldRow = Row & { soldId: number };
+type SoldRow = Row & { soldId: number; ageDays: number };
+
+// ── Recency weighting ──
+// External comps arrive undated: SerpApi's eBay sold results carry no date field at all, and a
+// Google Shopping row is a live offer. VYA's own sales are the ONLY comps whose date we know, which
+// is the real argument for leaning on them — not just that they are realized prices.
+//
+// A sale's weight halves every HALF_LIFE_DAYS, so last month's transaction counts for more than one
+// from six months ago without ever discarding the older evidence outright (a hard cutoff would take
+// a thin segment below the reliability floor and silently drop the anchor altogether).
+//
+// Caveat worth knowing when reading these numbers: `sold_at` is when the sync NOTICED the piece was
+// gone, not the moment it sold, so it lags by up to one sync cycle. Only 1 of 1,421 rows is
+// confirmed against a real order. It is an honest ordering of recency, not a precise timestamp.
+const HALF_LIFE_DAYS = 180;
+export const weightOf = (ageDays: number) => Math.pow(0.5, Math.max(0, ageDays) / HALF_LIFE_DAYS);
+
+/** Quantile over weighted samples: walk the sorted prices until the running weight crosses q. */
+export function weightedQuantile(sorted: Array<{ priceCents: number; w: number }>, q: number): number {
+ if (!sorted.length) return 0;
+ const total = sorted.reduce((s, x) => s + x.w, 0);
+ if (total <= 0) return sorted[Math.floor(sorted.length / 2)].priceCents;
+ let run = 0;
+ for (const x of sorted) {
+  run += x.w;
+  if (run >= q * total) return x.priceCents;
+ }
+ return sorted[sorted.length - 1].priceCents;
+}
+
+/**
+ * Kish effective sample size — how many evenly-weighted sales this weighted set is really worth.
+ *
+ * Without it the reliability floor becomes a lie: forty sales that are all two years old pass a
+ * "n >= 5" check while carrying almost no weight between them. The floor is applied to THIS number,
+ * not to the raw count.
+ */
+export function effectiveN(weights: number[]): number {
+ const sum = weights.reduce((a, b) => a + b, 0);
+ const sumSq = weights.reduce((a, b) => a + b * b, 0);
+ return sumSq > 0 ? (sum * sum) / sumSq : 0;
+}
 
 // ── THE SECOND CORPUS: what buyers actually PAID ──
 // The golden set above is built from live listings, i.e. asking prices — what stores hope to get.
@@ -109,7 +150,8 @@ type SoldRow = Row & { soldId: number };
 const loadSoldRows = async (): Promise<SoldRow[]> => {
  const sql = db();
  const rows = (await sql`
-  SELECT id, store_slug, store_name, title, designer, product_type, final_price
+  SELECT id, store_slug, store_name, title, designer, product_type, final_price,
+         GREATEST(0, EXTRACT(epoch FROM (now() - sold_at)) / 86400) AS age_days
   FROM sold_items
   WHERE final_price > 0 AND final_price * 100 >= 1500
     AND (original_price IS NULL OR original_price <= 0 OR final_price >= original_price * 0.5)
@@ -124,6 +166,7 @@ const loadSoldRows = async (): Promise<SoldRow[]> => {
   if (classifyBrand(effBrand) === "known") continue;
   out.push({
    soldId: Number(r.id),
+   ageDays: Number(r.age_days) || 0,
    brand: effBrand,
    material: null, // sold_items carries no fibre column, so this corpus buckets by category alone
    category: categoryOf(title, (r.product_type as string) ?? null),
@@ -211,13 +254,28 @@ export async function getUnbrandedBenchmark(opts: { category: string | null; mat
   const s = rows.map((r) => r.priceCents).sort((a, z) => a - z);
   return { segment: seg, medianCents: quantile(s, 0.5), p25Cents: quantile(s, 0.25), p75Cents: quantile(s, 0.75), count: s.length, storeCount: storesOf(rows), basis };
  };
+ /** Same summary, but recent sales weigh more. Only ever used on OUR sales — the only dated comps. */
+ const summariseWeighted = (rows: SoldRow[], seg: string): UnbrandedBenchmark => {
+  const pts = rows.map((r) => ({ priceCents: r.priceCents, w: weightOf(r.ageDays) })).sort((a, z) => a.priceCents - z.priceCents);
+  return {
+   segment: seg,
+   medianCents: weightedQuantile(pts, 0.5),
+   p25Cents: weightedQuantile(pts, 0.25),
+   p75Cents: weightedQuantile(pts, 0.75),
+   count: rows.length,
+   storeCount: storesOf(rows),
+   basis: "sold",
+  };
+ };
 
  // ── Preferred: what the market actually PAID for comparable unbranded pieces. ──
  // excludeSoldId keeps the price eval honest: an item must never sit inside its own anchor.
  const soldRows = (await fetchSoldRows().catch(() => [] as SoldRow[]))
   .filter((r) => r.category === cat && (opts.excludeSoldId == null || r.soldId !== opts.excludeSoldId));
- if (soldRows.length >= MIN_ITEMS && storesOf(soldRows) >= MIN_STORES) {
-  return summarise(soldRows, `unbranded ${cat} · sold on VYA`, "sold");
+ // The floor is applied to the EFFECTIVE count, so a segment held up entirely by old sales falls
+ // through to the asking-price basis rather than passing on a raw count it cannot support.
+ if (effectiveN(soldRows.map((r) => weightOf(r.ageDays))) >= MIN_ITEMS && storesOf(soldRows) >= MIN_STORES) {
+  return summariseWeighted(soldRows, `unbranded ${cat} · sold on VYA`);
  }
 
  // ── Fallback: asking prices on live inventory. Deeper, but it measures hope, not transactions. ──

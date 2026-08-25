@@ -15,6 +15,8 @@ import { researchComps, describeResearch } from "@/app/lib/comp-research";
 import { recordSuggestion } from "@/app/lib/price-suggestions-db";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
+import { attributeCostsTo } from "@/app/lib/cost-context";
+import { claimAiListing, refundAiListing } from "@/app/lib/store-ai-usage-db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -68,6 +70,10 @@ function reverseImageHint(matches: VisualMatch[], brandKnown = false): string {
 // price it comes back as an over/under-market flag rather than overwriting their number.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
+ // Everything this request spends — Anthropic, SerpApi, Voyage, however many layers down —
+ // is now attributed to this store. Scripts and crons set nothing and stay unattributed,
+ // which is what separates seller cost from our own eval runs.
+ attributeCostsTo({ storeSlug: slug });
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  if (!isIntakeConfigured()) {
  return NextResponse.json({ error: "AI intake isn’t enabled on the server yet." }, { status: 503 });
@@ -90,6 +96,31 @@ export async function POST(request: NextRequest) {
  const needPrice = !has("price"); // price typed → estimate becomes an over/under flag, not the price
  const draftOnly = body?.draftOnly === true; // phase 1: return the drafted fields fast, price/runway come from /pricing
  const needReverse = isCompsConfigured() && (needDraft || needPrice); // Lens → brand ID, runway/era, comps
+
+ // ── AI listing allowance ──
+ // Claimed BEFORE any paid call. Refusing after the vision draft, the Lens search and the
+ // valuation have run means paying for the listing we are declining to hand over.
+ //
+ // Only a run that actually GENERATES counts: re-opening a listing whose fields are already
+ // filled costs a seller nothing. And a refusal is not an error — the seller lists manually,
+ // exactly as they would have, and the response says what happened so the UI can offer the
+ // upgrade rather than showing a failure.
+ let claim: Awaited<ReturnType<typeof claimAiListing>> | null = null;
+ if (needDraft) {
+  claim = await claimAiListing(slug).catch(() => null);
+  if (claim && !claim.allowed) {
+   console.log(`[intake ${slug}] AI allowance spent — ${claim.used}/${claim.limit} this period`);
+   return NextResponse.json({
+    ok: false,
+    aiLimitReached: true,
+    used: claim.used,
+    limit: claim.limit,
+    tier: claim.tier,
+    trialing: claim.trialing,
+    message: `You've used all ${claim.limit} AI listings in this billing period. You can still list manually, and your allowance resets when your subscription renews.`,
+   }, { status: 402 });
+  }
+ }
 
  // Only learn the store voice when we're actually writing copy. Fold in the owner's
  // brief (what they explicitly told us) as authoritative directives on top of the
@@ -201,6 +232,8 @@ export async function POST(request: NextRequest) {
  ]);
 
  if (needDraft && draftRes.status === "rejected") {
+ // The seller got nothing, so the allowance shouldn't be spent on it.
+ if (claim) await refundAiListing(slug, claim.periodKey).catch(() => {});
  return NextResponse.json({ error: draftRes.reason instanceof Error ? draftRes.reason.message : "Draft failed." }, { status: 502 });
  }
  const draft = draftRes.status === "fulfilled" ? draftRes.value : null;
@@ -409,6 +442,9 @@ export async function POST(request: NextRequest) {
  // Garment type first: it drives every comp search, so getting it wrong prices a different
  // product entirely. At most two, usually none.
  questions: [garmentQ, brandQ].filter(Boolean),
+ // What's left of this period's AI listings, so the UI can warn before the wall rather than at it.
+ aiRemaining: claim ? claim.remaining : null,
+ aiLimit: claim ? claim.limit : null,
  // Near-duplicate recall marker — for a "✓ Recognized — same piece you listed" cue in the UI.
  recalled: exact ? { title: exact.title, similarity: exact.similarity, ageDays: exact.ageDays, ownStore: exact.ownStore, source: exact.source } : null,
  // For phase 2 (/api/store/intake/pricing): the reverse-image comps/titles + whether the draft ran.

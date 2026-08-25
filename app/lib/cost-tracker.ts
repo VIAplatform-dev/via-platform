@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { currentCostContext } from "./cost-context.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Real API-cost tracker. Every paid call logs its ACTUAL cost — computed from the
@@ -17,6 +18,11 @@ export const RATES = {
  voyagePerM: 0.12,            // voyage-multimodal-3, $/million tokens
  voyageFallbackTokens: 1000,  // if the API omits usage, assume ~1 image ≈ this many tokens
  serpPerSearchCents: 1.5,     // $75/mo ÷ 5,000 searches = $0.015/search (plan-amortized)
+ // PhotoRoom charges per processed image, and the tier depends on WHICH api you call. The
+ // background-removal endpoint is ~$0.02; the Image Editing API (image-api.photoroom.com/v2/edit,
+ // which is what ghostMannequinFromUrl uses) is ~$0.10. Confirm against the PhotoRoom dashboard —
+ // the real rate depends on the plan, and this is the single largest per-listing cost after comps.
+ photoroomPerImageCents: 10,
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -59,8 +65,14 @@ export async function recordCost(e: Entry): Promise<void> {
  try {
   await ensure();
   const sql = db();
+  // The spend happens four layers below the request that caused it, so an explicit ctx is rare.
+  // Fall back to the store set once at the request boundary (cost-context.ts). Without this the
+  // columns exist and stay empty, which is exactly what they did for the table's whole life.
+  const amb = currentCostContext();
+  const storeSlug = e.storeSlug ?? amb.storeSlug ?? null;
+  const itemId = e.itemId ?? amb.itemId ?? null;
   await sql`INSERT INTO api_costs (provider, operation, model, item_id, store_slug, input_tokens, output_tokens, units, cost_cents)
-   VALUES (${e.provider}, ${e.operation ?? null}, ${e.model ?? null}, ${e.itemId ?? null}, ${e.storeSlug ?? null}, ${e.inputTokens ?? null}, ${e.outputTokens ?? null}, ${e.units ?? 1}, ${e.costCents})`;
+   VALUES (${e.provider}, ${e.operation ?? null}, ${e.model ?? null}, ${itemId}, ${storeSlug}, ${e.inputTokens ?? null}, ${e.outputTokens ?? null}, ${e.units ?? 1}, ${e.costCents})`;
  } catch { /* best-effort — never break a request over cost logging */ }
 }
 
@@ -71,6 +83,9 @@ export async function recordAnthropic(model: string, operation: string, data: an
 }
 export async function recordSerp(engine: string, ctx?: { itemId?: string | null; storeSlug?: string | null }): Promise<void> {
  await recordCost({ provider: "serpapi", operation: engine, units: 1, costCents: RATES.serpPerSearchCents, itemId: ctx?.itemId, storeSlug: ctx?.storeSlug });
+}
+export async function recordPhotoroom(operation: string, ctx?: { itemId?: string | null; storeSlug?: string | null }): Promise<void> {
+ await recordCost({ provider: "photoroom", operation, units: 1, costCents: RATES.photoroomPerImageCents, itemId: ctx?.itemId, storeSlug: ctx?.storeSlug });
 }
 export async function recordVoyage(data: any, ctx?: { itemId?: string | null; storeSlug?: string | null }): Promise<void> {
  const tokens = Number(data?.usage?.total_tokens || RATES.voyageFallbackTokens);

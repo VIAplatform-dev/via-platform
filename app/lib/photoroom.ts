@@ -1,5 +1,10 @@
 // Reusable Photoroom ghost-mannequin helper (extracted from the admin prototype).
 // Turns an on-model / flat product photo into a clean ghost-mannequin cover image.
+import { recordPhotoroom } from "./cost-tracker.ts";
+
+// The Image Editing API, not the cheaper background-removal one — ghost mannequin is an editing
+// feature. That is a ~5x difference per image and it was costing money untracked: PHOTOROOM had no
+// entry on the rate card, so none of this appeared in api_costs at all.
 const PHOTOROOM_ENDPOINT = "https://image-api.photoroom.com/v2/edit";
 
 export function isPhotoroomConfigured(): boolean {

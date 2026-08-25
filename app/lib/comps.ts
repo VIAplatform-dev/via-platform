@@ -531,15 +531,25 @@ export async function fetchEbaySold(query: string): Promise<Comp[]> {
 
 /** Google Shopping — broad keyword market. One SerpApi call. Used as a FALLBACK when the
  *  reverse-image + eBay-sold set is thin (poor photo / very rare piece). */
-export async function fetchGoogleShopping(query: string): Promise<Comp[]> {
- if (!isCompsConfigured() || !query.trim()) return [];
+/** Google Shopping, reporting whether the REQUEST succeeded separately from whether it found
+ *  anything. An empty result and a timed-out request look identical as `[]`, and the difference
+ *  decides whether it is worth spending two more searches on the retailer passes below. */
+/** Google Shopping, reporting whether the REQUEST succeeded separately from whether it found
+ *  anything. An empty result and a timed-out request look identical as `[]`, and the difference
+ *  decides whether it is worth spending two more searches on the retailer passes below. */
+export async function fetchGoogleShoppingResult(query: string): Promise<{ comps: Comp[]; ok: boolean }> {
+ if (!isCompsConfigured() || !query.trim()) return { comps: [], ok: false };
  const r = await serp({ engine: "google_shopping", q: query, gl: "us" });
  const comps: Comp[] = [];
  for (const row of (r?.shopping_results || []).slice(0, 30)) {
  const cents = priceToCents(row.extracted_price ?? row.price);
  if (cents) comps.push({ title: String(row.title || ""), priceCents: cents, currency: "USD", sold: false, source: String(row.source || "Google Shopping"), link: row.link });
  }
- return comps;
+ return { comps, ok: r != null };
+}
+
+export async function fetchGoogleShopping(query: string): Promise<Comp[]> {
+ return (await fetchGoogleShoppingResult(query)).comps;
 }
 
 export const REALREAL_SOURCE = /real\s?real/i;
@@ -586,13 +596,24 @@ export const fetchVestiairePass = (query: string) => fetchRetailerPass(query, "v
 export async function fetchComps(query: string): Promise<Comp[]> {
  if (!isCompsConfigured() || !query.trim()) return [];
  const vestiaireOn = process.env.VYA_VESTIAIRE_PASS !== "false";
- const [ebay, shopping, realReal, vestiaire] = await Promise.all([
- fetchEbaySold(query),
- fetchGoogleShopping(query),
+
+ // The retailer passes are the SAME query with a retailer name appended, so a query Google
+ // Shopping cannot serve fails all three times and bills for all three. Measured on a 100-item
+ // run: 110 of 736 searches timed out, every one of them Google Shopping, and the failures came
+ // in per-query clusters rather than per-pass. So the plain call goes first and the retailer
+ // passes only run if it came back at all. An empty result still counts as an answer and lets
+ // them through — "Google has nothing generic" is exactly when a retailer-specific pass earns
+ // its keep.
+ const [ebay, shopping] = await Promise.all([fetchEbaySold(query), fetchGoogleShoppingResult(query)]);
+ if (!shopping.ok) {
+  console.log(`[serpapi] shopping unavailable for "${query.slice(0, 40)}" — skipped the retailer passes (2 searches saved)`);
+  return rankComps(ebay);
+ }
+ const [realReal, vestiaire] = await Promise.all([
  fetchRealRealPass(query),
  vestiaireOn ? fetchVestiairePass(query) : Promise.resolve([] as Comp[]),
  ]);
- return rankComps([...ebay, ...shopping, ...realReal, ...vestiaire]);
+ return rankComps([...ebay, ...shopping.comps, ...realReal, ...vestiaire]);
 }
 
 export type ResaleTrend = { momentumPct: number; trending: boolean; note: string; source: string };

@@ -39,6 +39,30 @@ export function getTier(id: string | null | undefined): Tier | null {
  return TIERS.find((t) => t.id === id) ?? null;
 }
 
+// ── AI listing allowance ────────────────────────────────────────────────────
+// Generating a listing costs real money — the vision draft that writes the title and description,
+// the valuation that prices it, the comp searches behind that, and image processing. Measured at
+// roughly $0.14 per listing (see scripts/tier-economics.ts, which reads live rates from api_costs).
+// It is cost of goods, charged per LISTING rather than per sale, so a store that lists heavily and
+// sells little is the case an allowance protects against.
+//
+// ONE pool per store: a listing counts whether it was created from photos or by text-to-list.
+// Metering them separately would double a tier's real allowance and invite routing around the cap
+// by switching input method.
+//
+// At the cap the AI stops and manual listing carries on — a store is never locked out of its own
+// inventory, it just loses the assistant until the period rolls over.
+export const AI_LISTINGS_PER_PERIOD: Record<TierId, number> = {
+ starter: 50,
+ studio: 150,
+ atelier: 300,
+};
+
+// A trial gets every feature, so it gets the top allowance — generous enough that no real
+// catalogue hits it (the largest store on VYA is 468 items, the median is 50), while still
+// bounding the cost of someone bulk-listing an inventory they never intend to sell here.
+export const TRIAL_AI_LISTINGS = 300;
+
 // ── Feature gating ──────────────────────────────────────────────────────────
 // Each gateable feature maps to the MINIMUM tier order that unlocks it. A store
 // on tier N gets every feature whose min-tier ≤ N. Reference these keys wherever

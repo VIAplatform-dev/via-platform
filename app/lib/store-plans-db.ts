@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { type TierId, type Feature, type Interval, TIER_ORDER, tierIncludesFeature } from "./plans";
+import { type TierId, type Feature, type Interval, TIER_ORDER, tierIncludesFeature } from "./plans.ts";  // ".ts" so `node --test` can load this tree — strip-only TS needs the extension
 
 // Per-store subscription plan for the getvya.ai operating system. A store subscribes
 // to one of 3 paid tiers (starter/studio/atelier, see plans.ts) with a 30-day trial.

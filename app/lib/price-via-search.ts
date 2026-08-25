@@ -17,9 +17,13 @@
 // One search, no proxies, no scraping infrastructure, using a service already being paid for.
 
 import { serp, priceToCents, type VisualMatch } from "./comps.ts";
+import { symbolToIso, toUsdCents } from "./currency.ts";
 
 /** How many blocked same-piece matches to look up per item. Each is one SerpApi search. */
 const MAX_LOOKUPS = 3;
+/** Confirmed, priced listings of THIS garment above which another lookup isn't worth a search.
+ *  Overridable so the gate itself can be A/B'd: VYA_RECOVERY_ENOUGH=999 disables it entirely. */
+const ENOUGH_PRICED = Number(process.env.VYA_RECOVERY_ENOUGH) || 3;
 
 const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const hostOf = (u?: string) => { try { return u ? new URL(u).hostname.replace(/^www\.|^us\./, "") : ""; } catch { return ""; } };
@@ -67,6 +71,68 @@ export async function priceByTitleSearch(m: VisualMatch): Promise<{ priceCents: 
  return null;
 }
 
+// ── Realized sale prices from a host that will not let us in ──
+//
+// Sold-through is the most valuable signal in the whole system and has been the biggest open gap:
+// a direct page fetch can read it, but the hosts worth reading block us, and a Google Shopping
+// result is a live offer, so inferring a completed sale from one would be inventing evidence.
+//
+// It turns out we do not have to infer anything. Google's own crawl of those pages carries the
+// realized price in the result snippet, verbatim:
+//
+//   "Celine. Triomphe Vintage leather travel bag. Very good condition. Brown, Leather.
+//    Sold at £313.71."
+//
+// That is the transaction, quoted by Google, for a listing that returns 403 to us. Not a guess.
+//
+// The extraction is deliberately narrow. Only "Sold at <price>" counts — Vestiaire's own phrasing
+// for a completed sale. A snippet reading "Sold with. Dust bag" or "item sold. shipped. canceled"
+// is not a realized price, and a bare /sold/ match would sweep both in.
+// The currency marker is REQUIRED, not optional. "Sold at 4 500 kr" with an optional marker parsed
+// as $4.00 — a plausible-looking number that would have entered the comp set as a real sale. An
+// unrecognised or absent currency means we cannot say what the piece sold for, so we don't.
+const SOLD_AT = /\bsold\s+(?:at|for)\s*(US\$|CA\$|AU\$|C\$|A\$|[€£$¥₩]|EUR|GBP|USD|CAD|AUD|CHF|JPY)\s*([\d][\d.,]*\d|\d)/i;
+
+/** Pull a realized sale price out of a search snippet, in USD cents. null when there isn't one. */
+export function extractSoldPrice(text: string): number | null {
+ const m = SOLD_AT.exec(text || "");
+ if (!m) return null;
+ const cents = priceToCents(m[2]);
+ if (!cents || cents <= 0) return null;
+ const iso = symbolToIso(m[1]);
+ // A foreign price we cannot convert is worse than no price — it would enter the comp set as if
+ // it were dollars. Drop it rather than quote it wrong.
+ const usd = toUsdCents(cents, iso);
+ return usd && usd > 0 ? usd : null;
+}
+
+/**
+ * Ask Google what a blocked listing actually SOLD for, scoped to its own host.
+ *
+ * Returns the realized price and marks the comp sold, which promotes it above every asking price
+ * in the valuation. null when the crawl shows no completed sale — silence is correct, and the
+ * caller falls back to looking up the live asking price instead.
+ */
+export async function soldByTitleSearch(m: VisualMatch): Promise<{ priceCents: number; source: string } | null> {
+ const title = (m.title || "").trim();
+ if (title.length < 12) return null;
+ const host = hostOf(m.link);
+ if (!host) return null;
+ const r = await serp({ engine: "google", q: `site:${host} "sold at" ${title}` }).catch(() => null);
+ const rows = (r?.organic_results ?? []) as Array<Record<string, unknown>>;
+ for (const row of rows.slice(0, 6)) {
+  const rowTitle = String(row.title || "");
+  const text = `${rowTitle} ${String(row.snippet || "")}`;
+  const cents = extractSoldPrice(text);
+  if (!cents) continue;
+  // Same guard as the price lookup: the sale has to belong to THIS listing, not to any piece the
+  // host happens to have sold.
+  if (!looksLikeSameListing(title, m.link, rowTitle, host, String(row.link || ""))) continue;
+  return { priceCents: cents, source: `${host} (sold)` };
+ }
+ return null;
+}
+
 /**
  * Fill in prices for same-piece matches we could not read, by asking Google what they cost.
  *
@@ -78,20 +144,36 @@ export async function recoverBlockedPrices(matches: VisualMatch[], max = MAX_LOO
  const needy = matches.filter((m) => m.visuallyVerified && !(m.priceCents && m.priceCents > 0) && (m.title || "").length >= 12);
  if (!needy.length) return matches;
 
+ // Recovery is the most expensive step in the pipeline — 178 searches per 100 items, at up to
+ // three per piece. It earns that when the same-piece evidence is thin, which is the case it was
+ // built for. It earns much less when three confirmed listings of this exact garment already
+ // carry prices: a fourth changes the median very little and costs a search every time.
+ const alreadyPriced = matches.filter((m) => m.visuallyVerified && m.priceCents && m.priceCents > 0).length;
+ if (alreadyPriced >= ENOUGH_PRICED) {
+  console.log(`[price-via-search] ${alreadyPriced} same-piece comps already priced — skipping ${Math.min(needy.length, max)} lookup(s)`);
+  return matches;
+ }
+
  const targets = needy.slice(0, max);
- const found = new Map<VisualMatch, { priceCents: number; source: string }>();
+ const found = new Map<VisualMatch, { priceCents: number; source: string; sold: boolean }>();
  await Promise.all(targets.map(async (m) => {
+  // A realized sale beats a live offer at any price, so try for it first. Only when the crawl
+  // shows no completed sale do we spend a second search on the asking price.
+  const soldHit = await soldByTitleSearch(m).catch(() => null);
+  if (soldHit) { found.set(m, { ...soldHit, sold: true }); return; }
   const hit = await priceByTitleSearch(m).catch(() => null);
-  if (hit) found.set(m, hit);
+  if (hit) found.set(m, { ...hit, sold: false });
  }));
 
  if (found.size) {
-  console.log(`[price-via-search] looked up ${targets.length} blocked same-piece listing(s), recovered ${found.size}`);
+  const soldN = [...found.values()].filter((v) => v.sold).length;
+  console.log(`[price-via-search] looked up ${targets.length} blocked same-piece listing(s), recovered ${found.size} (${soldN} as REALIZED sales)`);
  }
  return matches.map((m) => {
   const hit = found.get(m);
-  // `sold` is deliberately left alone: a shopping result is a live offer, and inferring a realized
-  // sale from one would be inventing evidence.
-  return hit ? { ...m, priceCents: hit.priceCents, source: m.source || hit.source } : m;
+  if (!hit) return m;
+  // `sold` is set ONLY for a price Google quoted as a completed sale. A shopping result is a live
+  // offer, and inferring a realized sale from one would be inventing evidence.
+  return { ...m, priceCents: hit.priceCents, source: m.source || hit.source, ...(hit.sold ? { sold: true } : {}) };
  });
 }

@@ -38,6 +38,13 @@ export type PriceEstimate = {
 // category adds nothing; if it has none, the category is what stops a bare model name from
 // matching the wrong product entirely.
 // Compound forms matter: "sundress" must count as a garment or we append a redundant "dress".
+// How long a cached comp stays usable. This was 45 days on the assumption it kept the comp set
+// recent — it never did: the window is keyed on when WE fetched the row, and the underlying sale
+// carries no date at all (SerpApi's eBay results have no date field, and a Shopping row is a live
+// offer). So it controls cost and snapshot freshness, nothing more, and 45 was paying to re-fetch
+// the same undated evidence twice as often as necessary.
+const COMP_CACHE_DAYS = 90;
+
 const GARMENT_NOUN = /\b(?:(?:sun|shirt|slip|shift|wrap|tea|maxi|midi|mini|sweater|smock)?dress(?:es)?|gown|skirt|top|blouse|shirt|tee|t-shirt|tshirt|tank|sweater|cardigan|knit|jacket|coat|blazer|trousers|pants|jeans|shorts|suit|jumpsuit|romper|bodysuit|corset|bra|lingerie|slip|robe|kimono|vest|bag|handbag|purse|clutch|tote|backpack|belt|scarf|hat|shoes?|boots?|heels?|sandals?|sneakers?|loafers?|flats?|pumps?|jewellery|jewelry|necklace|bracelet|earrings?|ring|watch|sunglasses)\b/i;
 
 /** "dresses" → "dress", "accessories" → "accessory", "bags" → "bag". A bare /s$/ strip turns
@@ -293,7 +300,7 @@ export async function getMarketReferenceFast(opts: { query: string; brand: strin
  const category = inferCategoryFromTitle(opts.query) as string;
  const [benchmark, cached, vya] = await Promise.all([
  getInternalPriceBenchmark({ brand: opts.brand, category }).catch(() => null),
- getCachedComps({ query: opts.query, brand: opts.brand, category, maxAgeDays: 45, limit: 60 }).catch(() => []),
+ getCachedComps({ query: opts.query, brand: opts.brand, category, maxAgeDays: COMP_CACHE_DAYS, limit: 60 }).catch(() => []),
  getVyaComps({ brand: opts.brand, limit: 30 }).catch(() => []),
  ]);
  if (benchmark?.medianCents) {
@@ -365,7 +372,7 @@ export async function estimatePrice(opts: {
  // on a cold/thin cache, then write every fresh comp back so the next similar item is free.
  // (Reverse-image comps in extraComps are always fresh — per photo — and also cached.)
  const [cached, benchmark, vyaComps, cacheAgeDays] = await Promise.all([
- getCachedComps({ query: query, brand, category, maxAgeDays: 45, limit: 40 }).catch(() => []),
+ getCachedComps({ query: query, brand, category, maxAgeDays: COMP_CACHE_DAYS, limit: 40 }).catch(() => []),
  getInternalPriceBenchmark({ brand, category }).catch(() => null),
  getVyaComps({ brand, limit: 15, excludeSoldId: opts.excludeSoldId ?? null }).catch(() => []),
  newestCompAgeDays(query).catch(() => null),

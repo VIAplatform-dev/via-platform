@@ -230,7 +230,7 @@ export async function runPriceEval(opts: {
  // measured: it costs ~1 SerpApi call per brand+category per week and has never been shown to
  // change a single price. VYA_TREND_SIGNAL=false runs the pipeline without it.
  const evalCategory = normalizeCategory(title) || "";
- const trendQuery = brand && process.env.VYA_TREND_SIGNAL !== "false" ? (evalCategory ? `${brand} ${evalCategory}` : brand) : "";
+ const trendQuery = brand && process.env.VYA_TREND_SIGNAL === "true" ? (evalCategory ? `${brand} ${evalCategory}` : brand) : "";
  const trend = trendQuery ? await fetchResaleTrend(trendQuery).catch(() => null) : null;
  const est = await estimatePrice({ query, photoUrl: image, minMarkupBps: 3000, extraComps: [...matchesToComps(research.matches), ...visualComps], context: { ...context, trend: trend?.trending ? `${brand} has rising demand across the resale market (${trend.note})` : null }, excludeSoldId: Number(r.id), storeName: r.store_name }).catch(() => null);
  // REFUSE to grade a price the valuation model did not produce. When the model is unreachable the

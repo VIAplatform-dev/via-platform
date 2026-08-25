@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { computeListingPricing } from "@/app/lib/intake-pricing";
 import type { Comp } from "@/app/lib/comps";
+import { attributeCostsTo } from "@/app/lib/cost-context";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,6 +13,10 @@ export const maxDuration = 60;
 // can render the fields immediately and slot pricing in a moment later.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
+ // Everything this request spends — Anthropic, SerpApi, Voyage, however many layers down —
+ // is now attributed to this store. Scripts and crons set nothing and stay unattributed,
+ // which is what separates seller cost from our own eval runs.
+ attributeCostsTo({ storeSlug: slug });
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
  const body = await request.json().catch(() => null);

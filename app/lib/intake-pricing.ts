@@ -156,7 +156,9 @@ export async function computeListingPricing(opts: {
  // No price typed → full valuation to SUGGEST a price (accurate, slower path).
  const minMarkupBps = await getMinMarkupBps(opts.slug).catch(() => 3000);
  // Same switch production-side, so the eval measures the pipeline the site actually runs.
- const trendQuery = brandVal && process.env.VYA_TREND_SIGNAL !== "false" ? (opts.category ? `${brandVal} ${opts.category}` : brandVal) : "";
+ // Off by default: measured at 47 searches per 100 items to reach 6 items in 120 with any signal
+ // at all. VYA_TREND_SIGNAL=true turns it back on.
+ const trendQuery = brandVal && process.env.VYA_TREND_SIGNAL === "true" ? (opts.category ? `${brandVal} ${opts.category}` : brandVal) : "";
  const trend = trendQuery ? await fetchResaleTrend(trendQuery).catch(() => null) : null;
  estimate = await AI_GATE().run(() => estimatePrice({
  query,
