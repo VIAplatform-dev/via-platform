@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FIELD, SUBMIT } from "./formStyles";
 
 export default function NewsletterForm({ accent, label }: { accent: string; label?: string }) {
  const [email, setEmail] = useState("");
@@ -27,7 +28,7 @@ export default function NewsletterForm({ accent, label }: { accent: string; labe
  if (done) return <p className="mt-6 text-sm opacity-70">Thanks — you’re on the list.</p>;
 
  return (
- <form onSubmit={submit} className="mx-auto mt-6 flex max-w-sm flex-col items-center gap-3">
+ <form onSubmit={submit} className="mx-auto mt-6 flex w-full max-w-sm flex-col gap-3">
  <input
  type="email"
  required

@@ -5,6 +5,7 @@ import { AdminPage, AdminHeader, TechButton, SectionLabel, StatusPill, TagRow, c
 import { CategoryBreadcrumb } from "../CategoryPicker";
 import { Input, Field } from "@/app/store/ui";
 import { ITEM_STATUSES, STATUS_TONE, toCategorySlug, categoryTagLabel, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
+import { PriceScale } from "../PriceScale";
 
 // One drafted item's AI results, shown inline on its card once "Draft" runs.
 type BulkItem = {
@@ -29,6 +30,17 @@ type BulkItem = {
 };
 // "queued" = accepted, waiting for a worker; "loading" = a worker is on it right now. The two are
 // distinct because a queued card must NOT show a moving progress bar — nothing is happening to it yet.
+// A question the intake wants to put to the seller, when the brand or the garment genuinely
+// couldn't be pinned down. The server has always returned these for bulk exactly as it does for the
+// one-at-a-time flow — this page just dropped them, so bulk kept the old guess-confidently
+// behaviour on the path where the volume actually arrives. Identified pieces price about twice as
+// well as unidentified ones, so an answered question here is worth more than any pricing tweak.
+type SellerQuestion = { field: string; prompt: string; hint: string; why: string; options?: string[] };
+
+// Everything /api/store/intake/pricing needs, kept from the draft run so answering a question can
+// re-price WITHOUT paying for another reverse-image search — the same trick the single flow uses.
+type PriceCtx = { searchQuery: unknown; reverseComps: unknown; reverseTitles: unknown; editorialTitles: unknown; knowledgeHintCents: number | null; draftRanFull: boolean };
+
 type Slot = BulkItem | "loading" | "queued" | undefined;
 
 // "Has this item actually finished?" — one predicate rather than a `!== "loading"` check repeated at
@@ -72,6 +84,10 @@ export default function BulkUploadPage() {
  const [editGi, setEditGi] = useState<number | null>(null);
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]);
+ const [asks, setAsks] = useState<Record<number, SellerQuestion[]>>({});
+ const [priceCtx, setPriceCtx] = useState<Record<number, PriceCtx>>({});
+ // The AI's price band + reasoning per item, for the draft editor.
+ const [aiPrice, setAiPrice] = useState<Record<number, { low: number; high: number; market: number | null; note: string }>>({});
  const [savingEdit, setSavingEdit] = useState(false);
  const [uploadingEdit, setUploadingEdit] = useState(false);
  // Collections picker + the fields the bulk draft never carried (cost, shipping dims) — pulled
@@ -201,6 +217,20 @@ export default function BulkUploadPage() {
     const P = (k: "weightOz" | "lengthIn" | "widthIn" | "heightIn") =>
      (dr.parcel && Number.isFinite(dr.parcel[k]) ? String(dr.parcel[k]) : "");
     const parcel = { weightOz: P("weightOz"), lengthIn: P("lengthIn"), widthIn: P("widthIn"), heightIn: P("heightIn") };
+    // Keep what the one-at-a-time flow keeps: the open questions, and enough context to re-price
+    // from an answer without a second reverse-image search.
+    setAsks((a) => ({ ...a, [gi]: (Array.isArray(d?.questions) ? d.questions : []) as SellerQuestion[] }));
+    setPriceCtx((c) => ({
+     ...c,
+     [gi]: {
+      searchQuery: d?.searchQuery ?? dr?.searchQuery ?? null,
+      reverseComps: d?.reverseComps ?? [],
+      reverseTitles: d?.reverseTitles ?? [],
+      editorialTitles: d?.editorialTitles ?? [],
+      knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null,
+      draftRanFull: d?.needDraft === true,
+     },
+    }));
 
     // 2) Price it (same inputs as the single-item flow).
     let priceUsd = 0;
@@ -210,6 +240,21 @@ export default function BulkUploadPage() {
       body: JSON.stringify({ imageUrls: photos, fields: { ...fields, conditionGrade: fields.condition, price: "", runway: (d?.runway ?? dr?.runway) || "", celebrity: d?.celebrity || "" }, searchQuery: d?.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d?.reverseComps ?? [], reverseTitles: d?.reverseTitles ?? [], editorialTitles: d?.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d?.needDraft === true }),
      }).then((r) => r.json()).catch(() => null);
      if (typeof p?.estimate?.suggestedCents === "number") priceUsd = Math.round(p.estimate.suggestedCents / 100);
+     // The whole estimate, not just the number. The band and the reasoning are what let the draft
+     // editor show the same guidance the one-at-a-time flow shows — bulk was keeping `suggestedCents`
+     // and dropping the rest, so a seller editing a bulk draft got a bare price with nothing behind it.
+     const e = p?.estimate;
+     if (e && typeof e.lowCents === "number" && typeof e.highCents === "number") {
+      setAiPrice((m) => ({
+       ...m,
+       [gi]: {
+        low: Math.round(e.lowCents / 100),
+        high: Math.round(e.highCents / 100),
+        market: typeof e.marketCents === "number" ? Math.round(e.marketCents / 100) : null,
+        note: typeof e.rationale === "string" ? e.rationale : "",
+       },
+      }));
+     }
     } catch { /* price stays 0 */ }
 
     // 3) Save a complete draft.
@@ -311,7 +356,33 @@ export default function BulkUploadPage() {
   const it = drafted[gi]; if (!isItem(it) || !it.id) return null;
   const t = (s: string) => s.trim();
   const n = (s: string) => (s.trim() === "" ? null : Number(s));
-  const priceUsd = Math.max(0, Math.round(Number(editForm.price) || 0));
+  let priceUsd = Math.max(0, Math.round(Number(editForm.price) || 0));
+
+  // ── A corrected brand is a different piece, so it needs a different price ──
+  // Answering "it's a Valentino, not unbranded" and leaving the price the AI wrote for an
+  // unbranded guess is the worst of both worlds: the listing now claims a designer at a
+  // no-name price. Re-priced from the context kept at draft time, so this costs one call and
+  // no second reverse-image search. Skipped when the seller set the price themselves — their
+  // number always wins.
+  const ctx = priceCtx[gi];
+  if (t(editForm.brand) !== it.brand && ctx && priceUsd === it.priceUsd) {
+   setSavingEdit(true);
+   const p = await fetch("/api/store/intake/pricing", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+     imageUrls: editImages,
+     fields: {
+      title: t(editForm.title), description: t(editForm.description), category: editForm.category || "",
+      brand: t(editForm.brand), era: t(editForm.era), material: t(editForm.material),
+      condition: t(editForm.condition), conditionGrade: t(editForm.condition), size: t(editForm.size),
+      price: "", runway: "", celebrity: "",
+     },
+     ...ctx,
+    }),
+   }).then((r) => r.json()).catch(() => null);
+   if (typeof p?.estimate?.suggestedCents === "number") priceUsd = Math.round(p.estimate.suggestedCents / 100);
+  }
+
   const next: BulkItem = {
    ...it, title: t(editForm.title), brand: t(editForm.brand), era: t(editForm.era), material: t(editForm.material),
    // No tag picked → keep whatever was stored. Some AI categories don't fold onto a tag, and
@@ -467,6 +538,17 @@ export default function BulkUploadPage() {
            <p className="shrink-0 text-[13px] font-semibold text-stone-900">{it.priceUsd > 0 ? `$${it.priceUsd.toLocaleString()}` : "—"}</p>
           </div>
           <p className="mt-0.5 text-[11px] text-stone-500">{meta || "no details detected"}</p>
+          {!!asks[gi]?.length && (
+           // Forty cards on screen and no way to tell which ones the AI was actually unsure about.
+           // This is the whole point of the questions: they mark the items worth thirty seconds.
+           <button
+            type="button"
+            onClick={() => openEdit(gi)}
+            className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 transition hover:border-amber-400 hover:bg-amber-100"
+           >
+            {asks[gi].map((q) => (q.field === "brand" ? "Brand" : "Garment")).join(" & ")} unconfirmed — answer
+           </button>
+          )}
           {it.description && <p className="mt-1 line-clamp-3 text-[11px] text-stone-400">{it.description}</p>}
           {!it.ok ? (
            <p className="mt-2 text-[11px] text-rose-600">Couldn&rsquo;t save this one — try it one at a time.</p>
@@ -531,6 +613,37 @@ export default function BulkUploadPage() {
       </div>
 
       <div className="space-y-3">
+       {editGi != null && asks[editGi]?.map((question) => (
+        // Garment first when both are open: it drives every comp search, so a wrong one prices a
+        // different product entirely.
+        <div key={question.field} className="rounded-lg border border-amber-300 bg-amber-50/70 px-3.5 py-3">
+         <p className="text-[13px] font-semibold text-amber-900">{question.prompt}</p>
+         <p className="mt-1 text-[12px] leading-relaxed text-amber-900/75">{question.hint}</p>
+         <p className="mt-1.5 text-[11px] text-amber-800/60">{question.why}</p>
+         <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {question.options?.map((opt) => (
+           <button
+            key={opt}
+            type="button"
+            onClick={() => {
+             setEditForm((f) => (question.field === "category" ? { ...f, category: opt } : { ...f, [question.field]: opt }));
+             setAsks((a) => ({ ...a, [editGi]: (a[editGi] || []).filter((x) => x.field !== question.field) }));
+            }}
+            className="rounded-md border border-amber-400 bg-white px-2.5 py-1 text-[12px] font-semibold text-amber-900 transition hover:bg-amber-100"
+           >
+            {opt}
+           </button>
+          ))}
+          <button
+           type="button"
+           onClick={() => setAsks((a) => ({ ...a, [editGi]: (a[editGi] || []).filter((x) => x.field !== question.field) }))}
+           className="rounded-md px-2.5 py-1 text-[12px] font-medium text-amber-800/70 underline underline-offset-2 transition hover:text-amber-900"
+          >
+           {question.field === "brand" ? "No label — leave it blank" : "Keep what's there"}
+          </button>
+         </div>
+        </div>
+       ))}
        <Field label="Title" required><Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} /></Field>
        <div className="grid grid-cols-2 gap-3">
         <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Fendi" /></Field>
@@ -559,6 +672,23 @@ export default function BulkUploadPage() {
          })()}
         </Field>
        </div>
+
+       {/* The same guidance the one-at-a-time flow gives: what the AI thought the piece was worth,
+           why, and where this price sits between a quick sale and top demand. Only shown when the
+           draft actually produced a band — an invented scale would be worse than none. */}
+       {editGi != null && aiPrice[editGi] && (
+        <div className="mt-3">
+         {aiPrice[editGi].note && (
+          <p className="text-[12px] leading-relaxed text-stone-400">{aiPrice[editGi].note}</p>
+         )}
+         <PriceScale
+          low={aiPrice[editGi].low}
+          high={aiPrice[editGi].high}
+          market={aiPrice[editGi].market}
+          value={Number(editForm.price) || 0}
+         />
+        </div>
+       )}
        <Field label="Description">
         <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
        </Field>

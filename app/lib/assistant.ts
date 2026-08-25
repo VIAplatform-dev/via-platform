@@ -177,7 +177,22 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  case "update_storefront_design": {
  const sf = (await getStorefrontBySlug(slug)) ?? (await upsertStorefront(slug, { handle: slug, enabled: false, tagline: "", accentColor: "#5D0F17", heroImage: "", about: "" }));
  const theme: StorefrontTheme = { ...(sf.theme ?? {}) };
- if (input.template) { const t = getTemplate(String(input.template)); if (t) { theme.template = t.id; theme.colors = { ...t.colors }; theme.fonts = { ...t.fonts }; } }
+ // A template's LOOK — palette, type, corners, header, catalogue density. Sections are left alone
+ // here on purpose: this tool runs mid-conversation on a store the seller has already built, and
+ // "make it feel more like Vitrine" must not silently delete the page they were editing. Laying out
+ // a template's sections is the studio's template picker, which asks first.
+ if (input.template) {
+ const t = getTemplate(String(input.template));
+ if (t) {
+  theme.template = t.id;
+  theme.colors = { ...t.colors };
+  theme.fonts = { ...t.fonts };
+  theme.radius = t.radius;
+  theme.headerLayout = t.headerLayout;
+  theme.shopGrid = { ...t.grid };
+  theme.productLayout = t.productLayout;
+ }
+ }
  if (input.colors) { const c = input.colors; theme.colors = { bg: HEX.test(c.bg) ? c.bg : theme.colors?.bg || "#FFFDF8", text: HEX.test(c.text) ? c.text : theme.colors?.text || "#1a1a1a", accent: HEX.test(c.accent) ? c.accent : theme.colors?.accent || "#5D0F17" }; }
  if (input.fonts) { const f = input.fonts; theme.fonts = { heading: HEADING_FONTS.includes(f.heading) ? f.heading : theme.fonts?.heading || "Playfair Display", body: BODY_FONTS.includes(f.body) ? f.body : theme.fonts?.body || "Inter" }; }
  await setStorefrontTheme(slug, theme);

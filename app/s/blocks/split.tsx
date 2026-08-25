@@ -25,7 +25,7 @@ function SplitHalf({ kit }: { kit: EditKit }) {
  return (
   <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
    <div className={right ? "@lg:order-2" : ""}>
-    <ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} ratio="aspect-[4/5]" rounded="vya-img" />
+    <ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[4/5]" rounded="vya-img" />
    </div>
    <div className="vya-free-canvas relative"><Body kit={kit} /></div>
   </section>
@@ -42,7 +42,7 @@ function SplitOffset({ kit }: { kit: EditKit }) {
  return (
   <section className="mx-auto grid max-w-6xl gap-8 px-5 @xl:px-8 py-16 @xl:py-28 @lg:grid-cols-[1.15fr_1fr] @lg:gap-16">
    <div className={right ? "@lg:order-2" : ""}>
-    <ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} ratio="aspect-[3/4] @lg:aspect-[4/5]" rounded="vya-img" />
+    <ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[3/4] @lg:aspect-[4/5]" rounded="vya-img" />
    </div>
    <div className="vya-free-canvas relative flex flex-col justify-end pb-4 @lg:pb-16"><Body kit={kit} /></div>
   </section>
@@ -74,7 +74,7 @@ function SplitStacked({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  return (
   <section className="mx-auto max-w-4xl px-5 @xl:px-8 py-16 @xl:py-24">
-   <ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} ratio="aspect-[16/9]" rounded="vya-img" />
+   <ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[16/9]" rounded="vya-img" />
    <div className="vya-free-canvas relative mx-auto mt-9 max-w-2xl text-center [&_.vya-cta]:mx-auto"><Body kit={kit} /></div>
   </section>
  );

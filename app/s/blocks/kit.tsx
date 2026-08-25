@@ -106,11 +106,16 @@ export type Ctx = {
 // An image slot inside a layout (a column's photo, a split's picture, a category tile).
 //
 // Live: the photo, or nothing at all when it's unset — a placeholder box on a real storefront is a
-// bug, not a hint. Editor: always a frame, and clicking it opens the file picker and writes the URL
-// straight back through `onPick`. An existing photo is replaced the same way, so a merchant never has
-// to recreate a section (or find the right panel row) to change one picture.
-export function ImageSlot({ kit, src, alt, onPick, ratio = "aspect-[4/3]", className = "", rounded = "vya-round", label = "Photo" }: {
+// bug, not a hint.
+//
+// Editor: always a frame. An EMPTY slot is one big target — click anywhere in it to pick a file.
+// A FILLED slot is not, because a photo you can't touch without the file dialog opening is a photo
+// you can't compose with: dragging it pans the crop, and replacing it is the explicit "Replace"
+// button that appears on hover. Panning writes `objectPosition` through `onPos`; a slot that doesn't
+// pass one simply isn't pannable (thumbnails, gallery tiles) and keeps the Replace button.
+export function ImageSlot({ kit, src, alt, onPick, pos, onPos, ratio = "aspect-[4/3]", className = "", rounded = "vya-round", label = "Photo" }: {
  kit: EditKit; src?: string; alt?: string; onPick: (url: string) => void;
+ pos?: string; onPos?: (v: string) => void;
  ratio?: string; className?: string; rounded?: string; label?: string;
 }) {
  const { ctx } = kit;
@@ -121,15 +126,52 @@ export function ImageSlot({ kit, src, alt, onPick, ratio = "aspect-[4/3]", class
  // component. A useState here would break that, and only the editor ever sees this highlight anyway.
  const ring = "ring-2 ring-[#5D0F17]";
  if (!ctx.edit) {
-  return src ? <div className={`${rounded} ${ratio} w-full overflow-hidden ${className}`} style={{ background: `${ctx.fg}0d` }}><img src={src} alt={alt || ""} loading="lazy" className="h-full w-full object-cover" /></div> : null;
+  return src ? <div className={`${rounded} ${ratio} w-full overflow-hidden ${className}`} style={{ background: `${ctx.fg}0d` }}><img src={src} alt={alt || ""} loading="lazy" className="h-full w-full object-cover" style={pos ? { objectPosition: pos } : undefined} /></div> : null;
  }
  const open = pick ? (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); pick(onPick); } : undefined;
+ // Pan the crop by dragging the photo. Hook-free like the rest of this file (it also renders on the
+ // server): the drag writes straight to the node's style for feedback and commits the final value
+ // once, on release — so an in-flight drag never round-trips through React.
+ const pannable = !!(src && onPos);
+ const startPan = pannable ? (e: React.PointerEvent) => {
+  if (e.button !== 0) return;
+  const frame = e.currentTarget as HTMLElement;
+  const img = frame.querySelector("img");
+  if (!img) return;
+  e.preventDefault(); e.stopPropagation();
+  const box = frame.getBoundingClientRect();
+  const m = /(-?[\d.]+)%\s+(-?[\d.]+)%/.exec(pos || "");
+  const sx = m ? parseFloat(m[1]) : 50, sy = m ? parseFloat(m[2]) : 50;
+  const x0 = e.clientX, y0 = e.clientY;
+  let nx = sx, ny = sy, moved = false;
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  const move = (ev: PointerEvent) => {
+   const dx = ev.clientX - x0, dy = ev.clientY - y0;
+   if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+   moved = true;
+   frame.style.cursor = "grabbing";
+   // Drag right and the picture should follow your finger, which means revealing what is to its
+   // LEFT — object-position counts the other way, so the delta is subtracted.
+   nx = clamp(sx - (dx / Math.max(1, box.width)) * 100);
+   ny = clamp(sy - (dy / Math.max(1, box.height)) * 100);
+   img.style.objectPosition = `${nx}% ${ny}%`;
+  };
+  const up = () => {
+   window.removeEventListener("pointermove", move);
+   window.removeEventListener("pointerup", up);
+   frame.style.cursor = "";
+   if (moved) onPos!(`${Math.round(nx)}% ${Math.round(ny)}%`);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+ } : undefined;
  return (
   <div
-   role={open ? "button" : undefined}
-   tabIndex={open ? 0 : undefined}
-   onClick={open}
-   onKeyDown={open ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); pick!(onPick); } } : undefined}
+   role={open && !src ? "button" : undefined}
+   tabIndex={open && !src ? 0 : undefined}
+   onClick={src ? undefined : open}
+   onPointerDown={startPan}
+   onKeyDown={open && !src ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); pick!(onPick); } } : undefined}
    onDragOver={drop ? (e) => { if (!e.dataTransfer.types.includes("Files")) return; e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add(...ring.split(" ")); } : undefined}
    onDragLeave={drop ? (e) => e.currentTarget.classList.remove(...ring.split(" ")) : undefined}
    onDrop={drop ? (e) => {
@@ -139,16 +181,22 @@ export function ImageSlot({ kit, src, alt, onPick, ratio = "aspect-[4/3]", class
     e.preventDefault(); e.stopPropagation();
     drop(f, onPick);
    } : undefined}
-   title={open ? (src ? "Click or drop a photo to replace" : "Click or drop a photo") : undefined}
-   className={`vya-slot group/slot relative ${rounded} ${ratio} w-full overflow-hidden ${open ? "cursor-pointer" : ""} ${className} ${src ? "" : "grid place-items-center border border-dashed"}`}
+   title={src ? (pannable ? "Drag to reposition · Replace to change the photo" : undefined) : open ? "Click or drop a photo" : undefined}
+   className={`vya-slot group/slot relative ${rounded} ${ratio} w-full overflow-hidden ${src ? (pannable ? "cursor-grab" : "") : open ? "cursor-pointer" : ""} ${className} ${src ? "" : "grid place-items-center border border-dashed"}`}
    style={src ? { background: `${ctx.fg}0d` } : { borderColor: `${ctx.fg}33`, background: `${ctx.fg}08` }}
   >
    {src
-    ? <img src={src} alt={alt || ""} loading="lazy" className="h-full w-full object-cover" />
+    ? <img src={src} alt={alt || ""} loading="lazy" draggable={false} className="h-full w-full select-none object-cover" style={pos ? { objectPosition: pos } : undefined} />
     : <span className="text-[10px] uppercase tracking-[0.2em] opacity-40">{open ? `Add ${label.toLowerCase()}` : label}</span>}
    {src && open && (
-    <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/35 opacity-0 transition-opacity group-hover/slot:opacity-100">
-     <span className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-800">Replace</span>
+    <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/35 opacity-0 transition-opacity group-hover/slot:opacity-100">
+     <button
+      type="button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={open}
+      className="pointer-events-auto rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-800 transition hover:bg-white"
+     >Replace</button>
+     {pannable && <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-white/80">Drag to reposition</span>}
     </span>
    )}
   </div>

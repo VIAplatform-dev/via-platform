@@ -1,5 +1,5 @@
 import { AI_MODELS } from "./ai-models";
-import { STOREFRONT_TEMPLATES } from "./storefront-templates";
+import { STOREFRONT_TEMPLATES, getTemplate } from "./storefront-templates";
 
 // Powers the landing-page "Describe it → build my store" trial. Turns a one-sentence shop
 // description into a storefront PREVIEW: an AI-written name + tagline and one of VYA's REAL
@@ -18,7 +18,7 @@ export type StorePreview = {
 };
 
 const TEMPLATE_IDS = STOREFRONT_TEMPLATES.map((t) => t.id);
-const DEFAULT_TEMPLATE = STOREFRONT_TEMPLATES.find((t) => t.id === "editorial-luxe") || STOREFRONT_TEMPLATES[0];
+const DEFAULT_TEMPLATE = getTemplate("elegant") || STOREFRONT_TEMPLATES[0];
 
 async function anthropic(body: unknown): Promise<string | null> {
  const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -85,7 +85,7 @@ Match the template to the vibe. Make the name and tagline specific and true to t
  const tagline = (typeof ai.tagline === "string" && ai.tagline.trim()) ? ai.tagline.trim().slice(0, 60) : "Curated vintage · worldwide";
 
  // Real template → real palette (so the preview looks like a store a seller would actually get).
- const tpl = STOREFRONT_TEMPLATES.find((t) => t.id === ai.template) || DEFAULT_TEMPLATE;
+ const tpl = getTemplate(String(ai.template)) || DEFAULT_TEMPLATE;
  const palette = { bg: tpl.colors.bg, name: tpl.colors.text, accent: tpl.colors.accent };
 
  return { storeName, tagline, template: tpl.id, palette };

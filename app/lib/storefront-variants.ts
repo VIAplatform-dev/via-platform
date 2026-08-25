@@ -14,8 +14,8 @@
 // `variant` field, and must keep rendering exactly what it rendered before. So the first entry always
 // describes the layout that shipped, and `resolveVariant` falls back to it for absent/unknown ids.
 
-import type { BlockType, BlockField } from "./storefront-blocks";
-import type { ItemSchemaName } from "./storefront-items";
+import type { BlockType, BlockField } from "./storefront-blocks.ts";
+import type { ItemSchemaName } from "./storefront-items.ts";
 
 // Picker groupings — so ~75 layouts read as an organized library instead of a wall of cards.
 export type SectionCategory = "Hero" | "Products" | "Collections" | "Editorial" | "Social Proof" | "Content" | "Media" | "Marketing" | "Miscellaneous";

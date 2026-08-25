@@ -55,13 +55,20 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
  const shown = products.slice(0, featuredCount(p.limit, 8));
  // Unset = "Auto": fit the row length to how many pieces there actually are.
  const c = p.cols || String(autoColumns(shown.length));
+ // autoColumns already avoids a stranded piece, but a template that pins `cols` bypasses it — and
+ // four pieces in a three-wide grid leaves one alone on its own row, which reads as a broken layout
+ // rather than a curated one. This is the FEATURED block, a chosen showcase rather than the
+ // catalogue, so dropping the odd one out is honest: nothing is hidden that a shopper was promised.
+ // A remainder of two still looks deliberate, so only the lone orphan is trimmed.
+ const perRow = Number(c) || 3;
+ const noOrphan = shown.length > perRow && shown.length % perRow === 1 ? shown.slice(0, -1) : shown;
  const cols = c === "1" ? "@lg:grid-cols-1" : c === "2" ? "@lg:grid-cols-2" : c === "3" ? "@lg:grid-cols-3" : c === "5" ? "@lg:grid-cols-4 @2xl:grid-cols-5" : "@lg:grid-cols-4";
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
    <Head kit={kit} />
-   {shown.length ? (
+   {noOrphan.length ? (
     <div className={`grid grid-cols-2 gap-x-5 gap-y-12 @lg:gap-x-8 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
-     {shown.map((it, i) => <Card key={it.key || i} it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} />)}
+     {noOrphan.map((it, i) => <Card key={it.key || i} it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} />)}
     </div>
    ) : <Empty />}
   </section>
@@ -91,7 +98,7 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
      ))}
     </div>
    ) : <Empty />}
-   <style dangerouslySetInnerHTML={{ __html: ".vya-rail{scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
+   <style dangerouslySetInnerHTML={{ __html: ".vya-rail{justify-content:safe center;scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
   </section>
  );
 }

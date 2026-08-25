@@ -5,73 +5,36 @@
 // decision per step on the right: look → pages → colours → fonts. In VYA a "look" IS the personality
 // (layout + colours + type as one kit), so there's a single look step. On finish it writes the theme +
 // pages and hands off to the Canva-style studio.
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Blocks from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, type ChromeNav } from "@/app/s/StoreChrome";
-import { STOREFRONT_TEMPLATES, STOREFRONT_PALETTES, templateBlocks, storefrontFontsHref, SERIF_FONTS } from "@/app/lib/storefront-templates";
+import { STOREFRONT_TEMPLATES, STOREFRONT_PALETTES, templateBlocks, templateShopBlocks, templatePages, getTemplate, storefrontFontsHref, SERIF_FONTS } from "@/app/lib/storefront-templates";
+import { CATEGORY_PRESET, TAILOR_FONT_PAIRS, tailorBlocks } from "@/app/lib/storefront-tailoring";
 import { makeBlock, type Block } from "@/app/lib/storefront-blocks";
-import { defaultStarterTheme } from "@/app/lib/storefront-default";
-import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
 const ACCENT = "#5D0F17";
 
-// In VYA the "personality" and the "template" are the same choice — each look IS a curated kit (layout +
-// colours + fonts). So there's ONE look step, not two. This is the personality word shown on each card.
-const VIBE: Record<string, string> = {
- "editorial-luxe": "Elevated", "archive-noir": "Archival", "modern-minimal": "Minimal",
- "literary-archive": "Literary", "romantic": "Romantic", "warm-earthy": "Warm & earthy", "playful-drop": "Playful",
-};
+// In VYA the "personality" and the "template" are the same choice — each look IS a curated kit
+// (layout + colours + type + the pages that come with it). So there's ONE look step, not two.
+//
+// The personality word IS the template's name, read from storefront-templates. This page used to
+// keep its own map of them — a second set of words for the same eight looks, which is precisely the
+// drift the note below warns about: a seller met "Collector" here and "Heirloom" in the gallery for
+// the same template. One name, one place.
 
-// Curated pairings from current editorial best-practice — a display face with personality over a clean,
-// legible body. (Serif display + sans body is the safe, high-fashion default; a couple stay all-serif.)
-const FONT_PAIRS = [
- { name: "Editorial", heading: "Playfair Display", body: "Inter" },
- { name: "High Contrast", heading: "Bodoni Moda", body: "DM Sans" },
- { name: "Contemporary", heading: "Bricolage Grotesque", body: "Inter" },
- { name: "Warm Serif", heading: "Fraunces", body: "Source Serif 4" },
- { name: "Literary", heading: "Newsreader", body: "Newsreader" },
- { name: "Romantic", heading: "Cormorant Garamond", body: "Poppins" },
- { name: "Modern", heading: "Space Grotesk", body: "Inter" },
-];
+// The font pairings, the sell-categories and their presets all live in storefront-tailoring so the
+// signup wizard, this build wizard and the one-shot auto-build can't drift apart — this page carried
+// its own copy of all three until the eight-template rewrite, and every one of them went stale.
+const FONT_PAIRS = TAILOR_FONT_PAIRS.map((f) => ({ ...f, name: `${f.heading} / ${f.body}` }));
 
-// What the seller sells drives the whole starting kit. Each category maps to a distinct look (template +
-// palette + font pairing) AND tailored content (hero copy, shop-by-category tiles, marquee words). Picking
-// several blends them: the FIRST pick leads the look; tiles + marquee merge across all picks — so
-// "streetwear + vintage" lands somewhere genuinely different from "designer luxury".
-type CatPreset = { template: string; palette: string; font: number; hero: { heading: string; sub: string; cta: string }; tiles: string[]; marquee: string[] };
-const CATEGORY_OPTIONS: { key: string; label: string }[] = [
- { key: "streetwear", label: "Streetwear" },
- { key: "designer", label: "Designer & luxury" },
- { key: "vintage", label: "Vintage & archival" },
- { key: "y2k", label: "Y2K & retro" },
- { key: "denim", label: "Denim" },
- { key: "workwear", label: "Workwear & utility" },
- { key: "contemporary", label: "Contemporary" },
- { key: "menswear", label: "Menswear" },
- { key: "womenswear", label: "Womenswear" },
- { key: "accessories", label: "Accessories & jewelry" },
-];
-const CATEGORY_PRESET: Record<string, CatPreset> = {
- streetwear: { template: "playful-drop", palette: "charcoal", font: 6, hero: { heading: "New heat, curated.", sub: "One-of-one grails and everyday staples — cop them before they’re gone.", cta: "Shop the drop" }, tiles: ["Hoodies", "Tees", "Sneakers", "Outerwear", "Denim", "Headwear"], marquee: ["New drops", "One of one", "Deadstock", "Grails", "Restocked"] },
- designer: { template: "editorial-luxe", palette: "bone-ink", font: 1, hero: { heading: "Designer, authenticated.", sub: "Investment pieces and timeless labels — curated, verified, one of a kind.", cta: "Shop designer" }, tiles: ["Handbags", "Ready-to-wear", "Shoes", "Jewelry", "Outerwear", "Accessories"], marquee: ["Authenticated", "Timeless", "Investment pieces", "Iconic"] },
- vintage: { template: "warm-earthy", palette: "espresso", font: 3, hero: { heading: "Vintage, one of one.", sub: "Hand-picked pieces with history — no restocks, ever.", cta: "Shop vintage" }, tiles: ["Dresses", "Denim", "Knitwear", "Outerwear", "Tees", "Accessories"], marquee: ["One of one", "Hand-picked", "With history", "No restocks"] },
- y2k: { template: "playful-drop", palette: "blush", font: 2, hero: { heading: "Y2K & retro finds.", sub: "The good stuff from the archives — nostalgic, playful, rare.", cta: "Shop the era" }, tiles: ["Tops", "Denim", "Dresses", "Bags", "Shoes", "Accessories"], marquee: ["Y2K", "Retro", "Archive", "Nostalgia", "Rare finds"] },
- denim: { template: "modern-minimal", palette: "dusty-blue", font: 6, hero: { heading: "Denim, done right.", sub: "Vintage washes, perfect fades, one-of-one pairs.", cta: "Shop denim" }, tiles: ["Jeans", "Jackets", "Shorts", "Skirts", "Workwear", "Accessories"], marquee: ["Vintage wash", "Selvedge", "Perfect fades", "One of one"] },
- workwear: { template: "archive-noir", palette: "sage", font: 3, hero: { heading: "Workwear & utility.", sub: "Built-to-last pieces with a story in every seam.", cta: "Shop workwear" }, tiles: ["Jackets", "Trousers", "Overalls", "Shirts", "Boots", "Bags"], marquee: ["Built to last", "Utility", "Heritage", "Rugged"] },
- contemporary: { template: "modern-minimal", palette: "greige", font: 2, hero: { heading: "Considered, contemporary.", sub: "Modern staples and quiet statement pieces.", cta: "Shop the edit" }, tiles: ["New in", "Tops", "Bottoms", "Outerwear", "Shoes", "Accessories"], marquee: ["New in", "Considered", "Everyday", "Quiet luxury"] },
- menswear: { template: "archive-noir", palette: "charcoal", font: 1, hero: { heading: "Menswear, curated.", sub: "Tailoring, staples and standout pieces — edited with intent.", cta: "Shop menswear" }, tiles: ["Shirts", "Tailoring", "Knitwear", "Outerwear", "Denim", "Shoes"], marquee: ["Curated", "Tailored", "Considered", "Standout"] },
- womenswear: { template: "romantic", palette: "blush", font: 5, hero: { heading: "Womenswear, one of one.", sub: "Dresses, knits and finds you won’t see on anyone else.", cta: "Shop womenswear" }, tiles: ["Dresses", "Tops", "Knitwear", "Outerwear", "Bags", "Shoes"], marquee: ["One of one", "Romantic", "Hand-picked", "Timeless"] },
- accessories: { template: "editorial-luxe", palette: "antique-gold", font: 0, hero: { heading: "Accessories & jewelry.", sub: "The finishing pieces — bags, belts, and one-of-a-kind jewels.", cta: "Shop accessories" }, tiles: ["Handbags", "Jewelry", "Belts", "Scarves", "Sunglasses", "Watches"], marquee: ["One of a kind", "Finishing pieces", "Rare", "Curated"] },
-};
-const dedupeCI = (a: string[]) => { const seen = new Set<string>(); return a.filter((x) => { const k = x.toLowerCase(); if (!x || seen.has(k)) return false; seen.add(k); return true; }); };
 
-const OPTIONAL_PAGES = [
- { slug: "about", label: "About" },
- { slug: "faq", label: "FAQ" },
- { slug: "shipping-returns", label: "Shipping & Returns" },
- { slug: "contact", label: "Contact" },
-];
+// The pages on offer come from the CHOSEN TEMPLATE, because each one ships its own set: Corner Shop
+// offers Visit and Consign With Us, Provenance offers Authentication and Sell To Us. A fixed
+// about/faq/shipping list was the same four pages whichever look you picked.
+const templatePageOptions = (templateId: string) =>
+ templatePages(templateId).map((p) => ({ slug: p.slug, label: p.title }));
 
 const SAMPLE = [
  { title: "Silk slip dress", price: "$185", image: "" },
@@ -80,7 +43,11 @@ const SAMPLE = [
  { title: "Cashmere knit", price: "$95", image: "" },
 ];
 
-const STEPS = ["Sell", "Look", "Pages", "Colours", "Fonts"];
+// The look IS the first decision. "What do you sell" used to lead, but it asks a seller to
+// describe their inventory before they've seen anything — and signup already asked. Categories
+// still arrive from signup via the URL and still pick the recommended template; they're just not
+// a question here any more.
+const STEPS = ["Look", "Pages", "Colours", "Fonts"];
 const ff = (name: string) => `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}`;
 
 // Every font any picker or the preview might show — loaded once so previews render in the real face.
@@ -89,26 +56,55 @@ const ALL_WIZARD_FONTS = Array.from(new Set([
  ...STOREFRONT_TEMPLATES.flatMap((t) => [t.fonts.heading, t.fonts.body]),
 ]));
 
-export default function BuildWizard() {
+function BuildWizardInner() {
  const router = useRouter();
  const [step, setStep] = useState(0);
  const [name, setName] = useState("Your store");
  const [cats, setCats] = useState<string[]>([]); // what they sell (ordered — first pick leads the look)
- const [customs, setCustoms] = useState<string[]>([]); // free-typed categories
- const [customInput, setCustomInput] = useState("");
- const [templateId, setTemplateId] = useState("editorial-luxe");
+ // Free-typed categories from signup. Nothing adds to them here — the look, not the inventory,
+ // is what this wizard asks about — but they still shape the starting content.
+ const [customs] = useState<string[]>([]);
+ // A live id, not a retired one. "editorial-luxe" only resolved because getTemplate falls through
+ // the legacy map — a default should name something that exists.
+ const [templateId, setTemplateId] = useState("elegant");
  const [pages, setPages] = useState<Set<string>>(new Set(["about", "faq"]));
  const [paletteId, setPaletteId] = useState<string | null>(null);
  const [fontIdx, setFontIdx] = useState<number | null>(null);
  const [previewPage, setPreviewPage] = useState("home"); // which page the live preview is showing
  const [busy, setBusy] = useState(false);
+ // The storefront already supports a logo — StoreHeader draws it in place of the store name — so
+ // this only needs somewhere to put one. Same upload path the studio uses.
+ const [logo, setLogo] = useState("");
+ const [uploadingLogo, setUploadingLogo] = useState(false);
+
+ async function uploadLogo(file: File | null | undefined) {
+  if (!file || !file.type.startsWith("image/")) return;
+  setUploadingLogo(true);
+  try {
+   const fd = new FormData(); fd.append("file", file);
+   const r = await fetch("/api/store/assets", { method: "POST", body: fd });
+   const d = r.ok ? await r.json().catch(() => null) : null;
+   if (d?.url) setLogo(d.url);
+  } finally { setUploadingLogo(false); }
+ }
+
+ // Signup hands over what it already asked — the store name and what they sell — so the seller
+ // isn't asked the same questions twice on the way into the builder.
+ const params = useSearchParams();
+ useEffect(() => {
+ const handed = params.get("cats");
+ if (handed) setCats(handed.split(",").filter(Boolean));
+ const handedName = params.get("name");
+ if (handedName) setName(handedName);
+ // Look is step 0 now, so there is nothing to skip past.
+ }, [params]);
 
  useEffect(() => {
  (async () => {
  const d = await fetch("/api/store/storefront/design").then((r) => (r.ok ? r.json() : null)).catch(() => null);
- if (d?.storeName) setName(d.storeName);
+ if (d?.storeName && !params.get("name")) setName(d.storeName);
  })();
- }, []);
+ }, [params]);
 
  // The first selected category with a known preset leads the look; falling back to the raw first pick.
  const primary = cats.map((k) => CATEGORY_PRESET[k]).find(Boolean) || null;
@@ -121,68 +117,55 @@ export default function BuildWizard() {
  setFontIdx(primary.font);
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [cats]);
- // Shop-by-category tiles + marquee words merge across every pick (and any custom ones); hero copy is the
- // primary's. This is what makes "streetwear + vintage" a materially different starting store than "designer".
- const tiles = dedupeCI([...cats.flatMap((k) => CATEGORY_PRESET[k]?.tiles || []), ...customs]).slice(0, 6);
- const marquee = dedupeCI(cats.flatMap((k) => CATEGORY_PRESET[k]?.marquee || [])).slice(0, 8);
-
- const tmpl = STOREFRONT_TEMPLATES.find((t) => t.id === templateId) || STOREFRONT_TEMPLATES[0];
+ // Tiles and marquee words merge across every pick (and any custom ones); the hero copy is the first
+ // pick's. That merge lives in tailorBlocks, which is what makes "streetwear + vintage" a materially
+ // different starting store than "designer".
+ const tmpl = getTemplate(templateId) || STOREFRONT_TEMPLATES[0];
  const colors = (paletteId && STOREFRONT_PALETTES.find((p) => p.id === paletteId)?.colors) || tmpl.colors;
  const fonts = fontIdx != null ? { heading: FONT_PAIRS[fontIdx].heading, body: FONT_PAIRS[fontIdx].body } : tmpl.fonts;
  const fontHref = useMemo(() => storefrontFontsHref(ALL_WIZARD_FONTS), []);
- // Tailor the template's home blocks to what they sell — overriding the hero copy, the shop-by-category
- // tiles, and the marquee words where those sections exist. Keeps the template's layout personality.
- const tailoredHome = (): Block[] => {
- const bs = templateBlocks(templateId);
- if (!primary) return bs;
- let heroDone = false, tilesDone = false, marqDone = false;
- return bs.map((b) => {
- if (b.type === "hero" && !heroDone) { heroDone = true; return { ...b, props: { ...b.props, heading: primary.hero.heading, subtext: primary.hero.sub, cta: primary.hero.cta } }; }
- if (b.type === "collections" && !tilesDone && tiles.length) { tilesDone = true; return { ...b, props: { ...b.props, items: tiles.join("\n") } }; }
- if (b.type === "marquee" && !marqDone && marquee.length) { marqDone = true; return { ...b, props: { ...b.props, items: marquee.join("\n") } }; }
- return b;
- });
- };
- // Real page content for the interactive preview — home is the tailored template, other pages come from the
- // same starter content the store gets on finish, so clicking the nav navigates a true multi-page site.
- const base = useMemo(() => defaultStarterTheme(name), [name]);
+ // Every page the store will actually get, tailored to what they sell. Built once per template so the
+ // preview and the store written on finish come from the same call — they used to be assembled
+ // separately, which is how the preview could show a page the finished store didn't have.
+ const tailored = useMemo(() => ({
+ home: tailorBlocks(templateBlocks(templateId), cats, customs),
+ shop: tailorBlocks(templateShopBlocks(templateId), cats, customs),
+ pages: templatePages(templateId).map((p) => ({ ...p, blocks: tailorBlocks(p.blocks, cats, customs) })),
+ }), [templateId, cats, customs]);
+
+ const pageOptions = useMemo(() => templatePageOptions(templateId), [templateId]);
+
+ // The interactive preview renders the real thing: the Shop page shows the template's intro above a
+ // product grid, and every other page is the template's own content.
  const pageBlocks = (slug: string): Block[] => {
- if (slug === "shop") return [makeBlock("featured", { heading: "Shop all" })];
- if (slug === "home") return tailoredHome();
- const seeded = base.extraPages?.find((p) => p.slug === slug);
- if (seeded) return seeded.blocks as Block[];
- if (slug === "contact") return [makeBlock("text", { heading: "Get in touch", body: "Questions about a piece, sizing, or an order? Email us — we usually reply within a day." })];
- return templateBlocks(templateId);
+ if (slug === "home") return tailored.home;
+ if (slug === "shop") return [...tailored.shop, makeBlock("featured", { heading: "Shop all", limit: "8", cols: String(tmpl.grid.cols) })];
+ return tailored.pages.find((p) => p.slug === slug)?.blocks ?? tailored.home;
  };
  const previewBlocks = pageBlocks(previewPage);
  const navItems: ChromeNav[] = [
  { label: "Home", slug: "home", active: previewPage === "home" },
  { label: "Shop", slug: "shop", active: previewPage === "shop" },
- ...OPTIONAL_PAGES.filter((p) => pages.has(p.slug)).map((p) => ({ label: p.label, slug: p.slug, active: previewPage === p.slug })),
+ ...pageOptions.filter((p) => pages.has(p.slug)).map((p) => ({ label: p.label, slug: p.slug, active: previewPage === p.slug })),
  ];
  const goPreview = (item: ChromeNav) => item.slug && setPreviewPage(item.slug);
 
  const canNext = step !== 1 || name.trim().length >= 2; // the name lives on the Look step (step 1)
  const isLast = step === STEPS.length - 1;
- const toggleCat = (k: string) => setCats((cs) => (cs.includes(k) ? cs.filter((x) => x !== k) : [...cs, k]));
- const addCustom = (e: React.FormEvent) => { e.preventDefault(); const v = customInput.trim(); if (v && customs.length < 8 && !customs.some((c) => c.toLowerCase() === v.toLowerCase())) setCustoms((cs) => [...cs, v]); setCustomInput(""); };
 
  async function finish() {
  setBusy(true);
- const base = defaultStarterTheme(name);
- const extraPages = [] as { slug: string; title: string; blocks: unknown[] }[];
- for (const p of OPTIONAL_PAGES) {
- if (!pages.has(p.slug)) continue;
- const seeded = base.extraPages?.find((x) => x.slug === p.slug);
- if (seeded) extraPages.push(seeded);
- else if (p.slug === "contact") extraPages.push({ slug: "contact", title: "Contact", blocks: [
- makeBlock("text", { heading: "Get in touch", body: "Questions about a piece, sizing, or an order? Email us — we usually reply within a day." }),
- makeBlock("newsletter", { heading: "Stay in touch", subtext: "News and new arrivals, now and then." }),
- ] });
- }
+ // Only the pages the seller kept ticked. Everything else — sections, palette, type, corners,
+ // header, catalogue density — is the template as previewed, so the store they land in is the
+ // store they just spent four steps looking at.
+ const extraPages = tailored.pages.filter((p) => pages.has(p.slug));
  await fetch("/api/store/storefront/design", {
  method: "POST", headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ template: templateId, colors, fonts, blocks: tailoredHome(), shopBlocks: [], extraPages }),
+ body: JSON.stringify({
+ template: templateId, applyContent: false,
+ colors, fonts, radius: tmpl.radius, headerLayout: tmpl.headerLayout, shopGrid: tmpl.grid, productLayout: tmpl.productLayout,
+ blocks: tailored.home, shopBlocks: tailored.shop, extraPages,
+ }),
  }).catch(() => {});
  router.replace("/admin/storefront");
  }
@@ -208,9 +191,9 @@ export default function BuildWizard() {
  <div style={{ width: 1180, zoom: 0.64 } as React.CSSProperties}>
  <div style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
  {/* The store name lands here as the wordmark — the branding shows on the page, not just the URL. */}
- <StoreHeader storeName={name || "Your store"} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={goPreview} />
+ <StoreHeader storeName={name || "Your store"} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={goPreview} />
  <Blocks blocks={previewBlocks} colors={colors} fonts={fonts} radius="sharp" products={SAMPLE} shopHref="#" />
- <StoreFooter storeName={name || "Your store"} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} year={2026} onNav={goPreview} newsletter={<div className="mx-auto flex max-w-sm items-center gap-2"><input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" /><span className="grid h-10 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Subscribe</span></div>} />
+ <StoreFooter storeName={name || "Your store"} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} year={2026} onNav={goPreview} newsletter={<div className="mx-auto flex max-w-sm items-center gap-2"><input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" /><span className="grid h-10 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Subscribe</span></div>} />
  </div>
  </div>
  </div>
@@ -226,42 +209,26 @@ export default function BuildWizard() {
 
  <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
  {step === 0 && (
- <Step title="What do you sell?" sub="Pick any that fit — we’ll tailor your store’s look and starting content to match. Your first pick leads the style.">
- <div className="flex flex-wrap gap-2">
- {CATEGORY_OPTIONS.map((c, i) => {
- const on = cats.includes(c.key);
- const lead = on && cats[0] === c.key;
- return (
- <button key={c.key} type="button" onClick={() => toggleCat(c.key)} className={`relative rounded-full border px-3.5 py-2 text-[13px] font-medium transition ${on ? "border-[#5D0F17] bg-[#5D0F17] text-white" : "border-black/12 text-stone-700 hover:border-black/30"}`}>
- {c.label}{lead && <span className="ml-1.5 rounded-full bg-white/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide">Leads</span>}
- </button>
- );
- })}
- </div>
- {customs.length > 0 && (
- <div className="mt-2.5 flex flex-wrap gap-2">
- {customs.map((c) => (
- <span key={c} className="flex items-center gap-1.5 rounded-full border border-[#5D0F17]/30 bg-[#5D0F17]/[0.06] px-3 py-1.5 text-[13px] text-stone-700">
- {c}<button type="button" onClick={() => setCustoms((cs) => cs.filter((x) => x !== c))} className="text-stone-400 hover:text-stone-700"><X size={13} /></button>
- </span>
- ))}
- </div>
- )}
- <form onSubmit={addCustom} className="mt-3">
- <input value={customInput} onChange={(e) => setCustomInput(e.target.value)} placeholder="Add your own — e.g. Bags, Band tees, Ceramics…" className="w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[13px] outline-none focus:border-[#5D0F17]/50" />
- </form>
- {primary ? (
- <p className="mt-5 rounded-xl bg-stone-50 px-4 py-3 text-[12px] leading-relaxed text-stone-500">Starting you on a <b className="text-stone-700">{VIBE[primary.template] || "curated"}</b> look, tailored for {cats.map((k) => CATEGORY_OPTIONS.find((c) => c.key === k)?.label).filter(Boolean).join(" + ")}. Refine everything in the next steps.</p>
- ) : (
- <p className="mt-5 text-[12px] leading-relaxed text-stone-400">Optional — skip and choose a look yourself next. Selecting here just gives you a tailored head start.</p>
- )}
- </Step>
- )}
-
- {step === 1 && (
  <Step title="Name & look" sub="Your store name and its overall look — each is a curated kit: layout, colours and type in one.">
  <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Store name</label>
- <input value={name} onChange={(e) => setName(e.target.value)} className="mb-5 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] outline-none focus:border-[#5D0F17]/50" />
+ <input value={name} onChange={(e) => setName(e.target.value)} className="mb-4 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] outline-none focus:border-[#5D0F17]/50" />
+
+ {/* Optional. With no logo the store name shows in the template's own type, which for most of
+     these is the better answer — so this never blocks getting to the look. */}
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Logo <span className="font-normal text-stone-400">— optional</span></label>
+ <label className="mb-5 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-black/15 px-3.5 py-3 transition hover:border-[#5D0F17]/50">
+  <input type="file" accept="image/*" className="hidden" onChange={(e) => { void uploadLogo(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+  {logo ? (
+   <>
+    <img src={logo} alt="" className="max-h-8 w-auto object-contain" />
+    <span className="text-[13px] text-stone-500">Replace</span>
+    <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLogo(""); }} className="ml-auto text-[12px] text-stone-400 underline underline-offset-2 hover:text-stone-700">Remove</button>
+   </>
+  ) : (
+   <span className="text-[13px] text-stone-500">{uploadingLogo ? "Uploading…" : "Drop an image or click to upload"}</span>
+  )}
+ </label>
+
  <label className="mb-2 block text-[12px] font-medium text-stone-500">Choose a look</label>
  <div className="space-y-2">
  {STOREFRONT_TEMPLATES.map((t) => (
@@ -270,7 +237,7 @@ export default function BuildWizard() {
  <span className="h-full flex-1" style={{ background: t.colors.bg }} /><span className="h-full flex-1" style={{ background: t.colors.text }} /><span className="h-full flex-1" style={{ background: t.colors.accent }} />
  </span>
  <span className="min-w-0 flex-1">
- <span className="block text-[14px] font-medium text-stone-800" style={{ fontFamily: ff(t.fonts.heading) }}>{VIBE[t.id] || t.name}</span>
+ <span className="block text-[14px] font-medium text-stone-800" style={{ fontFamily: ff(t.fonts.heading) }}>{t.name}</span>
  <span className="block truncate text-[12px] text-stone-400">{t.description}</span>
  </span>
  {templateId === t.id && <Check size={16} className="shrink-0 text-[#5D0F17]" />}
@@ -280,19 +247,19 @@ export default function BuildWizard() {
  </Step>
  )}
 
- {step === 2 && (
+ {step === 1 && (
  <Step title="Add pages" sub="Home and Shop come standard. Add anything else — you can change it later.">
  <div className="space-y-2">
  <PageRow label="Home" locked />
  <PageRow label="Shop" locked />
- {OPTIONAL_PAGES.map((p) => (
+ {pageOptions.map((p) => (
  <PageRow key={p.slug} label={p.label} checked={pages.has(p.slug)} onToggle={() => setPages((s) => { const n = new Set(s); if (n.has(p.slug)) n.delete(p.slug); else n.add(p.slug); return n; })} />
  ))}
  </div>
  </Step>
  )}
 
- {step === 3 && (
+ {step === 2 && (
  <Step title="Choose a colour palette" sub="Curated palettes. Change any colour later in the studio.">
  <div className="grid grid-cols-2 gap-2.5">
  {STOREFRONT_PALETTES.map((p) => {
@@ -310,7 +277,7 @@ export default function BuildWizard() {
  </Step>
  )}
 
- {step === 4 && (
+ {step === 3 && (
  <Step title="Choose your fonts" sub="Curated pairings. Explore more fonts anytime in the studio.">
  <div className="grid gap-2.5">
  {FONT_PAIRS.map((fp, i) => {
@@ -369,5 +336,17 @@ function PageRow({ label, checked, onToggle, locked }: { label: string; checked?
  <button type="button" onClick={onToggle} className={`grid h-5 w-5 place-items-center rounded-md border transition ${checked ? "border-[#5D0F17] bg-[#5D0F17] text-white" : "border-black/20"}`}>{checked && <Check size={13} />}</button>
  )}
  </div>
+ );
+}
+
+// `useSearchParams` opts the tree into client rendering, and Next refuses to prerender a page that
+// does so without a boundary — it fails the production BUILD, not just the request. The wizard is
+// behind a login and renders instantly, so a plain tinted ground is a truthful fallback rather than
+// a spinner that would flash for a frame.
+export default function BuildWizard() {
+ return (
+  <Suspense fallback={<div className="min-h-screen bg-[#f7f6f3]" />}>
+   <BuildWizardInner />
+  </Suspense>
  );
 }

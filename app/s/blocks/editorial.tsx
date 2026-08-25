@@ -113,7 +113,7 @@ const pickImage = (kit: EditKit) => (url: string) => kit.ctx.onEditField?.(kit.b
 function SpotlightHalf({ kit }: { kit: EditKit }) {
  return (
   <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
-   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} ratio="aspect-square" rounded="vya-img" />
+   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-square" rounded="vya-img" />
    <div className="vya-free-canvas relative"><SpotlightBody kit={kit} /></div>
   </section>
  );
@@ -141,7 +141,7 @@ function SpotlightOverlay({ kit }: { kit: EditKit }) {
 function SpotlightStacked({ kit }: { kit: EditKit }) {
  return (
   <section className="mx-auto max-w-3xl px-5 @xl:px-8 py-16 @xl:py-24">
-   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} ratio="aspect-[4/5]" rounded="vya-img" />
+   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[4/5]" rounded="vya-img" />
    <div className="vya-free-canvas relative mt-9 text-center [&_.vya-cta]:mx-auto"><SpotlightBody kit={kit} /></div>
   </section>
  );

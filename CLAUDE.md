@@ -1,9 +1,18 @@
 # VYA — Codebase Guide
 
-VYA is a curated vintage-fashion marketplace (pilot launched 2026-03-19). Buyers browse on
-VYA, favorite items, and click through to the seller's external store to buy. We earn ~6.7%
-commission on attributed orders. ~45 onboarded vintage stores, plus a store portal sellers
-log into.
+VYA is a platform for vintage-fashion sellers (pilot launched 2026-03-19). ~45 onboarded
+stores, each with a storefront VYA builds and hosts, plus a curated marketplace where buyers
+browse and favorite across every store.
+
+**Revenue: a subscription fee per store, plus 1% commission on every transaction.** Both
+halves matter when reasoning about cost. A subscription business is judged on cost to SERVE
+a store per month, not cost per sale — so `api_costs` (which logs every paid Anthropic /
+SerpApi / Voyage call) is attributed per store via `cost-context.ts`, and
+`scripts/unit-economics.ts` reports it. AI features are cost of goods, not tooling: pricing
+one piece costs ~$0.09 today, charged per LISTING rather than per sale.
+
+(The earlier click-through model — ~6.7% commission on attributed orders — is history. The
+attribution machinery below still exists and still runs.)
 
 ## Stack
 - **Next.js** App Router (web) + **Expo/React Native** app in a sibling repo (`../via-app`).
@@ -52,3 +61,13 @@ A monetizable seller-facing product built **into the store portal** (never a sep
   the privacy threshold elsewhere.
 - **Privacy**: sellers may NEVER see another individual store's numbers — only aggregated,
   anonymized, market-level signal (min N stores/transactions).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

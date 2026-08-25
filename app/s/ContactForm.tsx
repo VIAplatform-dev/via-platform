@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FIELD, SUBMIT } from "./formStyles";
 
 /**
  * The store's message form. Used by the contact SECTION as-is, and by a form ELEMENT a seller drops
@@ -34,16 +35,19 @@ export default function ContactForm({ accent, storeSlug, topic, cta = "Send", co
 
  if (done) return <p className="mt-8 text-sm opacity-70">Thanks — your message has been sent. We’ll be in touch.</p>;
 
- const field = "w-full border border-black/20 bg-white/60 px-4 py-2.5 text-sm outline-none focus:border-black/50";
+ // `currentColor` rather than black-on-white: the form inherits the storefront's ink and ground, so
+ // it belongs to the page instead of looking pasted onto it. `vya-field` picks up the template's
+ // corner setting, the same one the buttons and photos use.
  return (
- <form onSubmit={submit} className={compact ? "flex w-full flex-col gap-2" : "mx-auto mt-8 flex max-w-md flex-col gap-3"}>
- <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={field} />
- <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className={field} />
- <textarea value={message} onChange={(e) => setMessage(e.target.value)} required placeholder="Message" rows={compact ? 3 : 5} className={field} />
+ <form onSubmit={submit} className={compact ? "flex w-full flex-col gap-2" : "mx-auto mt-8 flex w-full max-w-md flex-col gap-3"}>
+ <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={FIELD} />
+ <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className={FIELD} />
+ {/* resize-none kills the browser's drag grip in the corner, which read as a torn-off edge. */}
+ <textarea value={message} onChange={(e) => setMessage(e.target.value)} required placeholder="Message" rows={compact ? 3 : 5} className={`${FIELD} resize-none`} />
  <button
  type="submit"
  disabled={busy}
- className="mt-1 self-start px-8 py-2.5 text-[11px] uppercase tracking-[0.18em] text-white transition hover:opacity-90 disabled:opacity-50"
+ className="vya-cta mt-1 w-full px-8 py-3 text-[11px] uppercase tracking-[0.18em] text-white transition hover:opacity-90 disabled:opacity-50"
  style={{ background: accent }}
  >
  {busy ? "Sending…" : cta}

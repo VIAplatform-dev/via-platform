@@ -89,7 +89,7 @@ function FormPreview({ kit, stacked }: { kit: EditKit; stacked?: boolean }) {
  if (!ctx.edit) return <NewsletterForm accent={ctx.colors.accent} label={p.cta || "Sign up"} />;
  return (
   <div className={stacked ? "mx-auto flex max-w-sm flex-col items-center gap-3" : "flex w-full max-w-md items-center gap-2"}>
-   <input disabled placeholder="Email address" className="w-full border border-black/20 bg-white/70 px-4 py-2.5 text-sm opacity-60 outline-none" />
+   <input disabled placeholder="Email address" className="vya-field w-full border border-current/20 bg-current/[0.03] px-4 py-2.5 text-sm opacity-60 outline-none" />
    <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Sign up"} className="vya-cta inline-block whitespace-nowrap px-8 py-2.5 text-[11px] uppercase tracking-[0.18em]" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>
  );
@@ -157,10 +157,10 @@ function ContactFields({ kit }: { kit: EditKit }) {
  if (!ctx.edit && ctx.storeSlug) return <ContactForm accent={ctx.colors.accent} storeSlug={ctx.storeSlug} />;
  return (
   <div className="flex flex-col gap-2.5">
-   <input disabled placeholder="Name" className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
-   <input disabled placeholder="Email" className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
-   <textarea disabled placeholder="Message" rows={4} className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
-   <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Send"} fullWidth className="vya-cta mt-1 grid place-items-center rounded-md py-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ background: ctx.colors.accent, color: "#fff" }} />
+   <input disabled placeholder="Name" className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   <input disabled placeholder="Email" className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   <textarea disabled placeholder="Message" rows={4} className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Send"} fullWidth className="vya-cta mt-1 grid place-items-center py-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>
  );
 }

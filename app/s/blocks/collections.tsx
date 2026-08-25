@@ -84,7 +84,7 @@ function CollectionsRow({ kit }: { kit: EditKit }) {
      </div>
     ))}
    </div>
-   <style dangerouslySetInnerHTML={{ __html: ".vya-rail{scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
+   <style dangerouslySetInnerHTML={{ __html: ".vya-rail{justify-content:safe center;scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
   </section>
  );
 }

@@ -13,7 +13,7 @@ function ImageFull({ kit }: { kit: EditKit }) {
  return (
   <figure className="w-full">
    {ctx.edit
-    ? <ImageSlot kit={kit} src={p.image} onPick={setImg} ratio="aspect-[21/9]" rounded="vya-img" />
+    ? <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[21/9]" rounded="vya-img" />
     : <img src={p.image} alt={p.caption || ""} className="vya-img w-full object-cover" style={{ maxHeight: "70vh" }} />}
    {(p.caption || ctx.edit) && <figcaption {...kit.txt(p.caption, "caption")} className="px-6 py-3 text-center text-xs opacity-60" />}
   </figure>
@@ -27,7 +27,7 @@ function ImageInset({ kit }: { kit: EditKit }) {
  const setImg = (url: string) => ctx.onEditField?.(kit.b.id, "image", url);
  return (
   <figure className="mx-auto max-w-4xl px-6 py-16 @xl:px-8 @xl:py-20">
-   <ImageSlot kit={kit} src={p.image} onPick={setImg} ratio="aspect-[4/3]" rounded="vya-img" />
+   <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[4/3]" rounded="vya-img" />
    {(p.caption || ctx.edit) && <figcaption {...kit.txt(p.caption, "caption")} className="mt-3 text-center text-xs opacity-60" />}
   </figure>
  );
@@ -40,7 +40,7 @@ function ImageCaptioned({ kit }: { kit: EditKit }) {
  const setImg = (url: string) => ctx.onEditField?.(kit.b.id, "image", url);
  return (
   <figure className="mx-auto grid max-w-5xl gap-5 px-6 py-16 @xl:px-8 @xl:py-24 @lg:grid-cols-[1.7fr_1fr] @lg:gap-12">
-   <ImageSlot kit={kit} src={p.image} onPick={setImg} ratio="aspect-[4/5]" rounded="vya-img" />
+   <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[4/5]" rounded="vya-img" />
    <figcaption className="flex items-end">
     <span {...kit.txt(p.caption, "caption")} className="text-[13px] leading-relaxed opacity-65" />
    </figcaption>
@@ -122,7 +122,7 @@ function GalleryRail({ kit }: { kit: EditKit }) {
      </div>
     ))}
    </div>
-   <style dangerouslySetInnerHTML={{ __html: ".vya-rail{scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
+   <style dangerouslySetInnerHTML={{ __html: ".vya-rail{justify-content:safe center;scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
   </section>
  );
 }

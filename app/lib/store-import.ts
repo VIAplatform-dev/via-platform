@@ -43,9 +43,17 @@ export type StorefrontTheme = {
  preSkin?: { colors?: { bg?: string; text?: string; accent?: string }; fonts?: { heading?: string; body?: string } };
  customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
- blocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
- shopBlocks?: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
- extraPages?: { slug: string; title: string; blocks: { id: string; type: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
+ // The catalogue grid on the Shop page. Seeded by the template (Vitrine runs 2-up, The Index 5-up)
+ // and editable after. Absent = the platform default, which is what every store rendered before
+ // templates carried a grid.
+ shopGrid?: { cols?: 2 | 3 | 4 | 5; ratio?: "4/5" | "1/1" | "5/6" | "3/4"; gutter?: "tight" | "normal" | "wide" };
+ // How a single product page is arranged. Seeded by the template: "rail" keeps the details beside you
+ // while the images scroll, "stacked" runs the photographs full width with the copy beneath, "classic"
+ // is the conventional two-column page. Absent = classic, which is what every store rendered before.
+ productLayout?: "classic" | "rail" | "stacked";
+ blocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
+ shopBlocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
+ extraPages?: { slug: string; title: string; blocks: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
  logo?: string | null;
  headerLayout?: "inline" | "center" | "split" | "stacked"; // where the brand and menu sit (app/s/StoreChrome.tsx)
  // Footer: the store's social links + a short about blurb, shown site-wide in the footer.

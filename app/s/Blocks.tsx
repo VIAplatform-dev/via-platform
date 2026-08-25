@@ -106,9 +106,9 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
    ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} compact />
    : (
    <div className="flex flex-col gap-2 opacity-70">
-    <input disabled placeholder="Name" className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
-    <input disabled placeholder="Email" className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
-    <textarea disabled placeholder="Message" rows={3} className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
+    <input disabled placeholder="Name" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    <input disabled placeholder="Email" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    <textarea disabled placeholder="Message" rows={3} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
     <span className="mt-0.5 self-start rounded px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white" style={{ background: accent }}>{p.cta || "Send"}</span>
    </div>
    )}
@@ -191,6 +191,14 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  // emitted after this, so they win for the fields they cover without touching the others.
  out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{text-align:${st.align}!important}`);
  out.push(`${sel} .vya-hero-inner{align-items:${ALIGN_FLEX[st.align]}!important;text-align:${st.align}!important}`);
+ // Headings and subtext carry `mx-auto` so they centre inside a wide hero. That auto-margin wins
+ // over the flex alignment above, so an aligned section ended up with a CENTRED box containing
+ // right-aligned text — which reads as a broken layout rather than a right-aligned one. Releasing
+ // the margin on the side we're aligning to lets the box itself move.
+ if (st.align !== "center") {
+  const [ml, mr] = st.align === "right" ? ["auto", "0"] : ["0", "auto"];
+  out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{margin-left:${ml}!important;margin-right:${mr}!important}`);
+ }
  }
  // Per-field alignment: heading/subtext/cta/body can each be aligned independently of one another and
  // of the section-wide default above — targeted by `data-field`, not by class, since the class alone
@@ -464,7 +472,12 @@ export default function Blocks({
  const br = BTN_RADIUS[radius] ?? 0;
  // Corner style, scoped to this storefront's sections. `.vya-round` marks the image/card frames that
  // should curve; the full-bleed hero, announcement bar, and marquee deliberately stay square.
- const radiusCss = ir || br ? `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}` : "";
+ // Always emitted, including for "sharp" where both values are 0. Skipping it when there is nothing
+ // to round looked like a harmless optimisation and wasn't: a block carrying its own Tailwind
+ // rounding (the contact form's `rounded-md` CTA) had nothing to override it, so a template set to
+ // sharp corners still drew a rounded button. The token has to be authoritative, not conditional.
+ // `.vya-field` keeps form inputs on the same curve as the images rather than a fixed 6px.
+ const radiusCss = `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}.vya-field{border-radius:${ir}px}`;
  // Overlay elements are absolutely placed (% coords) on wide layouts; on a narrow container they stack
  // into normal flow — centred, padded — so a button dragged over the hero never overlaps or runs off a
  // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.

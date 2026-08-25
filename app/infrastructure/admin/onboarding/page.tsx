@@ -112,7 +112,16 @@ export default function OnboardingWizard() {
      body: JSON.stringify({ template: kit.template, colors: kit.colors, fonts: kit.fonts, blocks: kit.blocks, shopBlocks: [], extraPages: starter.extraPages || [] }),
     }).catch(() => {});
    }
-   router.replace(`/admin/storefront${data?.existing ? "" : "?welcome=build"}`);
+   // A seller building from scratch chooses their own look. The auto-build above still runs, so an
+   // abandoned wizard leaves a working storefront rather than an empty one — but the builder is
+   // where they actually pick the template, palette and type, and it overwrites that starting point
+   // with their choices. Importers skip it: they already have a site, and it's been brought over.
+   if (data?.existing || hasWebsite === true) {
+    router.replace(`/admin/storefront${data?.existing ? "" : "?welcome=build"}`);
+   } else {
+    const q = new URLSearchParams({ name: finalName, cats: cats.join(",") });
+    router.replace(`/infrastructure/admin/onboarding/build?${q.toString()}`);
+   }
   } catch {
    setError("Network error — try again."); setBusy(false);
   }

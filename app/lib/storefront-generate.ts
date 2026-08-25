@@ -4,7 +4,7 @@
 // sections, and About / FAQ / Shipping pages — from the store's products + brand.
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront } from "./storefront-db";
 import { getListingsByStore } from "./listings-db";
-import { STOREFRONT_TEMPLATES, getTemplate, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
+import { STOREFRONT_TEMPLATES, getTemplate, templateShopBlocks, templatePages, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
 import { sanitizeBlocks, sanitizePages } from "./storefront-blocks";
 import { stores } from "./stores";
 import type { StorefrontTheme } from "./store-import";
@@ -74,7 +74,22 @@ Homepage order: announcement, hero, featured, an about/story text section (use s
  // A fresh generation is a CLEAN slate — don't carry over a previous import's
  // logo / nav / cloned sections / hero image (that's how Ascensio's logo lingered).
  await upsertStorefront(slug, { handle: sf?.handle || slug, enabled: sf?.enabled ?? false, tagline: sf?.tagline ?? null, accentColor: colors.accent, heroImage: null, about: sf?.about ?? null });
- const theme: StorefrontTheme = { template: template.id, colors, fonts, blocks, extraPages: pages };
+ // The model writes the home page and the content pages; the template supplies the structural
+ // decisions it has no business inventing — corner style, header arrangement, catalogue density, and
+ // the Shop page's intro. Without these a generated store lands on the platform defaults and every
+ // generation looks the same regardless of which template the model picked.
+ const theme: StorefrontTheme = {
+  template: template.id,
+  colors,
+  fonts,
+  radius: template.radius,
+  headerLayout: template.headerLayout,
+  shopGrid: { ...template.grid },
+  productLayout: template.productLayout,
+  blocks,
+  shopBlocks: templateShopBlocks(template.id),
+  extraPages: pages.length ? pages : templatePages(template.id),
+ };
  await setStorefrontTheme(slug, theme);
  return { ok: true, blocks: blocks.length, pages: pages.length };
 }

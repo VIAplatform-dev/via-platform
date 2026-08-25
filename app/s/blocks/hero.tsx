@@ -122,11 +122,21 @@ function HeroSplit({ kit }: { kit: EditKit }) {
  // The divider position is a percentage the merchant drags (style-free: it's structural, so it lives
  // in props). Clamped to keep both panels usable no matter how far the handle is dragged.
  const ratio = Math.min(75, Math.max(25, Number(p.splitRatio) || 50));
+ // A split hero with no photo is half a tinted rectangle and half a squeezed column of text. When
+ // there is nothing to show, the whole split collapses and the type takes the full width — the
+ // panel is hidden AND the grid stops splitting, because hiding only the panel would leave the
+ // headline stranded in a 50% column with nothing beside it.
+ const showMedia = !!p.image || ctx.edit;
  return (
-  <div className="vya-fill grid w-full items-stretch @lg:grid-cols-[var(--vya-split)]" style={{ ["--vya-split" as string]: `${ratio}% 1fr` }}>
-   <div className={`relative min-h-[42vh] w-full overflow-hidden @lg:min-h-[78vh] ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }}>
-    {p.image && <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-   </div>
+  <div
+   className={`vya-fill grid w-full items-stretch ${showMedia ? "@lg:grid-cols-[var(--vya-split)]" : ""}`}
+   style={showMedia ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}
+  >
+   {showMedia && (
+    <div className={`relative min-h-[42vh] w-full overflow-hidden @lg:min-h-[78vh] ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }}>
+     {p.image && <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+    </div>
+   )}
    <div className="vya-hero-inner vya-free-canvas relative flex flex-col justify-center px-7 py-20 @lg:px-14 @xl:px-20">
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-xl text-4xl leading-[1.06] @xl:text-6xl" style={{ fontFamily: head }} />
@@ -151,9 +161,14 @@ function HeroStack({ kit }: { kit: EditKit }) {
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mx-auto mt-5 max-w-xl text-sm leading-relaxed opacity-65 @xl:text-[15px]" />}
     {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
    </div>
-   <div className="relative w-full flex-1 overflow-hidden" style={{ minHeight: "46vh", background: `${fg}0d` }}>
-    {p.image && <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
-   </div>
+   {/* No photo, no box. A 46vh tinted rectangle with nothing in it doesn't read as "a picture goes
+       here" — it reads as a rendering fault, which is exactly how it looked on Heirloom. The editor
+       still shows the empty slot, because that is where a seller clicks to add one. */}
+   {(p.image || ctx.edit) && (
+    <div className="relative w-full flex-1 overflow-hidden" style={{ minHeight: "46vh", background: `${fg}0d` }}>
+     {p.image && <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+    </div>
+   )}
   </div>
  );
 }

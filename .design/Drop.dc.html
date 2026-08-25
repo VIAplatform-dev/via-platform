@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400;62..125,500;62..125,700;62..125,800&display=swap">
+  <style>
+    body { margin:0; background:#FFFFFF; font-family:'Archivo','Helvetica Neue',sans-serif; color:#0A0A0A; }
+    a { color:#C40025; text-decoration:none; } a:hover { color:#8E001B; }
+    .wide { font-stretch:125%; }
+    .ph { background-image:linear-gradient(150deg,#DEDCD7 0%,#C3C0B9 55%,#A8A49C 100%); }
+    .ph2 { background-image:linear-gradient(150deg,#D2CFC8 0%,#B6B2A9 55%,#9A958B 100%); }
+    .ph3 { background-image:linear-gradient(150deg,#E8E6E1 0%,#CFCCC5 55%,#B5B1A8 100%); }
+    .ph4 { background-image:linear-gradient(150deg,#C6C2B9 0%,#AAA59A 55%,#8E887C 100%); }
+  </style>
+</helmet>
+
+<div style="width:1200px; background:#FFFFFF;">
+
+  <!-- COUNTDOWN — signature: first thing on the page, above the hero -->
+  <div style="background:#C40025; color:#FFFFFF; padding:34px 44px; display:flex; align-items:center; justify-content:space-between; gap:40px;">
+    <div style="display:flex; flex-direction:column; gap:5px;">
+      <span class="wide" style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase;">The next drop opens in</span>
+      <span style="font-size:13.5px; color:#FFD9DF;">[DROP DATE] at [TIME] · [NUMBER] pieces</span>
+    </div>
+    <div style="display:flex; gap:26px; font-variant-numeric:tabular-nums;">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:2px;"><span class="wide" style="font-size:44px; font-weight:800; line-height:1;">02</span><span style="font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:#FFC2CB;">Days</span></div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:2px;"><span class="wide" style="font-size:44px; font-weight:800; line-height:1;">14</span><span style="font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:#FFC2CB;">Hours</span></div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:2px;"><span class="wide" style="font-size:44px; font-weight:800; line-height:1;">09</span><span style="font-size:10px; letter-spacing:0.16em; text-transform:uppercase; color:#FFC2CB;">Mins</span></div>
+    </div>
+    <span style="background:#FFFFFF; color:#C40025; padding:15px 30px; font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;">Set a reminder</span>
+  </div>
+
+  <div style="background:#0A0A0A; color:#FFF; text-align:center; padding:9px 0; font-size:11px; font-weight:500; letter-spacing:0.14em; text-transform:uppercase;">New drop monthly · Nothing is restocked</div>
+
+  <!-- header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 44px; border-bottom:2px solid #0A0A0A;">
+    <span class="wide" style="font-size:24px; font-weight:800; letter-spacing:-0.01em;">YOUR STORE</span>
+    <div style="display:flex; gap:26px; font-size:12px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase;">
+      <span>This drop</span><span>Past drops</span><span>How it works</span><span>Help</span>
+    </div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" stroke-width="2"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+    </div>
+  </div>
+
+  <!-- hero: giant centred poster type, image strip beneath -->
+  <div style="padding:76px 44px 60px; display:flex; flex-direction:column; align-items:center; gap:20px; text-align:center; border-bottom:2px solid #0A0A0A;">
+    <span class="wide" style="font-size:11px; font-weight:700; letter-spacing:0.24em; text-transform:uppercase; color:#C40025;">This month's drop</span>
+    <h1 class="wide" style="margin:0; font-size:88px; font-weight:800; line-height:0.9; letter-spacing:-0.03em; text-transform:uppercase; max-width:14ch;">New drop every month</h1>
+    <p style="margin:0; font-size:16px; line-height:1.6; max-width:56ch; color:#3A3A3A;">The full drop goes live at [TIME] on [DROP DATE]. Everything is one of one, and nothing is restocked once it sells.</p>
+    <div style="display:flex; gap:12px; margin-top:8px;">
+      <span style="background:#C40025; color:#FFF; padding:16px 34px; font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;">Preview the drop</span>
+      <span style="border:2px solid #0A0A0A; padding:14px 32px; font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;">Past drops</span>
+    </div>
+  </div>
+  <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:0; border-bottom:2px solid #0A0A0A;">
+    <div class="ph2" style="height:300px; border-right:2px solid #0A0A0A;"></div>
+    <div class="ph4" style="height:300px; border-right:2px solid #0A0A0A;"></div>
+    <div class="ph" style="height:300px;"></div>
+  </div>
+
+  <!-- marquee -->
+  <div style="background:#0A0A0A; color:#FFF; padding:15px 0; overflow:hidden; white-space:nowrap;">
+    <span class="wide" style="font-size:14px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;">One of each &nbsp;✦&nbsp; No restocks &nbsp;✦&nbsp; Ships within 24 hours &nbsp;✦&nbsp; New drop every month &nbsp;✦&nbsp; One of each &nbsp;✦&nbsp; No restocks &nbsp;✦&nbsp; Ships within 24 hours &nbsp;✦&nbsp; New drop every month</span>
+  </div>
+
+  <!-- featured 4-up -->
+  <div style="padding:56px 44px 64px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:26px;">
+      <h2 class="wide" style="margin:0; font-size:30px; font-weight:800; letter-spacing:-0.02em; text-transform:uppercase;">In this drop</h2>
+      <span style="font-size:12px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:#C40025;">See everything →</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:20px;">
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph" style="aspect-ratio:1;"></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500;">Cropped Leather Jacket Size M</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph3" style="aspect-ratio:1;"></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500;">Mesh Panel Long Sleeve Size S</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph4" style="aspect-ratio:1; position:relative; display:flex; align-items:center; justify-content:center;"><div style="position:absolute; inset:0; background:rgba(10,10,10,0.55);"></div><span class="wide" style="position:relative; color:#C40025; font-size:34px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; background:#FFF; padding:6px 18px;">Sold</span></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500; color:#8A8A8A;">Distressed Denim Maxi Size M</span><span style="font-size:13.5px; font-weight:700; color:#8A8A8A;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph2" style="aspect-ratio:1;"></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500;">Silver Hardware Belt</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph3" style="aspect-ratio:1;"></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500;">Suede Knee Boot Size 39</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph" style="aspect-ratio:1; position:relative; display:flex; align-items:center; justify-content:center;"><div style="position:absolute; inset:0; background:rgba(10,10,10,0.55);"></div><span class="wide" style="position:relative; color:#C40025; font-size:34px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; background:#FFF; padding:6px 18px;">Sold</span></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500; color:#8A8A8A;">Cropped Racer Jacket Size S</span><span style="font-size:13.5px; font-weight:700; color:#8A8A8A;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph4" style="aspect-ratio:1;"></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500;">Nylon Shoulder Bag</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:11px;"><div class="ph2" style="aspect-ratio:1;"></div><div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:13.5px; font-weight:500;">Satin Wrap Mini Size S</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+    </div>
+  </div>
+
+  <!-- past drops -->
+  <div style="padding:52px 44px; background:#F4F3F1; border-top:2px solid #0A0A0A;">
+    <h2 class="wide" style="margin:0 0 6px; font-size:26px; font-weight:800; letter-spacing:-0.02em; text-transform:uppercase;">Past drops</h2>
+    <p style="margin:0 0 22px; font-size:14px; color:#4A4A4A;">Previous releases. Everything shown has sold.</p>
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px;">
+      <div style="display:flex; flex-direction:column; gap:9px;"><div class="ph3" style="aspect-ratio:4/3;"></div><div style="display:flex; justify-content:space-between; align-items:baseline;"><span class="wide" style="font-size:14px; font-weight:700; text-transform:uppercase;">Drop four</span><span style="font-size:11.5px; color:#6A6A6A;">Sold out</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:9px;"><div class="ph" style="aspect-ratio:4/3;"></div><div style="display:flex; justify-content:space-between; align-items:baseline;"><span class="wide" style="font-size:14px; font-weight:700; text-transform:uppercase;">Drop three</span><span style="font-size:11.5px; color:#6A6A6A;">Sold out</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:9px;"><div class="ph4" style="aspect-ratio:4/3;"></div><div style="display:flex; justify-content:space-between; align-items:baseline;"><span class="wide" style="font-size:14px; font-weight:700; text-transform:uppercase;">Drop two</span><span style="font-size:11.5px; color:#6A6A6A;">Sold out</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:9px;"><div class="ph2" style="aspect-ratio:4/3;"></div><div style="display:flex; justify-content:space-between; align-items:baseline;"><span class="wide" style="font-size:14px; font-weight:700; text-transform:uppercase;">Drop one</span><span style="font-size:11.5px; color:#6A6A6A;">Sold out</span></div></div>
+    </div>
+  </div>
+
+  <!-- newsletter -->
+  <div style="background:#0A0A0A; color:#FFF; padding:62px 44px; display:flex; justify-content:space-between; align-items:center; gap:48px;">
+    <div style="display:flex; flex-direction:column; gap:9px; max-width:48ch;">
+      <h3 class="wide" style="margin:0; font-size:32px; font-weight:800; letter-spacing:-0.02em; text-transform:uppercase;">Get the drop alert</h3>
+      <p style="margin:0; font-size:14.5px; line-height:1.6; color:#B8B8B8;">One email shortly before each drop opens.</p>
+    </div>
+    <div style="display:flex; min-width:420px;">
+      <span style="flex:1; background:#1C1C1C; padding:16px 18px; font-size:14px; color:#8A8A8A;">Email address</span>
+      <span style="background:#C40025; color:#FFF; padding:16px 30px; font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;">Notify me</span>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="padding:38px 44px; display:flex; justify-content:space-between; font-size:13px; color:#4A4A4A;">
+    <div style="display:flex; gap:46px;">
+      <div style="display:flex; flex-direction:column; gap:7px;"><span style="font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8A8A8A;">Drops</span><span>This drop</span><span>Past drops</span><span>How it works</span></div>
+      <div style="display:flex; flex-direction:column; gap:7px;"><span style="font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8A8A8A;">Help</span><span>Sizing</span><span>Shipping</span><span>Returns</span></div>
+      <div style="display:flex; flex-direction:column; gap:7px;"><span style="font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#8A8A8A;">Contact</span><span>[YOUR EMAIL]</span><span>Instagram</span><span>TikTok</span></div>
+    </div>
+    <span class="wide" style="align-self:flex-end; font-weight:700; text-transform:uppercase; font-size:12px;">© 2026 [YOUR STORE]</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

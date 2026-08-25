@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, normalizeHandle } from "@/app/lib/storefront-db";
-import { STOREFRONT_TEMPLATES, getTemplate, HEADING_FONTS, BODY_FONTS } from "@/app/lib/storefront-templates";
+import { STOREFRONT_TEMPLATES, getTemplate, templateTheme, HEADING_FONTS, BODY_FONTS } from "@/app/lib/storefront-templates";
 import { BLOCK_TYPES, sanitizeBlocks, sanitizePages, safeSrc } from "@/app/lib/storefront-blocks";
 import { isSkin } from "@/app/lib/storefront-skins";
 import { getListingsByStore } from "@/app/lib/listings-db";
@@ -128,9 +128,36 @@ export async function POST(request: NextRequest) {
 
  const theme: StorefrontTheme = { ...(sf.theme ?? {}) };
 
+ // Applying a template lays out a whole STORE, not a colour scheme: the home page, the Shop page's
+ // intro and catalogue density, the corner style and header arrangement, and the pages the template
+ // ships with (Authentication, Visit, Condition Scale…).
+ //
+ // Two things are deliberately NOT destructive:
+ //   • The seller's existing pages survive. A template page is added only where the store has no
+ //     page at that slug — so switching template to try a look never deletes an About page someone
+ //     wrote. (Home and Shop ARE replaced; that is what choosing a layout means.)
+ //   • `applyContent: false` restyles only — palette, type, corners, header — leaving every section
+ //     where it is. That's the path the Design panel uses for a seller who has already built a page.
  if (body?.template) {
  const t = getTemplate(String(body.template));
- if (t) { theme.template = t.id; theme.colors = { ...t.colors }; theme.fonts = { ...t.fonts }; theme.colorsFrom = "studio"; }
+ const applied = t && templateTheme(t.id);
+ if (t && applied) {
+  theme.template = t.id;
+  theme.colors = { ...applied.colors };
+  theme.fonts = { ...applied.fonts };
+  theme.radius = applied.radius;
+  theme.headerLayout = applied.headerLayout;
+  theme.productLayout = applied.productLayout;
+  theme.colorsFrom = "studio";
+  if (body.applyContent !== false) {
+   theme.shopGrid = { ...applied.shopGrid };
+   theme.blocks = sanitizeBlocks(applied.blocks);
+   theme.shopBlocks = sanitizeBlocks(applied.shopBlocks);
+   const existing = sanitizePages(theme.extraPages ?? []);
+   const haveSlug = new Set(existing.map((p) => p.slug));
+   theme.extraPages = [...existing, ...sanitizePages(applied.extraPages).filter((p) => !haveSlug.has(p.slug))];
+  }
+ }
  }
  if (body?.colors) {
  const c = body.colors;
@@ -169,6 +196,20 @@ export async function POST(request: NextRequest) {
  if (f) { const heading = HEADING_FONTS.includes(f.heading) ? f.heading : undefined; const bodyF = BODY_FONTS.includes(f.body) ? f.body : undefined; if (heading && bodyF) pre.fonts = { heading, body: bodyF }; }
  if (pre.colors || pre.fonts) theme.preSkin = pre;
  }
+
+ // Catalogue density on the Shop page. Each field is validated against its own allowlist and applied
+ // independently, so a partial update ("just make it 2-up") keeps the ratio and gutter already set.
+ if (body?.shopGrid && typeof body.shopGrid === "object") {
+ const g = body.shopGrid as Record<string, unknown>;
+ const next = { ...(theme.shopGrid ?? {}) };
+ const cols = Number(g.cols);
+ if (cols === 2 || cols === 3 || cols === 4 || cols === 5) next.cols = cols;
+ if (["4/5", "1/1", "5/6", "3/4"].includes(String(g.ratio))) next.ratio = g.ratio as NonNullable<StorefrontTheme["shopGrid"]>["ratio"];
+ if (["tight", "normal", "wide"].includes(String(g.gutter))) next.gutter = g.gutter as NonNullable<StorefrontTheme["shopGrid"]>["gutter"];
+ theme.shopGrid = next;
+ }
+
+ if (["classic", "rail", "stacked"].includes(String(body?.productLayout))) theme.productLayout = body.productLayout;
 
  if (Array.isArray(body?.blocks)) theme.blocks = sanitizeBlocks(body.blocks);
  if (Array.isArray(body?.shopBlocks)) theme.shopBlocks = sanitizeBlocks(body.shopBlocks);

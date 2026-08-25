@@ -14,7 +14,7 @@ import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, HEADER_LAYOUTS, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
-import { STOREFRONT_TEMPLATES, templateBlocks, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
+import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
 import ItemsEditor from "@/app/store/storefront/ItemsEditor";
@@ -823,17 +823,37 @@ export default function StorefrontStudio() {
  if (cmd === "foreColor") document.execCommand("styleWithCSS", false, "false");
  }
 
- // Pick a vibe: restyle (colors/fonts) + lay out a fresh home page from the template.
+ // Pick a template: a template is a whole STORE, so applying one lays out the home page, the Shop
+ // page's intro and catalogue density, the corner style and header arrangement, and the pages this
+ // template ships with (Authentication, Visit, Condition Scale…).
+ //
+ // Pages the seller already has are kept. Only a template page whose slug is free gets added, so
+ // trying a different look can never delete an About page someone wrote. Home and Shop ARE replaced
+ // — that is what choosing a layout means, and the confirm says so.
  async function applyTemplate(t: StorefrontTemplate) {
- if (!window.confirm(`Switch to “${t.name}”? This restyles your store and replaces the home page sections. Your other pages, products, and settings stay.`)) return;
+ const added = templatePages(t.id).filter((p) => !extraPages.some((e) => e.slug === p.slug));
+ const addedNote = added.length ? ` It adds ${added.length} new ${added.length === 1 ? "page" : "pages"} (${added.map((p) => p.title).join(", ")}).` : "";
+ if (!window.confirm(`Switch to “${t.name}”? This restyles your store and replaces the Home and Shop page sections.${addedNote} Your other pages, products, and settings stay.`)) return;
  setColors(t.colors);
  setBaseColors(t.colors);
  setFonts(t.fonts);
- setBlocks(templateBlocks(t.id)); // the autosave effect persists the new sections
+ setRadius(t.radius);
+ setHeaderLayout(t.headerLayout);
+ // The autosave effect persists blocks / shopBlocks / extraPages; the design POST below carries the
+ // tokens and the grid, which don't ride that effect.
+ setBlocks(templateBlocks(t.id));
+ setShopBlocks(templateShopBlocks(t.id));
+ setExtraPages((ps) => [...ps, ...added]);
  setActiveSlug("home");
  setSelBlock(null);
  setShowTemplates(false);
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template: t.id, colors: t.colors, fonts: t.fonts }) }).catch(() => {});
+ await fetch("/api/store/storefront/design", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  // applyContent:false — the sections are already in local state and on their way up via autosave.
+  // Letting the server lay them out too would race that write and could clobber it.
+  body: JSON.stringify({ template: t.id, applyContent: false, colors: t.colors, fonts: t.fonts, radius: t.radius, headerLayout: t.headerLayout, shopGrid: t.grid, productLayout: t.productLayout }),
+ }).catch(() => {});
  }
 
  // ── Design panel: direct-manipulation colour / font / corner controls (the "Canva-easy" surface) ──
@@ -2546,7 +2566,20 @@ export default function StorefrontStudio() {
  <div className="mt-24 text-[13px] text-stone-400">Loading your store…</div>
  ) : (
  <div className="flex min-h-0 w-full flex-1 flex-col">
- <div ref={viewportRef} className="relative min-h-0 flex-1 overflow-auto">
+ <div
+  ref={viewportRef}
+  // Clicking the empty workspace around the page dismisses whatever is selected — the same
+  // "click away to put it down" gesture as Escape. A click that landed inside a page frame is
+  // left alone (sections own their own selection), and so is one on a floating toolbar: those
+  // are position:fixed but still DOM children here, so their clicks bubble through.
+  onPointerDown={(e) => {
+   const t = e.target as HTMLElement;
+   if (t.closest("[data-page], [data-studio-bar]")) return;
+   setSelBlock(null); setSelOverlay(null); setSelFree(null); setFreeEditing(null);
+   setTextFocus(null); setSelChrome(null); setFmtBar(null); setEditingId(null);
+  }}
+  className="relative min-h-0 flex-1 overflow-auto"
+ >
  {/* Spacer carries the SCALED footprint so the workspace scrolls and centres correctly; the page
      inside keeps its true pixel size and is drawn scaled. Two elements, because a transform
      doesn't change layout — without the spacer a zoomed-in page would have nowhere to scroll. */}
@@ -2724,7 +2757,7 @@ export default function StorefrontStudio() {
  // the now-trimmed button bar) stays on one row; flex-wrap only kicks in as a fallback once content
  // genuinely can't fit within max-w, e.g. a kind with many controls on a narrow device preview.
  return (
- <div ref={overlayBarRef} style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex w-max max-w-[92vw] flex-wrap items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
+ <div data-studio-bar ref={overlayBarRef} style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex w-max max-w-[92vw] flex-wrap items-center gap-2 rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400 capitalize">{selOverlayObj.kind}</span>
  <span className="h-5 w-px shrink-0 bg-black/10" />
  {selOverlayObj.kind === "button" && (
@@ -2847,7 +2880,7 @@ export default function StorefrontStudio() {
  </>
  ); })();
  const wrap = (label: string, body: React.ReactNode) => (
- <div key={`${bid}-${label}`} style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
+ <div data-studio-bar key={`${bid}-${label}`} style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{label}</span>
  <span className="h-5 w-px shrink-0 bg-black/10" />
  {body}
@@ -3010,27 +3043,40 @@ export default function StorefrontStudio() {
  <div className="max-h-[86vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
  <div className="mb-4 flex items-start justify-between">
  <div>
- <h2 className="text-[17px] font-semibold text-stone-900">Pick a vibe</h2>
- <p className="mt-0.5 text-[12px] text-stone-500">A full starting design — palette, type, and a laid-out home page. Change anything after, or ask VYA.</p>
+ <h2 className="text-[17px] font-semibold text-stone-900">Pick a template</h2>
+ <p className="mt-0.5 text-[12px] text-stone-500">A whole starting store — palette, type, a laid-out home page, the Shop grid, and its own pages. Change anything after, or ask VYA.</p>
  </div>
  <button type="button" onClick={() => setShowTemplates(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-600"><X size={18} /></button>
  </div>
  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
  {STOREFRONT_TEMPLATES.map((t) => (
- <button key={t.id} type="button" onClick={() => applyTemplate(t)} className="group overflow-hidden rounded-xl border border-stone-200 text-left transition hover:border-[#5D0F17] hover:shadow-md">
- <div className="flex h-28 flex-col justify-center gap-1.5 px-4" style={{ background: t.colors.bg }}>
- <span className="text-[19px] leading-none" style={{ fontFamily: ff(t.fonts.heading), color: t.colors.text }}>{t.name}</span>
- <span className="text-[11px] opacity-70" style={{ fontFamily: ff(t.fonts.body), color: t.colors.text }}>Curated vintage, one of one.</span>
- <div className="mt-1 flex gap-1">
- <span className="h-3 w-3 rounded-full ring-1 ring-black/10" style={{ background: t.colors.bg }} />
- <span className="h-3 w-3 rounded-full" style={{ background: t.colors.text }} />
- <span className="h-3 w-3 rounded-full" style={{ background: t.colors.accent }} />
+ <button key={t.id} type="button" onClick={() => applyTemplate(t)} title={t.signature} className="group overflow-hidden rounded-xl border border-stone-200 text-left transition hover:border-[#5D0F17] hover:shadow-md">
+ {/* The swatch shows the template's REAL catalogue density at its real card shape, because a
+     seller choosing Vitrine over The Index is choosing 2-up over 5-up — that's the decision,
+     and a name plus three colour dots doesn't show it. */}
+ <div className="flex h-28 flex-col justify-between px-3.5 pb-3 pt-3.5" style={{ background: t.colors.bg }}>
+ <span className="text-[17px] leading-none" style={{ fontFamily: ff(t.fonts.heading), color: t.colors.text }}>{t.name}</span>
+ <div className="flex gap-[3px]" style={{ gap: t.grid.gutter === "tight" ? 2 : t.grid.gutter === "wide" ? 6 : 4 }}>
+ {Array.from({ length: t.grid.cols }).map((_, i) => (
+ <span
+ key={i}
+ className="flex-1"
+ style={{
+ aspectRatio: t.grid.ratio.replace("/", " / "),
+ background: `${t.colors.text}1a`,
+ borderRadius: t.radius === "round" ? 8 : t.radius === "soft" ? 3 : 0,
+ }}
+ />
+ ))}
  </div>
  </div>
  <div className="border-t border-stone-100 p-3">
  <p className="text-[13px] font-semibold text-stone-900">{t.name}</p>
- <p className="mt-0.5 line-clamp-2 text-[11px] text-stone-500">{t.description}</p>
- <span className="mt-2 inline-block text-[11px] font-semibold text-[#5D0F17] opacity-0 transition group-hover:opacity-100">Use this vibe →</span>
+ <p className="mt-0.5 line-clamp-2 text-[11px] text-stone-500">{t.bestFor}</p>
+ <p className="mt-1.5 text-[10px] uppercase tracking-[0.1em] text-stone-400">
+ {t.grid.cols}-up · {t.layout.length} sections · {t.pages.length} pages
+ </p>
+ <span className="mt-2 inline-block text-[11px] font-semibold text-[#5D0F17] opacity-0 transition group-hover:opacity-100">Use this template →</span>
  </div>
  </button>
  ))}

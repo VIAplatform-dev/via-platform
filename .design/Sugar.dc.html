@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+  <style>
+    body { margin:0; background:#FFF0F5; font-family:'DM Sans','Helvetica Neue',sans-serif; color:#241019; }
+    a { color:#D6006E; text-decoration:none; } a:hover { color:#A30054; }
+    .disp { font-family:'Syne','Helvetica Neue',sans-serif; letter-spacing:-0.02em; }
+    .ph { background-image:linear-gradient(150deg,#F2D3E0 0%,#DDAEC4 55%,#C68FAB 100%); }
+    .ph2 { background-image:linear-gradient(150deg,#DCD9E4 0%,#BEBACB 55%,#A29DB2 100%); }
+    .ph3 { background-image:linear-gradient(150deg,#FAE0EA 0%,#EBC2D5 55%,#D6A3BE 100%); }
+    .ph4 { background-image:linear-gradient(150deg,#E6CFD8 0%,#CDAEBD 55%,#B28FA0 100%); }
+  </style>
+</helmet>
+
+<div style="width:1200px; background:#FFF0F5;">
+
+  <div style="background:#D6006E; color:#FFF; text-align:center; padding:10px 0; font-size:12px; font-weight:500; letter-spacing:0.04em;">new stuff every week · free shipping over [AMOUNT]</div>
+
+  <!-- header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 44px;">
+    <span class="disp" style="font-size:27px; font-weight:800;">YOUR STORE</span>
+    <div style="display:flex; gap:22px; font-size:14px; font-weight:500;"><span>new in</span><span>shop by vibe</span><span>bags</span><span>shoes</span><span>the story</span></div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#241019" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#241019" stroke-width="2"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+    </div>
+  </div>
+
+  <!-- hero: full-bleed with an offset overlapping card + rotated badge -->
+  <div style="position:relative; padding:0 0 70px;">
+    <div class="ph" style="height:520px;"></div>
+    <div style="position:absolute; left:44px; bottom:0; width:620px; background:#FFF; border-radius:22px; padding:36px 40px; display:flex; flex-direction:column; gap:14px; box-shadow:0 18px 46px rgba(36,16,25,0.18);">
+      <h1 class="disp" style="margin:0; font-size:56px; font-weight:800; line-height:0.98;">dress like you mean it</h1>
+      <p style="margin:0; font-size:16px; line-height:1.55; color:#4A3540; max-width:40ch;">Vintage and secondhand. One of each, and nothing is restocked.</p>
+      <div style="display:flex; gap:10px; margin-top:6px;">
+        <span class="disp" style="background:#D6006E; color:#FFF; padding:14px 32px; border-radius:999px; font-size:15px; font-weight:700;">shop everything</span>
+        <span class="disp" style="border:1.5px solid #241019; padding:12.5px 30px; border-radius:999px; font-size:15px; font-weight:700;">new in</span>
+      </div>
+    </div>
+    <div style="position:absolute; right:70px; bottom:64px; width:132px; height:132px; border-radius:999px; background:#D6006E; color:#FFF; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; transform:rotate(-11deg); box-shadow:0 12px 30px rgba(214,0,110,0.32);">
+      <span class="disp" style="font-size:19px; font-weight:800; line-height:1;">new</span>
+      <span class="disp" style="font-size:19px; font-weight:800; line-height:1;">weekly</span>
+    </div>
+  </div>
+
+  <!-- marquee -->
+  <div style="background:#241019; color:#FFF; padding:13px 0; overflow:hidden; white-space:nowrap;">
+    <span class="disp" style="font-size:14px; font-weight:700; letter-spacing:0.06em;">ONE OF EACH &nbsp;·&nbsp; NOTHING RESTOCKED &nbsp;·&nbsp; NEW EVERY WEEK &nbsp;·&nbsp; SHIPS IN 24 HOURS &nbsp;·&nbsp; ONE OF EACH &nbsp;·&nbsp; NOTHING RESTOCKED &nbsp;·&nbsp; NEW EVERY WEEK &nbsp;·&nbsp; SHIPS IN 24 HOURS</span>
+  </div>
+
+  <!-- featured dense 4-up -->
+  <div style="padding:44px 44px 34px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px;">
+      <h2 class="disp" style="margin:0; font-size:28px; font-weight:700;">just dropped</h2>
+      <span style="font-size:14px; font-weight:500; color:#D6006E;">see everything →</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:16px;">
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph3" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Embellished Halter Top Size S</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph2" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Metallic Shoulder Bag</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Low Rise Flare Jean W28</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph4" style="aspect-ratio:1; border-radius:14px; position:relative;"><span class="disp" style="position:absolute; top:10px; left:10px; background:#241019; color:#FFF; font-size:11px; font-weight:700; padding:5px 11px; border-radius:999px;">SOLD</span></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35; color:#7A6470;">Velour Tracksuit Set Size M</span><span style="font-size:13.5px; font-weight:700; color:#7A6470;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph2" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Oval Tinted Sunglasses</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph3" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Lace Trim Cami Size XS</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Studded Leather Mini Size S</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><div class="ph4" style="aspect-ratio:1; border-radius:14px;"></div><div style="display:flex; flex-direction:column; gap:1px;"><span style="font-size:13.5px; line-height:1.35;">Patent Platform Boot Size 38</span><span style="font-size:13.5px; font-weight:700;">$0.00</span></div></div>
+    </div>
+  </div>
+
+  <!-- vibe grid — signature -->
+  <div style="padding:34px 44px 44px;">
+    <h2 class="disp" style="margin:0 0 6px; font-size:28px; font-weight:700;">shop by vibe</h2>
+    <p style="margin:0 0 20px; font-size:14.5px; color:#6B5361;">pick by the mood, not the garment type</p>
+    <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px;">
+      <div style="position:relative; border-radius:16px; overflow:hidden;"><div class="ph" style="aspect-ratio:16/10;"></div><div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(36,16,25,0.55), transparent 60%); display:flex; align-items:flex-end; padding:18px;"><span class="disp" style="color:#FFF; font-size:22px; font-weight:700;">going out top</span></div></div>
+      <div style="position:relative; border-radius:16px; overflow:hidden;"><div class="ph2" style="aspect-ratio:16/10;"></div><div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(36,16,25,0.55), transparent 60%); display:flex; align-items:flex-end; padding:18px;"><span class="disp" style="color:#FFF; font-size:22px; font-weight:700;">off duty</span></div></div>
+      <div style="position:relative; border-radius:16px; overflow:hidden;"><div class="ph3" style="aspect-ratio:16/10;"></div><div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(36,16,25,0.55), transparent 60%); display:flex; align-items:flex-end; padding:18px;"><span class="disp" style="color:#FFF; font-size:22px; font-weight:700;">dressed up</span></div></div>
+      <div style="position:relative; border-radius:16px; overflow:hidden;"><div class="ph4" style="aspect-ratio:16/10;"></div><div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(36,16,25,0.55), transparent 60%); display:flex; align-items:flex-end; padding:18px;"><span class="disp" style="color:#FFF; font-size:22px; font-weight:700;">holiday</span></div></div>
+      <div style="position:relative; border-radius:16px; overflow:hidden;"><div class="ph3" style="aspect-ratio:16/10;"></div><div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(36,16,25,0.55), transparent 60%); display:flex; align-items:flex-end; padding:18px;"><span class="disp" style="color:#FFF; font-size:22px; font-weight:700;">the office, kind of</span></div></div>
+      <div style="position:relative; border-radius:16px; overflow:hidden;"><div class="ph" style="aspect-ratio:16/10;"></div><div style="position:absolute; inset:0; background:linear-gradient(to top, rgba(36,16,25,0.55), transparent 60%); display:flex; align-items:flex-end; padding:18px;"><span class="disp" style="color:#FFF; font-size:22px; font-weight:700;">total statement</span></div></div>
+    </div>
+  </div>
+
+  <!-- text: what this is -->
+  <div style="padding:0 44px 44px;">
+    <div style="background:#FFF; border-radius:20px; overflow:hidden; display:grid; grid-template-columns:0.95fr 1.05fr;">
+      <div class="ph3" style="min-height:340px;"></div>
+      <div style="padding:44px 46px; display:flex; flex-direction:column; gap:18px; justify-content:center;">
+        <span class="disp" style="font-size:13px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#D6006E;">what this is</span>
+        <h3 class="disp" style="margin:0; font-size:32px; font-weight:700; line-height:1.12;">secondhand, picked one piece at a time</h3>
+        <p style="margin:0; font-size:15.5px; line-height:1.7; color:#4A3540; max-width:46ch;">Everything here was chosen individually rather than ordered in. Nothing is restocked, so what you see on the site is genuinely what there is.</p>
+        <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:18px; margin-top:6px;">
+          <div style="display:flex; flex-direction:column; gap:4px;"><span class="disp" style="font-size:15px; font-weight:700;">one of each</span><span style="font-size:13.5px; line-height:1.55; color:#6B5361;">A single item in a single size.</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px;"><span class="disp" style="font-size:15px; font-weight:700;">new weekly</span><span style="font-size:13.5px; line-height:1.55; color:#6B5361;">New pieces added every week.</span></div>
+          <div style="display:flex; flex-direction:column; gap:4px;"><span class="disp" style="font-size:15px; font-weight:700;">measured flat</span><span style="font-size:13.5px; line-height:1.55; color:#6B5361;">Full measurements on every listing.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- statement -->
+  <div style="background:#D6006E; color:#FFF; padding:76px 44px; text-align:center;">
+    <p class="disp" style="margin:0 auto; max-width:22ch; font-size:44px; font-weight:800; line-height:1.08;">there is exactly one of everything here</p>
+  </div>
+
+  <!-- gallery IG wall -->
+  <div style="padding:52px 44px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:18px;">
+      <h2 class="disp" style="margin:0; font-size:26px; font-weight:700;">on you</h2>
+      <span style="font-size:14px; font-weight:500; color:#D6006E;">[@YOUR HANDLE]</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(8, minmax(0,1fr)); gap:8px;">
+      <div class="ph3" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph2" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph4" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph3" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph2" style="aspect-ratio:1; border-radius:10px;"></div><div class="ph4" style="aspect-ratio:1; border-radius:10px;"></div>
+    </div>
+  </div>
+
+  <!-- testimonials -->
+  <div style="padding:0 44px 52px; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px;">
+    <div style="background:#FFF; border-radius:16px; padding:24px; display:flex; flex-direction:column; gap:10px;"><span style="color:#D6006E; font-size:13px;">★★★★★</span><p style="margin:0; font-size:14.5px; line-height:1.6;">"Exactly as described, and it arrived fast."</p><span style="font-size:12.5px; color:#7A6470;">[Customer name]</span></div>
+    <div style="background:#FFF; border-radius:16px; padding:24px; display:flex; flex-direction:column; gap:10px;"><span style="color:#D6006E; font-size:13px;">★★★★★</span><p style="margin:0; font-size:14.5px; line-height:1.6;">"Shipped the same day and packaged really well."</p><span style="font-size:12.5px; color:#7A6470;">[Customer name]</span></div>
+    <div style="background:#FFF; border-radius:16px; padding:24px; display:flex; flex-direction:column; gap:10px;"><span style="color:#D6006E; font-size:13px;">★★★★★</span><p style="margin:0; font-size:14.5px; line-height:1.6;">"Everything I have bought here has been one of a kind."</p><span style="font-size:12.5px; color:#7A6470;">[Customer name]</span></div>
+  </div>
+
+  <!-- newsletter -->
+  <div style="background:#241019; color:#FFF; padding:64px 44px; text-align:center;">
+    <h3 class="disp" style="margin:0 0 10px; font-size:34px; font-weight:800;">first dibs</h3>
+    <p style="margin:0 auto 24px; font-size:15.5px; max-width:46ch; line-height:1.55; color:#D6B9C7;">New pieces by email before they go up anywhere else.</p>
+    <div style="display:flex; max-width:420px; margin:0 auto;">
+      <span style="flex:1; background:#3B1E2B; padding:15px 20px; border-radius:999px 0 0 999px; font-size:14.5px; color:#9C7D8C;">your email</span>
+      <span class="disp" style="background:#D6006E; color:#FFF; padding:15px 30px; border-radius:0 999px 999px 0; font-size:14px; font-weight:700;">sign me up</span>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="padding:40px 44px; display:flex; justify-content:space-between; font-size:14px; color:#6B5361;">
+    <div style="display:flex; gap:48px;">
+      <div style="display:flex; flex-direction:column; gap:7px;"><span class="disp" style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#241019;">Shop</span><span>Everything</span><span>By vibe</span><span>Sale</span></div>
+      <div style="display:flex; flex-direction:column; gap:7px;"><span class="disp" style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#241019;">Info</span><span>Sizing</span><span>Shipping</span><span>Returns</span></div>
+      <div style="display:flex; flex-direction:column; gap:7px;"><span class="disp" style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#241019;">Us</span><span>The story</span><span>[YOUR EMAIL]</span><span>TikTok</span></div>
+    </div>
+    <span class="disp" style="align-self:flex-end; font-weight:700;">© 2026 [YOUR STORE]</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
