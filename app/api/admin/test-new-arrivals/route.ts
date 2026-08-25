@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendNewArrivalsEmail } from "@/app/lib/email";
+import { sendNewArrivalsEmail, NEW_ARRIVALS_SUBJECT_KEY } from "@/app/lib/email";
+import { getSetting } from "@/app/lib/settings-db";
 import { getEmailPickProducts } from "@/app/lib/editors-picks-db";
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
@@ -40,6 +41,6 @@ export async function GET(request: NextRequest) {
  const usingPicks = picks.length > 0;
  const products = usingPicks ? picks : (rows as unknown as DBProduct[]);
 
- const { sent, failed } = await sendNewArrivalsEmail([to], products, usingPicks);
+ const { sent, failed } = await sendNewArrivalsEmail([to], products, usingPicks, await getSetting(NEW_ARRIVALS_SUBJECT_KEY).catch(() => null));
  return NextResponse.json({ ok: true, sent, failed, to, productCount: products.length, source: usingPicks ? "curated-picks" : "newest-12" });
 }
