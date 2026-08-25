@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { getApprovedPilotEmails } from "@/app/lib/pilot-db";
-import { sendNewArrivalsEmail } from "@/app/lib/email";
+import { sendNewArrivalsEmail, NEW_ARRIVALS_SUBJECT_KEY } from "@/app/lib/email";
 import { getEmailPickProducts } from "@/app/lib/editors-picks-db";
 import { getSetting } from "@/app/lib/settings-db";
+import { shouldSendAtFivePmEastern, easternHour } from "@/app/lib/eastern-cron";
 import type { DBProduct } from "@/app/lib/db";
 import { DISABLED_STORE_SLUGS } from "@/app/lib/db";
 import { brands as brandDefs } from "@/app/lib/brandData";
@@ -26,6 +27,21 @@ export async function GET(request: Request) {
  // unauthenticated open email-relay (testEmail) and an unauthenticated internal-state leak (status).
  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ }
+
+  // ── 5 PM Eastern, year-round ── see app/lib/eastern-cron.ts for why there are two slots.
+ const cronSchedule = request.headers.get("x-vercel-cron-schedule");
+ // Logged on every run so the LIVE registered schedule is visible in the runtime logs. Two
+ // abandoned Vercel projects were running this job on a stale schedule for two months; this
+ // header is the only thing that would have shown it.
+ console.log(`[new-arrivals] schedule=${cronSchedule ?? "(none: manual or stale registration)"} etHour=${easternHour(new Date())} testEmail=${testEmail ? "yes" : "no"}`);
+ if (!testEmail && !status && !shouldSendAtFivePmEastern(cronSchedule, new Date())) {
+  return NextResponse.json({
+   ok: true,
+   skipped: true,
+   reason: `Not 5 PM Eastern — it is ${easternHour(new Date())}:00 ET. The other UTC slot sends today.`,
+   cronSchedule,
+  });
  }
 
  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -174,7 +190,7 @@ export async function GET(request: Request) {
  return NextResponse.json({ ok: true, message: "No approved users to email.", sent: 0 });
  }
 
- const { sent, failed } = await sendNewArrivalsEmail(emails, products, usingPicks);
+ const { sent, failed } = await sendNewArrivalsEmail(emails, products, usingPicks, await getSetting(NEW_ARRIVALS_SUBJECT_KEY).catch(() => null));
 
  // If nothing actually went out, release the slot so it retries next run.
  if (!testEmail && sent === 0) {
