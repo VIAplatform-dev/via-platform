@@ -39,8 +39,12 @@ request**, so a hosted store never shows a frozen catalog. This is a hard requir
 
 ## 3. Current state
 
-All import-engine work is **uncommitted on a local branch**. Production runs the old code.
-Check `git status` before assuming anything is live.
+Milestone 0 (capture shim, source identity, coverage rungs, eval harness) is **committed and
+pushed** on `import/m0-capture-shim` — PR #5. Merging that PR is what deploys it.
+
+Milestone 2 (import visibility) is built on the same branch: a job model, resumable steps, a
+sweeper cron, structural checks at import time, and no silent error-swallowing left in the import
+path. Check `git status` / the PR before assuming anything is live in production.
 
 Known pre-existing failures, unrelated to this work — do not "fix" them by accident:
 - `app/lib/comps.test.ts` and `app/lib/data-layer/unbranded-benchmark.test.ts` fail at *import*
@@ -66,8 +70,17 @@ live products rendered 16/16  100%
 brand readable (3+)    16/16  100%
 ```
 
-Stores currently falling back to a generic grid: `chillboutiqueconsignment`, `leivintage`,
+Stores currently falling back to a generic grid: `unique-vintage`, `leivintage`,
 `thevintageboutiquestyle`.
+
+**The grid score changed meaning (2026-08-24).** It used to be measured only on the homepage — but
+several storefronts put *collection tiles* there and no product grid at all. Those tiles are
+structurally identical to a product grid, so they were being filled with products (a real bug: a
+"shop by collection" row rendered as individual items), and the harness scored that as a match.
+Now: collection rows are left alone, and a store whose homepage has no product grid is scored on
+`/collections/all` instead. Net score is unchanged at 13/16, but the composition is honest —
+`chillboutiqueconsignment` was never broken (wrong page), and `unique-vintage` is a genuine gap that
+the bug was masking (no detectable product grid on either page).
 
 The harness exits non-zero **only** on a platform-detection regression — that's the hard
 failure, because a wrong platform sends a store down the wrong extraction path. Grid fallback
@@ -206,9 +219,11 @@ Plan B requirements that are **security, not polish**:
 - A *subdomain* of vyaplatform.com is **same-site** and does not isolate (cookie tossing). Use a
   separate apex.
 
-Open product question gating Plan B: **are a hosted store's shoppers VYA's customers or the
-seller's?** Per-store identity is free and follows naturally if their customer list is imported.
-Single sign-on is a separate project.
+**Gate: ANSWERED (2026-08-24) — a hosted store's shoppers are the SELLER's customers, not VYA's.**
+So per-store identity is the model, single sign-on is *not* a prerequisite, and Plan B is unblocked.
+This decision also argues *for* Plan B architecturally: a separate origin per store gives per-store
+cookie/session isolation for free, whereas serving every store from vyaplatform.com (Plan A) puts
+all stores in one shared cookie jar — the wrong shape for "the seller's customers".
 
 ---
 
@@ -236,11 +251,10 @@ Single sign-on is a separate project.
 
 Ordered. Acceptance criteria are executable.
 
-1. **Ship what exists.** 1,400+ lines across 15 files, uncommitted, one machine.
-2. **Import visibility.** Job model, resumable steps, per-step reporting. Every bug found so far
-   was invisible until someone looked — the capture route still swallows step errors.
-   *Accept:* import reports `42 pages · 318 products · 2 warnings`; killing the server mid-crawl
-   resumes; no `.catch(() => 0)` left in the import path.
+1. ~~**Ship what exists.**~~ **Done** — committed and pushed, PR #5. Merge to deploy.
+2. ~~**Import visibility.**~~ **Built** (see §12). Job model, resumable steps, per-step reporting,
+   sweeper cron, import-time structural checks. Acceptance is enforced by tests, including an
+   executable check that no silent `.catch(() => …)` remains in the import path.
 3. **Plan B for Shopify.** *Accept:* the theme's own cart drawer shows VYA items; checkout reaches
    VYA Stripe; `curl store-origin/admin/inventory` is refused; **zero** network requests to
    `*.myshopify.com` or `shop.app` during add-to-cart → checkout.
@@ -268,3 +282,34 @@ Ordered. Acceptance criteria are executable.
 - **TOCTOU DNS rebinding:** `safe-url.ts` re-resolves per redirect hop, but a hostile DNS server
   could still swap records between `lookup()` and `fetch()`. Pinning the resolved IP at the socket
   layer is the real fix.
+
+---
+
+## 12. The import job model (milestone 2)
+
+An import is a **job row** (`import_jobs`, created by `CREATE TABLE IF NOT EXISTS` on first call —
+no migration step). Everything about it is designed around one fact: **a big store's crawl outlives
+a single serverless invocation**, so stopping half-way is normal, not exceptional.
+
+| File | What it is |
+|---|---|
+| `import-engine/report.ts` | Pure: step machine, report string, stall/resume predicates. Unit tested. |
+| `import-engine/run-import.ts` | The pipeline. Every dependency **injected**, so it's tested with fakes. |
+| `import-engine/jobs-db.ts` | Job persistence + atomic stalled-job claiming. |
+| `import-engine/checks.ts` | Structural checks **shared with `scripts/eval-import.ts`** — never duplicate them. |
+| `import-engine/wire.ts` | Glues the pipeline to the real crawler/importer. Used by the route AND the cron. |
+| `api/cron/import-sweeper` | Claims stalled jobs, continues paused ones. Every 5 min. |
+
+Rules worth keeping:
+
+- **Fatal vs. warning.** Only the crawl (and a password lock) stops an import. Products, collections,
+  membership, blocks and checks degrade to *reported* warnings — a store whose design copied but
+  whose collections didn't link is a partial success the seller must be told about.
+- **Never swallow in the import path.** `run-import.test.ts` fails the build if a
+  `.catch(() => …)` appears in the route, `capture-commerce.ts`, `wire.ts`, the pipeline or the
+  sweeper. An intentional exception needs an `/* allow-swallow: reason */` marker.
+- **Resume must not re-enter the crawler when the crawl already finished** — `crawlAndStore` starts
+  by DELETING the store's captured pages, so that would destroy a good capture. Guarded, and tested.
+- **Two things resume a job**: the seller's browser (fast, while the tab is open) and the sweeper
+  cron (slow, works when it isn't). Both go through `wire.ts` so they can't drift.
+- The crawl's time budget is **180s of the 300s limit**, leaving room for the steps after it.

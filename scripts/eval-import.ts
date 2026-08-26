@@ -14,9 +14,11 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import * as cheerio from "cheerio";
 import { detectPlatform, declineMessage } from "../app/lib/import-engine/detect.ts";
-import { injectCollectionItems, detectGridHandles } from "../app/lib/site-capture.ts";
+// The fidelity checks are SHARED with the import pipeline (app/lib/import-engine/checks.ts) rather
+// than reimplemented here. Two copies would drift, and then the harness and the importer would
+// disagree about whether a store imported correctly — the numbers have to reconcile.
+import { scoreCaptureHtml, gridNotes, PROBE_ITEMS } from "../app/lib/import-engine/checks.ts";
 import { readBrand } from "../app/lib/storefront-from-brand.ts";
 import { safeFetch } from "../app/lib/safe-url.ts";
 
@@ -61,19 +63,19 @@ async function load(url: string, live: boolean): Promise<string | null> {
  }
 }
 
-/** Three fake items are enough to prove the live grid renders in the store's own card. */
-const SAMPLE = [
- { id: "e1", title: "1990s Silk Slip Dress", priceCents: 18000, currency: "USD", images: ["https://x/1.jpg"], sourceId: "silk-slip" },
- { id: "e2", title: "Beaded Evening Clutch", priceCents: 9500, currency: "USD", images: ["https://x/2.jpg"], sourceId: "clutch" },
- { id: "e3", title: "Wool Overcoat", priceCents: 42000, currency: "USD", images: ["https://x/3.jpg"], sourceId: "coat" },
-];
+/** The probe items live with the checks so the harness and the importer measure the same thing. */
+const SAMPLE = PROBE_ITEMS;
 
 type Row = {
  store: string; platform: string; ok: boolean; declined: boolean;
  grid: "theme" | "fallback" | "none"; titles: number; brand: number; notes: string[];
 };
 
-function score(url: string, html: string, expect: string): Row {
+/** Some storefronts put only COLLECTION tiles on the homepage — no product grid at all. Scoring a
+ *  theme-card match there measured nothing (and used to "pass" only because collection rows were
+ *  wrongly filled with products). When the homepage has no product grid, the shop page is scored
+ *  instead: the question is whether we can clone THIS THEME's product card, not which page it's on. */
+function score(url: string, html: string, expect: string, shopHtml?: string | null): Row {
  const store = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
  const notes: string[] = [];
  const d = detectPlatform(html, url);
@@ -81,25 +83,18 @@ function score(url: string, html: string, expect: string): Row {
  if (!ok) notes.push(`platform ${d.platform}, expected ${expect}`);
  const declined = Boolean(declineMessage(d)) || d.shell.isShell;
 
- // Live-grid rendering: does the store's OWN product card get reused?
- let grid: Row["grid"] = "none";
- let titles = 0;
- const out = injectCollectionItems(html, SAMPLE as never, (it) => `/p/${(it as { id: string }).id}`);
- const $ = cheerio.load(out);
- const $live = $("[data-vya-collection]");
- if ($live.length) {
-  const generic = ($live.attr("style") || "").includes("grid-template-columns");
-  grid = generic ? "fallback" : "theme";
-  titles = SAMPLE.filter((s) => out.includes(s.title)).length;
+ // Live-grid rendering (does the store's OWN product card get reused?), navigation survival, and
+ // whether homepage grids line up with the collections they belong to.
+ let s = scoreCaptureHtml(html);
+ let scoredOn = "home";
+ if (s.grid !== "theme" && shopHtml) {
+  const alt = scoreCaptureHtml(shopHtml);
+  if (alt.grid === "theme") { s = alt; scoredOn = "shop"; }
  }
- if (grid === "fallback") notes.push("generic grid — theme card not found");
- if (grid === "theme" && titles < SAMPLE.length) notes.push(`only ${titles}/${SAMPLE.length} titles rendered`);
+ notes.push(...gridNotes(s));
+ if (scoredOn === "shop") notes.push("no product grid on the homepage — scored on /collections/all");
 
- // Homepage grids must line up with the collections they belong to.
- const handles = detectGridHandles(html);
- if (handles.length && handles.every((h) => h === null)) notes.push("grids found but no collection handles resolved");
-
- return { store, platform: d.platform, ok, declined, grid, titles, brand: 0, notes };
+ return { store, platform: d.platform, ok, declined, grid: s.grid, titles: s.titles, brand: 0, notes };
 }
 
 async function main() {
@@ -113,7 +108,11 @@ async function main() {
  for (const t of targets) {
   const html = await load(t.url, live);
   if (!html) { console.log(`  ✘ ${t.url} — unreachable`); continue; }
-  const row = score(t.url, html, t.expect || detectPlatform(html, t.url).platform);
+  let row = score(t.url, html, t.expect || detectPlatform(html, t.url).platform);
+  if (row.grid !== "theme") {
+   const shop = await load(t.url.replace(/\/+$/, "") + "/collections/all", live);
+   if (shop) row = score(t.url, html, t.expect || detectPlatform(html, t.url).platform, shop);
+  }
   const brand = await readBrand(t.url).catch(() => null);
   row.brand = brand?.found.length ?? 0;
   rows.push(row);

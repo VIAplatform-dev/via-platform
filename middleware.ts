@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
 import type { NextRequest } from "next/server";
 import { verifyRecipientTokenEdge } from "@/app/lib/recipientToken-edge";
 import { capturedSlugForDomain } from "@/app/lib/domain-routing-edge";
@@ -176,6 +177,7 @@ function isSessionOnlyRoute(pathname: string): boolean {
   );
 }
 
+
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const fullPath = pathname + search;
@@ -188,6 +190,92 @@ export async function middleware(request: NextRequest) {
   const rawHost = (request.headers.get("host") || "").toLowerCase();
   const host = rawHost.split(":")[0];
   const localPort = rawHost.split(":")[1] || "";
+
+  // ── PLAN B: stores served from their own registrable domain ────────────────
+  // {slug}.vyasites.com (or .vyasites.test locally, via /etc/hosts) serves that seller's captured
+  // storefront from an origin the same-origin policy isolates from VYA — which is what lets the
+  // seller's OWN JavaScript run, so their carousels, filters, cart drawer and search work natively
+  // instead of being imitated by a shim.
+  //
+  // Runs FIRST: a store origin is not a "connected custom domain", and must never fall through to
+  // the marketplace, the OS host or the login gate.
+  const planBSlug = storeSlugForHost(host);
+  if (planBSlug) {
+    // SECURITY. The seller's own code runs on this origin, so VYA's admin, portal and internal APIs
+    // must not answer here — that script could otherwise drive them with the visitor's cookies.
+    // 404, not 403: a store origin has no business confirming those surfaces exist.
+    if (isRefusedOnStoreHost(pathname)) {
+      return new NextResponse("Not found", { status: 404 });
+    }
+
+    // The theme's own route table, answered in Shopify's dialect. Every Shopify theme publishes
+    // these as RELATIVE paths, so on this origin the theme's JavaScript sends its cart calls to us
+    // (see app/lib/plan-b/cart-json.ts). One mapping covers every Shopify store.
+    // …and Squarespace's, which its one shared storefront bundle calls the same relative way.
+    const themeRoute = shopifyThemeRoute(pathname) || squarespaceThemeRoute(pathname);
+    if (themeRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = themeRoute;
+      return NextResponse.rewrite(url);
+    }
+
+    // Squarespace's Checkout buttons go through a redirector of its own; send it to VYA's checkout
+    // with the shopper's VYA cart. Unrouted it was rewritten into /site/{slug}/commerce/goto-checkout
+    // and answered "Page not found" — one click from paying.
+    const sqsCheckout = squarespaceCheckoutRedirect(pathname);
+    if (sqsCheckout) {
+      const url = request.nextUrl.clone();
+      const [p, q] = sqsCheckout.split("?");
+      url.pathname = p;
+      url.search = q ? `?${q}` : "";
+      return NextResponse.redirect(url);
+    }
+
+    // Shopify also serves every product under a COLLECTION-SCOPED url —
+    // /collections/{handle}/products/{product}. Themes use it for real navigation and for their
+    // quick-shop fetch, so leaving it unrouted meant clicking "Quick Shop" fetched a 404 and the
+    // panel simply never appeared.
+    const scoped = pathname.match(/^\/collections\/[^/]+\/products\/([^/]+)\/?$/i);
+    if (scoped) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/site/${planBSlug}/products/${scoped[1]}`;
+      return NextResponse.rewrite(url);
+    }
+
+    // Shopify's telemetry sink. The theme's inline analytics bootstrap beacons here (a SAME-ORIGIN
+    // path, so no allowlist reaches it) on every page view. Unrouted it fell through to Next's HTML
+    // 404 — a 107KB error page returned for a fire-and-forget beacon. Ad blockers cancel these
+    // before they leave the browser, which is why they showed as ERR_BLOCKED_BY_CLIENT; a shopper
+    // WITHOUT a blocker was silently paying for the 404 instead. 204 costs nothing and is what a
+    // beacon endpoint is supposed to say.
+    if (pathname.startsWith("/.well-known/shopify/monorail")) {
+      return new NextResponse(null, { status: 204 });
+    }
+
+    // Theme assets. Shopify themes publish their import map with ROOT-RELATIVE `/cdn/…` specifiers,
+    // so on this origin they resolve against us — app/cdn/[...path] proxies them from the site we
+    // captured. Most such paths carry a file extension and skip middleware entirely (the matcher
+    // excludes dotted paths); this covers the extensionless ones, which would otherwise be rewritten
+    // into /site/{slug}/cdn/… and 404.
+    if (pathname.startsWith("/cdn/")) return NextResponse.next();
+
+    // Checkout is VYA's own flow, not a captured page — the theme's cart links straight to it, and
+    // rewriting it into /site/{slug}/ left the shopper on a 404 one click from paying.
+    if (isVyaOwnedPath(pathname)) return NextResponse.next();
+
+    // Everything else is a storefront page, served from the captured site.
+    // A path that ALREADY points at /site/ is passed through: captures taken for Plan A rewrote
+    // their internal links to /site/{slug}/…, and prefixing those again would 404 every link on the
+    // page. (New Plan B captures keep links root-relative — see CrawlOpts.linkBase.)
+    if (pathname.startsWith("/site/")) return NextResponse.next();
+    if (!pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/site/${planBSlug}${pathname === "/" ? "" : pathname}`;
+      return NextResponse.rewrite(url);
+    }
+    return NextResponse.next();
+  }
+
   const isVyaHost =
     host === "vyaplatform.com" ||
     host === "www.vyaplatform.com" ||
@@ -443,5 +531,17 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)" ],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)",
+    // The default pattern above skips any path containing a dot, which would exclude the very
+    // endpoints a Shopify theme calls. List them explicitly so Plan B's cart works.
+    "/cart.js",
+    "/cart.json",
+    "/cart/add.js",
+    "/cart/change.js",
+    "/cart/update.js",
+    "/search/suggest.json",
+    // Shopify's analytics beacon — dotted path, so the default pattern above skips it.
+    "/.well-known/shopify/monorail/:path*",
+  ],
 };

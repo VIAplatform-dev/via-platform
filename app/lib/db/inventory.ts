@@ -303,6 +303,41 @@ export async function sweepExpiredReservations(): Promise<number> {
 }
 
 /** Active (buyable) items for a seller — the storefront's source of truth. */
+/**
+ * What a hosted STOREFRONT should show: everything a shopper can see, not only what they can buy.
+ *
+ * A vintage store's sold archive is part of the browsing experience — the source site keeps sold
+ * pieces on the shelf with a "Sold out" badge, and hiding them made a 52-product store look like a
+ * 15-product one. Drafts and removed rows stay hidden; those are the seller's private state.
+ *
+ * Buyable pieces lead, then the archive, newest first within each.
+ */
+export async function listStorefrontItems(sellerId: string): Promise<Item[]> {
+ const db = getDb();
+ return db.select().from(items)
+  .where(and(eq(items.sellerId, sellerId), inArray(items.status, ["active", "sold"])))
+  .orderBy(sql`CASE WHEN ${items.status} = 'active' THEN 0 ELSE 1 END`, desc(items.createdAt));
+}
+
+/**
+ * The subset of a seller's storefront items whose `sourceId` (the imported handle) is in the given
+ * list — live data, but scoped to a SPECIFIC set of products rather than the whole catalogue.
+ *
+ * Built for a captured collection page VYA has no curation data for (no assigned VYA collection,
+ * no category/brand match on the handle): rather than falling back to the seller's entire
+ * inventory, the caller reads the handles the CAPTURED page actually listed and asks for just
+ * those, live. Ordered to match `sourceIds`, since that's the seller's own curated order on a
+ * manually-built Shopify collection with no category logic behind it at all.
+ */
+export async function listStorefrontItemsBySourceIds(sellerId: string, sourceIds: string[]): Promise<Item[]> {
+ if (!sourceIds.length) return [];
+ const db = getDb();
+ const rows = await db.select().from(items)
+  .where(and(eq(items.sellerId, sellerId), inArray(items.status, ["active", "sold"]), inArray(items.sourceId, sourceIds)));
+ const order = new Map(sourceIds.map((id, i) => [id, i]));
+ return rows.sort((a, b) => (order.get(a.sourceId || "") ?? 0) - (order.get(b.sourceId || "") ?? 0));
+}
+
 export async function listAvailableItems(sellerId: string): Promise<Item[]> {
  const db = getDb();
  return db.select().from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));

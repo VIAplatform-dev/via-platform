@@ -51,6 +51,18 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  const pathname = usePathname();
  const [open, setOpen] = useState(false);
  const [suppressed, setSuppressed] = useState(false); // hide launcher when the home full-page chat is open
+ // The launcher sits fixed bottom-right on every page, which on some (e.g. a wide inventory table)
+ // lands right on top of real content with no way to move it. Let people dismiss it for the tab —
+ // sessionStorage, not permanent, so it's back next visit rather than gone for good by accident.
+ const [dismissed, setDismissed] = useState(false);
+ useEffect(() => {
+ try { if (sessionStorage.getItem("vya_sidekick_dismissed") === "1") setDismissed(true); } catch { /* private mode etc. */ }
+ }, []);
+ function dismiss(e: React.MouseEvent) {
+ e.stopPropagation();
+ setDismissed(true);
+ try { sessionStorage.setItem("vya_sidekick_dismissed", "1"); } catch { /* private mode etc. */ }
+ }
  const [msgs, setMsgs] = useState<Msg[]>([]);
  const [input, setInput] = useState("");
  const [attached, setAttached] = useState<string[]>([]); // data-URL inspiration/reference images
@@ -139,14 +151,19 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  return (
  <>
  {/* Launcher */}
- {!docked && !open && !suppressed && (
- <button onClick={() => setOpen(true)} className="group fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-full bg-[#5D0F17] py-2.5 pl-2.5 pr-4 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12]">
+ {!docked && !open && !suppressed && !dismissed && (
+ <div className="fixed bottom-5 right-5 z-50">
+ <button onClick={() => setOpen(true)} className="group flex items-center gap-2 rounded-full bg-[#5D0F17] py-2.5 pl-2.5 pr-4 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12]">
  <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/10">
  <Sparkles size={15} />
  <span className="vya-status-dot absolute -right-0 -top-0 h-2 w-2 rounded-full border border-[#5D0F17] bg-emerald-400" />
  </span>
  <span className="font-mono text-[11px] uppercase tracking-[0.18em]">Ask VYA</span>
  </button>
+ <button onClick={dismiss} title="Hide" aria-label="Hide Ask VYA" className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-black/10 bg-white text-[#5D0F17] shadow transition hover:bg-[#5D0F17] hover:text-white">
+ <X size={11} strokeWidth={2.5} />
+ </button>
+ </div>
  )}
 
  {/* Panel */}

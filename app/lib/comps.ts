@@ -7,6 +7,8 @@ import { unstable_cache } from "next/cache";
 import { getCachedLens, saveCachedLens } from "./lens-cache-db";
 import { recordSerp } from "./cost-tracker";
 import { embedImages, cosine } from "./embeddings";
+import { parseLensMatches, mergeLensMatches, pricedCount, priceToCents } from "./lens-products";
+export { priceToCents };
 
 const SERPAPI_URL = "https://serpapi.com/search.json";
 
@@ -38,20 +40,11 @@ async function serp(params: Record<string, string>): Promise<any | null> {
  }
 }
 
-/** Coerce SerpApi's many price shapes (number | {extracted_value} | {raw} | {from}) into cents. */
-export function priceToCents(p: any): number | null {
- let v: number | null = null;
- if (typeof p === "number") v = p;
- else if (typeof p?.extracted_value === "number") v = p.extracted_value;
- else if (typeof p?.extracted === "number") v = p.extracted; // eBay engine
- else if (typeof p?.from?.extracted_value === "number") v = p.from.extracted_value;
- else if (typeof p?.from?.extracted === "number") v = p.from.extracted; // eBay price range
- else if (typeof p?.raw === "string") { const n = parseFloat(p.raw.replace(/[^0-9.]/g, "")); v = Number.isFinite(n) ? n : null; }
- else if (typeof p === "string") { const n = parseFloat(p.replace(/[^0-9.]/g, "")); v = Number.isFinite(n) ? n : null; }
- return v && v > 0 ? Math.round(v * 100) : null;
-}
 
-export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string; thumbnail?: string; similarity?: number };
+// Fewer priced matches than this from the default Lens tab → also query the products tab.
+const LENS_PRODUCTS_MIN_PRICED = Number(process.env.VYA_LENS_PRODUCTS_MIN_PRICED) || 3;
+
+export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string; thumbnail?: string; similarity?: number; pricedFrom?: "products" };
 
 /** Reverse-image search (Google Lens) for the exact / visually-identical product.
  *  This is the single best signal for BRAND ID and true price — it finds the same
@@ -62,10 +55,16 @@ export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch
  const cached = await getCachedLens(imageUrl);
  if (cached) return cached;
  const r = await serp({ engine: "google_lens", url: imageUrl, country: "us" });
- const matches = ((r?.visual_matches || []) as any[])
- .slice(0, 25)
- .map((m) => ({ title: String(m.title || ""), priceCents: priceToCents(m.price), source: String(m.source || ""), link: m.link as string | undefined, thumbnail: (typeof m.thumbnail === "string" && m.thumbnail) || undefined }))
- .filter((m) => m.title);
+ let matches = parseLensMatches(r);
+ // Google badges a price on only a minority of default-tab results. When that leaves too few comps,
+ // spend ONE more credit on Lens's products tab (every hit there is priced) and merge it in. Runs
+ // before caching so a repeat lookup reuses the enriched set. VYA_LENS_PRODUCTS=false switches it off.
+ if (r && pricedCount(matches) < LENS_PRODUCTS_MIN_PRICED && process.env.VYA_LENS_PRODUCTS !== "false") {
+ const p = await serp({ engine: "google_lens", url: imageUrl, country: "us", type: "products" });
+ const products = parseLensMatches(p, "products");
+ matches = mergeLensMatches(matches, products);
+ console.log(`[lens-products] primary_priced=${pricedCount(parseLensMatches(r))} products=${products.length} merged_priced=${pricedCount(matches)}`);
+ }
  // Cache only a genuine SerpApi response (r != null) — never persist a transient timeout/error as
  // "no matches", which would poison this photo's lookups for the whole TTL.
  if (r) await saveCachedLens(imageUrl, matches);
@@ -162,7 +161,7 @@ export async function verifyMatchesByImage(
 export function matchesToComps(matches: VisualMatch[]): Comp[] {
  return matches
  .filter((m) => m.priceCents && m.priceCents > 0)
- .map((m) => ({ title: m.title, priceCents: m.priceCents as number, currency: "USD", sold: false, source: m.source || "Visual match", link: m.link }));
+ .map((m) => ({ title: m.title, priceCents: m.priceCents as number, currency: "USD", sold: false, source: (m.source || "Visual match") + (m.pricedFrom === "products" ? " (Lens products)" : ""), link: m.link }));
 }
 
 // Authenticated-luxury resellers — the truest comps for designer pieces; surfaced first so

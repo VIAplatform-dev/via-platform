@@ -7,6 +7,20 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
+
+/**
+ * Which store these calls act on.
+ *
+ * Without a ?store= the API resolves to whatever store the SESSION belongs to — so opening this page
+ * to look at another seller's inventory silently read and edited your own store instead, and an item
+ * "added to inventory" never reached the storefront being looked at.
+ */
+function withStore(path: string): string {
+ if (typeof window === "undefined") return path;
+ const s = new URLSearchParams(window.location.search).get("store");
+ return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+}
+
 type Item = {
  id: string;
  sku: number; // per-store sequence by creation order (1 = the store's first item)
@@ -79,7 +93,7 @@ export default function ItemsPage() {
 
  async function load() {
  try {
- const r = await fetch("/api/store/items");
+ const r = await fetch(withStore("/api/store/items"));
  if (!r.ok) {
  setAuthErr(r.status === 401 ? "Sign in as your store to manage items." : "Couldn’t load items.");
  setLoading(false);
@@ -95,10 +109,10 @@ export default function ItemsPage() {
  }
  useEffect(() => {
  (async () => { await load(); })();
- fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  // Cross-listing board → which channels each item is ACTUALLY published on. "Posted on" should
  // only reflect a real, completed listing — not a started-but-unpublished ('pending') or failed one.
- fetch("/api/store/cross-listing").then((r) => (r.ok ? r.json() : null)).then((r) => {
+ fetch(withStore("/api/store/cross-listing")).then((r) => (r.ok ? r.json() : null)).then((r) => {
  if (!r) return;
  const names: Record<string, string> = {};
  (r.platforms || []).forEach((p: { key: string; name: string }) => { names[p.key] = p.name; });
@@ -130,7 +144,7 @@ export default function ItemsPage() {
  async function act(id: string, action: "sold" | "remove" | "publish") {
  if (action === "remove" && !confirm("Remove this item?")) return;
  setBusyId(id);
- const r = await fetch(`/api/store/items/${id}`, {
+ const r = await fetch(withStore(`/api/store/items/${id}`), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action }),
@@ -160,7 +174,7 @@ export default function ItemsPage() {
  if (!ids.length) return;
  if (action === "remove" && !confirm(`Remove ${ids.length} selected item${ids.length > 1 ? "s" : ""}?`)) return;
  setBulkBusy(true);
- await fetch("/api/store/items", {
+ await fetch(withStore("/api/store/items"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action, ids }),
@@ -175,7 +189,7 @@ export default function ItemsPage() {
  const ids = [...selected];
  if (!ids.length) return;
  setBulkBusy(true); setAiNotice(null);
- const r = await fetch("/api/store/items/categorize", {
+ const r = await fetch(withStore("/api/store/items/categorize"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ ids }),
@@ -198,10 +212,10 @@ export default function ItemsPage() {
  const ids = [...selected];
  if (!name || !ids.length) return;
  setBulkBusy(true);
- await fetch("/api/store/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "addToCollection", ids, collection: name }) }).catch(() => {});
+ await fetch(withStore("/api/store/items"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "addToCollection", ids, collection: name }) }).catch(() => {});
  setBulkColOpen(false); setBulkColName(""); setSelected(new Set());
  await load();
- fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  setBulkBusy(false);
  }
 
@@ -225,7 +239,7 @@ export default function ItemsPage() {
  setUploading(true);
  for (const file of Array.from(files)) {
  const fd = new FormData(); fd.append("file", file);
- const r = await fetch("/api/store/listings/upload", { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  if (r?.url) setEditImages((imgs) => [...imgs, r.url]);
  }
  setUploading(false);
@@ -237,7 +251,7 @@ export default function ItemsPage() {
  if (!editing) return;
  const n = (s: string) => (s.trim() === "" ? null : Number(s));
  setSavingEdit(true);
- await fetch(`/api/store/items/${editing.id}`, {
+ await fetch(withStore(`/api/store/items/${editing.id}`), {
  method: "PATCH",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({
@@ -258,7 +272,7 @@ export default function ItemsPage() {
  const n = items.length;
  if (!confirm(`OWNER RESET: permanently delete ALL ${n} items — including sold — plus their orders and collections from this store? This can’t be undone.`)) return;
  setLoading(true);
- await fetch("/api/store/items", { method: "DELETE" }).catch(() => {});
+ await fetch(withStore("/api/store/items"), { method: "DELETE" }).catch(() => {});
  setCols([]);
  await load();
  }
@@ -372,7 +386,7 @@ export default function ItemsPage() {
  className="h-9 w-full rounded-full border border-stone-200 bg-white pl-8 pr-3 text-[13px] text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[var(--accent,#0e9f76)] sm:w-52" />
  </div>
  <TechButton variant="secondary" onClick={() => setImportOpen(true)}>Import</TechButton>
- <TechButtonLink href="/admin/add-listing">+ New listing</TechButtonLink>
+ <TechButtonLink href={withStore("/admin/add-listing")}>+ New listing</TechButtonLink>
  </>
  }
  />
@@ -454,7 +468,7 @@ export default function ItemsPage() {
  body={term || filtering ? "Try a different search, or clear the filters in the table headers." : "Snap a photo and VYA drafts the listing for you — title, description, and a ghost-mannequin image."}
  action={term ? undefined : filtering
  ? <TechButton variant="secondary" onClick={clearFilters}>Clear filters</TechButton>
- : <TechButtonLink href="/admin/add-listing">Snap your first piece</TechButtonLink>}
+ : <TechButtonLink href={withStore("/admin/add-listing")}>Snap your first piece</TechButtonLink>}
  />
  ) : (
  <TechCard className="overflow-hidden">
@@ -737,7 +751,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
  async function importCatalog() {
  setBusy(true); setMsg(null);
  try {
- const r = await fetch("/api/store/inventory/convert", { method: "POST" });
+ const r = await fetch(withStore("/api/store/inventory/convert"), { method: "POST" });
  const d = await r.json();
  if (!r.ok) { setMsg(d.error || "Couldn’t import your catalog."); return; }
  setMsg(d.added > 0 ? `✓ Imported ${d.added} item${d.added === 1 ? "" : "s"} from your synced catalog — they’re now editable inventory.` : "Nothing new to import — your catalog is already in your inventory.");
@@ -748,7 +762,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
  if (!csv.trim()) { setMsg("Paste or upload your inventory file first."); return; }
  setBusy(true); setMsg(null);
  try {
- const r = await fetch("/api/store/items/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv, status: goLive ? "active" : "draft" }) });
+ const r = await fetch(withStore("/api/store/items/import"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv, status: goLive ? "active" : "draft" }) });
  const d = await r.json();
  if (!r.ok) { setMsg(d.error || "Couldn’t read that file."); return; }
  setMsg(`✓ Added ${d.added} of ${d.found} item${d.found === 1 ? "" : "s"}${goLive ? " — live now." : " as drafts — review and publish when ready."}`);

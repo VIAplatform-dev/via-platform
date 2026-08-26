@@ -41,14 +41,23 @@ export default function OnboardingPage() {
  setBusy(true);
  setErr(null);
  try {
+ // A big store's crawl outlives one serverless invocation, so the server hands back a `paused`
+ // job with its place kept rather than a truncated result. Keep asking it to continue —
+ // otherwise a 90-page store would report the 12 pages that fit in the first invocation.
+ let d: Record<string, unknown> | null = null;
+ let ok = false;
+ for (let i = 0; i < 40; i++) {
  const r = await fetch("/api/store/capture", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ url }),
+ body: JSON.stringify(i === 0 ? { url } : { resume: true }),
  });
- const d = await r.json();
- if (!r.ok) setErr(d.error || "Couldn’t bring that site over.");
- else setResult({ pages: d.pages, items: d.items ?? 0, url: d.url });
+ d = await r.json();
+ ok = r.ok;
+ if (!ok || d?.status !== "paused") break;
+ }
+ if (!ok) setErr((d?.error as string) || "Couldn’t bring that site over.");
+ else setResult({ pages: Number(d?.pages) || 0, items: Number(d?.items) || 0, url: String(d?.url || "") });
  } catch {
  setErr("Couldn’t bring that site over.");
  }

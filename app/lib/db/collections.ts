@@ -183,7 +183,7 @@ export async function listCollectionItemsForStorefront(
 ): Promise<Item[]> {
  await ensureOrderColumn();
  const db = getDb();
- const assigned = collectionId ? await listCollectionItems(collectionId) : [];
+ const assigned = collectionId ? await listCollectionItems(collectionId, { storefront: true }) : [];
  const term = handle.replace(/[-_]+/g, " ").trim().toLowerCase();
  if (!term) return assigned;
  const matches = await db
@@ -191,26 +191,42 @@ export async function listCollectionItemsForStorefront(
   .from(items)
   .where(and(
    eq(items.sellerId, sellerId),
-   eq(items.status, "active"),
+   dsql`${items.status} IN ('active','sold')`,
    dsql`(lower(coalesce(${items.category}, '')) = ${term} OR lower(coalesce(${items.brand}, '')) = ${term})`,
   ));
  const seen = new Set(assigned.map((i) => i.id));
  return [...assigned, ...matches.filter((m) => !seen.has(m.id))];
 }
 
-export async function listCollectionItems(collectionId: string, opts?: { manage?: boolean }): Promise<Item[]> {
+export async function listCollectionItems(collectionId: string, opts?: { manage?: boolean; storefront?: boolean }): Promise<Item[]> {
  await ensureOrderColumn();
  const db = getDb();
+ // Three views of the same collection:
+ //   manage     — everything except removed (the seller's own list)
+ //   storefront — active AND sold, because a vintage store's archive is part of browsing; hiding
+ //                sold pieces turned a 37-piece archive collection into a single card
+ //   default    — active only (internal callers that mean "buyable right now")
+ const visible = opts?.manage
+  ? dsql`${items.status} <> 'removed'`
+  : opts?.storefront
+   ? dsql`${items.status} IN ('active','sold')`
+   : eq(items.status, "active");
  const rows = await db
  .select()
  .from(items)
  .innerJoin(itemCollections, eq(itemCollections.itemId, items.id))
- // Storefront view shows only live items; the management view shows everything except removed.
- .where(and(eq(itemCollections.collectionId, collectionId), opts?.manage ? dsql`${items.status} <> 'removed'` : eq(items.status, "active")))
+ .where(and(eq(itemCollections.collectionId, collectionId), visible))
  // The seller's chosen order first; anything never ordered falls in behind it, newest first. `id`
  // last so the sequence is fully deterministic — a section showing "the first 5" must show the SAME
  // five on every render, which is exactly what was not true before.
- .orderBy(dsql`${itemCollections.position} ASC NULLS LAST`, dsql`${items.createdAt} DESC NULLS LAST`, items.id);
+ // Deliberately NOT sorted available-first: a curated collection has an order the seller chose, and
+ // hoisting the one in-stock piece to the front reordered their archive against their wishes. The
+ // "buyable first" default belongs on the uncurated shop-all page, not here.
+ .orderBy(
+  dsql`${itemCollections.position} ASC NULLS LAST`,
+  dsql`${items.createdAt} DESC NULLS LAST`,
+  items.id,
+ );
  return rows.map((r) => r.items);
 }
 

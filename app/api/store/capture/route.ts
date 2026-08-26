@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
-import { crawlAndStore } from "@/app/lib/site-capture";
-import { listCapturePaths, getCapturePage, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
-import { importStoreFromUrl, importStoreBlocks, importStoreThemeAndBlocks, type ImportedProduct } from "@/app/lib/store-import";
-import { importProductsAsItems, syncCollectionMembership } from "@/app/lib/capture-commerce";
-import { getConnection } from "@/app/lib/store-connections-db";
-import { getPlatform } from "@/app/lib/platforms";
+import { listCapturePaths, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { deleteAllItems } from "@/app/lib/db/inventory";
-import { ensureCollection } from "@/app/lib/db/collections";
-import { isJunkCollection } from "@/app/lib/collections-sync";
-import { getStorefrontBySlug, setStorefrontTheme } from "@/app/lib/storefront-db";
-import { buildStorefrontFromUrl } from "@/app/lib/storefront-from-brand";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
+import { runImportJob } from "@/app/lib/import-engine/wire";
+import { createJob, getActiveJob, getLatestJob, getJob, saveJob } from "@/app/lib/import-engine/jobs-db";
+import { describeError, isResumable, reportLine, type ImportJob } from "@/app/lib/import-engine/report";
 
 // The captured site is served by the MARKETPLACE app (vyaplatform.com/site/{slug}) or the
 // store's own connected domain — NOT the getvya.ai OS host the seller is viewing this from.
 // Returning a relative "/site/{slug}" made "View your site" 404 (it opened on getvya.ai, which
 // doesn't serve /site). Always return an absolute URL to where the site actually lives.
 async function siteViewUrl(slug: string): Promise<string> {
- const sf = await getStorefrontBySlug(slug).catch(() => null);
+ const sf = await getStorefrontBySlug(slug).catch(() => null); /* allow-swallow: cosmetic — the fallback URL below is always valid */
  const cd = (sf?.customDomain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "").trim().toLowerCase();
  // Use a connected domain ONLY if it's a real external domain. A VYA host (or a bare
  // "vyaplatform.com" left in custom_domain) would send the seller to the marketplace
@@ -28,137 +23,136 @@ async function siteViewUrl(slug: string): Promise<string> {
  return `https://vyaplatform.com/site/${slug}`;
 }
 
-// Shopify's "store is password-protected" lock screen looks like a real page, so a
-// naive crawl would capture it. Detect it so we don't host the lock screen.
-function looksPasswordProtected(html: string): boolean {
- return /template-password|action=["']\/password|id=["']password|store is password|opening soon/i.test(html);
-}
-
-// Products: prefer a connected store's API (exact data, works even behind a store
-// password) over the public feed.
-async function pullProducts(slug: string, url: string): Promise<ImportedProduct[]> {
- const conn = await getConnection(slug).catch(() => null);
- if (conn) {
- const adapter = getPlatform(conn.platform);
- if (adapter?.getProducts) {
- const api = await adapter.getProducts(conn.credentials).catch(() => []);
- if (api.length) return api;
- }
- }
- return (await importStoreFromUrl(url).catch(() => ({ products: [] as ImportedProduct[] }))).products || [];
-}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // a full-site crawl can take a couple minutes
 
-// GET — capture status for the acting store.
+/** Public shape of a job for the portal (steps + counts + readable warnings). */
+function jobView(job: ImportJob) {
+ return {
+  id: job.id,
+  status: job.status,
+  url: job.url,
+  steps: job.steps,
+  counts: job.counts,
+  warnings: job.warnings,
+  report: reportLine(job.counts, job.warnings),
+  resumable: isResumable(job),
+  remaining: job.crawl?.queue.length ?? 0,
+  error: job.error,
+  updatedAt: job.updatedAt,
+ };
+}
+
+// GET — capture status for the acting store, plus the latest import job so the portal can show
+// progress while a crawl is still running (and resume it if the invocation died).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const paths = await listCapturePaths(slug).catch(() => []);
- const origin = paths.length ? await getCaptureOrigin(slug).catch(() => null) : null;
+ const paths = await listCapturePaths(slug).catch(() => []); /* allow-swallow: status read — a DB blip shows "not captured yet", never a failed import */
+ const origin = paths.length ? await getCaptureOrigin(slug).catch(() => null) : null; /* allow-swallow: display-only */
+ const job = await getLatestJob(slug).catch(() => null); /* allow-swallow: the job record is additive; its absence must not break the capture status */
  // isAdmin gates the owner-only "reset to simple design + wipe inventory" action.
  // `url` is the ABSOLUTE public view URL (for "View your site"); `slug` lets the editor build a
  // SAME-ORIGIN /site/{slug} preview so it works on localhost / getvya.ai, not just prod.
- return NextResponse.json({ captured: paths.length, url: paths.length ? await siteViewUrl(slug) : null, slug, origin, pages: paths, isAdmin: isOwner(request, slug) });
+ return NextResponse.json({
+  captured: paths.length,
+  url: paths.length ? await siteViewUrl(slug) : null,
+  slug, origin, pages: paths,
+  isAdmin: isOwner(request, slug),
+  job: job ? jobView(job) : null,
+ });
+}
+
+/** Run (or continue) a job to completion-or-pause, and shape the seller-facing response. */
+async function execute(slug: string, job: ImportJob, replaceBlocks: boolean) {
+ const r = await runImportJob(job, { replaceBlocks });
+
+ if (r.status === "failed") {
+  return NextResponse.json({ error: r.error || "Capture failed.", jobId: job.id, warnings: r.warnings }, { status: 502 });
+ }
+
+ const url = await siteViewUrl(slug);
+ // Out of time with pages still queued. Nothing is lost — the browser resumes immediately, and the
+ // sweeper cron picks it up if the seller closes the tab.
+ if (r.status === "paused") {
+  return NextResponse.json({
+   ok: true, jobId: job.id, status: "paused", resumable: true,
+   pages: r.counts.pages, items: r.counts.products, report: r.report, warnings: r.warnings,
+   remaining: r.crawl?.queue.length ?? 0, steps: r.steps, url,
+   note: `Still copying your site — ${r.counts.pages} pages so far.`,
+  });
+ }
+
+ if (r.mode === "brand") {
+  const found = r.steps.find((s) => s.name === "blocks")?.detail?.replace(/^brand storefront \(|\)$/g, "") || "branding";
+  return NextResponse.json({
+   ok: true, jobId: job.id, status: "done", mode: "brand", pages: 0, items: 0, url,
+   report: r.report, warnings: r.warnings, steps: r.steps,
+   note: `We couldn't copy this site's pages — it builds them in the browser. We've set up your VYA storefront using your ${found} instead. Add your inventory by uploading a CSV or connecting your store.`,
+  });
+ }
+
+ // Password-protected? The crawl either reads nothing or only grabs the lock screen — don't host
+ // that. Products still import (a connected store's API works behind a password).
+ if (r.locked) {
+  const base = "Your storefront looks password-protected, so we couldn’t capture its design. Remove the password (Shopify: Online Store → Preferences) and re-run to bring your exact site over.";
+  if (r.counts.products > 0) {
+   return NextResponse.json({ ok: true, jobId: job.id, status: "done", pages: 0, items: r.counts.products, url, report: r.report, warnings: r.warnings, steps: r.steps, note: `${base} (We did import your ${r.counts.products} products.)` });
+  }
+  return NextResponse.json({ error: `${base} Or connect your store above to import just your products.`, jobId: job.id, warnings: r.warnings }, { status: 400 });
+ }
+
+ return NextResponse.json({
+  ok: true, jobId: job.id, status: "done",
+  pages: r.counts.pages, items: r.counts.products, collections: r.counts.collections,
+  report: r.report, warnings: r.warnings, steps: r.steps, url,
+ });
 }
 
 // POST { url } — capture the seller's entire existing site and host every page on VYA.
+// POST { resume: true } — continue an interrupted import where it stopped.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const body = await request.json().catch(() => null);
- const url = body?.url ? String(body.url).trim() : "";
+ const body = await request.json().catch(() => null); /* allow-swallow: a malformed body is answered with 400 immediately below */
  // When the seller explicitly (re)imports their site — e.g. from onboarding — the block storefront
  // should BECOME that site, replacing any stale/starter blocks. Otherwise we only seed empty ones.
  const replaceBlocks = body?.replaceBlocks === true;
- if (!url) return NextResponse.json({ error: "Paste your site URL." }, { status: 400 });
 
  try {
- const r = await crawlAndStore(slug, url, 100);
- // A site that renders in the browser (Wix, a single-page app) returns almost nothing to crawl.
- // Rather than leave the seller with a broken copy or a blank starter, build them a VYA storefront
- // from their BRAND — the colours, fonts, logo, name and menu labels survive in the HTML even when
- // the layout doesn't. Inventory then comes from the CSV upload or a platform connection.
- if (r.pages <= 1) {
-  const built = await buildStorefrontFromUrl(url).catch(() => null);
-  if (built) {
-   await setStorefrontTheme(slug, built.theme).catch(() => {});
+  // ── Resume an interrupted import ─────────────────────────────────────────────────────────────
+  if (body?.resume === true || body?.jobId) {
+   const job = body?.jobId ? await getJob(String(body.jobId)) : await getActiveJob(slug);
+   if (!job || job.slug !== slug) return NextResponse.json({ error: "No import to resume." }, { status: 404 });
+   if (!isResumable(job)) {
+    return NextResponse.json({ ok: true, jobId: job.id, status: job.status, report: reportLine(job.counts, job.warnings), warnings: job.warnings, steps: job.steps, url: await siteViewUrl(slug) });
+   }
+   await saveJob(job.id, { status: "running" });
+   return await execute(slug, job, replaceBlocks);
+  }
+
+  const url = body?.url ? String(body.url).trim() : "";
+  if (!url) return NextResponse.json({ error: "Paste your site URL." }, { status: 400 });
+
+  // One import per store at a time. A second request (an impatient double-click, or a re-import
+  // while the sweeper is resuming) would otherwise run a parallel crawl over the same slug —
+  // two crawlers writing the same pages, and the first one's deleteCaptures wiping the second's work.
+  const active = await getActiveJob(slug);
+  if (active) {
    return NextResponse.json({
-    ok: true, mode: "brand", pages: 0, items: 0,
-    url: await siteViewUrl(slug),
-    brand: built.brand.found,
-    note: `We couldn't copy this site's pages — it builds them in the browser. We've set up your VYA storefront using your ${built.brand.found.join(", ")} instead. Add your inventory by uploading a CSV or connecting your store.`,
+    ok: true, jobId: active.id, status: active.status, alreadyRunning: true,
+    report: reportLine(active.counts, active.warnings), warnings: active.warnings,
+    steps: active.steps, pages: active.counts.pages, items: active.counts.products,
+    note: "An import is already running for this store.",
    });
   }
- }
- // Products come in as checkout-able items regardless of design capture (the
- // connected-store API path works even when the public site is locked).
- // Products are matched by SOURCE IDENTITY, so a re-run updates the store's catalog in place
- // (added / updated / removed) instead of wiping and re-adding it — that's what lets inventory
- // stay in sync without a destructive re-crawl.
- const pulled = await pullProducts(slug, url);
- const stats = await importProductsAsItems(slug, pulled)
-  .catch(() => ({ added: 0, updated: 0, unchanged: 0, skipped: 0, removed: 0 }));
- const items = stats.added + stats.updated + stats.unchanged;
 
- // Pre-create VYA collections that mirror the store's captured collection pages, so the
- // seller can assign items to them (slug = the Shopify handle → items render on that page).
- try {
- const seller = await getSellerBySlug(slug);
- if (seller) {
-  const handles = new Set<string>();
-  for (const p of r.paths) { const m = p.match(/^\/collections\/([^/]+)\/?$/); if (m && m[1] !== "all") handles.add(m[1]); }
-  const titleize = (h: string) => h.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  // Skip the store's operational collections (price bands, presales/drops, demo data, catch-alls) —
-  // importing 100+ junk collections just floods the seller's picker. Real ones (brands, eras, categories) stay.
-  for (const h of handles) { const title = titleize(h); if (!isJunkCollection(title)) await ensureCollection(seller.id, h, title).catch(() => {}); }
- }
- } catch { /* non-fatal — assignment can create collections on demand too */ }
-
- // …then actually PUT the imported items in those collections. Without this the collections stay
- // empty, and a captured /collections/{handle} page silently falls back to the frozen source grid
- // instead of the store's live VYA inventory — which is the whole point of the swap.
- const membership = await syncCollectionMembership(slug, new URL(url.startsWith("http") ? url : `https://${url}`).hostname, pulled)
-  .catch(() => ({ collections: 0, links: 0 }));
-
- // Seed the visual studio with a section-by-section replica of the real homepage, so
- // the builder mirrors the seller's actual layout instead of a generic starter template.
- // Only when they haven't already built/edited a block design — never clobber real work.
- try {
- const sf = await getStorefrontBySlug(slug).catch(() => null);
- if (replaceBlocks || !sf?.theme?.blocks?.length) {
-  // Pull their homepage as blocks AND their real theme (colours, fonts, logo, brand name) so the
-  // studio mirrors THEIR store — not our starter palette/type wrapped around their content.
-  const imported = await importStoreThemeAndBlocks(url).catch(() => ({ theme: null, blocks: [] as Awaited<ReturnType<typeof importStoreBlocks>>, name: null }));
-  if (imported.blocks.length) {
-   const prev = sf?.theme || {};
-   await setStorefrontTheme(slug, {
-    ...prev,
-    blocks: imported.blocks,
-    colors: { ...prev.colors, ...(imported.theme?.colors || {}) }, // their palette wins, ours fills gaps
-    fonts: { ...prev.fonts, ...(imported.theme?.fonts || {}) },
-    ...(imported.theme?.logo ? { logo: imported.theme.logo } : {}),
-    ...(imported.name ? { storeName: imported.name } : {}), // their brand name in the header wordmark
-   }).catch(() => {});
-  }
- }
- } catch { /* non-fatal — studio falls back to the starter template */ }
-
- // Password-protected? The crawl either reads nothing or only grabs the lock
- // screen — don't host that. Import products (if a store is connected) and tell
- // the seller to drop the password so we can capture their real design.
- const home = r.pages ? await getCapturePage(slug, "/").catch(() => null) : null;
- const locked = !r.pages || (r.pages <= 2 && !!home && looksPasswordProtected(home));
- if (locked) {
- const base = "Your storefront looks password-protected, so we couldn’t capture its design. Remove the password (Shopify: Online Store → Preferences) and re-run to bring your exact site over.";
- if (items > 0) return NextResponse.json({ ok: true, pages: 0, items, url: await siteViewUrl(slug), note: `${base} (We did import your ${items} products.)` });
- return NextResponse.json({ error: `${base} Or connect your store above to import just your products.` }, { status: 400 });
- }
- return NextResponse.json({ ok: true, pages: r.pages, items, products: stats, collections: membership, url: await siteViewUrl(slug) });
+  const job = await createJob(slug, url);
+  return await execute(slug, job, replaceBlocks);
  } catch (e) {
- console.error("site capture error:", e);
- return NextResponse.json({ error: e instanceof Error ? e.message : "Capture failed." }, { status: 502 });
+  console.error("site capture error:", e);
+  return NextResponse.json({ error: describeError(e, "Capture failed.") }, { status: 502 });
  }
 }
 
@@ -169,9 +163,15 @@ export async function DELETE(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  // Owner/admin only — this is a destructive reset, not a per-seller feature.
  if (!isOwner(request, slug)) return NextResponse.json({ error: "Owner only" }, { status: 403 });
- await deleteCaptures(slug).catch(() => {});
- // Also wipe the inventory the capture imported, for a true clean slate.
- const seller = await getSellerBySlug(slug).catch(() => null);
- const itemsDeleted = seller ? await deleteAllItems(seller.id).catch(() => 0) : 0;
- return NextResponse.json({ ok: true, itemsDeleted });
+ try {
+  await deleteCaptures(slug);
+  // Also wipe the inventory the capture imported, for a true clean slate.
+  const seller = await getSellerBySlug(slug);
+  const itemsDeleted = seller ? await deleteAllItems(seller.id) : 0;
+  return NextResponse.json({ ok: true, itemsDeleted });
+ } catch (e) {
+  // A reset that half-worked must say so — the old code reported ok:true regardless, so a failed
+  // wipe looked identical to a successful one.
+  return NextResponse.json({ error: describeError(e, "Reset failed.") }, { status: 500 });
+ }
 }

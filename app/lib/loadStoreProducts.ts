@@ -82,20 +82,16 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  ["bags", [
  "bag", "pouch", "backpack", "rucksack", "luggage", "suitcase", "duffel", "duffle", "chain wallet",
  "handbag", "purse", "hobo", "baguette", "bucket bag", "top handle", "chain bag", "frame bag",
- // LV / Fendi / Chanel / Gucci / Prada / Balenciaga icon styles
+ // LV / Fendi / Chanel / Gucci / Prada / Balenciaga icon styles — bag-exclusive MODEL names,
+ // distinctive enough to be safe here (unlike the hardware/material names below, a brand doesn't
+ // reuse "Speedy" or "Birkin" to describe a skirt or a loafer).
  "pochette", "musette", "keepall", "speedy", "alma", "papillon", "noé", "noe", "deauville", "vanity",
  "peekaboo", "kan i", "first bag", "sunshine",
  "flap bag", "boy bag", "2.55", "cambon", "gabrielle",
- "marmont", "dionysus", "bamboo", "ophidia", "horsebit",
- "galleria", "saffiano",
  "city bag", "le cagole",
- // Iconic model names with no "bag" word — distinctive enough to be safe.
  "chanel 22", "lady dior", "classic flap", "wallet on chain", "capucines",
  "petite malle", "metis", "loulou", "cassette", "arco",
  "birkin", "constance", "lindy", "picotin", "bolide", "evelyne",
- // Chanel/Loewe flap & quilted styles named without the word "bag".
- "flap", "mini flap", "double flap", "single flap", "jumbo flap", "woc", "puzzle",
- "matelasse", "matelassé",
  ]],
  // Specific garment types first — these take priority over material keywords
  ["dresses", ["dress", "gown", "kaftan", "caftan", "sundress", "slip dress", "maxi", "mini dress", "midi dress"]],
@@ -174,6 +170,15 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "hair pin", "charm", "signet",
  "accessories",
  ]],
+ // Ambiguous bag HARDWARE/LINE and fabric-pattern names — a brand reuses these across its whole
+ // product range (Gucci's Horsebit is as much a loafer as a bag; Bamboo and Marmont hardware turns
+ // up on wallets and belts; Saffiano and Matelassé are leather/quilting finishes, not bag words at
+ // all) — unlike the bag-exclusive MODEL names in the "bags" block above, these can legitimately
+ // describe a non-bag item. Checked LAST — after every other category above, garment through
+ // accessories — so "Gucci Bamboo Leather Detail Skirt" or "Gucci Horsebit Loafers" classify by
+ // what they actually ARE, and these only win as a final fallback (a bare "Gucci Marmont" listing
+ // with nothing else in its title to go on).
+ ["bags", ["marmont", "dionysus", "bamboo", "ophidia", "horsebit", "galleria", "saffiano", "flap", "puzzle", "matelasse", "matelassé"]],
 ];
 
 // Pre-compile word-boundary patterns once at module load.

@@ -17,6 +17,12 @@
 //      animates it; only the JS that set translateX is missing, so that's all we supply.
 //   3. Third-party libraries   — swiper/slick/flickity/splide/owl markup that never initialises
 //      because we don't load the library. We lay these out with scroll-snap and wire their arrows.
+//
+// Squarespace (section 7) is a different problem from all three. On Shopify the theme's CSS has
+// already laid the page out and only the behaviour is missing; on Squarespace the CSS deliberately
+// ships content INVISIBLE (opacity:0 / display:none) and the gallery reel entirely UNSIZED, because
+// site-bundle.js is expected to reveal and measure it. So a captured Squarespace store doesn't lose
+// its interactivity — it loses its content. Those rules have to reveal, not just wire.
 
 export const CAPTURE_SHIM = `
 <style data-vya-shim="1">
@@ -44,6 +50,43 @@ export const CAPTURE_SHIM = `
 mega-menu{position:absolute;top:100%;left:0;z-index:60;background:#fff;color:#111;box-shadow:0 12px 30px rgba(0,0,0,.14);display:none;min-width:240px;padding:20px 24px;text-align:left}
 mega-menu a{color:inherit}
 li:hover>mega-menu,li:focus-within>mega-menu,mega-menu.vya-open{display:block}
+
+/* ── Squarespace. Everything above is Shopify/Dawn; Squarespace is a different platform with a
+      different failure mode. Its markup ships HIDDEN AND UNSIZED and leans on site-bundle.js to
+      finish the render: content sits at opacity:0 (or display:none) until that script adds
+      .loaded/.is-loaded/.animation-loaded/[data-visible], and the gallery reel's slides get their
+      width and position from JS alone. Strip the script — as Plan A always does — and a captured
+      Squarespace store is a working header above a blank white page. So unlike the Dawn rules
+      above, which only WIRE markup the theme already laid out, these must also REVEAL it. ── */
+.product-list .product-list-item,.blog-basic-grid--container,.blog-single-column--container,
+.blog-side-by-side .blog-item,.blog-alternating-side-by-side .blog-item,.blog-masonry .entry,
+.lazy-load,.collection-content-wrapper .grid-item,.portfolio-grid-basic .grid-item,
+[data-animation-role]{opacity:1!important;transform:none!important}
+.sqs-gallery-block-grid img,.gallery-lightbox-item-img,.gallery-slideshow-thumbnails-thumb img,
+.product-gallery-slides-item .product-gallery-slides-item-image,.product-gallery-thumbnails-item,
+.sqs-block-summary-v2 .summary-thumbnail-container img{opacity:1!important}
+
+/* The gallery reel is a horizontal filmstrip whose slides the stylesheet gives NO width and NO
+   height at all — Squarespace's JS measures each image and sets both, plus the translateX that
+   scrolls the strip. Without it every slide is a 0x0 absolutely-positioned box whose wrapper also
+   sits at z-index:-1 (behind the page), so an 80vh hero renders as pure white with two working
+   arrows under it. Rebuild it as a scroll-snap strip — the same treatment section 3 gives library
+   carousels — and let the JS below turn each image's real dimensions into a slide width.
+   Deliberately NO position override on the list: it is absolute when the arrows overlay the reel
+   and relative when they sit below it, and a flex row lays out correctly either way. Height comes
+   from flex:1 1 auto inside .gallery-reel-wrapper (a full-height flex column) so the slides'
+   height:100% resolves in both arrangements. */
+.gallery-reel-list{display:flex!important;flex:1 1 auto;min-height:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.gallery-reel-list::-webkit-scrollbar{display:none}
+.gallery-reel-item{position:relative!important;flex:0 0 auto;height:100%;transform:none!important;scroll-snap-align:start}
+.gallery-reel-item-wrapper{position:relative!important;width:100%;height:100%;z-index:auto!important}
+.gallery-reel-item-src{position:relative!important;display:block!important;opacity:1!important;width:100%;height:100%}
+.gallery-reel-control-btn{pointer-events:auto;cursor:pointer}
+/* Squarespace ships EVERY candidate image in a product card inline-hidden and lets its JS pick the
+   one to show; the losers also carry .grid-item-additional-image/.grid-image-not-selected, whose
+   opacity:0 is !important. So the reveal has to out-rank both the inline style and that important
+   rule — hence a dedicated class rather than setting style.opacity from JS. */
+img.vya-sqs-img{display:block!important;opacity:1!important}
 </style>
 <script data-vya-shim="1">
 (function(){
@@ -170,7 +213,10 @@ ready(function(){
    if(e.key!=="Enter")return;
    e.preventDefault();
    var q=(input.value||"").trim();
-   if(q)location.href=location.pathname.replace(/\/$/,"")+"/search?q="+encodeURIComponent(q);
+   /* NOTE the doubled backslash: this whole shim lives in a template literal, and \/ is not an
+      escape sequence there — it collapses to a bare /, which turned this regex into a // line
+      comment and threw "Unexpected token }" that killed the ENTIRE shim on every captured page. */
+   if(q)location.href=location.pathname.replace(/\\/$/,"")+"/search?q="+encodeURIComponent(q);
   });
  });
 
@@ -266,6 +312,59 @@ ready(function(){
  });
  document.addEventListener("keydown",function(e){
   if(e.key==="Escape")document.querySelectorAll("mega-menu.vya-open").forEach(function(m){m.classList.remove("vya-open")});
+ });
+
+ /* ── 7. Squarespace gallery reel: supply the per-slide width its JS would have computed.
+        CSS alone can't do this — the width is the image's aspect ratio scaled to the reel's
+        height, and no stylesheet can read data-image-dimensions — so set an aspect-ratio here
+        and let the strip rules above resolve it into a width. */
+ document.querySelectorAll(".gallery-reel").forEach(function(reel){
+  var list=reel.querySelector(".gallery-reel-list");
+  if(!list||!list.children.length)return;
+  list.querySelectorAll(".gallery-reel-item").forEach(function(item){
+   var img=item.querySelector("img");
+   if(!img)return;
+   /* data-image-dimensions ("3024x4032") is authoritative and available before load; the width/
+      height attributes and naturalWidth are fallbacks for slides that lack it. */
+   var d=(img.getAttribute("data-image-dimensions")||"").split("x");
+   var iw=parseInt(d[0],10)||parseInt(img.getAttribute("width")||"",10)||img.naturalWidth;
+   var ih=parseInt(d[1],10)||parseInt(img.getAttribute("height")||"",10)||img.naturalHeight;
+   /* A slot of some kind beats leaving a zero-width box that renders as nothing. */
+   if(iw>0&&ih>0)item.style.aspectRatio=iw+" / "+ih;
+   else item.style.width="60vh";
+  });
+  wire(reel.querySelector(".gallery-reel-control-btn-previous"),
+       reel.querySelector(".gallery-reel-control-btn-next"),
+       function(){advance(list,-1)},function(){advance(list,1)});
+ });
+
+ /* ── 8. Squarespace's image loader (data-loader="sqs"). Its JS is what finally SHOWS a grid image:
+        it clears the inline display:none on the one candidate to display, and swaps sizes="0" — a
+        placeholder meaning "slot not measured yet" — for the slot's real width. Left alone a product
+        grid is a row of empty boxes, and any image that does appear downloads the 100w thumbnail
+        because a 0px slot selects the smallest srcset candidate. */
+ /* Batched deliberately: every read below is done before any write. Interleaving them made the
+        browser re-layout once per image — 1400+ forced reflows on a big catalogue page, which took
+        the shop page ~30s to settle. Read all, then write all, and it is one layout. */
+ var cards=[].slice.call(document.querySelectorAll(".product-list-item-image, .grid-item .grid-image, .summary-thumbnail"));
+ var reveal=[];
+ cards.forEach(function(box){
+  var cands=[].slice.call(box.querySelectorAll("img"));
+  if(!cands.length)return;
+  /* If the theme already leaves one showing, it doesn't need us. */
+  for(var i=0;i<cands.length;i++){ if(getComputedStyle(cands[i]).display!=="none")return; }
+  reveal.push(cands[0]);
+ });
+ reveal.forEach(function(img){ img.classList.add("vya-sqs-img"); });
+ var slots=[].slice.call(document.querySelectorAll("img[sizes='0']"));
+ var widths=slots.map(function(img){
+  return Math.round(img.getBoundingClientRect().width)||Math.round((img.parentElement||img).getBoundingClientRect().width);
+ });
+ slots.forEach(function(img,i){
+  /* No measurable slot: drop the attribute so it defaults to 100vw. Over-fetches a little, but
+     that beats leaving a 0px slot to pick the 100w thumbnail and render it as a blur. */
+  if(widths[i]>0)img.setAttribute("sizes",widths[i]+"px");
+  else img.removeAttribute("sizes");
  });
 });
 })();
