@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "VYA",
+    "slug": "vya",
+    "scheme": "vya",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#FFFDF8",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vyaplatform.app"
+    },
+    "android": {
+      "package": "com.vyaplatform.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFDF8",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "apiBaseUrl": "https://vyaplatform.com"
+    }
+  }
+}
