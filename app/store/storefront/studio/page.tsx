@@ -14,14 +14,16 @@ import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, HEADER_LAYOUTS, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
-import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, type StorefrontTemplate } from "@/app/lib/storefront-templates";
+import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, isTemplatePageSlug, type StorefrontTemplate } from "@/app/lib/storefront-templates";
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
 import ItemsEditor from "@/app/store/storefront/ItemsEditor";
 import { variantsFor, resolveVariant, variantDefaults, normalizeVariant, SECTION_CATEGORIES, VARIANTS, type SectionCategory } from "@/app/lib/storefront-variants";
 import { applyVariant, switchNotes } from "@/app/lib/storefront-variant-switch";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
-import { SKINS, isSkin, type SkinId } from "@/app/lib/storefront-skins";
+// The skin PICKER is gone (templates replaced it), but skin state is still read and passed
+// through to <Blocks> so stores that already chose one keep rendering as they do today.
+import { isSkin, type SkinId } from "@/app/lib/storefront-skins";
 import { ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, Film, Link as LinkIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search, Undo2, Redo2, RotateCcw, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, Shapes, Upload as UploadIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 
 type Colors = { bg: string; text: string; accent: string };
@@ -408,7 +410,8 @@ export default function StorefrontStudio() {
  const [fonts, setFonts] = useState<Fonts>({ heading: "Playfair Display", body: "Inter" });
  const [radius, setRadius] = useState<Radius>("sharp");
  const [skin, setSkin] = useState<SkinId | "">("");
- // What the palette/type looked like BEFORE the first skin was applied, so "No skin" can put it back
+ // What the palette/type looked like BEFORE a skin was applied. Retained so an existing
+ // store's preSkin value survives a save round-trip rather than being dropped.
  // rather than stranding the store on the last skin's colours. Session-scoped: after a reload the
  // colours are simply the store's colours, and the palette picker is the way to change them.
  const preSkinRef = useRef<{ colors: Colors; fonts: Fonts } | null>(null);
@@ -495,6 +498,9 @@ export default function StorefrontStudio() {
  const [save, setSave] = useState<"idle" | "saving" | "saved">("idle");
  const [ddOpen, setDdOpen] = useState(false);
  const [showTemplates, setShowTemplates] = useState(false);
+ // Which template this store is currently on, so the Design panel can mark it as
+ // selected. Read from the design GET, which has always persisted it.
+ const [templateId, setTemplateId] = useState<string>("");
  // Section picker: a search box and a category filter, because the library is ~30 layouts today and
  // heading for ~75. A flat wall of cards stops being browsable well before that.
  const [secQuery, setSecQuery] = useState("");
@@ -603,6 +609,7 @@ export default function StorefrontStudio() {
  if (d.fonts) setFonts(d.fonts);
  if (d.radius === "sharp" || d.radius === "soft" || d.radius === "round") setRadius(d.radius);
  setSkin(isSkin(d.skin) ? d.skin : "");
+ setTemplateId(typeof d.template === "string" ? d.template : "");
  preSkinRef.current = d.preSkin?.colors && d.preSkin?.fonts ? { colors: d.preSkin.colors, fonts: d.preSkin.fonts } : null;
  setProducts(d.products || []);
  setCollections(d.collections || []);
@@ -827,13 +834,22 @@ export default function StorefrontStudio() {
  // page's intro and catalogue density, the corner style and header arrangement, and the pages this
  // template ships with (Authentication, Visit, Condition Scale…).
  //
- // Pages the seller already has are kept. Only a template page whose slug is free gets added, so
- // trying a different look can never delete an About page someone wrote. Home and Shop ARE replaced
- // — that is what choosing a layout means, and the confirm says so.
+ // Template pages are REPLACED, not accumulated. This used to only ever add — any template page
+ // whose slug was free got appended and nothing was removed — so trying three templates left the
+ // nav carrying all three sets at once: How Drops Work and Drop Archive from Bold sitting next to
+ // The Edits and Sourcing Requests from Catalogue, with Home and Shop restyled to something else
+ // entirely. The store was never actually the template you picked.
+ //
+ // A page counts as template-provided when its slug appears in ANY template (TEMPLATE_PAGE_SLUGS).
+ // Anything else was written by the seller and is never touched — so an About page someone wrote
+ // survives, but the previous template's Authentication page makes way for the new one's.
  async function applyTemplate(t: StorefrontTemplate) {
- const added = templatePages(t.id).filter((p) => !extraPages.some((e) => e.slug === p.slug));
- const addedNote = added.length ? ` It adds ${added.length} new ${added.length === 1 ? "page" : "pages"} (${added.map((p) => p.title).join(", ")}).` : "";
- if (!window.confirm(`Switch to “${t.name}”? This restyles your store and replaces the Home and Shop page sections.${addedNote} Your other pages, products, and settings stay.`)) return;
+ const incoming = templatePages(t.id);
+ const kept = extraPages.filter((e) => !isTemplatePageSlug(e.slug));
+ const dropped = extraPages.filter((e) => isTemplatePageSlug(e.slug) && !incoming.some((p) => p.slug === e.slug));
+ const droppedNote = dropped.length ? ` It removes ${dropped.length} page${dropped.length === 1 ? "" : "s"} from your current template (${dropped.map((p) => p.title).join(", ")}).` : "";
+ const keptNote = kept.length ? ` Your own ${kept.length} page${kept.length === 1 ? "" : "s"} (${kept.map((p) => p.title).join(", ")}) stay.` : "";
+ if (!window.confirm(`Switch to “${t.name}”? This restyles your store, replaces the Home and Shop page sections, and lays down its own ${incoming.length} pages (${incoming.map((p) => p.title).join(", ")}).${droppedNote}${keptNote} Your products and settings are unaffected.`)) return;
  setColors(t.colors);
  setBaseColors(t.colors);
  setFonts(t.fonts);
@@ -843,10 +859,13 @@ export default function StorefrontStudio() {
  // tokens and the grid, which don't ride that effect.
  setBlocks(templateBlocks(t.id));
  setShopBlocks(templateShopBlocks(t.id));
- setExtraPages((ps) => [...ps, ...added]);
+ // Seller-authored pages first, then this template's — so the nav reads in a stable order
+ // rather than however the accumulated history happened to land.
+ setExtraPages([...kept, ...incoming]);
  setActiveSlug("home");
  setSelBlock(null);
  setShowTemplates(false);
+ setTemplateId(t.id);
  await fetch("/api/store/storefront/design", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -881,24 +900,6 @@ export default function StorefrontStudio() {
  function changeColor(key: keyof Colors, val: string) { const next = { ...colors, [key]: val }; setColors(next); pushDesign({ colors: next }); }
  function changeFont(which: keyof Fonts, val: string) { const next = { ...fonts, [which]: val }; setFonts(next); pushDesign({ fonts: next }); }
  function changeFont2(heading: string, body: string) { const next = { heading, body }; setFonts(next); pushDesign({ fonts: next }); }
- // Applying a skin sets the style layer, and SEEDS any palette/type the skin carries — once. It is
- // seeded rather than enforced: the colour and font controls keep working afterwards and their values
- // stick, which is what makes a skin a starting point rather than a theme that owns the storefront.
- // Clicking the active skin clears it. All of it rides the normal undo stack.
- function changeSkin(id: SkinId | "") {
- const def = SKINS.find((x) => x.id === id);
- const patch: { skin: string; colors?: Colors; fonts?: Fonts; preSkin?: { colors: Colors; fonts: Fonts } | null } = { skin: id };
- // Stepping from no-skin into a skin: remember the store's own look, and PERSIST it — a skin removed
- // in a later session still has to be undoable, and a ref alone dies at the next reload.
- if (id && !skin) { const pre = { colors, fonts }; preSkinRef.current = pre; patch.preSkin = pre; }
- setSkin(id);
- // Into a skin: wear its look. Out of every skin: put the store's own look back.
- const look = def ? { colors: def.palette, fonts: def.fonts } : preSkinRef.current || {};
- if (look.colors) { setColors(look.colors); setBaseColors(look.colors); patch.colors = look.colors; }
- if (look.fonts) { setFonts(look.fonts); patch.fonts = look.fonts; }
- if (!id) { preSkinRef.current = null; patch.preSkin = null; }
- pushDesign(patch);
- }
 
  // ── Undo / redo ─────────────────────────────────────────────────────────────────────────────────
  // A snapshot of everything editable. We diff the serialized state on every change: a real edit pushes
@@ -984,15 +985,49 @@ export default function StorefrontStudio() {
  return () => window.removeEventListener("keydown", onKey);
  }, [undo, redo, selBlock, selOverlay, selFree]); // eslint-disable-line react-hooks/exhaustive-deps
 
+ /**
+  * Where a new section should land.
+  *
+  * It used to always be the end of the page, which meant scrolling back down to find what you
+  * just added and then dragging it up to where you actually wanted it. Two rules instead:
+  *
+  *   1. A SELECTED section is an explicit "here" — the new one goes directly after it.
+  *   2. Otherwise use what's ON SCREEN. The section covering the middle of the visible canvas
+  *      is the one being looked at, so the new section goes after it.
+  *
+  * Scrolled to the very top with nothing yet crossing the midpoint, the new section goes first —
+  * which is what "add a section while looking at the top of the page" should mean.
+  */
+ function insertIndexForNewSection(bs: Block[]): number {
+ if (selBlock) {
+  const i = bs.findIndex((b) => b.id === selBlock);
+  if (i >= 0) return i + 1;
+ }
+ const c = canvasRef.current;
+ if (!c) return bs.length;
+ const mid = c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2;
+ // The LAST section that starts above the midpoint. Using "starts above" rather than "contains
+ // the midpoint" means a gap between two sections still resolves to the one above it.
+ let at = -1;
+ bs.forEach((b, i) => {
+  const el = c.querySelector(`.vya-b-${b.id}`) as HTMLElement | null;
+  if (el && el.getBoundingClientRect().top <= mid) at = i;
+ });
+ return at + 1;
+ }
+
  // Add a section to the current page (Canva's "Elements" analog for a section-based builder) and
  // select it so the seller can immediately edit it on the canvas.
  function addSection(type: BlockType, variant?: string) {
  // The type's own defaults, the chosen layout's defaults on top, and the layout id itself (omitted
  // when it's the type's default, so the block stays identical to one added before variants existed).
  const b = makeBlock(type, variantDefaults(type, variant), normalizeVariant(type, variant));
- updateCur((bs) => [...bs, b]);
+ const at = insertIndexForNewSection(curBlocks);
+ updateCur((bs) => [...bs.slice(0, at), b, ...bs.slice(at)]);
  setSelBlock(b.id);
- requestAnimationFrame(() => canvasRef.current?.scrollTo({ top: canvasRef.current.scrollHeight, behavior: "smooth" }));
+ // Scroll to the new section itself rather than to the bottom of the page — it is no longer
+ // necessarily at the bottom, and centring it is how you confirm it landed where you meant.
+ requestAnimationFrame(() => canvasRef.current?.querySelector(`.vya-b-${b.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }));
  // A product section arrives already pointed at a collection the seller can fill. Without this the
  // only way to curate is to go make a collection first and come back — so the default would stay
  // "newest items" forever and the feature would go unused. An existing "Featured" is reused, never
@@ -2258,37 +2293,72 @@ export default function StorefrontStudio() {
  ) : railTab === "design" ? (
  <div className="h-full overflow-y-auto px-4 py-4">
  <p className="mb-4 text-[17px] font-semibold tracking-tight text-stone-800">Design</p>
- {/* Palettes */}
- {/* Style skin — the second axis of the builder: layouts decide a section's bones, a skin decides
-     type, spacing, and button shape across all of them at once. Deliberately above the palette,
-     because applying one seeds colours you then edit below. */}
- <button type="button" onClick={() => toggleDesign("Style")} className="mb-1 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
- <ChevronDown size={12} className={`transition ${openDesign.has("Style") ? "" : "-rotate-90"}`} /> <span className="flex-1">Style</span>
+ {/* Templates — the store's whole look lives here now.
+     The Style skins (Gallery / Editorial / Boutique / Archive / Statement) used to sit
+     in this slot. They were a second, competing style axis that seeded a palette and a
+     font pairing — the same two things the Colour palette and Type controls below own —
+     so picking a skin silently overwrote choices made under them and there were two
+     different answers to "what does my store look like".
+
+     Templates are the real answer: a whole store, with its own home page, Shop grid
+     density and pages. applyTemplate() confirms before switching, because it replaces
+     the Home and Shop sections.
+
+     NOTE: skinCss() is deliberately still wired up in app/s/Blocks.tsx. Any store that
+     already picked a skin keeps rendering exactly as it does today — this removes the
+     way to choose a NEW one, it does not retroactively restyle live storefronts. */}
+ <button type="button" onClick={() => toggleDesign("Template")} className="mb-2 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
+ <ChevronDown size={12} className={`transition ${openDesign.has("Template") ? "" : "-rotate-90"}`} /> <span className="flex-1">Template</span>
  </button>
- {openDesign.has("Style") && (<>
- <p className="mb-2 mt-2 text-[12px] leading-snug text-stone-400">A starting point, not a lock — change any colour, font, or section afterwards and your choice wins.</p>
- <div className="mb-6 grid grid-cols-2 gap-2">
- {SKINS.map((sk) => {
- const active = skin === sk.id;
+ {openDesign.has("Template") && (<>
+ <p className="mb-2 mt-2 text-[12px] leading-snug text-stone-400">A whole starting store — palette, type, a laid-out home page and its own pages. Switching asks first, and keeps the pages you&rsquo;ve written.</p>
+ <div className="grid grid-cols-2 gap-2">
+ {STOREFRONT_TEMPLATES.map((t) => {
+ const active = templateId === t.id;
  return (
- <button key={sk.id} type="button" title={sk.description} onClick={() => { if (!active) changeSkin(sk.id); }} className={cn("flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition", active ? "border-[#5D0F17] ring-1 ring-[#5D0F17]" : "border-black/10 hover:border-[#5D0F17]/40")}>
- <span className="flex w-full items-center gap-1.5">
- <span className={cn("min-w-0 flex-1 truncate text-[13px] font-semibold", active ? "text-[#5D0F17]" : "text-stone-700")}>{sk.label}</span>
- {sk.palette && (
- <span className="flex shrink-0 items-center gap-0.5 rounded-full p-0.5 ring-1 ring-black/10" style={{ background: sk.palette.bg }}>
- <span className="h-2.5 w-2.5 rounded-full" style={{ background: sk.palette.text }} />
- <span className="h-2.5 w-2.5 rounded-full" style={{ background: sk.palette.accent }} />
- </span>
+ <button
+ key={t.id}
+ type="button"
+ title={t.signature}
+ onClick={() => { if (!active) applyTemplate(t); }}
+ className={cn("group overflow-hidden rounded-lg border text-left transition", active ? "border-[#5D0F17] ring-1 ring-[#5D0F17]" : "border-black/10 hover:border-[#5D0F17]/40")}
+ >
+ {/* The template's REAL catalogue density at its real card shape, because
+     choosing between them is largely choosing 2-up over 5-up.
+
+     The strips are capped at 34px tall. They size themselves from grid.ratio,
+     and in a two-column sidebar a 3/4 card comes out ~57px — taller than the
+     swatch, so they were being clipped by overflow-hidden and every card looked
+     cut off at the bottom. min-h-0 lets the row shrink instead of overflowing.
+
+     The name is NOT repeated under the swatch: it already renders inside, in the
+     template's own heading font, which is half the point of showing it. */}
+ <div className="relative flex h-[84px] flex-col justify-between gap-2 overflow-hidden px-2.5 pb-2.5 pt-2.5" style={{ background: t.colors.bg }}>
+ <span className="truncate pr-10 text-[12px] leading-tight" style={{ fontFamily: ff(t.fonts.heading), color: t.colors.text }}>{t.name}</span>
+ {active && (
+ <span className="absolute right-2 top-2 rounded-full bg-[#5D0F17] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-white">Current</span>
  )}
- </span>
- <span className="line-clamp-2 text-[11px] leading-snug text-stone-400">{sk.description}</span>
+ <div className="flex min-h-0 items-end" style={{ gap: t.grid.gutter === "tight" ? 2 : t.grid.gutter === "wide" ? 5 : 3 }}>
+ {Array.from({ length: t.grid.cols }).map((_, i) => (
+ <span
+ key={i}
+ className="flex-1"
+ style={{
+ aspectRatio: t.grid.ratio.replace("/", " / "),
+ maxHeight: 34,
+ background: `${t.colors.text}1a`,
+ borderRadius: t.radius === "round" ? 6 : t.radius === "soft" ? 2 : 0,
+ }}
+ />
+ ))}
+ </div>
+ </div>
  </button>
  );
  })}
  </div>
-
  </>)}
- <button type="button" onClick={() => toggleDesign("Colour palette")} className="mb-2 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
+ <button type="button" onClick={() => toggleDesign("Colour palette")} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
  <ChevronDown size={12} className={`transition ${openDesign.has("Colour palette") ? "" : "-rotate-90"}`} /> <span className="flex-1">Colour palette</span>
  </button>
  {openDesign.has("Colour palette") && (<>

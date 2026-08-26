@@ -668,7 +668,11 @@ const AUTHORED_TEMPLATES: StorefrontTemplate[] = [
     ],
    },
    {
-    slug: "shipping-returns", title: "Shipping & Returns",
+    // "shipping", not "shipping-returns": every other template uses "shipping" for this
+    // page, and applyTemplate dedupes by SLUG — so the odd one out slipped past the check
+    // and a store that tried Editorial plus any other template ended up with two
+    // "Shipping & Returns" entries in its nav.
+    slug: "shipping", title: "Shipping & Returns",
     blocks: [
      { type: "text", variant: "lede", props: { heading: "Shipping & returns", body: "The short version: it ships fast, and if something's wrong I'll fix it." } },
      { type: "faq", variant: "accordion", props: { heading: "", subtext: "", q0: "How fast does it ship?", a0: `Within [1–2] business days from [YOUR CITY]. ${SHIP_LINE}.`, q1: "Do you ship internationally?", a1: "[Yes — duties are on you, sorry. / Not yet.]", q2: "Can I return something?", a2: RETURNS_BODY, q3: "It arrived damaged", a3: "Email me a photograph within [7] days and I'll refund you, including shipping. No argument." } },
@@ -1033,3 +1037,22 @@ export const RADIUS_OPTIONS: { id: "sharp" | "soft" | "round"; name: string }[] 
  { id: "soft", name: "Soft" },
  { id: "round", name: "Round" },
 ];
+
+/**
+ * Every page slug that ANY template ships. This is how the studio tells a template-provided
+ * page apart from one the seller wrote themselves, without needing a marker column on the
+ * page or a migration for stores that already exist.
+ *
+ * Switching templates removes the pages in this set and lays down the new template's, so a
+ * store that tries three looks ends up with the third one's pages — not all three stacked
+ * into the nav. A page whose slug is NOT in here was created by the seller and is never
+ * touched.
+ */
+export const TEMPLATE_PAGE_SLUGS: ReadonlySet<string> = new Set(
+ STOREFRONT_TEMPLATES.flatMap((t) => templatePages(t.id).map((p) => p.slug)),
+);
+
+/** True when this slug is a template-provided page rather than one the seller authored. */
+export function isTemplatePageSlug(slug: string): boolean {
+ return TEMPLATE_PAGE_SLUGS.has(slug);
+}

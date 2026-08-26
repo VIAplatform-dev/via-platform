@@ -183,6 +183,11 @@ export async function POST(request: NextRequest) {
  // safeSrc keeps this from becoming a way to point the header at an arbitrary remote URL.
  if (["inline", "center", "split", "stacked"].includes(String(body?.headerLayout))) theme.headerLayout = body.headerLayout;
  if (typeof body?.logo === "string") { const u = body.logo.trim(); theme.logo = u ? (safeSrc(u) ?? theme.logo ?? null) : null; }
+ // Store name (the storefront wordmark). The GET has always READ theme.storeName, but nothing
+ // ever wrote it — so the name field in the build wizard was preview-only and the seller's
+ // typed name was discarded the moment the wizard closed. Blank is ignored rather than stored,
+ // so a client that omits it can't wipe the name off a live store.
+ if (typeof body?.storeName === "string") { const n = body.storeName.trim().slice(0, 80); if (n.length >= 2) theme.storeName = n; }
  // Global style skin. "" clears it (back to no skin); anything unrecognized is ignored rather than stored.
  if (typeof body?.skin === "string") { if (body.skin === "") delete theme.skin; else if (isSkin(body.skin)) theme.skin = body.skin; }
  // The pre-skin look, so removing a skin can restore what the store looked like before it. `null`
