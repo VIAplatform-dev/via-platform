@@ -765,6 +765,23 @@
   .contact-cols{grid-template-columns:1fr;gap:36px}
   .form-row{grid-template-columns:1fr}
 }
+/* Mobile: contact form + feature cards breathing room */
+@media(max-width:480px){
+  .form-wrap{padding:0 16px}
+  .form-card{padding:22px 18px;border-radius:18px}
+  .form{gap:14px}
+  .field input,.field textarea,.field select{font-size:14px;padding:12px 13px}
+  .field textarea{min-height:110px}
+  .feat-rows{padding:0 20px}
+  .fr-visual{aspect-ratio:4/5}
+  .mk{padding:16px}
+  .mk-field{padding:8px 10px}
+  .mk-field .u{font-size:11px}
+  .mk-btn{font-size:10px;padding:6px 10px}
+  .mk-card{padding:10px}
+  .mk-t{font-size:12px}
+  .mk-pill{font-size:8.5px;padding:2px 7px}
+}
 
 /* image logo variants for subpages */
 .brand-mark{height:26px;width:auto;display:block}
@@ -944,6 +961,10 @@ header.nav.theme-dark .brand-mark{filter:invert(1) brightness(2)}
     .vs-mobframe .vs-asset.vs-on .vs-tr-row,.vs-mobframe .vs-asset.vs-on .vs-of-row,.vs-mobframe .vs-asset.vs-on .vs-ms-bub{animation:pop .5s both}
     .vs-mobframe::before{content:"";position:absolute;inset:0;background:radial-gradient(46% 42% at 50% 60%,rgba(255,255,255,0.08),transparent 70%);pointer-events:none;z-index:0}
     .vs-mobframe .vs-asset{position:static;opacity:1;transform:none;pointer-events:auto;padding:0;width:100%;z-index:1;display:flex;align-items:center;justify-content:center}
+  }
+  @media(max-width:480px){
+    .vs-mobframe{padding:14px;min-height:auto;border-radius:18px}
+    .vs-wrap{padding:40px 18px}
   }
 
 .vs-steps{background:#060607;position:relative;z-index:1;color:#f2f3f5}
@@ -1264,6 +1285,15 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 .feat-row.in .mk-ltable>.mk-lt-row:nth-child(6){animation-delay:.49s}
 @keyframes ltRow{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.feat-row.in .mk-ltable>.mk-lt-row{animation:none}}
+/* Mobile: Recently Listed table — tighten columns so badges don't overflow */
+@media(max-width:480px){
+ .mk-lt-head,.mk-lt-row{grid-template-columns:minmax(0,1fr) 46px minmax(0,auto) minmax(0,auto);gap:8px}
+ .mk-lt-chips{flex-wrap:wrap}
+ .mk-lt-chip{width:18px;height:18px;border-radius:4px}
+ .mk-lt-name{font-size:11.5px}
+ .mk-lt-price{font-size:11.5px}
+ .mk-lt-status{font-size:9px;padding:3px 7px}
+}
 
 /* ---- capabilities "Text to list": cross-post icons w/ checks ---- */
 .vs-post{position:absolute;top:50%;left:50%;transform:translate(-212px,-22px);display:flex;flex-direction:column;gap:16px;z-index:3;pointer-events:none}
@@ -1383,6 +1413,24 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 .vb-fc.on{border-color:#5D0F17}
 .vb-fc b{display:block;font-size:13px;color:#2a2620}
 .vb-fc span{font:500 8.5px var(--g);color:#a19a90}
+/* Storefront builder duo — stack vertically on narrow screens so each mockup is readable */
+@media(max-width:560px){
+ .vs-duo{flex-direction:column;gap:14px;min-height:auto;height:auto}
+ .vs-duo-col{flex:none}
+ .vs-mini{min-height:300px;height:300px}
+ .vs-duo-label{font-size:11.5px}
+ .vs-duo-i{width:18px;height:18px;border-radius:6px;font-size:10px}
+ /* Scale the store iframe down so its ~600px layout fits the ~340px container */
+ .vs-mini-screen iframe{width:166%;height:166%;transform:scale(0.6);transform-origin:top left}
+ .vb-rail{flex:0 0 38px}
+ .vb-ri{width:34px;font-size:7px;padding:5px 0}
+ .vb-ri .vb-ic{font-size:12px}
+ .vb-panel{padding:8px 8px 12px}
+ .vb-lbl{font-size:7.5px;margin:8px 0 5px}
+ .vb-pal{gap:4px}
+ .vb-sw{padding:6px;font-size:8px;border-radius:7px}
+ .vb-dots i{width:9px;height:9px}
+}
 .vs-tk-load{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;gap:10px;background:#0b0c0f;color:rgba(255,255,255,0.72);font:500 12px var(--g)}
 .vs-tk-spin{width:15px;height:15px;border-radius:50%;border:2px solid rgba(255,255,255,0.18);border-top-color:#33d18f;animation:vsspin .7s linear infinite}
 @keyframes vsspin{to{transform:rotate(360deg)}}
