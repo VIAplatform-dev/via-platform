@@ -1,136 +1,143 @@
-import { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
-import { WebView, type WebViewNavigation } from "react-native-webview";
-import CookieManager from "@react-native-cookies/cookies";
+import { useRef, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { WebView } from "react-native-webview";
 import { colors, spacing } from "../lib/theme";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Depop connect — DIAGNOSTIC SPIKE, not the finished flow.
+// Depop connect — DIAGNOSTIC SPIKE. Reads only, sends NOTHING to VYA, stores nothing.
 //
-// This exists to answer the two questions that block everything else:
-//   Q1  What credential does a completed Depop login actually produce?
-//   Q2  How long does it last?
+// It answers the one question that decides how the whole cross-listing feature gets built:
+// after a completed on-device login, WHAT is Depop's session, and is it reachable from JavaScript?
 //
-// It logs into Depop ON THE DEVICE inside a WebView — the seller's real phone, real IP — so the
-// login looks genuine and never trips the SMS gate that the desktop-web attempt hit. After login,
-// it reads Depop's cookie jar natively (CookieManager, which can see httpOnly session cookies that
-// injected `document.cookie` cannot) and shows each cookie's NAME, VALUE LENGTH and EXPIRY on
-// screen. It deliberately does NOT send anything to VYA yet, and never shows a full value — this is
-// reconnaissance, and it needs no VYA login to run.
+//   · If auth rides a JS-readable token (localStorage / an Authorization header), we can capture it
+//     with no native modules at all.
+//   · If nothing readable turns up, the session is an httpOnly cookie — invisible to JS — and we'll
+//     know the real flow needs native cookie access (and how to solve the New-Architecture issue).
 //
-// Once we can see the real session here, we'll know: whether it's one cookie or a set, whether
-// there's a long-lived refresh cookie, and how many days a seller gets before reconnecting. THAT
-// is what tells us how to build the poster and the sold-sync correctly, instead of guessing.
+// HOW: the WebView logs into Depop on THIS device (real phone, real IP → the login looks genuine,
+// which is the whole point). A tiny script hooks fetch before the page loads to catch any
+// Authorization header Depop's own API calls send. Then "Capture session" snapshots localStorage,
+// sessionStorage and the cookie names the page can see. Everything is reported as SHAPES — a name,
+// a length, whether it looks like a JWT — never a real value.
 //
-// PREREQS (this file won't compile/run until these are in place):
-//   npx expo install react-native-webview @react-native-cookies/cookies
-//   @react-native-cookies/cookies needs a native build (not Expo Go):  npx expo run:ios
+// Uses only react-native-webview (New-Architecture compatible). No @react-native-cookies/cookies,
+// so no native-arch conflict. Needs a dev build (WebView is native): npx expo run:ios --device
 // ───────────────────────────────────────────────────────────────────────────
 
 const DEPOP_LOGIN = "https://www.depop.com/login/";
-const DEPOP_ORIGIN = "https://www.depop.com";
 
-// Shape only — never the value. Enough to recognise a JWT vs an opaque session id.
-type CookieShape = { name: string; len: number; looksLike: string; expires: string | null };
+// Installed BEFORE the page's own scripts, so it catches auth headers from the very first API call.
+const HOOK_FETCH = `
+(function(){
+  function shape(v){ if(!v) return null; var s=String(v);
+    var l = /^ey[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\./.test(s) ? "JWT"
+          : /^[0-9a-f-]{32,}$/i.test(s) ? "hex/uuid"
+          : s.length>=20 ? "opaque" : "short";
+    return { len:s.length, looks:l }; }
+  function send(o){ try{ window.ReactNativeWebView.postMessage(JSON.stringify(o)); }catch(e){} }
+  var seen = {};
+  function note(headers){
+    try{
+      var get = headers && headers.get ? function(k){return headers.get(k);} : function(k){return headers ? headers[k] || headers[k.toLowerCase()] : null;};
+      var a = get("Authorization") || get("authorization");
+      if(a && !seen[String(a).slice(0,12)]){ seen[String(a).slice(0,12)]=1; send({type:"auth", header:"Authorization", value:shape(a)}); }
+    }catch(e){}
+  }
+  var of = window.fetch;
+  if(of){ window.fetch = function(input, init){ try{ note(init && init.headers); }catch(e){} return of.apply(this, arguments); }; }
+  var xo = window.XMLHttpRequest && window.XMLHttpRequest.prototype.setRequestHeader;
+  if(xo){ window.XMLHttpRequest.prototype.setRequestHeader = function(k,v){ try{ if(/^authorization$/i.test(k)) note({Authorization:v}); }catch(e){} return xo.apply(this, arguments); }; }
+  true;
+})();
+`;
 
-function classify(v: string): string {
-  if (/^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\./.test(v)) return "JWT";
-  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return "UUID";
-  if (v.length >= 20) return "opaque token";
-  return "short";
-}
+// Run on demand, after the seller has logged in.
+const SNAPSHOT = `
+(function(){
+  function shape(v){ if(!v) return null; var s=String(v);
+    var l = /^ey[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\./.test(s) ? "JWT"
+          : /^[0-9a-f-]{32,}$/i.test(s) ? "hex/uuid"
+          : s.length>=20 ? "opaque" : "short";
+    return { len:s.length, looks:l }; }
+  var out = { type:"snapshot", url:location.href, local:{}, session:{}, cookieNames:[] };
+  try{ for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); out.local[k]=shape(localStorage.getItem(k)); } }catch(e){}
+  try{ for(var j=0;j<sessionStorage.length;j++){ var k2=sessionStorage.key(j); out.session[k2]=shape(sessionStorage.getItem(k2)); } }catch(e){}
+  try{ out.cookieNames = document.cookie.split(";").map(function(c){return c.split("=")[0].trim();}).filter(Boolean); }catch(e){}
+  window.ReactNativeWebView.postMessage(JSON.stringify(out));
+  true;
+})();
+`;
+
+type Shape = { len: number; looks: string } | null;
+type Snapshot = { url: string; local: Record<string, Shape>; session: Record<string, Shape>; cookieNames: string[] };
 
 export default function ConnectDepop() {
-  const [phase, setPhase] = useState<"login" | "reading" | "done">("login");
-  const [cookies, setCookies] = useState<CookieShape[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const web = useRef<WebView>(null);
+  const [authHeaders, setAuthHeaders] = useState<Shape[]>([]);
+  const [snap, setSnap] = useState<Snapshot | null>(null);
 
-  // Watch the WebView's navigation: once we're logged in, Depop leaves /login and lands on the
-  // app/home. That transition is our cue to read the jar. The /mfa path means the SMS gate fired —
-  // surface it rather than silently waiting, so we learn whether on-device really avoids it.
-  async function onNav(nav: WebViewNavigation) {
-    if (nav.loading) return;
-    const url = nav.url || "";
-    if (url.includes("/login/mfa")) {
-      setError("Depop asked for an SMS code even on-device. Enter it in the page above — if this keeps happening, on-device isn't clearing MFA and that's an important finding.");
-      return;
-    }
-    const loggedIn = url.startsWith(DEPOP_ORIGIN) && !url.includes("/login");
-    if (!loggedIn || phase !== "login") return;
-
-    setError(null);
-    setPhase("reading");
+  function onMessage(e: { nativeEvent: { data: string } }) {
     try {
-      // useWebKit:true reads the WKWebView jar on iOS — the one the login actually populated.
-      const jar = await CookieManager.get(DEPOP_ORIGIN, true);
-      const shapes: CookieShape[] = Object.entries(jar).map(([name, c]) => {
-        const value = (c as { value?: string }).value ?? "";
-        const expires = (c as { expires?: string }).expires ?? null;
-        return { name, len: value.length, looksLike: classify(value), expires };
-      });
-      shapes.sort((a, b) => b.len - a.len);
-      setCookies(shapes);
-      setPhase("done");
-    } catch (e) {
-      setError(`Couldn't read the cookie jar: ${e instanceof Error ? e.message : String(e)}`);
-      setPhase("done");
-    }
+      const msg = JSON.parse(e.nativeEvent.data);
+      if (msg.type === "auth") setAuthHeaders((prev) => [...prev, msg.value]);
+      if (msg.type === "snapshot") setSnap(msg);
+    } catch { /* ignore non-JSON page chatter */ }
   }
 
-  if (phase === "done") {
-    return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.pad}>
-        <Text style={styles.h1}>What Depop gave us</Text>
-        <Text style={styles.note}>
-          Cookie names, value lengths and expiries — no values. This is the answer to &ldquo;what is
-          the session and how long does it last.&rdquo; Screenshot it and hand it back.
-        </Text>
-
-        {error ? <Text style={styles.err}>{error}</Text> : null}
-
-        {cookies.length === 0 ? (
-          <Text style={styles.note}>No cookies found for depop.com — login may not have completed.</Text>
-        ) : (
-          cookies.map((c) => (
-            <View key={c.name} style={styles.row}>
-              <Text style={styles.cName}>{c.name}</Text>
-              <Text style={styles.cMeta}>
-                {c.len} chars · {c.looksLike}
-                {c.expires ? ` · expires ${c.expires.slice(0, 10)}` : " · session cookie (no expiry)"}
-              </Text>
-            </View>
-          ))
-        )}
-
-        <Pressable style={styles.btn} onPress={() => { setCookies([]); setPhase("login"); setError(null); }}>
-          <Text style={styles.btnText}>Start over</Text>
-        </Pressable>
-      </ScrollView>
-    );
-  }
+  const rows = (obj: Record<string, Shape>) =>
+    Object.entries(obj).filter(([, v]) => v).map(([k, v]) => (
+      <Text key={k} style={styles.mono}>{k} — {v!.len} chars · {v!.looks}</Text>
+    ));
 
   return (
     <View style={styles.screen}>
       <View style={styles.banner}>
         <Text style={styles.bannerText}>
-          Log into Depop below, on this phone. When you land back on Depop&rsquo;s home, we&rsquo;ll
-          read what the login produced.
+          Log into Depop below, on this phone. Once you&rsquo;re signed in, tap Capture — it reads
+          what the session looks like. Nothing is sent anywhere.
         </Text>
-        {error ? <Text style={styles.err}>{error}</Text> : null}
       </View>
-      {phase === "reading" ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-          <Text style={styles.note}>Reading the session…</Text>
-        </View>
-      ) : (
-        <WebView
-          source={{ uri: DEPOP_LOGIN }}
-          onNavigationStateChange={onNav}
-          sharedCookiesEnabled
-          thirdPartyCookiesEnabled
-          style={styles.web}
-        />
+
+      <WebView
+        ref={web}
+        source={{ uri: DEPOP_LOGIN }}
+        injectedJavaScriptBeforeContentLoaded={HOOK_FETCH}
+        onMessage={onMessage}
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        style={styles.web}
+      />
+
+      <Pressable style={styles.capture} onPress={() => web.current?.injectJavaScript(SNAPSHOT)}>
+        <Text style={styles.captureText}>Capture session</Text>
+      </Pressable>
+
+      {(snap || authHeaders.length > 0) && (
+        <ScrollView style={styles.results} contentContainerStyle={styles.resultsPad}>
+          <Text style={styles.h2}>What&rsquo;s readable from JavaScript</Text>
+
+          <Text style={styles.label}>Authorization headers seen ({authHeaders.length})</Text>
+          {authHeaders.length === 0
+            ? <Text style={styles.dim}>None — auth isn&rsquo;t a JS bearer token.</Text>
+            : authHeaders.map((a, i) => a && <Text key={i} style={styles.mono}>Bearer — {a.len} chars · {a.looks}</Text>)}
+
+          {snap && (
+            <>
+              <Text style={styles.label}>localStorage</Text>
+              {rows(snap.local).length ? rows(snap.local) : <Text style={styles.dim}>empty</Text>}
+              <Text style={styles.label}>sessionStorage</Text>
+              {rows(snap.session).length ? rows(snap.session) : <Text style={styles.dim}>empty</Text>}
+              <Text style={styles.label}>Cookie names visible to JS</Text>
+              {snap.cookieNames.length
+                ? <Text style={styles.mono}>{snap.cookieNames.join(", ")}</Text>
+                : <Text style={styles.dim}>none visible — the session is httpOnly (native access needed)</Text>}
+            </>
+          )}
+          <Text style={styles.footnote}>
+            Screenshot this and send it back. If everything is empty and no Authorization header
+            appeared, the session is httpOnly — an important answer, not a failure.
+          </Text>
+        </ScrollView>
       )}
     </View>
   );
@@ -141,14 +148,13 @@ const styles = StyleSheet.create({
   web: { flex: 1, backgroundColor: colors.bg },
   banner: { padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
   bannerText: { color: colors.textMuted, fontSize: 13, lineHeight: 18 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: spacing.md },
-  pad: { padding: spacing.xl, gap: spacing.md },
-  h1: { fontFamily: "Georgia", fontSize: 26, color: colors.text },
-  note: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
-  err: { color: "#A32637", fontSize: 13, lineHeight: 19, marginTop: spacing.sm },
-  row: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  cName: { fontFamily: "Courier", fontSize: 14, color: colors.text, fontWeight: "600" },
-  cMeta: { fontFamily: "Courier", fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  btn: { marginTop: spacing.xl, backgroundColor: colors.accent, paddingVertical: spacing.md, borderRadius: 8, alignItems: "center" },
-  btnText: { color: colors.accentText, fontSize: 14, fontWeight: "600" },
+  capture: { backgroundColor: colors.accent, paddingVertical: spacing.md, alignItems: "center" },
+  captureText: { color: colors.accentText, fontSize: 14, fontWeight: "600" },
+  results: { maxHeight: "45%", backgroundColor: colors.bgCard, borderTopWidth: 1, borderTopColor: colors.border },
+  resultsPad: { padding: spacing.lg, gap: spacing.xs },
+  h2: { fontFamily: "Georgia", fontSize: 20, color: colors.text, marginBottom: spacing.sm },
+  label: { fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: colors.textDim, marginTop: spacing.md },
+  mono: { fontFamily: "Courier", fontSize: 12, color: colors.text, marginTop: 2 },
+  dim: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  footnote: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: spacing.lg },
 });
