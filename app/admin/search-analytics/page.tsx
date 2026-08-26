@@ -80,7 +80,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export default function SearchAnalyticsPage() {
- const [range, setRange] = useState<DateRange>("30d");
+ const [range, setRange] = useState<DateRange>("all");
  const [data, setData] = useState<Data | null>(null);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);

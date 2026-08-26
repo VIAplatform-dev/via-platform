@@ -692,7 +692,7 @@ function TimeOnPageSection({ items }: { items: TimeOnPage[] }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SessionFlowsPage() {
- const [range, setRange] = useState<DateRange>("7d");
+ const [range, setRange] = useState<DateRange>("all");
  const [data, setData] = useState<SessionFlowsData | null>(null);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);

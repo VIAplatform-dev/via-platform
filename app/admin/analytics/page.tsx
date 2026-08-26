@@ -132,15 +132,10 @@ type AnalyticsData = {
  trafficSources: TrafficSource[];
  clicksBySource: ClicksBySource[];
  conversionsBySource: ConversionsBySource[];
+ conversionsByFirstTouch: ConversionsBySource[];
+ conversionsByLastTouch: ConversionsBySource[];
 };
 
-type CohortPoint = {
- cohort: string;
- period: number;
- activeUsers: number;
- cohortSize: number;
- retentionPct: number;
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -162,15 +157,6 @@ function relativeTime(iso: string): string {
  if (hrs < 24) return `${hrs} hr ago`;
  const days = Math.floor(hrs / 24);
  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
-
-function dayLabel(dateStr: string): string {
- // dateStr is YYYY-MM-DD
- const parts = dateStr.split("-");
- const month = parseInt(parts[1], 10);
- const day = parseInt(parts[2], 10);
- const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
- return `${months[month - 1]} ${day}`;
 }
 
 // ── Colour tokens ─────────────────────────────────────────────────────────────
@@ -269,12 +255,15 @@ type CollabsPartnership = {
 };
 
 export default function DeepAnalyticsPage() {
- const [range, setRange] = useState<DateRange>("30d");
+ const [range, setRange] = useState<DateRange>("all");
+ // Which attribution model the table sorts by, and which one reads as primary.
+ // Both column groups stay visible — the toggle changes emphasis and ordering,
+ // because the whole point is being able to compare them.
+ const [touchModel, setTouchModel] = useState<"first" | "last">("first");
  const [tab, setTab] = useState<Tab>("overview");
  const [data, setData] = useState<AnalyticsData | null>(null);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);
- const [cohortData, setCohortData] = useState<CohortPoint[]>([]);
 
  const fetchData = useCallback(async (r: DateRange, silent = false) => {
  if (!silent) setLoading(true);
@@ -313,13 +302,6 @@ export default function DeepAnalyticsPage() {
  return () => document.removeEventListener("visibilitychange", onVisible);
  }, [range, fetchData]);
 
- // Cohort data is range-independent — fetch once on mount
- useEffect(() => {
- fetch("/api/admin/cohort-retention")
-  .then((r) => r.json())
-  .then((j) => setCohortData(j.cohorts ?? []))
-  .catch(() => {});
- }, []);
 
  // ── Render ────────────────────────────────────────────────────────────────
 
@@ -422,78 +404,132 @@ export default function DeepAnalyticsPage() {
  </div>
 
 
- {/* ── Source Attribution Funnel ─────────────────────────────── */}
+ {/* ── Source Attribution ───────────────────────────────────────────
+     Two attribution models side by side, because they disagree and the
+     disagreement is the point.
+
+     FIRST TOUCH — the earliest real channel this customer ever arrived
+     through. Same rule the customer list uses, so the two pages agree.
+     Answers "what brought them to VYA at all".
+
+     LAST TOUCH — the click that carried them to the order, else their most
+     recent visit. This is what the panel used to show, and all it showed.
+     Answers "what closed the sale".
+
+     Both are computed from the SAME order rows, so both columns always total
+     the same order count and revenue as the Orders KPI. There is deliberately
+     no "Conv %": visits, clicks and orders are three separately-derived
+     numbers joined by a source label, not stages of one funnel, so dividing
+     them produced rates that looked real and were not. ── */}
  {data.trafficSources && data.trafficSources.length > 0 && (
  <div style={{ marginBottom: 36 }}>
  <SectionTitle>Source Attribution</SectionTitle>
+
+ {/* Group header — which columns belong to which model */}
+ {/* 164px, not 152px: each group spans TWO 76px data columns PLUS the 12px gap
+     between them. At 152px the group headers drifted 24px left of the columns they
+     label, so "First touch" sat over the last-touch orders column. */}
+ <div style={{ display: "grid", gridTemplateColumns: "150px 76px 76px 164px 164px", gap: 12, padding: "0 12px 6px" }}>
+ <span /><span /><span />
+ {(["first", "last"] as const).map((m) => {
+ const active = touchModel === m;
+ return (
+ <button
+ key={m}
+ onClick={() => setTouchModel(m)}
+ title={m === "first" ? "Sort by the channel that first brought the customer to VYA" : "Sort by the channel that carried them to the order"}
+ style={{
+ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em",
+ color: active ? "#5D0F17" : MUTED,
+ textAlign: "center", paddingBottom: 4, paddingTop: 2,
+ background: "transparent", cursor: "pointer",
+ border: "none", borderBottom: `2px solid ${active ? "#5D0F17" : BORDER}`,
+ }}
+ >
+ {m === "first" ? "First touch" : "Last touch"}
+ </button>
+ );
+ })}
+ </div>
+
  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
- {/* Header */}
- <div style={{ display: "grid", gridTemplateColumns: "140px 80px 80px 80px 80px 90px 90px", gap: 12, padding: "0 12px 8px", borderBottom: `1px solid ${BORDER}` }}>
+ {/* Column header */}
+ <div style={{ display: "grid", gridTemplateColumns: "150px 76px 76px 76px 76px 76px 76px", gap: 12, padding: "0 12px 8px", borderBottom: `1px solid ${BORDER}` }}>
  {[
  { label: "Source", align: "left" },
  { label: "Visits", align: "right" },
  { label: "Clicks", align: "right" },
- { label: "Clicks/Visit", align: "right" },
  { label: "Orders", align: "right" },
  { label: "Revenue", align: "right" },
- { label: "Conv %", align: "right" },
- ].map((h) => (
- <span key={h.label} style={{ fontSize: 11, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: MUTED, textAlign: h.align as "left" | "right" }}>{h.label}</span>
+ { label: "Orders", align: "right" },
+ { label: "Revenue", align: "right" },
+ ].map((h, i) => (
+ <span key={i} style={{ fontSize: 11, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: MUTED, textAlign: h.align as "left" | "right" }}>{h.label}</span>
  ))}
  </div>
- {/* Rows — built from trafficSources (visits) joined with clicks + conversions */}
+
  {(() => {
- // Collect all sources that appear in any dataset
+ const first = data.conversionsByFirstTouch ?? [];
+ const last = data.conversionsByLastTouch ?? data.conversionsBySource ?? [];
  const allSources = Array.from(new Set([
  ...data.trafficSources.map((r) => r.source),
  ...(data.clicksBySource ?? []).map((r) => r.source),
- ...(data.conversionsBySource ?? []).map((r) => r.source),
+ ...first.map((r) => r.source),
+ ...last.map((r) => r.source),
  ]));
 
  const rows = allSources.map((source) => {
  const visitRow = data.trafficSources.find((r) => r.source === source);
  const clickRow = data.clicksBySource?.find((r) => r.source === source);
- const convRow = data.conversionsBySource?.find((r) => r.source === source);
+ const f = first.find((r) => r.source === source);
+ const l = last.find((r) => r.source === source);
  return {
  source,
  visits: visitRow?.visits ?? 0,
  clicks: clickRow?.clicks ?? 0,
- orders: convRow?.conversions ?? 0,
- revenue: convRow?.revenue ?? 0,
+ firstOrders: f?.conversions ?? 0,
+ firstRevenue: f?.revenue ?? 0,
+ lastOrders: l?.conversions ?? 0,
+ lastRevenue: l?.revenue ?? 0,
  };
- }).sort((a, b) => b.visits - a.visits);
+ }).sort((a, b) => (touchModel === "first"
+ ? b.firstRevenue - a.firstRevenue
+ : b.lastRevenue - a.lastRevenue) || b.visits - a.visits);
 
- const maxVisits = rows[0]?.visits ?? 1;
+ const maxVisits = Math.max(...rows.map((r) => r.visits), 1);
+ const money = (n: number) => `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+ // `dim` fades the model that isn't selected, so the active one reads first
+ // without either set of numbers disappearing.
+ const num = (n: number, bold = false, dim = false) => (
+ <span style={{ fontSize: 13, fontWeight: bold ? 700 : 600, color: n > 0 ? "#15803d" : MUTED, opacity: dim ? 0.45 : 1, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+ {n > 0 ? (bold ? money(n) : n.toLocaleString()) : "\u2014"}
+ </span>
+ );
 
- return rows.map((row, i) => {
- const clickRate = row.visits > 0 ? (row.clicks / row.visits) * 100 : 0;
- const convRate = row.clicks > 0 ? (row.orders / row.clicks) * 100 : 0;
- return (
- <div key={i} style={{ display: "grid", gridTemplateColumns: "140px 80px 80px 80px 80px 90px 90px", gap: 12, padding: "10px 12px", backgroundColor: i % 2 === 0 ? BG_HOVER : "transparent", borderRadius: 6, alignItems: "center" }}>
- {/* Source + bar */}
+ return rows.map((row, i) => (
+ <div key={row.source} style={{ display: "grid", gridTemplateColumns: "150px 76px 76px 76px 76px 76px 76px", gap: 12, padding: "10px 12px", backgroundColor: i % 2 === 0 ? BG_HOVER : "transparent", borderRadius: 6, alignItems: "center" }}>
  <div style={{ minWidth: 0 }}>
- <div style={{ fontSize: 13, fontWeight: 700, color: DARK, textTransform: "capitalize", marginBottom: 3 }}>{row.source}</div>
+ <div style={{ fontSize: 13, fontWeight: 700, color: DARK, marginBottom: 3 }}>{row.source}</div>
  <div style={{ height: 3, backgroundColor: BORDER, borderRadius: 2 }}>
  <div style={{ height: "100%", backgroundColor: "#5D0F17", borderRadius: 2, width: `${(row.visits / maxVisits) * 100}%`, opacity: 0.6 }} />
  </div>
  </div>
- {/* Visits */}
- <span style={{ fontSize: 13, fontWeight: 600, color: DARK, textAlign: "right" }}>{row.visits.toLocaleString()}</span>
- {/* Clicks */}
- <span style={{ fontSize: 13, fontWeight: 600, color: row.clicks > 0 ? DARK : MUTED, textAlign: "right" }}>{row.clicks > 0 ? row.clicks.toLocaleString() : "—"}</span>
- {/* Click rate */}
- <span style={{ fontSize: 12, color: clickRate >= 10 ? "#15803d" : clickRate > 0 ? GRAY : MUTED, textAlign: "right" }}>{clickRate > 0 ? `${clickRate.toFixed(1)}%` : "—"}</span>
- {/* Orders */}
- <span style={{ fontSize: 13, fontWeight: 600, color: row.orders > 0 ? "#15803d" : MUTED, textAlign: "right" }}>{row.orders > 0 ? row.orders.toLocaleString() : "—"}</span>
- {/* Revenue */}
- <span style={{ fontSize: 13, fontWeight: 700, color: row.revenue > 0 ? "#15803d" : MUTED, textAlign: "right" }}>{row.revenue > 0 ? `$${row.revenue.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—"}</span>
- {/* Conv rate */}
- <span style={{ fontSize: 12, color: convRate >= 5 ? "#15803d" : convRate > 0 ? GRAY : MUTED, textAlign: "right" }}>{convRate > 0 ? `${convRate.toFixed(1)}%` : "—"}</span>
+ <span style={{ fontSize: 13, fontWeight: 600, color: DARK, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.visits.toLocaleString()}</span>
+ <span style={{ fontSize: 13, fontWeight: 600, color: row.clicks > 0 ? DARK : MUTED, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{row.clicks > 0 ? row.clicks.toLocaleString() : "\u2014"}</span>
+ {num(row.firstOrders, false, touchModel !== "first")}
+ {num(row.firstRevenue, true, touchModel !== "first")}
+ {num(row.lastOrders, false, touchModel !== "last")}
+ {num(row.lastRevenue, true, touchModel !== "last")}
  </div>
- );
- });
+ ));
  })()}
  </div>
+
+ <p style={{ fontSize: 11, color: MUTED, margin: "10px 12px 0", lineHeight: 1.5, maxWidth: 760 }}>
+ Both models cover the same orders, so each pair of columns totals the same as the Orders KPI &mdash;
+ they only disagree about which channel gets the credit. Where first touch is much higher than last
+ touch, that channel is <strong>finding</strong> customers who convert later through something else.
+ </p>
  </div>
  )}
 
@@ -528,36 +564,8 @@ export default function DeepAnalyticsPage() {
  </div>
  </div>
 
- {/* ── Top Searches ─────────────────────────────────────────────── */}
- <div style={{ marginBottom: 36 }}>
- <SectionTitle>Top Searches</SectionTitle>
- {data.topSearches.length === 0 ? (
- <p style={{ fontSize: 13, color: MUTED }}>No searches recorded yet.</p>
- ) : (
- <>
- {/* #1 highlight */}
- <div style={{ backgroundColor: BG_HOVER, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "12px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
- <span style={{ fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED }}>#1</span>
- <span style={{ fontSize: 18, fontWeight: 700, color: DARK }}>{data.topSearches[0].query}</span>
- <span style={{ fontSize: 12, color: MUTED, marginLeft: "auto" }}>{data.topSearches[0].count} searches</span>
- </div>
- <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
- {data.topSearches.slice(1).map((s, i) => (
- <div key={s.query} style={{ display: "flex", alignItems: "center", gap: 10 }}>
- <span style={{ fontSize: 11, color: MUTED, width: 20, textAlign: "right", flexShrink: 0 }}>{i + 2}</span>
- <div style={{ flex: 1, minWidth: 0 }}>
- <p style={{ margin: "0 0 3px", fontSize: 13, color: DARK, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.query}</p>
- <div style={{ height: 4, backgroundColor: BORDER, borderRadius: 2 }}>
- <div style={{ height: "100%", backgroundColor: DARK, borderRadius: 2, width: `${(s.count / data.topSearches[0].count) * 100}%`, opacity: 0.4 }} />
- </div>
- </div>
- <span style={{ fontSize: 11, color: MUTED, flexShrink: 0 }}>{s.count}</span>
- </div>
- ))}
- </div>
- </>
- )}
- </div>
+ {/* Top Searches lived here AND on /admin/search-analytics, which has the full
+     breakdown plus its own range picker. One link instead of a second copy. */}
 
  {/* ── Top Stores ───────────────────────────────────────────────── */}
  <div style={{ marginBottom: 36 }}>
@@ -565,11 +573,8 @@ export default function DeepAnalyticsPage() {
  <StoresTable stores={data.topStores} />
  </div>
 
- {/* ── Cohort Retention ─────────────────────────────────────────── */}
- <div style={{ marginBottom: 36 }}>
- <SectionTitle>Buyer Cohort Retention</SectionTitle>
- <CohortRetentionChart data={cohortData} />
- </div>
+ {/* Buyer Cohort Retention removed — the same chart, from the same
+     /api/admin/cohort-retention endpoint, is on /admin/summary. */}
 
  {/* ── Conversions ──────────────────────────────────────────────── */}
  <div style={{ marginBottom: 36 }}>
@@ -611,8 +616,12 @@ export default function DeepAnalyticsPage() {
  ))}
  </div>
 
- {/* Orders table */}
- <ConversionsTable rows={data.recentConversions} onRefresh={() => fetchData(range, true)} />
+ {/* The full order table used to render here as well. It is the same data as
+     /admin/conversions, which has filtering and the unmatched queue — the three
+     cards above already link into it, so the second copy was noise. */}
+ <Link href="/admin/conversions?filter=all" style={{ fontSize: 12, color: GRAY, textDecoration: "none", borderBottom: `1px solid ${BORDER}`, paddingBottom: 1 }}>
+ View full order history &rarr;
+ </Link>
  </div>
 
 
@@ -1030,282 +1039,9 @@ function InventoryTab({ inv }: { inv: InventoryStats }) {
 
 // ── CohortRetentionChart ──────────────────────────────────────────────────────
 
-const COHORT_COLORS = ["#2563eb", "#16a34a", "#7c3aed", "#ea580c", "#0891b2", "#db2777"];
-const MIN_COHORT_SIZE = 5; // cohorts smaller than this are shown in table but not charted
 
-function fmtCohortLabel(ym: string): string {
- const [y, m] = ym.split("-");
- const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
- return `${months[parseInt(m, 10) - 1]} '${y.slice(2)}`;
-}
 
-function retentionColor(pct: number): string {
- if (pct >= 50) return "#dcfce7";
- if (pct >= 25) return "#fef9c3";
- if (pct > 0)  return "#fef3c7";
- return "#f4f4f5";
-}
 
-function CohortRetentionChart({ data }: { data: CohortPoint[] }) {
- if (data.length === 0) {
- return (
-  <div style={{ padding: "24px 0", color: MUTED, fontSize: 13 }}>
-   No repeat-buyer data yet. This populates once the same user makes purchases in two different calendar months.
-  </div>
- );
- }
-
- // Group by cohort
- const cohortMap = new Map<string, CohortPoint[]>();
- for (const pt of data) {
- const arr = cohortMap.get(pt.cohort) ?? [];
- arr.push(pt);
- cohortMap.set(pt.cohort, arr);
- }
- const cohorts = Array.from(cohortMap.keys()).sort();
- const maxPeriod = Math.max(...data.map((d) => d.period));
- const periods = Array.from({ length: maxPeriod + 1 }, (_, i) => i);
-
- // Cohorts large enough to chart AND that have at least M+1 data
- let colorIdx = 0;
- const cohortColorMap = new Map<string, string>();
- const chartableCohorts = cohorts.filter((cohort) => {
- const pts = cohortMap.get(cohort) ?? [];
- const size = pts[0]?.cohortSize ?? 0;
- const hasReturnData = pts.some((p) => p.period > 0);
- return size >= MIN_COHORT_SIZE && hasReturnData;
- });
- for (const cohort of chartableCohorts) {
- cohortColorMap.set(cohort, COHORT_COLORS[colorIdx++ % COHORT_COLORS.length]);
- }
-
- // ── SVG line chart (only when we have something meaningful to show) ────────
- const showChart = chartableCohorts.length > 0 && maxPeriod >= 1;
- const W = 580, H = 220;
- const PAD = { top: 16, right: 16, bottom: 40, left: 44 };
- const cW = W - PAD.left - PAD.right;
- const cH = H - PAD.top - PAD.bottom;
- const xOf = (p: number) => maxPeriod <= 1 ? (p === 0 ? 0 : cW) : (p / maxPeriod) * cW;
- const yOf = (pct: number) => cH - (pct / 100) * cH;
-
- return (
- <div>
-  {showChart ? (
-  <>
-   <div style={{ overflowX: "auto", marginBottom: 12 }}>
-   <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: 280, maxWidth: W, display: "block" }}>
-    <g transform={`translate(${PAD.left},${PAD.top})`}>
-    {/* Grid lines */}
-    {[0, 25, 50, 75, 100].map((pct) => (
-     <g key={pct}>
-     <line x1={0} y1={yOf(pct)} x2={cW} y2={yOf(pct)} stroke={BORDER} strokeWidth={1} />
-     <text x={-6} y={yOf(pct) + 4} textAnchor="end" fontSize={9} fill={MUTED}>{pct}%</text>
-     </g>
-    ))}
-    {/* X-axis labels */}
-    {periods.map((p) => (
-     <text key={p} x={xOf(p)} y={cH + 16} textAnchor="middle" fontSize={10} fill={GRAY}>
-     {p === 0 ? "M+0\nacquisition" : `M+${p}`}
-     </text>
-    ))}
-    {/* Lines — only chartable cohorts, connected points only (no gap-jumping) */}
-    {chartableCohorts.map((cohort) => {
-     const pts = (cohortMap.get(cohort) ?? []).sort((a, b) => a.period - b.period);
-     const color = cohortColorMap.get(cohort)!;
-     // Only connect consecutive periods
-     const pathParts: string[] = [];
-     for (let i = 0; i < pts.length; i++) {
-     const pt = pts[i];
-     const x = xOf(pt.period), y = yOf(pt.retentionPct);
-     const prevPt = pts[i - 1];
-     if (i === 0 || !prevPt || pt.period !== prevPt.period + 1) {
-      pathParts.push(`M${x.toFixed(1)},${y.toFixed(1)}`);
-     } else {
-      pathParts.push(`L${x.toFixed(1)},${y.toFixed(1)}`);
-     }
-     }
-     return (
-     <g key={cohort}>
-      <path d={pathParts.join(" ")} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-      {pts.map((pt) => (
-      <circle key={pt.period} cx={xOf(pt.period)} cy={yOf(pt.retentionPct)} r={4} fill={color} stroke="#fff" strokeWidth={1.5}>
-       <title>{fmtCohortLabel(cohort)} · M+{pt.period}: {pt.retentionPct}% ({pt.activeUsers} of {pt.cohortSize})</title>
-      </circle>
-      ))}
-     </g>
-     );
-    })}
-    </g>
-   </svg>
-   </div>
-   {/* Legend */}
-   <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", marginBottom: 20 }}>
-   {chartableCohorts.map((cohort) => {
-    const size = cohortMap.get(cohort)?.[0]?.cohortSize ?? 0;
-    const color = cohortColorMap.get(cohort)!;
-    return (
-    <div key={cohort} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: DARK }}>
-     <div style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
-     <span style={{ fontWeight: 500 }}>{fmtCohortLabel(cohort)}</span>
-     <span style={{ color: MUTED }}>n={size}</span>
-    </div>
-    );
-   })}
-   </div>
-  </>
-  ) : (
-  <div style={{ padding: "16px 0 20px", color: MUTED, fontSize: 13 }}>
-   Chart will appear once a cohort has ≥{MIN_COHORT_SIZE} buyers and at least one month of return data.
-  </div>
-  )}
-
-  {/* Heatmap table — shows every cohort */}
-  <div style={{ overflowX: "auto" }}>
-  <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", border: `1px solid ${BORDER}`, borderRadius: 8 }}>
-   <thead>
-   <tr style={{ background: "#fafafa" }}>
-    <th style={{ padding: "8px 14px", textAlign: "left", fontSize: 10, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${BORDER}` }}>
-    Cohort
-    </th>
-    <th style={{ padding: "8px 12px", textAlign: "center", fontSize: 10, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${BORDER}` }}>
-    Buyers
-    </th>
-    {periods.filter((p) => p > 0).map((p) => (
-    <th key={p} style={{ padding: "8px 12px", textAlign: "center", fontSize: 10, fontWeight: 600, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
-     Month +{p}
-    </th>
-    ))}
-   </tr>
-   </thead>
-   <tbody>
-   {cohorts.map((cohort, rowIdx) => {
-    const pts = cohortMap.get(cohort) ?? [];
-    const pointMap = new Map(pts.map((p) => [p.period, p]));
-    const cohortSize = pts[0]?.cohortSize ?? 0;
-    const isTiny = cohortSize < MIN_COHORT_SIZE;
-    const color = cohortColorMap.get(cohort);
-    return (
-    <tr key={cohort} style={{ borderBottom: rowIdx < cohorts.length - 1 ? `1px solid ${BORDER}` : "none", opacity: isTiny ? 0.65 : 1 }}>
-     <td style={{ padding: "10px 14px", whiteSpace: "nowrap", fontWeight: 600, color: color ?? DARK }}>
-     {fmtCohortLabel(cohort)}
-     {isTiny && <span style={{ fontSize: 10, color: MUTED, fontWeight: 400, marginLeft: 6 }}>small sample</span>}
-     </td>
-     <td style={{ padding: "10px 12px", textAlign: "center", color: GRAY, fontWeight: 500 }}>
-     {cohortSize}
-     </td>
-     {periods.filter((p) => p > 0).map((p) => {
-     const pt = pointMap.get(p);
-     return (
-      <td
-      key={p}
-      style={{
-       padding: "10px 12px",
-       textAlign: "center",
-       backgroundColor: pt ? retentionColor(pt.retentionPct) : "transparent",
-       color: pt ? DARK : MUTED,
-       fontWeight: pt ? 600 : 400,
-       whiteSpace: "nowrap",
-      }}
-      >
-      {pt ? (
-       <span title={`${pt.activeUsers} of ${pt.cohortSize} buyers returned`}>
-       {pt.retentionPct}%
-       </span>
-      ) : (
-       <span style={{ fontSize: 11 }}>—</span>
-      )}
-      </td>
-     );
-     })}
-    </tr>
-    );
-   })}
-   </tbody>
-  </table>
-  </div>
-
-  <p style={{ fontSize: 11, color: MUTED, marginTop: 10, lineHeight: 1.5 }}>
-  Month +1 = % of that cohort&apos;s buyers who made another purchase the following month.
-  {" "}A number that stays above 0% as months increase = a loyal retained core.
-  {" "}Cohorts under {MIN_COHORT_SIZE} buyers (marked &ldquo;small sample&rdquo;) are shown for completeness but aren&apos;t statistically meaningful yet.
-  </p>
- </div>
- );
-}
-
-// ── SignupBarChart ────────────────────────────────────────────────────────────
-
-function SignupBarChart({ days }: { days: SignupDay[] }) {
- // Aggregate into weeks when there are more than 21 data points
- type Bar = { label: string; count: number };
- let bars: Bar[];
-
- if (days.length > 21) {
- // Group by week (chunks of 7 days)
- const weeks: Bar[] = [];
- for (let i = 0; i < days.length; i += 7) {
- const chunk = days.slice(i, i + 7);
- const total = chunk.reduce((s, d) => s + d.count, 0);
- weeks.push({ label: dayLabel(chunk[0].date), count: total });
- }
- bars = weeks;
- } else {
- bars = days.map((d) => ({ label: dayLabel(d.date), count: d.count }));
- }
-
- const max = Math.max(...bars.map((b) => b.count), 1);
- const CHART_HEIGHT = 160;
-
- return (
- <div style={{ overflowX: "auto" }}>
- <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: CHART_HEIGHT, minWidth: bars.length * 28 }}>
- {bars.map((b, i) => {
- const pct = (b.count / max) * 100;
- const barH = Math.max(pct / 100 * CHART_HEIGHT, b.count > 0 ? 6 : 0);
- return (
- <div
- key={i}
- style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", flex: "0 0 auto", width: 22, height: "100%" }}
- title={`${b.label}: ${b.count} signup${b.count === 1 ? "" : "s"}`}
- >
- {b.count > 0 && barH > 20 && (
- <span style={{ fontSize: 9, color: MUTED, marginBottom: 2 }}>{b.count}</span>
- )}
- <div
- style={{
- width: "100%",
- height: barH,
- backgroundColor: DARK,
- borderRadius: "2px 2px 0 0",
- opacity: 0.75,
- }}
- />
- </div>
- );
- })}
- </div>
- {/* Labels */}
- <div style={{ display: "flex", alignItems: "flex-start", gap: 4, minWidth: bars.length * 28, marginTop: 4, borderTop: `1px solid ${BORDER}`, paddingTop: 6 }}>
- {bars.map((b, i) => (
- <div key={i} style={{ flex: "0 0 auto", width: 22, overflow: "visible" }}>
- <span
- style={{
- fontSize: 9,
- color: MUTED,
- whiteSpace: "nowrap",
- display: "block",
- transform: "rotate(-40deg)",
- transformOrigin: "top left",
- }}
- >
- {b.label}
- </span>
- </div>
- ))}
- </div>
- </div>
- );
-}
 
 // ── ProductList ───────────────────────────────────────────────────────────────
 
@@ -1406,285 +1142,7 @@ function ProductList({ items }: { items: ProductListItem[] }) {
 
 // ── ConversionsTable ──────────────────────────────────────────────────────────
 
-type CandidateClick = { clickId: string; timestamp: string; productName: string; storeSlug: string; userId: string | null; userEmail: string | null; userName: string | null };
 
-function ConversionsTable({ rows, onRefresh }: { rows: ConversionRow[]; onRefresh: () => void }) {
- const [selected, setSelected] = React.useState<ConversionRow | null>(null);
- const [candidates, setCandidates] = React.useState<CandidateClick[]>([]);
- const [candidatesLoading, setCandidatesLoading] = React.useState(false);
- const [userInput, setUserInput] = React.useState("");
- const [matching, setMatching] = React.useState<string | null>(null);
- const [addingOrder, setAddingOrder] = React.useState(false);
- const [newOrder, setNewOrder] = React.useState({ storeSlug: "", storeName: "", orderId: "", orderTotal: "", currency: "USD", userEmail: "", timestamp: "" });
- const [savingOrder, setSavingOrder] = React.useState(false);
- const [saveOrderError, setSaveOrderError] = React.useState<string | null>(null);
-
- function openMatch(r: ConversionRow) {
- setSelected(r);
- setUserInput(r.buyerEmail ?? "");
- setCandidates([]);
- setCandidatesLoading(true);
- fetch(`/api/admin/conversions/${r.conversionId}`)
- .then((res) => res.json())
- .then((d) => { setCandidates(d.clicks ?? []); setCandidatesLoading(false); })
- .catch(() => setCandidatesLoading(false));
- }
-
- async function matchToClick(clickId: string) {
- if (!selected) return;
- setMatching(clickId);
- await fetch(`/api/admin/conversions/${selected.conversionId}`, {
- method: "POST", headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ clickId }),
- });
- setMatching(null);
- setSelected(null);
- onRefresh();
- }
-
- async function matchToUser() {
- if (!selected || !userInput.trim()) return;
- setMatching("user");
- const input = userInput.trim();
- const body = input.includes("@") ? { userEmail: input } : { userId: input };
- const res = await fetch(`/api/admin/conversions/${selected.conversionId}`, {
- method: "POST", headers: { "Content-Type": "application/json" },
- body: JSON.stringify(body),
- });
- if (!res.ok) { const d = await res.json(); alert(d.error ?? "Not found"); }
- setMatching(null);
- setSelected(null);
- onRefresh();
- }
-
- async function markReturned(conversionId: string, currentlyReturned: boolean) {
- const action = currentlyReturned ? "unreturn" : "return";
- if (!currentlyReturned && !confirm("Mark this order as returned? It will be excluded from GMV.")) return;
- await fetch(`/api/admin/conversions/${conversionId}`, {
- method: "PATCH",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ action }),
- });
- onRefresh();
- }
-
- async function deleteConversion(conversionId: string) {
- if (!confirm("Permanently delete this order record? This cannot be undone.")) return;
- await fetch(`/api/admin/conversions/${conversionId}`, { method: "DELETE" });
- onRefresh();
- }
-
- async function editAmount(conversionId: string, currentTotal: number) {
- const input = prompt("Enter corrected order total:", String(currentTotal));
- if (!input || isNaN(Number(input))) return;
- await fetch(`/api/admin/conversions/${conversionId}`, {
- method: "PUT",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ orderTotal: Number(input) }),
- });
- onRefresh();
- }
-
- async function saveManualOrder() {
- if (!newOrder.storeSlug || !newOrder.orderId || !newOrder.orderTotal) return;
- setSavingOrder(true);
- setSaveOrderError(null);
- const res = await fetch("/api/admin/conversions", {
- method: "POST", headers: { "Content-Type": "application/json" },
- body: JSON.stringify(newOrder),
- });
- const d = await res.json();
- if (!res.ok) { setSaveOrderError(d.error ?? "Failed"); setSavingOrder(false); return; }
- setSavingOrder(false);
- setAddingOrder(false);
- setNewOrder({ storeSlug: "", storeName: "", orderId: "", orderTotal: "", currency: "USD", userEmail: "", timestamp: "" });
- onRefresh();
- }
-
- const hStyle: React.CSSProperties = {
- fontSize: 11, fontWeight: 500, color: MUTED,
- textTransform: "uppercase", letterSpacing: "0.07em",
- padding: "8px 12px", textAlign: "left", borderBottom: `1px solid ${BORDER}`,
- background: BG_HOVER,
- };
-
- return (
- <>
- <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
- <button
- onClick={() => setAddingOrder(true)}
- style={{ fontSize: 11, padding: "5px 14px", background: PRIMARY, color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em" }}
- >
- + Record Order
- </button>
- </div>
-
- {rows.length === 0 ? (
- <p style={{ fontSize: 13, color: MUTED }}>No orders in this period.</p>
- ) : (
- <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: 600, border: `1px solid ${BORDER}`, borderRadius: 8 }}>
- <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
- <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
- <tr>
- <th style={hStyle}>Time</th>
- <th style={hStyle}>Store</th>
- <th style={{ ...hStyle, textAlign: "right" }}>Order Total</th>
- <th style={hStyle}>Buyer</th>
- <th style={hStyle}>Attribution</th>
- <th style={hStyle}>Clicked Product</th>
- <th style={hStyle}></th>
- </tr>
- </thead>
- <tbody>
- {rows.map((r, i) => (
- <tr key={r.conversionId} style={{ backgroundColor: i % 2 === 0 ? BG_CARD : BG_HOVER, borderBottom: `1px solid ${BORDER}` }}>
- <td style={{ padding: "9px 12px", color: GRAY, whiteSpace: "nowrap" }}>{relativeTime(r.timestamp)}</td>
- <td style={{ padding: "9px 12px", fontWeight: 600, color: DARK }}>{r.storeName}</td>
- <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 700, color: DARK }}>
- <span style={{ textDecoration: r.returned ? "line-through" : "none", opacity: r.returned ? 0.4 : 1 }}>{formatRevenue(r.orderTotal)}</span>
- {r.returned && <span style={{ display: "block", fontSize: 9, fontWeight: 700, textTransform: "uppercase", color: "#dc2626", letterSpacing: "0.08em" }}>Returned</span>}
- </td>
- <td style={{ padding: "9px 12px", color: DARK, maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
- {r.buyerEmail ? (
- <span title={r.buyerEmail} style={{ fontSize: 12 }}>
- {r.buyerName || r.buyerEmail}
- {r.buyerName && <span style={{ display: "block", fontSize: 10, color: MUTED }}>{r.buyerEmail}</span>}
- </span>
- ) : <span style={{ color: MUTED, fontSize: 11 }}>—</span>}
- </td>
- <td style={{ padding: "9px 12px" }}>
- <span style={{ display: "inline-block", fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 99, background: r.matched ? "#dcfce7" : "#fef9c3", color: r.matched ? "#15803d" : "#854d0e" }}>
- {r.matched ? "Matched" : "Unmatched"}
- </span>
- </td>
- <td style={{ padding: "9px 12px", color: GRAY, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
- {r.clickedProduct ?? (r.matched ? "—" : <span style={{ color: MUTED }}>no click recorded</span>)}
- </td>
- <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
- <button
- onClick={() => openMatch(r)}
- style={{ fontSize: 11, padding: "3px 10px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 4, color: DARK, cursor: "pointer", fontWeight: 500, marginRight: 6 }}
- >
- {r.matched ? "Re-match" : "Match"}
- </button>
- <button
- onClick={() => editAmount(r.conversionId, r.orderTotal)}
- style={{ fontSize: 11, padding: "3px 10px", background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 4, color: GRAY, cursor: "pointer", marginRight: 6 }}
- >
- Edit $
- </button>
- <button
- onClick={() => markReturned(r.conversionId, r.returned)}
- style={{ fontSize: 11, padding: "3px 10px", background: "#fff", border: `1px solid ${r.returned ? BORDER : "#fca5a5"}`, borderRadius: 4, color: r.returned ? GRAY : "#dc2626", cursor: "pointer", marginRight: 6 }}
- >
- {r.returned ? "Undo Return" : "Return"}
- </button>
- <button
- onClick={() => deleteConversion(r.conversionId)}
- style={{ fontSize: 11, padding: "3px 10px", background: "#fff", border: "1px solid #fca5a5", borderRadius: 4, color: "#dc2626", cursor: "pointer" }}
- >
- Delete
- </button>
- </td>
- </tr>
- ))}
- </tbody>
- </table>
- </div>
- )}
-
- {/* Match panel */}
- {selected && (
- <>
- <div onClick={() => setSelected(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 100 }} />
- <div style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: 500, background: "#fff", zIndex: 101, overflowY: "auto", boxShadow: "-4px 0 24px rgba(0,0,0,0.12)", fontFamily: "system-ui, sans-serif" }}>
- <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
- <div>
- <p style={{ fontSize: 15, fontWeight: 600, color: DARK, margin: 0 }}>Match Order</p>
- <p style={{ fontSize: 12, color: MUTED, margin: "3px 0 0" }}>{selected.storeName} · {formatRevenue(selected.orderTotal)} · {relativeTime(selected.timestamp)}</p>
- </div>
- <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: MUTED }}>×</button>
- </div>
- <div style={{ padding: "20px 24px" }}>
- <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED, fontWeight: 500, margin: "0 0 8px" }}>Match to Customer</p>
- <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
- <input
- type="text"
- value={userInput}
- onChange={(e) => setUserInput(e.target.value)}
- placeholder="Email address"
- style={{ flex: 1, padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK }}
- />
- <button
- onClick={matchToUser}
- disabled={!userInput.trim() || matching === "user"}
- style={{ padding: "7px 14px", background: PRIMARY, color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: !userInput.trim() ? 0.4 : 1 }}
- >
- {matching === "user" ? "Saving…" : "Set"}
- </button>
- </div>
- <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED, fontWeight: 500, margin: "0 0 8px" }}>Candidate Clicks (same store, ±48h)</p>
- {candidatesLoading ? (
- <p style={{ fontSize: 13, color: MUTED }}>Loading…</p>
- ) : candidates.length === 0 ? (
- <p style={{ fontSize: 13, color: MUTED }}>No clicks found in this window.</p>
- ) : candidates.map((click) => (
- <div key={click.clickId} style={{ border: `1px solid ${BORDER}`, borderRadius: 6, padding: "10px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
- <div>
- <p style={{ fontSize: 13, fontWeight: 600, color: DARK, margin: 0 }}>{click.productName || "—"}</p>
- <p style={{ fontSize: 11, color: MUTED, margin: "2px 0 0" }}>
- {new Date(click.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
- {click.userEmail && ` · ${click.userName || click.userEmail}`}
- </p>
- </div>
- <button
- onClick={() => matchToClick(click.clickId)}
- disabled={matching === click.clickId}
- style={{ padding: "5px 12px", background: PRIMARY, color: "#fff", border: "none", borderRadius: 4, fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
- >
- {matching === click.clickId ? "Saving…" : "Use this"}
- </button>
- </div>
- ))}
- </div>
- </div>
- </>
- )}
-
- {/* Record Order modal */}
- {addingOrder && (
- <>
- <div onClick={() => setAddingOrder(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 200 }} />
- <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 460, background: "#fff", zIndex: 201, borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.18)", padding: "24px 28px", fontFamily: "system-ui, sans-serif" }}>
- <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
- <p style={{ fontSize: 15, fontWeight: 600, color: DARK, margin: 0 }}>Record Order Manually</p>
- <button onClick={() => setAddingOrder(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: MUTED }}>×</button>
- </div>
- <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
- <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Store Slug *</label><input value={newOrder.storeSlug} onChange={(e) => setNewOrder({ ...newOrder, storeSlug: e.target.value })} placeholder="porters-preloved" style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Store Name</label><input value={newOrder.storeName} onChange={(e) => setNewOrder({ ...newOrder, storeName: e.target.value })} placeholder="Porter's Preloved" style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- </div>
- <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Order ID *</label><input value={newOrder.orderId} onChange={(e) => setNewOrder({ ...newOrder, orderId: e.target.value })} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Amount *</label><input type="number" value={newOrder.orderTotal} onChange={(e) => setNewOrder({ ...newOrder, orderTotal: e.target.value })} placeholder="0.00" style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- </div>
- <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Currency</label><input value={newOrder.currency} onChange={(e) => setNewOrder({ ...newOrder, currency: e.target.value })} placeholder="USD" style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Order Date</label><input type="datetime-local" value={newOrder.timestamp} onChange={(e) => setNewOrder({ ...newOrder, timestamp: e.target.value })} style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- </div>
- <div><label style={{ fontSize: 11, color: GRAY, display: "block", marginBottom: 3 }}>Customer Email (optional)</label><input value={newOrder.userEmail} onChange={(e) => setNewOrder({ ...newOrder, userEmail: e.target.value })} placeholder="Links to a VYA account" style={{ width: "100%", padding: "7px 10px", border: `1px solid ${BORDER}`, borderRadius: 6, fontSize: 13, color: DARK, boxSizing: "border-box" }} /></div>
- {saveOrderError && <p style={{ fontSize: 12, color: "#dc2626", margin: 0 }}>{saveOrderError}</p>}
- <button onClick={saveManualOrder} disabled={savingOrder || !newOrder.storeSlug || !newOrder.orderId || !newOrder.orderTotal} style={{ padding: "9px", background: PRIMARY, color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: (!newOrder.storeSlug || !newOrder.orderId || !newOrder.orderTotal) ? 0.5 : 1 }}>
- {savingOrder ? "Saving…" : "Save Order"}
- </button>
- </div>
- </div>
- </>
- )}
- </>
- );
-}
 
 // ── StoresTable ───────────────────────────────────────────────────────────────
 

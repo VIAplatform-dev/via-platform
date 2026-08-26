@@ -148,7 +148,7 @@ function Leaderboard({ rows }: { rows: { name: string; sold: number; revenueCent
 }
 
 export default function AnalyticsPage() {
- const [range, setRange] = useState<"30" | "90" | "all">("30");
+ const [range, setRange] = useState<"30" | "90" | "all">("all");
  const [tab, setTab] = useState<TabKey>("overview");
  // Deep-link a tab via ?tab= (e.g. the old Audience page redirects here to Traffic).
  useEffect(() => {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FIELD, SUBMIT } from "./formStyles";
+import { acquisitionSource } from "@/app/lib/capturedSource";
 
 export default function NewsletterForm({ accent, label }: { accent: string; label?: string }) {
  const [email, setEmail] = useState("");
@@ -16,7 +17,7 @@ export default function NewsletterForm({ accent, label }: { accent: string; labe
  await fetch("/api/newsletter", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ email }),
+ body: JSON.stringify({ email, source: acquisitionSource("storefront_newsletter") }),
  });
  } catch {
  /* still show thanks */

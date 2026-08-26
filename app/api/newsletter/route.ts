@@ -55,7 +55,12 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "Too many attempts. Please try again in a few minutes." }, { status: 429 });
  }
  const body = await request.json();
- const { email } = body;
+ // `source` is the acquisition channel the page tracker captured (instagram, tiktok,
+ // a referrer). It used to be ignored entirely and every row was written as the
+ // literal 'newsletter' — which records WHICH FORM they used, not where they came
+ // from, so newsletter signups had no acquisition signal at all. The form name is
+ // now only the fallback, matching how /api/waitlist has always behaved.
+ const { email, source } = body;
 
  if (!email || typeof email !== "string") {
  return NextResponse.json(
@@ -101,7 +106,7 @@ export async function POST(request: NextRequest) {
 
  await sql`
  INSERT INTO waitlist (email, signup_date, source)
- VALUES (${normalizedEmail}, NOW(), 'newsletter')
+ VALUES (${normalizedEmail}, NOW(), ${(typeof source === "string" && source.trim()) || "newsletter"})
  `;
 
  return NextResponse.json(

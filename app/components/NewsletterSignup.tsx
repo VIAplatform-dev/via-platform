@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { acquisitionSource } from "@/app/lib/capturedSource";
 
 type NewsletterSignupProps = {
  variant?: "default" | "hero" | "footer";
@@ -49,7 +50,7 @@ export default function NewsletterSignup({
  const response = await fetch("/api/newsletter", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ email: email.trim().toLowerCase() }),
+ body: JSON.stringify({ email: email.trim().toLowerCase(), source: acquisitionSource("newsletter") }),
  });
 
  const data = await response.json();
