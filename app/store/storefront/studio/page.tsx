@@ -24,6 +24,7 @@ import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 // The skin PICKER is gone (templates replaced it), but skin state is still read and passed
 // through to <Blocks> so stores that already chose one keep rendering as they do today.
 import { isSkin, type SkinId } from "@/app/lib/storefront-skins";
+import type { ResizeHandle } from "@/app/s/blocks/kit";
 import { ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, Film, Link as LinkIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search, Undo2, Redo2, RotateCcw, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, Shapes, Upload as UploadIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 
 type Colors = { bg: string; text: string; accent: string };
@@ -293,12 +294,22 @@ function SectionStyleInspector({ block, one, multi, pick, uploading }: { block: 
  const st = (block.style || {}) as Record<string, string>;
  const n = (k: string) => (st[k] != null && st[k] !== "" ? Number(st[k]) : undefined);
  const swatch = (val: string, onChange: (v: string) => void) => <ColorSwatch value={val} onChange={onChange} />;
- const bgType: "theme" | "solid" | "gradient" | "photo" | "accent" | "dark" = st.bgImage ? "photo" : st.bgGradient ? "gradient" : st.bg === "dark" ? "dark" : st.bg === "accent" ? "accent" : /^#/.test(st.bg || "") ? "solid" : "theme";
+ // "Photo" is the one background type with nothing to write until a file is chosen — every other
+ // option sets `bg`/`bgGradient` immediately, and bgType is derived from those. So picking Photo
+ // wrote nothing, bgType fell straight back to "theme", the tab snapped back, and the upload row it
+ // was supposed to reveal never rendered: the button looked dead. The INTENT has to be held here
+ // until there's an image to derive it from. Keyed by block id so selecting a different section
+ // doesn't inherit a Photo tab that section never asked for.
+ const [photoIntent, setPhotoIntent] = useState<string | null>(null);
+ const wantsPhoto = photoIntent === block.id;
+ const bgType: "theme" | "solid" | "gradient" | "photo" | "accent" | "dark" = st.bgImage ? "photo" : st.bgGradient ? "gradient" : st.bg === "dark" ? "dark" : st.bg === "accent" ? "accent" : /^#/.test(st.bg || "") ? "solid" : wantsPhoto ? "photo" : "theme";
  const grad = (st.bgGradient || "#F4F0E8|#E9E0CE|180").split("|");
  return (
  <div className="mt-1">
  <StyleGroup label="Background">
- <Seg options={[["theme", "Theme"], ["solid", "Solid"], ["gradient", "Gradient"], ["photo", "Photo"], ["accent", "Accent"], ["dark", "Dark"]] as const} value={bgType} onPick={(v) => {
+ {/* "Page" (not "Theme") to match the section toolbar's own first chip — one concept, one name. */}
+ <Seg options={[["theme", "Page"], ["solid", "Solid"], ["gradient", "Gradient"], ["photo", "Photo"], ["accent", "Accent"], ["dark", "Dark"]] as const} value={bgType} onPick={(v) => {
+ setPhotoIntent(v === "photo" ? block.id : null);
  if (v === "theme") multi({ bg: undefined, bgGradient: undefined, bgImage: undefined });
  else if (v === "solid") multi({ bg: /^#/.test(st.bg || "") ? st.bg : "#F4F0E8", bgGradient: undefined, bgImage: undefined });
  else if (v === "gradient") multi({ bgGradient: st.bgGradient || "#F4F0E8|#E9E0CE|180", bg: undefined, bgImage: undefined });
@@ -367,8 +378,16 @@ function SectionStyleInspector({ block, one, multi, pick, uploading }: { block: 
  {/* The button's own style (fill, shape, hover, …) now lives in its own dedicated panel — click
  directly into the button's text on the canvas to open it, same as a free-floating button. */}
 
- <StyleGroup label="Spacing">
- <StyleRow label="Vertical"><StyleSlider value={n("padY")} min={0} max={200} step={4} suffix="px" onChange={(x) => one("padY", String(x))} onClear={() => one("padY", "")} /></StyleRow>
+ <StyleGroup label="Size &amp; spacing">
+ {/* Height was only ever settable by dragging the section's bottom edge on the canvas — precise
+     enough to be fiddly, and undiscoverable if you never noticed the handle. Bounds match what that
+     handle enforces for this section type. */}
+ <StyleRow label="Height"><StyleSlider value={n("minH")} min={minSectionHeight(block.type)} max={maxSectionHeight(block.type)} step={10} suffix="px" onChange={(x) => one("minH", String(x))} onClear={() => one("minH", "")} /></StyleRow>
+ {/* Top and bottom separately. One "Vertical" slider moved both edges at once, so closing the gap
+     above a photo also closed the one below it. padY still backs these when neither is set, which is
+     why an untouched section doesn't move. */}
+ <StyleRow label="Top"><StyleSlider value={n("padTop") ?? n("padY")} min={0} max={400} step={4} suffix="px" onChange={(x) => one("padTop", String(x))} onClear={() => one("padTop", "")} /></StyleRow>
+ <StyleRow label="Bottom"><StyleSlider value={n("padBottom") ?? n("padY")} min={0} max={400} step={4} suffix="px" onChange={(x) => one("padBottom", String(x))} onClear={() => one("padBottom", "")} /></StyleRow>
  <StyleRow label="Sides"><StyleSlider value={n("padX")} min={0} max={140} step={4} suffix="px" onChange={(x) => one("padX", String(x))} onClear={() => one("padX", "")} /></StyleRow>
  </StyleGroup>
 
@@ -419,6 +438,9 @@ export default function StorefrontStudio() {
  // how I found it" — not "back to the last thing I clicked", which is what undo is for.
  const loadedLook = useRef<{ colors: Colors; fonts: Fonts } | null>(null);
  const [railTab, setRailTab] = useState<RailTab>("design");
+ // What the per-section VYA button hands the Assist panel. Held in state rather than dispatched as an
+ // event because the panel isn't mounted until the tab actually switches — see Sidekick's `seed`.
+ const [vyaSeed, setVyaSeed] = useState<string | null>(null);
  const [panelOpen, setPanelOpen] = useState(true); // Canva-style: collapse the side panel to free up canvas space
  const [products, setProducts] = useState<Product[]>([]);
  const [collections, setCollections] = useState<StoreCollection[]>([]);
@@ -463,6 +485,7 @@ export default function StorefrontStudio() {
  const [faqOver, setFaqOver] = useState<{ blockId: string; index: number } | null>(null); // where it will drop
  const [fileDrag, setFileDrag] = useState(false); // an image file is being dragged over the canvas
  const [uploading, setUploading] = useState(false);
+ const [uploadErr, setUploadErr] = useState<string | null>(null); // why the last upload failed — shown as a toast
  const [dragIdx, setDragIdx] = useState<number | null>(null);
  const [canvasOver, setCanvasOver] = useState<number | null>(null);
  const [fmtBar, setFmtBar] = useState<{ top: number; left: number } | null>(null);
@@ -916,13 +939,23 @@ export default function StorefrontStudio() {
  const json = JSON.stringify({ blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout });
  if (lastSnapRef.current === "") { lastSnapRef.current = json; return; } // seed on first settled state
  if (applyingRef.current) { applyingRef.current = false; lastSnapRef.current = json; return; } // this change WAS an undo/redo
+ // A DRAG is ONE edit. Every gesture — resizing a photo, moving a heading, dragging a section's
+ // bottom edge — writes on every pointermove, and each of those writes was landing on the undo stack
+ // as its own entry. So a two-second drag buried the state you actually wanted behind a hundred
+ // one-pixel steps, and pressing undo appeared to do nothing at all: it worked perfectly, one
+ // imperceptible increment at a time.
+ //
+ // While a gesture runs we push nothing AND leave lastSnapRef alone, so it still holds the state from
+ // before the gesture began. `ovlDragging` is in the dep list, so releasing the pointer re-runs this
+ // and pushes exactly one entry: the whole drag, undone in one press.
+ if (ovlDragging) return;
  if (json === lastSnapRef.current) return;
  pastRef.current.push(lastSnapRef.current);
  if (pastRef.current.length > 200) pastRef.current.shift();
  futureRef.current = [];
  lastSnapRef.current = json;
  setHist({ u: pastRef.current.length, r: 0 });
- }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, loading]);
+ }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, loading, ovlDragging]);
  const restoreSnap = useCallback((json: string) => {
  const s = JSON.parse(json);
  applyingRef.current = true;
@@ -975,6 +1008,9 @@ export default function StorefrontStudio() {
  }
  if (k === "delete" || k === "backspace") { // remove selection — the SELECTED element first, section last
  if (selOverlay) { e.preventDefault(); removeOverlay(selOverlay.blockId, selOverlay.overlayId); }
+ // A selected PHOTO deletes the photo, not merely its free transform — "delete" on a picture can
+ // only sensibly mean the picture. Its frame goes too, so re-adding one starts from the layout.
+ else if (selFree?.key === "image") { e.preventDefault(); removePhoto(selFree.blockId); }
  else if (selFree) { e.preventDefault(); removeFreeField(selFree.blockId, selFree.key); }
  else if (selBlock) { e.preventDefault(); removeBlock(selBlock); }
  return;
@@ -1157,6 +1193,32 @@ export default function StorefrontStudio() {
  return { ...x, props, style: Object.keys(style).length ? style : undefined };
  }));
  }
+ /**
+  * Hand the selected section to VYA.
+  *
+  * Asking the assistant to fix a section used to mean leaving the canvas, opening Assist, and then
+  * writing a description of WHICH section — by which point typing the change yourself was faster,
+  * so nobody asked. This puts VYA on every section's own toolbar and pre-addresses the question, so
+  * the merchant writes what they want changed and nothing else.
+  *
+  * It composes rather than sends: the section is context, not a request, and firing a half-formed
+  * prompt at an assistant that edits the live store would be worse than useless.
+  */
+ function askVya(b: Block) {
+  const name = blockDef(b.type)?.label || b.type.replace(/[-_]/g, " ");
+  // Clearing the selection is what MAKES the panel open. The left rail is one branch chain and the
+  // section-edit panel is tested BEFORE the Assist branch, so any selected block wins and the chat
+  // can never render — selecting the section here (which the first cut did, for context) is exactly
+  // what stopped the button from reaching the panel at all. Same clear the VYA icon in the rail
+  // already does. The context isn't lost: it's in the seed text below, which is where VYA reads it.
+  // selChrome heads the same chain, so it has to go too — otherwise header/footer settings would
+  // outrank the chat exactly the way a selected section did.
+  setSelBlock(null); setSelOverlay(null); setSelFree(null); setTextFocus(null); setSelChrome(null);
+  setRailTab("assist");
+  setPanelOpen(true); // a collapsed panel would swallow the click just as silently
+  setVyaSeed(`About my ${name} section on ${activeTitle}: `);
+ }
+
  function duplicateBlock(id: string) {
  updateCur((bs) => {
  const i = bs.findIndex((b) => b.id === id);
@@ -1181,6 +1243,40 @@ export default function StorefrontStudio() {
  }
  // Delete a selected BUILT-IN element (hero CTA, heading, …): clear its text and its free transform,
  // so the element disappears without removing the whole section.
+ /**
+  * Put the photo back in the slot the layout designed for it — full width, the template's own height,
+  * back in the flow. The way OUT of a frame you dragged somewhere you didn't mean to.
+  *
+  * Deletes the whole free entry rather than zeroing its parts: an x with no y (or a w with no h) is a
+  * half-state the renderer would still treat as positioned.
+  */
+ function resetPhotoFrame(blockId: string) {
+  updateCur((bs) => bs.map((b) => {
+   if (b.id !== blockId) return b;
+   const free = { ...(b.style?.free || {}) };
+   delete free.image;
+   const style: BlockStyle = { ...(b.style || {}) };
+   if (Object.keys(free).length) style.free = free; else delete style.free;
+   return { ...b, style: Object.keys(style).length ? style : undefined };
+  }));
+ }
+
+ /** Clear a section's photo and the frame it was sitting in. */
+ function removePhoto(blockId: string) {
+  setSelFree(null);
+  updateCur((bs) => bs.map((b) => {
+   if (b.id !== blockId) return b;
+   const free = { ...(b.style?.free || {}) };
+   delete free.image;
+   const style: BlockStyle = { ...(b.style || {}) };
+   if (Object.keys(free).length) style.free = free; else delete style.free;
+   // Both keys: hero/image sections paint props.image, every other section a bgImage/bgMedia layer.
+   delete style.bgImage;
+   delete style.bgMedia;
+   return { ...b, props: { ...(b.props || {}), image: "" }, style: Object.keys(style).length ? style : undefined };
+  }));
+ }
+
  function removeFreeField(blockId: string, key: string) {
  updateCur((bs) => bs.map((b) => {
  if (b.id !== blockId) return b;
@@ -1274,34 +1370,55 @@ export default function StorefrontStudio() {
  }));
  }
  // Human label + icon for an element, for the Layers panel.
- const overlayLabel = (o: Overlay) => o.kind === "text" ? (o.props?.text || "Text") : o.kind === "button" ? (o.props?.label || "Button") : o.kind === "image" ? "Image" : o.kind === "rect" ? "Rectangle" : o.kind === "circle" ? "Circle" : "Line";
- const OverlayIcon = (o: Overlay) => o.kind === "text" ? Type : o.kind === "button" ? MousePointerClick : o.kind === "image" ? ImageIcon : o.kind === "rect" ? Square : o.kind === "circle" ? Circle : Minus;
+ // `form` was missing from both of these, so a form element listed itself as "Line" with a line's icon.
+ const overlayLabel = (o: Overlay) => o.kind === "text" ? (o.props?.text || "Text") : o.kind === "button" ? (o.props?.label || "Button") : o.kind === "image" ? "Image" : o.kind === "rect" ? "Rectangle" : o.kind === "circle" ? "Circle" : o.kind === "form" ? (o.props?.title || "Form") : "Line";
+ const OverlayIcon = (o: Overlay) => o.kind === "text" ? Type : o.kind === "button" ? MousePointerClick : o.kind === "image" ? ImageIcon : o.kind === "rect" ? Square : o.kind === "circle" ? Circle : o.kind === "form" ? AlignLeft : Minus;
  // Add an element to the SELECTED section (fallback: the last section on the page), then select it.
  // The section currently centered in the canvas viewport, by its `vya-b-<id>` class. Lets a newly
  // added element land where the user is looking instead of at the bottom of the page. Returns null
  // if the canvas isn't mounted or no section overlaps the viewport.
+ // The section you're actually looking at = the one filling the most of the canvas right now, by
+ // VISIBLE AREA. The old version used "center nearest the viewport middle", which broke on a tall
+ // hero: a hero taller than the viewport has its center off-screen, so a shorter next section whose
+ // center sits near the middle would win — and a button added "to the section in view" landed in the
+ // wrong one. Most-visible-area gets it right: a hero filling the screen wins even with its center off.
  function sectionInViewId(): string | null {
  const c = canvasRef.current;
  if (!c) return null;
  const cr = c.getBoundingClientRect();
- const mid = cr.top + cr.height / 2;
- let bestId: string | null = null, bestDist = Infinity;
+ let bestId: string | null = null, bestVisible = 0;
  c.querySelectorAll<HTMLElement>(".vya-sec").forEach((sec) => {
  const r = sec.getBoundingClientRect();
- if (r.bottom < cr.top || r.top > cr.bottom) return; // fully off-screen — skip
- const dist = Math.abs((r.top + r.height / 2) - mid);
- if (dist < bestDist) {
+ const visible = Math.max(0, Math.min(r.bottom, cr.bottom) - Math.max(r.top, cr.top));
+ if (visible > bestVisible) {
  const cls = Array.from(sec.classList).find((k) => k.startsWith("vya-b-"));
- if (cls) { bestDist = dist; bestId = cls.slice("vya-b-".length); }
+ if (cls) { bestVisible = visible; bestId = cls.slice("vya-b-".length); }
  }
  });
  return bestId;
  }
+ /** Is this section at least partly on screen right now? Used so a stale selection that's been
+  *  scrolled away doesn't capture a new element meant for the section actually in view. */
+ function isSectionOnScreen(blockId: string): boolean {
+ const c = canvasRef.current;
+ const sec = c?.querySelector<HTMLElement>(`.vya-b-${blockId}`);
+ if (!c || !sec) return false;
+ const cr = c.getBoundingClientRect(), r = sec.getBoundingClientRect();
+ return r.bottom > cr.top && r.top < cr.bottom;
+ }
  function addElement(kind: OverlayKind, extraProps?: Record<string, string>) {
- // Priority: an explicitly selected section → the section you're looking at → last section (fallback).
+ // Where the new element lands, in order:
+ //  1. the selected section — but ONLY if it's still on screen (a selection you scrolled away from
+ //     shouldn't hijack an element you're adding to the hero you're now looking at),
+ //  2. otherwise the section filling the most of the canvas — what you're actually looking at,
+ //  3. otherwise the selected section even if off-screen, then the last section.
+ // This is the fix for "added a button and it went to the next section / clicked me out of hero":
+ // the target is now the section in view, and we keep it selected below.
  const inView = sectionInViewId();
- const targetId = (selBlock && curBlocks.some((b) => b.id === selBlock)) ? selBlock
+ const selUsable = selBlock && curBlocks.some((b) => b.id === selBlock);
+ const targetId = (selUsable && isSectionOnScreen(selBlock!)) ? selBlock
  : (inView && curBlocks.some((b) => b.id === inView)) ? inView
+ : selUsable ? selBlock
  : curBlocks[curBlocks.length - 1]?.id;
  if (!targetId) { setRailTab("sections"); window.alert("Add a section first, then drop elements onto it."); return; }
  const o = makeOverlay(kind);
@@ -1356,7 +1473,7 @@ export default function StorefrontStudio() {
  // Drag a corner/side handle to resize. Corners resize both axes (shapes/images); side handles widen
  // only (text/buttons/lines keep flowing height). The opposite edge stays anchored, so top/left handles
  // move x/y as the box shrinks — same feel as Canva/Figma.
- onResizeStart: (blockId: string, overlayId: string, handle: "nw" | "ne" | "sw" | "se" | "e" | "w", e: React.PointerEvent) => {
+ onResizeStart: (blockId: string, overlayId: string, handle: ResizeHandle, e: React.PointerEvent) => {
  const handleEl = e.currentTarget as HTMLElement;
  const wrapper = handleEl.closest(".vya-ovl") as HTMLElement | null;
  const sec = wrapper?.closest(".vya-sec") as HTMLElement | null;
@@ -1508,8 +1625,15 @@ export default function StorefrontStudio() {
  }
  // Grab a native element's body and drag it anywhere in its section canvas (centre-anchored, like the hero group).
  function onFreeDragStart(blockId: string, key: string, e: React.PointerEvent) {
- const el = e.currentTarget as HTMLElement;
- const canvas = el.closest(".vya-free-canvas") as HTMLElement | null;
+ // The grip is inside the frame, so measure the FRAME — el.closest finds it either way, but for the
+ // photo the grip is the currentTarget rather than the box itself.
+ const el = (key === "image" ? (e.currentTarget as HTMLElement).closest(".vya-photo") : e.currentTarget) as HTMLElement;
+ if (!el) return;
+ // A photo's coordinate space is the whole SECTION. Text fields live inside a .vya-free-canvas and
+ // are positioned against it; a photo usually sits OUTSIDE that canvas (a hero-stack strip is a
+ // sibling of the text block), so scoping it to the canvas would find nothing and the drag would
+ // silently do nothing at all. .vya-sec is position:relative, so it's a valid offset parent.
+ const canvas = (key === "image" ? el.closest(".vya-sec") : el.closest(".vya-free-canvas") || el.closest(".vya-sec")) as HTMLElement | null;
  if (!canvas) return;
  const rect = canvas.getBoundingClientRect();
  if (!rect.width || !rect.height) return;
@@ -1522,7 +1646,9 @@ export default function StorefrontStudio() {
  // section and over its neighbour. Clamp by half-size so the element's BOX stays inside.
  // Measure the FIELD, not the selection wrapper: the wrapper can be taller than what it frames
  // (flow margins, line-box space), and clamping to that would restrict the drag by empty pixels.
- const er0 = (el.firstElementChild as HTMLElement | null)?.getBoundingClientRect() || el.getBoundingClientRect();
+ // A text wrapper can be taller than what it frames, so it measures its child; a photo frame IS the
+ // box, and measuring its first child (the <img>) would clamp against the wrong thing.
+ const er0 = key === "image" ? el.getBoundingClientRect() : ((el.firstElementChild as HTMLElement | null)?.getBoundingClientRect() || el.getBoundingClientRect());
  const halfW = Math.min(50, (er0.width / 2 / rect.width) * 100), halfH = Math.min(50, (er0.height / 2 / rect.height) * 100);
  const clampX = (n: number) => Math.min(100 - halfW, Math.max(halfW, n));
  const clampY = (n: number) => Math.min(100 - halfH, Math.max(halfH, n));
@@ -1562,10 +1688,13 @@ export default function StorefrontStudio() {
  //
  // Every handle used to scale the font, so the side handles just made the text bigger — which is
  // not what a side handle means anywhere else, and left no way to control line length at all.
- function onFreeResizeStart(blockId: string, key: string, handle: "nw" | "ne" | "sw" | "se" | "e" | "w", e: React.PointerEvent) {
+ function onFreeResizeStart(blockId: string, key: string, handle: ResizeHandle, e: React.PointerEvent) {
  const handleEl = e.currentTarget as HTMLElement;
- const wrapper = handleEl.closest(".vya-free") as HTMLElement | null;
- const canvas = wrapper?.closest(".vya-free-canvas") as HTMLElement | null;
+ // A photo frame is `.vya-photo`; every other free field is `.vya-free`. They're deliberately
+ // separate classes — the mobile fallback un-positions `.vya-free`, which a photo must not inherit.
+ const wrapper = handleEl.closest(key === "image" ? ".vya-photo" : ".vya-free") as HTMLElement | null;
+ // Same scoping as the drag — a photo sizes itself against the section it lives in.
+ const canvas = (key === "image" ? wrapper?.closest(".vya-sec") : wrapper?.closest(".vya-free-canvas") || wrapper?.closest(".vya-sec")) as HTMLElement | null;
  if (!wrapper || !canvas) return;
  const rect = canvas.getBoundingClientRect();
  if (!rect.width) return;
@@ -1575,19 +1704,53 @@ export default function StorefrontStudio() {
  const startW = (wrapper.getBoundingClientRect().width / rect.width) * 100 || 1;
  const left = handle === "w" || handle === "nw" || handle === "sw";
  const right = handle === "e" || handle === "ne" || handle === "se";
- const widthOnly = handle === "w" || handle === "e";
+ // A button scales as one piece (fontPx) from EVERY handle — it has no meaningful width to drag,
+ // so its side/middle handles scale it too instead of doing nothing. Text fields keep width on the
+ // side handles (control the line width) and font on the corners.
+ const isButton = key === "cta" || key.startsWith("cta");
+ // A photo has no type to scale — its corners size the FRAME in both axes. Text keeps font-on-corners.
+ const isImage = key === "image";
+ const widthOnly = (handle === "w" || handle === "e") && !isButton;
+ // Top/bottom on a photo change the frame's HEIGHT only — the picture keeps its scale and simply
+ // shows less of itself, because it's object-cover. That is a crop, not a squash: the Canva gesture.
+ const heightOnly = (handle === "n" || handle === "s") && isImage;
+ const down = handle === "sw" || handle === "se" || handle === "s";
  // Width is stored as a % of the field's OWN container, so it stays exact wherever the field sits —
  // the canvas for a positioned field, whatever column holds it otherwise.
  const basis = (wrapper.parentElement?.getBoundingClientRect().width) || rect.width;
  const startWidthPct = cur?.w ?? Math.min(100, (wrapper.getBoundingClientRect().width / basis) * 100 || 100);
- const sx = e.clientX;
+ const sx = e.clientX, sy = e.clientY;
+ // The frame's on-screen box at the moment the drag starts. Seeding from what is actually rendered
+ // means the first pixel of movement continues from the current size instead of jumping to a value
+ // derived from somewhere else.
+ const startBox = wrapper.getBoundingClientRect();
+ const startWpx = startBox.width, startHpx = startBox.height;
  setSelBlock(blockId); setSelFree({ blockId, key }); setOvlDragging(true);
  handleEl.setPointerCapture?.(e.pointerId);
  const move = (ev: PointerEvent) => {
+ if (heightOnly) {
+  const hpx = Math.max(24, startHpx + (ev.clientY - sy) * (down ? 1 : -1));
+  patchFree(blockId, key, { h: Math.min(400, Math.max(10, Math.round((hpx / (startWpx || 1)) * 100))) });
+  return;
+ }
  if (widthOnly) {
   // Both side handles grow the field when dragged AWAY from it, which is what the cursor implies.
   const d = ((ev.clientX - sx) / basis) * 100 * (right ? 1 : -1);
   patchFree(blockId, key, { w: Math.min(100, Math.max(5, Math.round(startWidthPct + d))) });
+  return;
+ }
+ if (isImage) {
+  // Corners size the frame in both axes at once, each edge growing when dragged away from the box.
+  //
+  // Height is stored as a RATIO (percent of the frame's own width), not as a percent of anything
+  // else, and both numbers here are ratios of on-screen pixels — so the canvas zoom cancels out of
+  // the maths instead of having to be threaded through it.
+  const wpx = Math.max(24, startWpx + (ev.clientX - sx) * (right ? 1 : -1));
+  const hpx = Math.max(24, startHpx + (ev.clientY - sy) * (down ? 1 : -1));
+  patchFree(blockId, key, {
+   w: Math.min(100, Math.max(5, Math.round((wpx / basis) * 100))),
+   h: Math.min(400, Math.max(10, Math.round((hpx / wpx) * 100))),
+  });
   return;
  }
  const dx = ((ev.clientX - sx) / rect.width) * 100;
@@ -1617,7 +1780,7 @@ export default function StorefrontStudio() {
  const el = (selOverlay ? c.querySelector(`[data-ovl="${selOverlay.overlayId}"]`) : fieldEl || c.querySelector(`.vya-b-${selBlock}`)) as HTMLElement | null;
  if (!el) { setAnchor(null); return; }
  const r = el.getBoundingClientRect(), cr = c.getBoundingClientRect();
- const GAP = 10;
+ const GAP = 22; // sit the toolbar a bit higher above the selection so it doesn't crowd what you clicked
  // The overlay toolbar can wrap onto a second row (more controls than fit on one line), so it no
  // longer has a fixed height — measure it directly once it exists. Before it's ever rendered, fall
  // back to a single-row estimate; the requestAnimationFrame pass below corrects this right after
@@ -1639,15 +1802,34 @@ export default function StorefrontStudio() {
  }, [selBlock, selOverlay, textFocus, selFree, blocks, shopBlocks, extraPages, activeSlug, device]);
 
  // ── Image upload + drag-and-drop (no more URL fields) ──
+ // Every failure now tells the seller WHY. The server already returns clear messages
+ // ("Image must be under 25MB", "Use an MP4, WebM, or MOV video", …); the client used to throw
+ // them away and just return null, so an upload would silently do nothing. We surface the server's
+ // message, pre-check the size so an oversized file fails instantly instead of after a long upload,
+ // and translate the platform's raw 413 (body-too-large, which never reaches our route as JSON).
+ const IMAGE_MAX = 25 * 1024 * 1024, VIDEO_MAX = 64 * 1024 * 1024;
  async function uploadImage(file: File): Promise<string | null> {
- if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) return null;
+ const isVideo = file.type.startsWith("video/");
+ if (!file.type.startsWith("image/") && !isVideo) { setUploadErr("That file isn’t an image or video. Use a JPG, PNG, GIF, or MP4."); return null; }
+ // Fail fast on size — a 100MB photo shouldn't upload for 30s only to be rejected.
+ const max = isVideo ? VIDEO_MAX : IMAGE_MAX;
+ if (file.size > max) { setUploadErr(`That ${isVideo ? "video" : "image"} is ${(file.size / 1048576).toFixed(0)}MB — the limit is ${max / 1048576}MB. Try a smaller file.`); return null; }
  const fd = new FormData(); fd.append("file", file);
- setUploading(true);
+ setUploading(true); setUploadErr(null);
  try {
  const r = await fetch("/api/store/assets", { method: "POST", body: fd });
- if (!r.ok) return null;
+ if (!r.ok) {
+  // 413 is the platform rejecting the body before our route runs — it isn't JSON, so read it as text.
+  const d = await r.json().catch(() => null);
+  setUploadErr(d?.error || (r.status === 413 ? "That file’s too large to upload — try one under 25MB." : `Upload failed (${r.status}). Try again.`));
+  return null;
+ }
  const d = await r.json().catch(() => null);
- return d?.url || null;
+ if (!d?.url) { setUploadErr("Upload didn’t return an image — try again."); return null; }
+ return d.url;
+ } catch {
+ setUploadErr("Upload failed — check your connection and try again.");
+ return null;
  } finally { setUploading(false); }
  }
  // Pick a file, upload it, and hand back the hosted URL (used by the toolbar "Upload" buttons).
@@ -1806,6 +1988,14 @@ export default function StorefrontStudio() {
  return (
  // fixed inset-0 z-[60] covers the portal sidebar + floating chat — a focused full-screen builder.
  <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#e7e3db] text-stone-800">
+ {/* Upload error toast — says WHY an upload failed (too big, wrong type, offline). Click to dismiss. */}
+ {uploadErr && (
+ <div className="fixed left-1/2 top-4 z-[95] flex -translate-x-1/2 items-start gap-3 rounded-xl border border-red-200 bg-white px-4 py-3 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]" role="alert">
+ <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-red-100 text-[12px] font-bold text-red-600">!</span>
+ <p className="max-w-xs text-[13px] leading-snug text-stone-700">{uploadErr}</p>
+ <button type="button" onClick={() => setUploadErr(null)} aria-label="Dismiss" className="ml-1 shrink-0 text-stone-400 transition hover:text-stone-700"><X size={15} /></button>
+ </div>
+ )}
  {/* Top bar */}
  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
  <div className="flex items-center gap-2.5">
@@ -1936,6 +2126,44 @@ export default function StorefrontStudio() {
  </div>
 
  </div>
+ ) : selOverlay && selOverlayObj?.kind === "form" ? (
+ // A form was addable and then frozen: every word it shows — its heading, its note, its button, and
+ // the subject its enquiries arrive under — was fixed at whatever `addElement` seeded, with no way
+ // to change any of it. Same docked panel the button gets, editing exactly the props the renderer
+ // reads, so what you type is what a shopper sees.
+ (() => {
+ const { blockId, overlayId } = selOverlay;
+ const p = selOverlayObj.props || {};
+ const patch = (kv: Record<string, string>) => patchOverlayProps(blockId, overlayId, kv);
+ const inp = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50";
+ return (
+ <div className="h-full overflow-y-auto px-4 py-4">
+ <div className="mb-4 flex items-center justify-between">
+ <p className="text-[17px] font-semibold tracking-tight text-stone-800">Edit form</p>
+ <button type="button" onClick={() => { setSelBlock(null); setSelOverlay(null); }} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
+ </div>
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Heading</label>
+ <input value={p.title || ""} onChange={(e) => patch({ title: e.target.value })} className={inp} placeholder="Enquire" />
+ </div>
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Note <span className="font-normal text-stone-400">— optional</span></label>
+ <textarea value={p.note || ""} onChange={(e) => patch({ note: e.target.value })} rows={2} className={`${inp} resize-y leading-relaxed`} placeholder="A line under the heading, if it needs one." />
+ </div>
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Button label</label>
+ <input value={p.cta || ""} onChange={(e) => patch({ cta: e.target.value })} className={inp} placeholder="Send" />
+ </div>
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Subject</label>
+ <input value={p.topic || ""} onChange={(e) => patch({ topic: e.target.value })} className={inp} placeholder={p.title || "Enquiry"} />
+ {/* This one isn't decoration: it's how a seller tells two forms apart in the inbox. */}
+ <p className="mt-1 text-[11px] leading-snug text-stone-400">What these messages are labelled as in your inbox. Leave blank to use the heading.</p>
+ </div>
+ <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">The name, email and message fields are always shown. On your live storefront the form really sends; here it stays inert so you cannot message yourself while arranging the page.</p>
+ </div>
+ );
+ })()
  ) : selOverlay && selOverlayObj?.kind === "button" ? (
  // Select a button element → its full style lives in this SAME panel sections use — a real
  // docked panel, not another floating popover, so it reads unambiguously as "settings," not
@@ -2205,7 +2433,28 @@ export default function StorefrontStudio() {
  ) : null}
 
  {selBlockObj.type === "collections" ? (
+ <>
  <CollectionsEditor block={selBlockObj} onField={(key, value) => editField(selBlockObj.id, key, value)} pick={pickAndUpload} uploading={uploading} />
+ {/* The tile labels are the one piece of type in this section nothing else reaches: they aren't the
+     heading (that has its own on-canvas toolbar) and they aren't body copy, so the Headings and
+     Subtext groups below both miss them. Unset = whatever the layout already did. */}
+ <div className="mt-4 border-t border-black/[0.06] pt-3">
+ <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Tile captions</p>
+ <div className="space-y-3">
+ <StyleRow label="Font">
+ <select value={bp.tileFont || ""} onChange={(e) => editField(selBlockObj.id, "tileFont", e.target.value)} className="w-[140px] rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] text-stone-700 outline-none focus:border-[#5D0F17]/50" style={{ fontFamily: bp.tileFont ? ff(bp.tileFont) : undefined }}>
+ <option value="">Heading font</option>
+ {ALL_STOREFRONT_FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: ff(f) }}>{f}</option>)}
+ </select>
+ </StyleRow>
+ <StyleRow label="Size"><StyleSlider value={bp.tileSizePx ? Number(bp.tileSizePx) : undefined} min={9} max={64} suffix="px" onChange={(x) => editField(selBlockObj.id, "tileSizePx", String(x))} onClear={() => editField(selBlockObj.id, "tileSizePx", "")} /></StyleRow>
+ <StyleRow label="Colour">
+ <ColorSwatch value={bp.tileColor || "#ffffff"} onChange={(v) => editField(selBlockObj.id, "tileColor", v)} />
+ {bp.tileColor && <button type="button" onClick={() => editField(selBlockObj.id, "tileColor", "")} title="Back to the layout's own colour" className="text-stone-300 hover:text-stone-500"><X size={12} /></button>}
+ </StyleRow>
+ </div>
+ </div>
+ </>
  ) : fields.length ? fields.map((f) => {
  // The hero's "image" field IS the section background — surface the SAME Background dropdown as the
  // toolbar (Photo/GIF, Video, or an embedded link), not a plain image upload, so the two stay in sync.
@@ -2289,7 +2538,7 @@ export default function StorefrontStudio() {
  );
  })()
  ) : railTab === "assist" ? (
- <Sidekick docked />
+ <Sidekick docked seed={vyaSeed} onSeedUsed={() => setVyaSeed(null)} />
  ) : railTab === "design" ? (
  <div className="h-full overflow-y-auto px-4 py-4">
  <p className="mb-4 text-[17px] font-semibold tracking-tight text-stone-800">Design</p>
@@ -2928,6 +3177,9 @@ export default function StorefrontStudio() {
  <ToolbarDropdown key={`${overlayId}-position`} label="Position" options={OVL_POSITION_OPTIONS} labels={OVL_POSITION_LABEL} value={undefined} onChange={(v) => reorderOverlay(blockId, overlayId, v)} width="w-40" />
  <button type="button" onClick={() => duplicateOverlay(blockId, overlayId)} title="Duplicate (⌘D)" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><Copy size={14} /></button>
  <button type="button" onClick={() => removeOverlay(blockId, overlayId)} title="Delete element (⌫)" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ {/* VYA sits on this bar too — an element you dragged onto a section is still part of that section,
+     and "universally" has to mean every bar or merchants learn it's only on some of them. */}
+ {(() => { const ob = curBlocks.find((x) => x.id === blockId); return ob ? <button type="button" onClick={() => askVya(ob)} title="Ask VYA about this section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#5D0F17] transition hover:bg-[#5D0F17]/[0.08]"><Sparkles size={14} /></button> : null; })()}
  </div>
  );
  })()}
@@ -2949,12 +3201,23 @@ export default function StorefrontStudio() {
  <button type="button" onClick={() => removeBlock(bid)} title="Delete section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
  </>
  ); })();
- const wrap = (label: string, body: React.ReactNode) => (
+ // `sectionTail` is what scopes the bar to what's actually selected. Move-up/down, duplicate, and
+ // delete act on the WHOLE section — correct when the section is what you picked, wrong when you
+ // picked a heading inside it and the arrow silently reordered the page instead. So a field/button
+ // bar drops them (and already carries its own delete): to move the section, select the section.
+ // VYA, on every bar. The assistant was only reachable by leaving the canvas for the Assist rail and
+ // then describing which section you meant — so the fastest way to fix a section was never to ask.
+ // This opens Assist with the question already addressed to the section you're looking at.
+ const vyaBtn = (
+ <button type="button" onClick={() => askVya(b)} title="Ask VYA about this section" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[#5D0F17] transition hover:bg-[#5D0F17]/[0.08]"><Sparkles size={14} /></button>
+ );
+ const wrap = (label: string, body: React.ReactNode, sectionTail = true) => (
  <div data-studio-bar key={`${bid}-${label}`} style={{ position: "fixed", top: anchor.top, left: anchor.left, transform: "translateX(-50%)", zIndex: 65 }} className="flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-xl border border-black/10 bg-white px-3 py-2 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]">
  <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{label}</span>
  <span className="h-5 w-px shrink-0 bg-black/10" />
  {body}
- {tail}
+ {sectionTail ? tail : null}
+ {vyaBtn}
  </div>
  );
  // Focused inside a text field in THIS section → its own bar: colour, alignment, and (heading only)
@@ -2963,6 +3226,31 @@ export default function StorefrontStudio() {
  // A built-in text field is ACTIVE when it's focused (being typed into) OR just selected on the canvas —
  // either way it gets the Text toolbar, never the section's background bar.
  const activeKey = (textFocus && textFocus.blockId === bid) ? textFocus.key : (selFree && selFree.blockId === bid) ? selFree.key : null;
+ if (activeKey === "image") {
+ // A photo's own bar. Without this the generic text bar takes over and its first control is an
+ // input bound to props[key] — which for a photo is the image URL, offered as if it were copy.
+ const z = Math.min(400, Math.max(100, Number(b.props?.imageZoom) || 100));
+ const fv: FreeStyle = st.free?.image || {};
+ const framed = fv.x != null || fv.w != null || fv.h != null;
+ return wrap("Photo", (
+ <>
+ <button type="button" disabled={uploading} onClick={() => pickAndUpload((url) => editField(bid, "image", url))} className="shrink-0 rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{uploading ? "…" : "Replace"}</button>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ <div className="flex shrink-0 items-center gap-1.5">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Zoom</span>
+ <input type="range" min={100} max={400} step={5} value={z} onChange={(e) => editField(bid, "imageZoom", e.target.value === "100" ? "" : e.target.value)} className="w-20 accent-[#5D0F17]" />
+ <span className="w-9 text-right font-mono text-[11px] tabular-nums text-stone-500">{z}%</span>
+ </div>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ {/* "Fully across", in one click. Dragging a frame to exactly full width is a game of pixels, and
+     it's the shape most of these layouts want anyway. Clears the position too: a full-width band
+     that's also floating somewhere isn't a thing anyone means. */}
+ <button type="button" onClick={() => resetPhotoFrame(bid)} title="Back to the layout's own full-width frame" className="shrink-0 rounded-md border border-black/10 px-2.5 py-1 text-[11px] font-medium text-stone-600 transition hover:bg-stone-100">{framed ? "Reset to layout" : "Full width"}</button>
+ <span className="h-5 w-px shrink-0 bg-black/10" />
+ <button type="button" onClick={() => removePhoto(bid)} title="Remove the photo (⌫)" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ </>
+ ), false);
+ }
  if (activeKey) {
  const key = activeKey;
  // The built-in button ("cta") isn't running text like the others — it needs its own dedicated
@@ -2979,7 +3267,7 @@ export default function StorefrontStudio() {
  <ToolbarDropdown key={`${bid}-cta-size`} label="Size" options={OVL_BTN_SIZE_OPTIONS} labels={OVL_BTN_SIZE_LABEL} value={st.ctaSize || "md"} onChange={(s) => setBlockStyle(bid, "ctaSize", s)} width="w-32" />
  {!st.ctaFullWidth && <ToolbarDropdown key={`${bid}-cta-align`} label="Align" options={ALIGN_OPTIONS} labels={ALIGN_LABEL} value={st.ctaAlign} onChange={(a) => setBlockStyle(bid, "ctaAlign", st.ctaAlign === a ? undefined : a)} width="w-28" />}
  </>
- ));
+ ), false);
  }
  const fieldLabel = FIELD_LABEL[key] || (key.charAt(0).toUpperCase() + key.slice(1));
  // Every built-in text field now carries its OWN styling in style.free[key] — font, size, weight, colour,
@@ -3008,7 +3296,7 @@ export default function StorefrontStudio() {
  <span className="h-5 w-px shrink-0 bg-black/10" />
  <button type="button" onClick={() => { setSelFree(null); setTextFocus(null); removeFreeField(bid, key); }} title="Delete (⌫)" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
  </>
- ));
+ ), false);
  }
  // Show each swatch's real current colour (Page default → theme bg, accent/dark → their colour), not a fixed fallback.
  const eff = effectiveSectionColors(st, colors);
@@ -3039,6 +3327,29 @@ export default function StorefrontStudio() {
  </button>
  <span className="h-5 w-px shrink-0 bg-black/10" />
  <ToolbarDropdown key={bid} label="Space" options={SPACE_OPTIONS} labels={SPACE_LABEL} value={st.space} onChange={(s) => setBlockStyle(bid, "space", st.space === s ? undefined : s)} width="w-32" />
+ {/* Edge to edge. An image section's framing is a choice, and this is where you make it — one
+     click, rather than finding Spacing in the panel and dragging two sliders to zero. */}
+ {b.type === "image" && (
+ <button type="button" onClick={() => editField(bid, "fill", b.props?.fill === "1" ? "" : "1")} title="Fill — edge to edge, no margin around the photo" aria-pressed={b.props?.fill === "1"} className={`shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-medium transition ${b.props?.fill === "1" ? "border-[#5D0F17] bg-[#5D0F17] text-white" : "border-black/10 text-stone-600 hover:bg-stone-100"}`}>Fill</button>
+ )}
+ {/* Zoom — for whichever photo this section actually has.
+     A hero, split or spotlight paints props.image; every other section paints a full-bleed background
+     photo. Both are now real <img> layers that drag to reposition, so both take the same control —
+     it just writes a different key. Zoom scales about the focal point the drag stores, so the two
+     compose: pan to the part you want, then magnify it. */}
+ {(() => {
+ const zoomKey = b.props?.image ? "imageZoom" : bgUrl ? "bgZoom" : null;
+ if (!zoomKey) return null;
+ const z = Math.min(400, Math.max(100, Number(b.props?.[zoomKey]) || 100));
+ return (
+ <div className="flex shrink-0 items-center gap-1.5">
+ <span className="text-[10px] uppercase tracking-wide text-stone-400">Zoom</span>
+ <input type="range" min={100} max={400} step={5} value={z} onChange={(e) => editField(bid, zoomKey, e.target.value === "100" ? "" : e.target.value)} title="Zoom into the photo — drag the photo itself to choose which part" className="w-24 accent-[#5D0F17]" />
+ <span className="w-9 text-right font-mono text-[11px] tabular-nums text-stone-500">{z}%</span>
+ {z > 100 && <button type="button" onClick={() => editField(bid, zoomKey, "")} title="Reset zoom" className="text-stone-300 hover:text-stone-500"><X size={12} /></button>}
+ </div>
+ );
+ })()}
  {b.type === "hero" && b.props?.image && (b.props?.cx || b.props?.cy) && (
  <button type="button" onClick={() => updateCur((bs) => bs.map((x) => (x.id === bid ? { ...x, props: { ...(x.props || {}), cx: "", cy: "" } } : x)))} title="Recenter the content" className="shrink-0 rounded-md border border-black/10 px-2.5 py-1 text-[11px] font-medium text-stone-600 transition hover:bg-stone-100">Recenter</button>
  )}

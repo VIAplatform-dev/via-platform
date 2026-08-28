@@ -17,12 +17,12 @@ export type ItemSchema = { key: string; fields: readonly string[]; loose?: boole
 export type Item = Record<string, string>;
 
 export const ITEM_SCHEMAS = {
- collections: { key: "items", fields: ["label", "img"] },
+ collections: { key: "items", fields: ["label", "img", "pos", "href"] },
  testimonials: { key: "items", fields: ["quote", "name"] },
  blog: { key: "items", fields: ["title", "excerpt", "img", "link"] },
  columns: { key: "items", fields: ["heading", "body", "img", "btn", "href"] },
  marquee: { key: "items", fields: ["label"], loose: true },
- gallery: { key: "images", fields: ["src"], loose: true },
+ gallery: { key: "images", fields: ["src", "pos"], loose: true },
  // Hero slideshow — each slide is a full hero's worth of content (see the `slides` hero variant).
  slides: { key: "slides", fields: ["heading", "subtext", "cta", "image"] },
 } as const satisfies Record<string, ItemSchema>;

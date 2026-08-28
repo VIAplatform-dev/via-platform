@@ -31,7 +31,47 @@ const ACTION_LABELS: Record<string, string> = {
  update_email_design: "Updated email design", revert_last_change: "Reverted last change",
 };
 
+// How tall the composer may grow before it starts scrolling instead. Roughly seven lines — enough to
+// hold a paragraph in view, short enough that the message log never gets squeezed out of the panel.
+const COMPOSER_MAX_PX = 168;
+
 const SUGGESTIONS = ["Build my whole storefront for me", "Make my storefront more elegant", "Add a sale announcement bar", "Write a description for my Chanel bag"];
+
+// A yes/no question deserves yes/no buttons.
+//
+// VYA confirms before it changes anything ("Want me to add a reviews section?"), which is right — but
+// it means the most common reply in the whole product is the word "yes", typed out.
+//
+// Finding the question is the whole problem. An earlier pass read only the final LINE, which missed
+// every real case: VYA writes "I can make the hero taller.\n\nShall I go ahead?" — where the question
+// is the last line — but just as often "Shall I go ahead? Just say the word." or a question closing a
+// paragraph. So: locate the last "?", allow a short sign-off after it, and take the sentence that
+// ends there.
+//
+// Deliberately conservative about WHICH questions qualify. An open question — "what should the
+// heading say?" — must never get Yes/No buttons, because the buttons would be the wrong reply and the
+// merchant would click one anyway.
+const YES_NO_OPENERS = /^(?:do|does|did|should|shall|would|will|can|could|may|is|are|was|were|have|has|want|ready|okay|ok|sound|look)\b|(?:want me to|shall i|should i|would you like|do you want|ok(?:ay)? to|sound good|look right|make sense|go ahead|shall we)\b/i;
+function isYesNoQuestion(text: string): boolean {
+ const t = text.replace(/[*_`>#]/g, "").trim();
+ const q = t.lastIndexOf("?");
+ if (q === -1) return false;
+ // A brief sign-off after the question is fine ("… go ahead? Just say the word."). Anything on a NEW
+ // line is not: a question followed by a list of options ("Should I use a grid?\n\n- Grid\n- Rail")
+ // is asking you to choose, not to say yes. So a sign-off has to sit on the question's own line.
+ const after = t.slice(q + 1);
+ if (after.includes("\n") || after.trim().length > 60) return false;
+ // The question itself: back to the previous sentence end or line break.
+ const before = t.slice(0, q);
+ const start = Math.max(before.lastIndexOf("\n"), before.lastIndexOf(". "), before.lastIndexOf("! "), before.lastIndexOf("? "));
+ const last = before.slice(start + 1).trim();
+ if (!last || last.length > 200) return false;
+ // An "or" question ("a grid or a carousel?") takes neither answer.
+ if (/\bor\b/i.test(last)) return false;
+ // A wh-question is open by definition, whatever it starts with.
+ if (/^(?:what|which|who|whom|whose|where|when|why|how)\b/i.test(last)) return false;
+ return YES_NO_OPENERS.test(last);
+}
 
 function ActionChips({ actions }: { actions?: Action[] }) {
  const chips = (actions ?? []).filter((a) => a.ok && ACTION_LABELS[a.name]);
@@ -47,7 +87,7 @@ function ActionChips({ actions }: { actions?: Action[] }) {
  );
 }
 
-export default function Sidekick({ docked = false }: { docked?: boolean }) {
+export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?: boolean; seed?: string | null; onSeedUsed?: () => void }) {
  const pathname = usePathname();
  const [open, setOpen] = useState(false);
  const [suppressed, setSuppressed] = useState(false); // hide launcher when the home full-page chat is open
@@ -56,6 +96,7 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  const [attached, setAttached] = useState<string[]>([]); // data-URL inspiration/reference images
  const [busy, setBusy] = useState(false);
  const fileRef = useRef<HTMLInputElement>(null);
+ const inputRef = useRef<HTMLTextAreaElement>(null);
  const scroller = useRef<HTMLDivElement>(null);
  const msgsRef = useRef<Msg[]>([]);
  const busyRef = useRef(false);
@@ -63,6 +104,18 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  useEffect(() => { pathRef.current = pathname; }, [pathname]);
 
  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }); }, [msgs, busy]);
+
+ // A one-row textarea doesn't wrap so much as HIDE: a long message scrolls its own single visible
+ // line and everything already written disappears upward. So the box grows with the text — up to a
+ // point, after which it scrolls rather than swallowing the whole panel. Driven off `input` (not the
+ // change handler) so it also collapses back to one row after a send clears the field, and resizes
+ // correctly when the composer is seeded from the studio.
+ useEffect(() => {
+ const el = inputRef.current;
+ if (!el) return;
+ el.style.height = "0px";
+ el.style.height = `${Math.min(el.scrollHeight, COMPOSER_MAX_PX)}px`;
+ }, [input]);
 
  useEffect(() => {
  fetch("/api/store/assistant").then((r) => (r.ok ? r.json() : null)).then((d) => {
@@ -129,6 +182,26 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, []);
 
+ // PREFILL the composer, rather than send.
+ //
+ // The studio's per-section VYA button hands its context down as `seed`. It is a PROP and not an
+ // event on purpose: the studio mounts this component only while the Assist tab is open, so an event
+ // dispatched in the same tick as the tab switch fires before the listener exists and is lost — which
+ // is exactly what "the VYA button doesn't connect to anything" was.
+ //
+ // Seeding never sends. The section is context for a request the merchant hasn't written yet, and
+ // firing a bare "About my Hero banner section:" at an assistant that edits the live store would act
+ // on nothing anyone asked for. Caret lands at the end, ready to type.
+ useEffect(() => {
+ if (!seed) return;
+ setOpen(true);
+ setInput(seed);
+ // The parent clears the seed once consumed, so clicking the SAME section twice seeds twice.
+ onSeedUsed?.();
+ requestAnimationFrame(() => { const el = inputRef.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } });
+ // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [seed]);
+
  // The home full-page chat signals when it's open so we hide our (redundant) launcher.
  useEffect(() => {
  const onHomeChat = (e: Event) => setSuppressed(!!(e as CustomEvent).detail);
@@ -190,8 +263,16 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  {m.images.map((src, k) => <img key={k} src={src} alt="" className="h-16 w-16 rounded-lg object-cover ring-1 ring-white/20" />)}
  </div>
  )}
- {m.role === "assistant" ? <RichText text={m.content} /> : m.content ? <span className="whitespace-pre-wrap">{m.content}</span> : null}
+ {m.role === "assistant" ? <RichText text={m.content} /> : m.content ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content}</span> : null}
  {m.role === "assistant" && <ActionChips actions={m.actions} />}
+ {/* Only the LAST message, and only when nothing is in flight — an older question answered out of
+     order would attach "Yes" to whatever VYA asked most recently, not to what was clicked. */}
+ {m.role === "assistant" && i === msgs.length - 1 && !busy && isYesNoQuestion(m.content) && (
+ <div className="mt-2.5 flex gap-1.5">
+ <button onClick={() => send("Yes")} className="rounded-full bg-[#5D0F17] px-4 py-1.5 text-[12px] font-semibold text-[#FFFDF8] transition hover:bg-[#4a0c12]">Yes</button>
+ <button onClick={() => send("No")} className="rounded-full border border-[#5D0F17]/20 px-4 py-1.5 text-[12px] font-semibold text-[#5D0F17] transition hover:bg-[#5D0F17]/[0.06]">No</button>
+ </div>
+ )}
  </div>
  </div>
  ))}
@@ -218,13 +299,15 @@ export default function Sidekick({ docked = false }: { docked?: boolean }) {
  <button onClick={() => fileRef.current?.click()} disabled={attached.length >= 4} title="Attach an inspiration image" aria-label="Attach image" className="shrink-0 rounded-lg p-1.5 text-[#5D0F17]/50 transition hover:bg-[#5D0F17]/[0.06] hover:text-[#5D0F17] disabled:opacity-30"><ImagePlus size={16} /></button>
  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files) addFiles(Array.from(e.target.files)); e.target.value = ""; }} />
  <textarea
+ ref={inputRef}
  value={input}
  onChange={(e) => setInput(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
  onPaste={(e) => { const imgs = Array.from(e.clipboardData.items).filter((it) => it.type.startsWith("image/")).map((it) => it.getAsFile()).filter((f): f is File => !!f); if (imgs.length) { e.preventDefault(); addFiles(imgs); } }}
  placeholder="Ask, tell me to do something, or paste an image…"
  rows={1}
- className="max-h-28 flex-1 resize-none bg-transparent text-[13.5px] text-[#2c241d] outline-none placeholder:text-[#5D0F17]/35"
+ className="min-w-0 flex-1 resize-none overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] bg-transparent text-[13.5px] leading-relaxed text-[#2c241d] outline-none placeholder:text-[#5D0F17]/35"
+ style={{ maxHeight: COMPOSER_MAX_PX }}
  />
  <button onClick={() => send()} disabled={busy || (!input.trim() && attached.length === 0)} aria-label="Send" className="shrink-0 rounded-lg bg-[#5D0F17] p-1.5 text-[#FFFDF8] transition hover:bg-[#4a0c12] disabled:opacity-40"><ArrowUp size={15} /></button>
  </div>

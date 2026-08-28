@@ -37,13 +37,13 @@ function Head({ kit, align = "text-center", className = "mb-12" }: { kit: EditKi
  if (!p.heading) return null;
  return (
   <div className={`${className} ${align}`}>
-   <span {...txt(p.eyebrow || "The Edit", "eyebrow")} className="mb-3 block text-[10px] uppercase tracking-[0.3em] opacity-40" />
+   <span {...txt(p.eyebrow || "The Edit", "eyebrow")} className="mb-3 block text-[11px] @lg:text-[10px] uppercase tracking-[0.3em] opacity-40" />
    <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-3xl @xl:text-[2.6rem] leading-tight" style={{ fontFamily: ctx.head }} />
   </div>
  );
 }
 
-const Empty = () => <p className="py-16 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">Coming soon</p>;
+const Empty = () => <p className="py-10 @lg:py-16 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">Coming soon</p>;
 
 // ── grid ────────────────────────────────────────────────────────────────────────────────────────
 // The layout that shipped. Column count and gap are merchant controls; the defaults reproduce the
@@ -64,7 +64,7 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
  const noOrphan = shown.length > perRow && shown.length % perRow === 1 ? shown.slice(0, -1) : shown;
  const cols = c === "1" ? "@lg:grid-cols-1" : c === "2" ? "@lg:grid-cols-2" : c === "3" ? "@lg:grid-cols-3" : c === "5" ? "@lg:grid-cols-4 @2xl:grid-cols-5" : "@lg:grid-cols-4";
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} />
    {noOrphan.length ? (
     <div className={`grid grid-cols-2 gap-x-5 gap-y-12 @lg:gap-x-8 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
@@ -87,7 +87,7 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
  const shown = products.slice(0, featuredCount(p.limit, 12));
  const w = Math.min(60, Math.max(18, Number(p.cardW) || 26));
  return (
-  <section className="vya-free-canvas relative py-20 @xl:py-24">
+  <section className="vya-free-canvas relative py-12 @lg:py-20 @xl:py-24">
    <div className="mx-auto max-w-6xl px-5 @xl:px-8"><Head kit={kit} align="text-left" className="mb-8" /></div>
    {shown.length ? (
     <div className="vya-rail flex snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-2 @xl:px-8" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
@@ -114,10 +114,10 @@ function FeaturedEditorial({ kit }: { kit: EditKit }) {
  // Composed layout: one lead piece plus a fixed stack. The count IS the composition, so a stale
  // `limit` left behind by a previous layout is deliberately ignored rather than honoured.
  const shown = products.slice(0, EDITORIAL_PIECES);
- if (!shown.length) return <section className="mx-auto max-w-6xl px-5 py-20"><Head kit={kit} /><Empty /></section>;
+ if (!shown.length) return <section className="mx-auto max-w-6xl px-5 py-12 @lg:py-20"><Head kit={kit} /><Empty /></section>;
  const [lead, ...rest] = shown;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} align="text-left" className="mb-10" />
    <div className="grid gap-6 @lg:grid-cols-[1.25fr_1fr] @lg:gap-10">
     <Card it={lead} i={0} shopHref={shopHref} accent={colors.accent} fg={fg} ratio="aspect-[4/5] @lg:aspect-[3/4]" />
@@ -139,7 +139,7 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
  // Composed layout: alternating large/small anchors. Same reasoning as editorial above.
  const shown = products.slice(0, MOSAIC_PIECES);
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-20 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} />
    {shown.length ? (
     <div className="grid grid-cols-2 gap-4 @lg:grid-cols-4 @lg:gap-6" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
@@ -168,7 +168,7 @@ function FeaturedList({ kit }: { kit: EditKit }) {
  const products = productsFor(ctx, p);
  const shown = products.slice(0, featuredCount(p.limit, 10));
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-20 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} align="text-left" className="mb-8" />
    {shown.length ? (
     <div style={{ borderTop: `1px solid ${fg}1f` }}>

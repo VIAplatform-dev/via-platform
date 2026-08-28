@@ -360,7 +360,13 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {headerNav.map((n, i) =>
  /^shop/i.test(n.label) && shopMenu.length ? (
  <div key={i} className="group relative">
- <a href={n.href} className="hover:opacity-100">{n.label} ⌄</a>
+ {/* A drawn chevron, not the "⌄" character. That glyph is a text arrowhead: it renders at whatever
+     weight and baseline the nav font happens to give it, sits low next to small caps, and looks
+     pasted on. This is stroked to match the type's weight and optically centred against it. */}
+ <a href={n.href} className="inline-flex items-center gap-1.5 hover:opacity-100">
+  {n.label}
+  <svg width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true" className="mt-px shrink-0 opacity-60"><path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" /></svg>
+ </a>
  <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-3 opacity-0 transition group-hover:visible group-hover:opacity-100">
  <div className="grid min-w-[210px] gap-0.5 border border-black/10 p-3 shadow-xl" style={{ background: bg }}>
  {/* "Shop all" first — the way back to the full catalogue once you've narrowed it. */}

@@ -136,7 +136,7 @@ function Rows({ kit, pairs, className = "" }: { kit: EditKit; pairs: Pair[]; cla
 function FaqAccordion({ kit }: { kit: EditKit }) {
  const pairs = readPairs(kit.p);
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-3xl px-5 @xl:px-8 py-16 @xl:py-20">
+  <section className="vya-free-canvas relative mx-auto max-w-3xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-20">
    <Head kit={kit} />
    <Rows kit={kit} pairs={pairs} />
    <Tail kit={kit} count={pairs.length} />
@@ -153,7 +153,7 @@ function FaqTwoColumn({ kit }: { kit: EditKit }) {
  const half = Math.ceil(pairs.length / 2);
  const cols = [pairs.slice(0, half), pairs.slice(half)];
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-5xl px-5 @xl:px-8 py-16 @xl:py-20">
+  <section className="vya-free-canvas relative mx-auto max-w-5xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-20">
    <Head kit={kit} />
    <div className="vya-faq grid gap-x-10 @lg:grid-cols-2" data-faq-container data-faq-block={b.id}>
     {cols.map((col, c) => (
@@ -174,7 +174,7 @@ function FaqSided({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  const pairs = readPairs(kit.p);
  return (
-  <section className="mx-auto grid max-w-6xl gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-[0.85fr_1.15fr] @lg:gap-16">
+  <section className="mx-auto grid max-w-6xl gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-[0.85fr_1.15fr] @lg:gap-16">
    <div className="vya-free-canvas relative">
     {(p.heading || ctx.edit) && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: ctx.head }} />}
     {(p.subtext || ctx.edit) && <p {...txtPlain(p.subtext, "subtext")} className="vya-sub mt-4 text-sm leading-relaxed opacity-65" />}
@@ -196,7 +196,7 @@ function FaqCards({ kit }: { kit: EditKit }) {
  const pairs = readPairs(kit.p);
  const cols = p.cols === "3" ? "@lg:grid-cols-3" : "@lg:grid-cols-2";
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-20">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-20">
    <Head kit={kit} />
    <div className={`vya-faq grid gap-3 @xl:gap-4 ${cols}`} data-faq-container data-faq-block={b.id}>
     {pairs.map((pair) => (
@@ -233,7 +233,7 @@ function FaqNumbered({ kit }: { kit: EditKit }) {
  const pairs = readPairs(kit.p);
  const num = (n: number) => String(n + 1).padStart(2, "0");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-3xl px-5 @xl:px-8 py-16 @xl:py-20">
+  <section className="vya-free-canvas relative mx-auto max-w-3xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-20">
    <Head kit={kit} />
    <div className="vya-faq" data-faq-container data-faq-block={b.id} style={{ borderBottom: `1px solid ${ctx.fg}1f` }}>
     {pairs.map((pair, n) => {
@@ -267,13 +267,15 @@ function FaqIndex({ kit }: { kit: EditKit }) {
  const pairs = readPairs(kit.p);
  const anchor = (i: number) => `faq-${b.id}-${i}`;
  return (
-  <section className="mx-auto grid max-w-6xl gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-[0.7fr_1.3fr] @lg:gap-14">
+  <section className="mx-auto grid max-w-6xl gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-[0.7fr_1.3fr] @lg:gap-14">
    <div>
     <div className="vya-free-canvas relative"><Head kit={kit} align="text-left" /></div>
     <nav className="flex flex-col gap-2 @lg:sticky @lg:top-8" style={{ borderTop: `1px solid ${ctx.fg}1f`, paddingTop: "1rem" }}>
      {pairs.map((pair) => (ctx.edit
       ? <span key={pair.i} className="text-[13px] leading-snug opacity-60">{pair.q}</span>
-      : <a key={pair.i} href={`#${anchor(pair.i)}`} className="text-[13px] leading-snug transition-opacity hover:opacity-60" style={{ color: ctx.colors.accent }}>{pair.q}</a>
+      // py-2 on the LINK, not the row: an 18px-tall anchor is a miss on a phone however carefully you
+      // aim. This lands it near the 44px guideline without changing how the list looks.
+      : <a key={pair.i} href={`#${anchor(pair.i)}`} className="-my-2 py-2 text-[13px] leading-snug transition-opacity hover:opacity-60" style={{ color: ctx.colors.accent }}>{pair.q}</a>
      ))}
     </nav>
    </div>

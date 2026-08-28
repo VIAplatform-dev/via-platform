@@ -38,7 +38,7 @@ function ColumnsImage({ kit }: { kit: EditKit }) {
  const { cols, set } = useCols(kit);
  if (!cols.length) return emptyHint(ctx, "Columns — add content");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-12 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
    <div className={`grid grid-cols-1 gap-8 @sm:grid-cols-2 @lg:gap-10 ${gridFor(p.cols)}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
     {cols.slice(0, 8).map((c, i) => (
@@ -62,7 +62,7 @@ function ColumnsClaims({ kit }: { kit: EditKit }) {
  const { cols, set } = useCols(kit);
  if (!cols.length) return emptyHint(ctx, "Columns — add your promises");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-14 @xl:py-20" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-8 @lg:py-14 @xl:py-20" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
    <Heading kit={kit} className="mb-10 text-center text-[11px] uppercase tracking-[0.24em] opacity-50" />
    <div className={`grid grid-cols-1 gap-8 @sm:grid-cols-2 @lg:gap-12 ${gridFor(p.cols)}`}>
     {cols.slice(0, 8).map((c, i) => (
@@ -85,7 +85,7 @@ function ColumnsSteps({ kit }: { kit: EditKit }) {
  const { cols, set } = useCols(kit);
  if (!cols.length) return emptyHint(ctx, "Columns — add your steps");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-12 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
    <div className={`grid grid-cols-1 gap-10 @sm:grid-cols-2 ${gridFor(p.cols)}`}>
     {cols.slice(0, 8).map((c, i) => (
@@ -112,7 +112,7 @@ function ColumnsBordered({ kit }: { kit: EditKit }) {
  const { cols, set } = useCols(kit);
  if (!cols.length) return emptyHint(ctx, "Columns — add content");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
    <div className={`grid grid-cols-1 gap-0 @sm:grid-cols-2 ${gridFor(p.cols)}`} style={{ border: `1px solid ${ctx.fg}1f` }}>
     {cols.slice(0, 8).map((c, i) => (

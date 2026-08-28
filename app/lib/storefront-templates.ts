@@ -15,7 +15,7 @@
 // bracketed — [YOUR CITY], [DROP DAY] — so nothing invented ever ships live.
 
 import { makeBlock, type Block, type BlockType, type BlockStyle } from "./storefront-blocks.ts";
-import { greekBlocks } from "./storefront-greek.ts";
+import { placeholderBlocks } from "./storefront-placeholder-copy.ts";
 
 export type HeroStyle = "carousel" | "text-over-image" | "logo-masthead" | "drop-banner" | "minimal";
 
@@ -857,19 +857,27 @@ const AUTHORED_TEMPLATES: StorefrontTemplate[] = [
  },
 ];
 
-// ── Greeked on the way out ──
+// ── Placeholder copy on the way out ──
 // The authored copy above is the reference — it says what each block is FOR, and whoever edits a
-// template needs that. What ships (and what the specimen gallery renders) is lorem ipsum, so a
-// storefront is judged on its layout rather than read as prose.
+// template needs that. What SHIPS is plain English placeholder copy, identical in every template.
 //
-// Names, descriptions, taglines and page titles are deliberately NOT greeked: they're how a seller
-// chooses a template and how the navigation reads. To ship the authored copy instead, export
+// It used to be lorem ipsum, on the reasoning that a storefront should be judged on layout rather
+// than read as prose. In practice that failed the person it was for: a seller opening a template
+// found "Excepteur sint occaecat cupidatat" where their headline goes and had to work out what the
+// section was even for. Plain English says what belongs in each slot, and a template can be
+// published untouched and still make sense.
+//
+// The same words in every template, deliberately: templates differ by layout and palette, which is
+// what a seller is choosing between, and varying the copy alongside that is noise.
+//
+// Names, descriptions, taglines and page titles are untouched: they're how a seller chooses a
+// template and how the navigation reads. To ship the authored copy instead, export
 // AUTHORED_TEMPLATES here — that is the whole switch.
 export const STOREFRONT_TEMPLATES: StorefrontTemplate[] = AUTHORED_TEMPLATES.map((t) => ({
  ...t,
- layout: greekBlocks(t.layout),
- shop: greekBlocks(t.shop || []),
- pages: (t.pages || []).map((pg) => ({ ...pg, blocks: greekBlocks(pg.blocks) })),
+ layout: placeholderBlocks(t.layout),
+ shop: placeholderBlocks(t.shop || []),
+ pages: (t.pages || []).map((pg) => ({ ...pg, blocks: placeholderBlocks(pg.blocks) })),
 }));
 
 /**

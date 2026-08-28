@@ -144,7 +144,7 @@ export default function OnboardingWizard() {
      <Section title="Do you already have a website?" sub="We’ll either bring your existing site over, or build you a new one.">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
        <ChoiceCard icon={<Globe size={20} />} label="Yes, I have one" desc="Paste the URL — we’ll import it" active={hasWebsite === true} onClick={() => setHasWebsite(true)} />
-       <ChoiceCard icon={<Hammer size={20} />} label="No, build me one" desc="Pick a look and we’ll build it" active={hasWebsite === false} onClick={() => { setHasWebsite(false); setWebsiteUrl(""); }} />
+       <ChoiceCard icon={<Hammer size={20} />} label="No, let’s start from scratch" desc="Choose your design" active={hasWebsite === false} onClick={() => { setHasWebsite(false); setWebsiteUrl(""); }} />
       </div>
       {hasWebsite === true && (
        <div className="mt-5">
@@ -170,7 +170,7 @@ export default function OnboardingWizard() {
       className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-[14px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40"
       style={{ background: ACCENT }}
      >
-      {busy ? "Setting up…" : hasWebsite === true ? "Bring my site over" : "Pick how it looks"}
+      {busy ? "Setting up…" : hasWebsite === true ? "Bring my site over" : "Next"}
       {!busy && <ArrowRight size={16} />}
      </button>
     </div>

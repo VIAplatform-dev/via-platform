@@ -4,6 +4,14 @@
 import { ImageSlot, emptyHint, type EditKit } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
+// "Fill" — edge to edge, no margin around the photo.
+//
+// An image section frames its picture by default: page measure, real padding, the photo reading as a
+// plate rather than a banner. That framing is right until it isn't, and the merchant who wants the
+// picture to BE the section shouldn't have to find four spacing sliders and set each one to zero.
+// One switch, stored on the block, that every image layout honours the same way.
+const isFill = (p: Record<string, string>) => p.fill === "1";
+
 // ── image ───────────────────────────────────────────────────────────────────────────────────────
 // Edge to edge, capped so a tall photo can't swallow the page. The layout that shipped.
 function ImageFull({ kit }: { kit: EditKit }) {
@@ -13,9 +21,9 @@ function ImageFull({ kit }: { kit: EditKit }) {
  return (
   <figure className="w-full">
    {ctx.edit
-    ? <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[21/9]" rounded="vya-img" />
-    : <img src={p.image} alt={p.caption || ""} className="vya-img w-full object-cover" style={{ maxHeight: "70vh" }} />}
-   {(p.caption || ctx.edit) && <figcaption {...kit.txt(p.caption, "caption")} className="px-6 py-3 text-center text-xs opacity-60" />}
+    ? <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={p.imageZoom} ratio="aspect-[21/9]" rounded="vya-img" />
+    : <img src={p.image} alt={p.caption || ""} className="vya-img w-full object-cover" style={{ maxHeight: "70vh", ...(p.imagePos ? { objectPosition: p.imagePos } : {}), ...(Number(p.imageZoom) > 100 ? { transform: `scale(${Math.min(400, Number(p.imageZoom)) / 100})`, transformOrigin: p.imagePos || "50% 50%" } : {}) }} />}
+   {(p.caption || ctx.edit) && <figcaption {...kit.txt(p.caption, "caption")} className={`text-center text-xs opacity-60 ${isFill(p) ? "py-2" : "px-6 py-3"}`} />}
   </figure>
  );
 }
@@ -26,9 +34,9 @@ function ImageInset({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const setImg = (url: string) => ctx.onEditField?.(kit.b.id, "image", url);
  return (
-  <figure className="mx-auto max-w-4xl px-6 py-16 @xl:px-8 @xl:py-20">
-   <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[4/3]" rounded="vya-img" />
-   {(p.caption || ctx.edit) && <figcaption {...kit.txt(p.caption, "caption")} className="mt-3 text-center text-xs opacity-60" />}
+  <figure className={isFill(p) ? "w-full" : "mx-auto max-w-4xl px-6 py-10 @lg:py-16 @xl:px-8 @xl:py-20"}>
+   <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={p.imageZoom} ratio="aspect-[4/3]" rounded="vya-img" />
+   {(p.caption || ctx.edit) && <figcaption {...kit.txt(p.caption, "caption")} className={`text-center text-xs opacity-60 ${isFill(p) ? "py-2" : "mt-3"}`} />}
   </figure>
  );
 }
@@ -39,9 +47,9 @@ function ImageCaptioned({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const setImg = (url: string) => ctx.onEditField?.(kit.b.id, "image", url);
  return (
-  <figure className="mx-auto grid max-w-5xl gap-5 px-6 py-16 @xl:px-8 @xl:py-24 @lg:grid-cols-[1.7fr_1fr] @lg:gap-12">
-   <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} ratio="aspect-[4/5]" rounded="vya-img" />
-   <figcaption className="flex items-end">
+  <figure className={`grid gap-5 @lg:grid-cols-[1.7fr_1fr] @lg:gap-12 ${isFill(p) ? "w-full" : "mx-auto max-w-5xl px-6 py-10 @lg:py-16 @xl:px-8 @xl:py-24"}`}>
+   <ImageSlot kit={kit} src={p.image} onPick={setImg} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={p.imageZoom} ratio="aspect-[4/5]" rounded="vya-img" />
+   <figcaption className={`flex items-end ${isFill(p) ? "px-5 pb-5 @lg:pb-8" : ""}`}>
     <span {...kit.txt(p.caption, "caption")} className="text-[13px] leading-relaxed opacity-65" />
    </figcaption>
   </figure>
@@ -53,24 +61,26 @@ const S = ITEM_SCHEMAS.gallery;
 
 function galleryOps(kit: EditKit) {
  const shots = kit.items(S);
- const setSrc = (i: number, src: string) => kit.setItems(S, shots.map((x, j) => (j === i ? { src } : x)));
+ const setSrc = (i: number, src: string) => kit.setItems(S, shots.map((x, j) => (j === i ? { ...x, src } : x)));
+ // Drag-to-reposition each gallery photo (object-position), same as every single image.
+ const setPos = (i: number, pos: string) => kit.setItems(S, shots.map((x, j) => (j === i ? { ...x, pos } : x)));
  // In the editor an extra empty slot always trails the set, so adding a photo is one click on the
  // canvas rather than a trip to the panel.
  const slots = kit.ctx.edit ? [...shots, { src: "" }] : shots;
  const addAt = shots.length;
  const pick = (i: number) => (url: string) => (i === addAt ? kit.setItems(S, [...shots, { src: url }]) : setSrc(i, url));
- return { shots, slots, pick };
+ return { shots, slots, pick, setPos };
 }
 
 // A tight grid, no gutters to speak of — the contact sheet. What shipped.
 function GalleryGrid({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- const { shots, slots, pick } = galleryOps(kit);
+ const { shots, slots, pick, setPos } = galleryOps(kit);
  if (!shots.length && !ctx.edit) return null;
  const cols = p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3";
  return (
   <div className={`grid grid-cols-2 gap-1 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
-   {slots.map((s, i) => <ImageSlot key={i} kit={kit} src={s.src} onPick={pick(i)} ratio="aspect-square" />)}
+   {slots.map((s, i) => <ImageSlot key={i} kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio="aspect-square" />)}
   </div>
  );
 }
@@ -78,12 +88,12 @@ function GalleryGrid({ kit }: { kit: EditKit }) {
 // Airy: fewer per row, real gutters, page margins. The same photos given room to be looked at.
 function GalleryLoose({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
- const { shots, slots, pick } = galleryOps(kit);
+ const { shots, slots, pick, setPos } = galleryOps(kit);
  if (!shots.length && !ctx.edit) return null;
  return (
-  <section className="mx-auto max-w-6xl px-5 py-16 @xl:px-8 @xl:py-24">
+  <section className="mx-auto max-w-6xl px-5 py-10 @lg:py-16 @xl:px-8 @xl:py-24">
    <div className="grid grid-cols-2 gap-4 @lg:grid-cols-3 @xl:gap-6">
-    {slots.map((s, i) => <ImageSlot key={i} kit={kit} src={s.src} onPick={pick(i)} ratio="aspect-[4/5]" />)}
+    {slots.map((s, i) => <ImageSlot key={i} kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio="aspect-[4/5]" />)}
    </div>
   </section>
  );
@@ -93,14 +103,14 @@ function GalleryLoose({ kit }: { kit: EditKit }) {
 // spreadsheet, without needing the merchant to crop anything.
 function GalleryMosaic({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
- const { shots, slots, pick } = galleryOps(kit);
+ const { shots, slots, pick, setPos } = galleryOps(kit);
  if (!shots.length && !ctx.edit) return null;
  return (
-  <section className="mx-auto max-w-6xl px-5 py-16 @xl:px-8 @xl:py-24">
+  <section className="mx-auto max-w-6xl px-5 py-10 @lg:py-16 @xl:px-8 @xl:py-24">
    <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4 @xl:gap-4">
     {slots.map((s, i) => (
      <div key={i} className={i % 3 === 0 ? "row-span-2" : ""}>
-      <ImageSlot kit={kit} src={s.src} onPick={pick(i)} ratio={i % 3 === 0 ? "aspect-[3/4]" : "aspect-square"} />
+      <ImageSlot kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio={i % 3 === 0 ? "aspect-[3/4]" : "aspect-square"} />
      </div>
     ))}
    </div>
@@ -111,14 +121,14 @@ function GalleryMosaic({ kit }: { kit: EditKit }) {
 // A swipeable strip that bleeds off the edge. Fits a whole lookbook in one band of the page.
 function GalleryRail({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
- const { shots, slots, pick } = galleryOps(kit);
+ const { shots, slots, pick, setPos } = galleryOps(kit);
  if (!shots.length && !ctx.edit) return null;
  return (
-  <section className="py-16 @xl:py-20">
+  <section className="py-10 @lg:py-16 @xl:py-20">
    <div className="vya-rail flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 @xl:gap-4 @xl:px-8">
     {slots.map((s, i) => (
      <div key={i} className="shrink-0 snap-start" style={{ width: "min(62vw, 20rem)" }}>
-      <ImageSlot kit={kit} src={s.src} onPick={pick(i)} ratio="aspect-[3/4]" />
+      <ImageSlot kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio="aspect-[3/4]" />
      </div>
     ))}
    </div>
@@ -151,7 +161,7 @@ function VideoFramed({ kit }: { kit: EditKit }) {
  const url = (p.url || "").trim();
  if (!url) return <NoVideo kit={kit} />;
  return (
-  <section className="mx-auto max-w-5xl px-5 py-16 @xl:px-8 @xl:py-20">
+  <section className="mx-auto max-w-5xl px-5 py-10 @lg:py-16 @xl:px-8 @xl:py-20">
    <Player url={url} caption={p.caption} />
    {p.caption && <p {...kit.txt(p.caption, "caption")} className="mt-3 text-center text-xs opacity-60" />}
   </section>
@@ -178,7 +188,7 @@ function VideoPortrait({ kit }: { kit: EditKit }) {
  const url = (p.url || "").trim();
  if (!url) return <NoVideo kit={kit} />;
  return (
-  <section className="mx-auto max-w-md px-5 py-16 @xl:py-20">
+  <section className="mx-auto max-w-md px-5 py-10 @lg:py-16 @xl:py-20">
    <Player url={url} caption={p.caption} ratio="9 / 16" />
    {p.caption && <p {...kit.txt(p.caption, "caption")} className="mt-3 text-center text-xs opacity-60" />}
   </section>

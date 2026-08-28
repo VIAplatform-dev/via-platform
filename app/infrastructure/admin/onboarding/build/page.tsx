@@ -47,7 +47,7 @@ const SAMPLE = [
 // describe their inventory before they've seen anything — and signup already asked. Categories
 // still arrive from signup via the URL and still pick the recommended template; they're just not
 // a question here any more.
-const STEPS = ["Look", "Pages", "Colours", "Fonts"];
+const STEPS = ["Design", "Pages", "Colours", "Fonts"];
 const ff = (name: string) => `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}`;
 
 // Every font any picker or the preview might show — loaded once so previews render in the real face.
@@ -117,6 +117,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  const [logo, setLogo] = useState("");            // preview src: an object URL until uploaded
  const [logoFile, setLogoFile] = useState<File | null>(null);
  const [uploadingLogo, setUploadingLogo] = useState(false);
+ const [logoDrag, setLogoDrag] = useState(false); // dropzone highlight while dragging over it
 
  /**
   * Preview immediately from an object URL and defer the real upload to finish().
@@ -222,6 +223,27 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  ];
  const goPreview = (item: ChromeNav) => item.slug && setPreviewPage(item.slug);
 
+ // The pages that actually exist on the store right now, in nav order: the two standard ones plus
+ // whatever's ticked. The Pages step lays these out side by side as a filmstrip (Squarespace-style),
+ // so ticking a box adds a page to the row and unticking removes it.
+ const activePages: { slug: string; label: string }[] = [
+  { slug: "home", label: "Home" },
+  { slug: "shop", label: "Shop" },
+  ...pageOptions.filter((p) => pages.has(p.slug)).map((p) => ({ slug: p.slug, label: p.label })),
+ ];
+
+ // The Pages step is a horizontal filmstrip of big, readable page previews side by side. When a
+ // page is ticked, its card mounts (and slides in) and the strip scrolls right to reveal it.
+ const stripRef = useRef<HTMLDivElement>(null);
+ const prevPageCount = useRef(activePages.length);
+ useEffect(() => {
+  if (step === 1 && activePages.length > prevPageCount.current) {
+   requestAnimationFrame(() => stripRef.current?.scrollTo({ left: stripRef.current.scrollWidth, behavior: "smooth" }));
+  }
+  prevPageCount.current = activePages.length;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [activePages.length, step]);
+
  // The name field is on step 0 ("Name & look"), not step 1 ("Pages") — the old guard blocked the
  // wrong step. It went unnoticed while the name defaulted to "Your store", because that always
  // satisfied the length check; the moment the default became empty it locked Next on Pages while
@@ -263,6 +285,34 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
 
  <div className="flex min-h-0 flex-1">
  {/* ── Live preview ─────────────────────────────────────────────── */}
+ {step === 1 ? (
+ /* PAGES STEP — big page previews side by side (Squarespace-style). Ticking a page mounts a new
+    card that slides in, and the strip scrolls right to reveal it; unticking removes it. Each card
+    is large and readable, and the row scrolls horizontally for as many pages as you add. */
+ <div ref={stripRef} className="hidden min-w-0 flex-1 items-start gap-8 overflow-x-auto p-10 lg:flex">
+ {activePages.map((pg) => (
+ /* Keyed by slug so a newly-ticked page mounts and animates; pages already on screen stay put. */
+ <div key={pg.slug} className="vya-step-in-right flex shrink-0 flex-col gap-3">
+ <span className="pl-1 text-[13px] font-medium tracking-tight text-stone-500">{pg.label}</span>
+ <div className="w-[540px] overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_-28px_rgba(43,36,29,0.5)]">
+ <div className="flex h-8 items-center gap-1.5 border-b border-black/[0.06] bg-[#f4f1ec] px-3">
+ <span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
+ <span className="ml-2 truncate text-[10px] text-stone-400">{(name.trim() ? name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "your-store")}.vyaplatform.com{pg.slug === "home" ? "" : `/${pg.slug}`}</span>
+ </div>
+ <div className="h-[68vh] overflow-y-auto overscroll-contain">
+ <div style={{ width: 1180, zoom: 0.457 } as React.CSSProperties}>
+ <div style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
+ <StoreHeader storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} />
+ <Blocks blocks={pageBlocks(pg.slug)} colors={colors} fonts={fonts} radius="sharp" products={SAMPLE} shopHref="#" />
+ <StoreFooter storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} year={2026} newsletter={<div className="mx-auto flex max-w-sm items-center gap-2"><input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" /><span className="grid h-10 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Subscribe</span></div>} />
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+ ))}
+ </div>
+ ) : (
  <div className="hidden min-w-0 flex-1 items-start justify-center overflow-hidden p-8 lg:flex">
  <div className="w-full max-w-[760px] overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_-24px_rgba(43,36,29,0.5)]">
  <div className="flex h-8 items-center gap-1.5 border-b border-black/[0.06] bg-[#f4f1ec] px-3">
@@ -285,6 +335,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  </div>
  </div>
  </div>
+ )}
 
  {/* ── Step panel ───────────────────────────────────────────────── */}
  <div className="flex w-full shrink-0 flex-col border-l border-black/10 bg-white lg:w-[440px]">
@@ -303,14 +354,22 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
      a class swap alone would only fire the first time. */}
  <div key={step} className={dir === 1 ? "vya-step-in-right" : "vya-step-in-left"}>
  {step === 0 && (
- <Step title="Name & look" sub="Your store name and its overall look — each is a curated kit: layout, colours and type in one.">
- <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Store name</label>
+ <Step title="Choose your store name and design" sub="Nothing here is final — you can change your name, design, colours, fonts, and every word later in the editor.">
+ <label className="mb-1 block text-[12px] font-medium text-stone-500">Store name</label>
+ <p className="mb-1.5 text-[11px] text-stone-400">This is the name of your store — you can change it later.</p>
  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Aurora Vintage" className="mb-4 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] outline-none placeholder:text-stone-300 focus:border-[#5D0F17]/50" />
 
  {/* Optional. With no logo the store name shows in the template's own type, which for most of
-     these is the better answer — so this never blocks getting to the look. */}
+     these is the better answer — so this never blocks getting to the design. */}
  <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Logo <span className="font-normal text-stone-400">— optional</span></label>
- <label className="mb-5 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-black/15 px-3.5 py-3 transition hover:border-[#5D0F17]/50">
+ {/* Both paths land on stageLogo: click opens the file picker; drag-and-drop reads the dropped
+     file. onDragOver must preventDefault or the browser just opens the image in the tab. */}
+ <label
+  onDragOver={(e) => { e.preventDefault(); setLogoDrag(true); }}
+  onDragLeave={() => setLogoDrag(false)}
+  onDrop={(e) => { e.preventDefault(); setLogoDrag(false); stageLogo(e.dataTransfer.files?.[0]); }}
+  className={`mb-5 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed px-3.5 py-3 transition ${logoDrag ? "border-[#5D0F17] bg-[#5D0F17]/[0.03]" : "border-black/15 hover:border-[#5D0F17]/50"}`}
+ >
   <input type="file" accept="image/*" className="hidden" onChange={(e) => { stageLogo(e.target.files?.[0]); e.currentTarget.value = ""; }} />
   {logo ? (
    <>
@@ -319,11 +378,12 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
     <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLogo(""); }} className="ml-auto text-[12px] text-stone-400 underline underline-offset-2 hover:text-stone-700">Remove</button>
    </>
   ) : (
-   <span className="text-[13px] text-stone-500">{uploadingLogo ? "Uploading…" : "Drop an image or click to upload"}</span>
+   <span className="text-[13px] text-stone-500">{uploadingLogo ? "Uploading…" : logoDrag ? "Drop to upload" : "Drop an image or click to upload"}</span>
   )}
  </label>
 
- <label className="mb-2 block text-[12px] font-medium text-stone-500">Choose a look</label>
+ <label className="mb-1 block text-[12px] font-medium text-stone-500">Choose a design</label>
+ <p className="mb-2 text-[11px] text-stone-400">Pick your store&rsquo;s design — you can always change it later.</p>
  <div className="space-y-2">
  {STOREFRONT_TEMPLATES.map((t) => (
  <button key={t.id} type="button" onClick={() => setTemplateId(t.id)} className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition ${templateId === t.id ? "border-[#5D0F17] ring-1 ring-[#5D0F17]/20" : "border-black/10 hover:border-black/25"}`}>

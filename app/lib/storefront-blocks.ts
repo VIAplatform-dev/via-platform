@@ -22,6 +22,13 @@ export type FreeStyle = {
  w?: number;                    // width as a % of the field's own container — set by dragging a SIDE
                                 // handle. Rewraps the text (three lines become one long line); the
                                 // corner handles scale the type instead.
+ h?: number;                    // height as a % of the frame's OWN WIDTH — i.e. an aspect ratio, where
+                                // 100 is square. Only a PHOTO uses it: text takes its height from its
+                                // content, but a photo's frame is a box the merchant sizes directly,
+                                // so its corner handles set w and h rather than a font size.
+                                // A ratio rather than a height because a percentage height resolves
+                                // against the parent, and collapses to nothing when that parent's own
+                                // height is content-driven.
  font?: string;                 // font family (from the storefront font list)
  bold?: boolean; italic?: boolean; underline?: boolean;
  color?: string;                // #hex text colour
@@ -67,7 +74,12 @@ export type BlockStyle = {
  ctaSize?: "sm" | "md" | "lg"; // parity with a free-form overlay button's own Size control
  ctaFullWidth?: boolean; // stretch the button to the section's full content width, instead of hugging its label
  space?: BlockScale; // vertical breathing-room preset (used when padY isn't set)
- padY?: number; // px — explicit vertical padding (overrides `space`)
+ padY?: number; // px — explicit vertical padding, top AND bottom (overrides `space`)
+ // Top and bottom independently. `padY` sets both at once and stays the simple control; these win
+ // over it per edge, so "no gap above, keep the gap below" is expressible — which it wasn't when the
+ // only vertical control moved both edges together.
+ padTop?: number; // px — space above the section's content (overrides padY/space for this edge)
+ padBottom?: number; // px — space below it (ditto)
  padX?: number; // px — explicit horizontal padding
  radius?: number; // px — section corner radius
  border?: number; // px — section border width
@@ -401,11 +413,51 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (hex(s.headingFont) ? false : typeof s.headingFont === "string" && s.headingFont.trim()) style.headingFont = String(s.headingFont).slice(0, 50).replace(/[^\w \-]/g, "");
  { const t = num(s.tracking, -10, 40); if (t !== undefined) style.tracking = t; }
  { const p = num(s.padY, 0, 240); if (p !== undefined) style.padY = p; }
+ { const p = num(s.padTop, 0, 400); if (p !== undefined) style.padTop = p; }
+ { const p = num(s.padBottom, 0, 400); if (p !== undefined) style.padBottom = p; }
  { const p = num(s.padX, 0, 160); if (p !== undefined) style.padX = p; }
  { const r = num(s.radius, 0, 80); if (r !== undefined) style.radius = r; }
  { const bw = num(s.border, 0, 12); if (bw !== undefined) style.border = bw; }
  if (hex(s.borderColor)) style.borderColor = s.borderColor;
  if (s.shadow === "sm" || s.shadow === "md" || s.shadow === "lg" || s.shadow === "xl") style.shadow = s.shadow;
+
+ // Everything below was DECLARED on BlockStyle, emitted by the CSS compiler, and wired to a control
+ // in the studio — but never copied here. This function rebuilds `style` from scratch as a whitelist,
+ // and every autosave round-trips through it (see the design route), so each of these was written to
+ // the block, rendered once, and then silently thrown away on the very next save. Section height set
+ // by dragging the resize handle, the whole button style panel, per-field alignment, an explicit
+ // heading size in px, line-height, bold/italic/underline: all of it looked like it worked until the
+ // page was reloaded. Anything added to BlockStyle from here on has to be added here too.
+ const align = (v: unknown): BlockAlign | undefined => (v === "left" || v === "center" || v === "right" ? v : undefined);
+ // Same treatment headingFont already gets: a plain family name, no quotes or braces to break out of
+ // the `font-family:'…'` declaration it is interpolated into.
+ const fontName = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v.slice(0, 50).replace(/[^\w \-]/g, "") : undefined);
+ if (align(s.headingAlign)) style.headingAlign = s.headingAlign;
+ if (align(s.subtextAlign)) style.subtextAlign = s.subtextAlign;
+ if (align(s.bodyAlign)) style.bodyAlign = s.bodyAlign;
+ if (align(s.ctaAlign)) style.ctaAlign = s.ctaAlign;
+ { const n2 = num(s.headingSizePx, 8, 200); if (n2 !== undefined) style.headingSizePx = n2; }
+ { const n2 = num(s.subtextSizePx, 8, 120); if (n2 !== undefined) style.subtextSizePx = n2; }
+ { const n2 = num(s.lineHeight, 80, 250); if (n2 !== undefined) style.lineHeight = n2; }
+ { const f = fontName(s.subtextFont); if (f) style.subtextFont = f; }
+ if (s.textBold) style.textBold = true;
+ if (s.textItalic) style.textItalic = true;
+ if (s.textUnderline) style.textUnderline = true;
+ // The section's built-in button.
+ if (hex(s.ctaBg)) style.ctaBg = s.ctaBg;
+ if (hex(s.ctaColor)) style.ctaColor = s.ctaColor;
+ if (hex(s.ctaHoverBg)) style.ctaHoverBg = s.ctaHoverBg;
+ if (hex(s.ctaHoverColor)) style.ctaHoverColor = s.ctaHoverColor;
+ if (hex(s.ctaBorderColor)) style.ctaBorderColor = s.ctaBorderColor;
+ { const bw = num(s.ctaBorder, 0, 12); if (bw !== undefined) style.ctaBorder = bw; }
+ if (s.ctaShape === "square" || s.ctaShape === "rounded" || s.ctaShape === "pill") style.ctaShape = s.ctaShape;
+ if (s.ctaSize === "sm" || s.ctaSize === "md" || s.ctaSize === "lg") style.ctaSize = s.ctaSize;
+ { const f = fontName(s.ctaFont); if (f) style.ctaFont = f; }
+ if (s.ctaOutline) style.ctaOutline = true;
+ if (s.ctaFullWidth) style.ctaFullWidth = true;
+ // Section height. Clamped to the same bounds the canvas resize handle enforces, per section type —
+ // a strip (announcement/marquee) tops out far lower than a hero.
+ { const h = num(s.minH, minSectionHeight(b.type), maxSectionHeight(b.type)); if (h !== undefined) style.minH = h; }
  // Per-element free transforms (heading/subtext/cta/… dragged & scaled on the canvas).
  if (s.free && typeof s.free === "object") {
   const free: Record<string, FreeStyle> = {};
@@ -417,6 +469,7 @@ export function sanitizeBlocks(input: unknown): Block[] {
    if (fx !== undefined && fy !== undefined) { entry.x = fx; entry.y = fy; } // position needs both
    if (fp !== undefined) entry.fontPx = fp;
    const fw = num(val.w, 5, 100); if (fw !== undefined) entry.w = fw;
+   const fh = num(val.h, 10, 400); if (fh !== undefined) entry.h = fh; // aspect %, 100 = square
    if (typeof val.font === "string" && val.font.trim()) entry.font = String(val.font).slice(0, 50).replace(/[^\w \-]/g, "");
    if (typeof val.bold === "boolean") entry.bold = val.bold;
    if (typeof val.italic === "boolean") entry.italic = val.italic;

@@ -22,7 +22,7 @@ function TestimonialsCards({ kit }: { kit: EditKit }) {
  if (!items.length) return emptyHint(ctx, "Reviews — add customer quotes");
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-5xl px-6 @xl:px-8 py-16 @xl:py-24" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
+  <section className="vya-free-canvas relative mx-auto max-w-5xl px-6 @xl:px-8 py-10 @lg:py-16 @xl:py-24" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
    <Heading kit={kit} className="mb-12 text-center text-2xl @xl:text-3xl leading-tight" />
    <div className="grid gap-8 @lg:grid-cols-3 @lg:gap-10">
     {items.slice(0, 3).map((t, i) => (
@@ -47,7 +47,7 @@ function TestimonialsSingle({ kit }: { kit: EditKit }) {
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  const t = items[0];
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-3xl px-6 @xl:px-8 py-20 @xl:py-28 text-center">
+  <section className="vya-free-canvas relative mx-auto max-w-3xl px-6 @xl:px-8 py-12 @lg:py-20 @xl:py-28 text-center">
    <Heading kit={kit} className="mb-8 text-[11px] uppercase tracking-[0.24em] opacity-50" />
    <Stars accent={ctx.colors.accent} className="mb-6 flex justify-center" />
    <p className="text-2xl leading-[1.4] @xl:text-[2rem]" style={{ fontFamily: ctx.head }}>“<span {...kit.txtItem(t.quote, (v) => set(0, { quote: v }))} />”</p>
@@ -66,7 +66,7 @@ function TestimonialsPlain({ kit }: { kit: EditKit }) {
  if (!items.length) return emptyHint(ctx, "Reviews — add customer quotes");
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-2xl px-6 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-2xl px-6 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-[11px] uppercase tracking-[0.24em] opacity-50" />
    <div className="flex flex-col gap-9">
     {items.map((t, i) => (
@@ -94,7 +94,7 @@ function TestimonialsMarquee({ kit }: { kit: EditKit }) {
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  const row = ctx.edit ? items : [...items, ...items];
  return (
-  <section className="vya-free-canvas relative py-14 @xl:py-16" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
+  <section className="vya-free-canvas relative py-8 @lg:py-14 @xl:py-16" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
    <div className="mx-auto mb-8 max-w-5xl px-6"><Heading kit={kit} className="text-center text-[11px] uppercase tracking-[0.24em] opacity-50" /></div>
    <div className="vya-tmarq overflow-hidden whitespace-nowrap">
     <div className="vya-tmarq-track inline-flex gap-14" style={ctx.edit ? { animation: "none" } : undefined}>
