@@ -161,6 +161,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/sync-depop-sales",
+      "schedule": "20 * * * *"
+    },
+    {
       "path": "/api/cron/sync-ebay-stats",
       "schedule": "0 7 * * *"
     },

@@ -158,7 +158,7 @@ export async function syncItemToApiPlatforms(storeSlug: string, itemId: string):
  await markCrossListing(storeSlug, itemId, "ebay", "pending");
  const r = await listOnEbay(storeSlug, {
  itemId, title: item.title, description: item.description ?? null, brand: item.brand,
- condition: item.condition, size: item.size, priceCents: item.priceCents, currency: item.currency || "USD",
+ condition: item.condition, size: item.size, material: item.material, priceCents: item.priceCents, currency: item.currency || "USD",
  images: item.images || [],
  }).catch((): EbayResult => ({ ok: false, error: "eBay push failed." }));
  await markCrossListing(storeSlug, itemId, "ebay", r.ok ? "listed" : "error", r.ok ? (r.listingUrl ?? null) : (r.error ?? "error"));

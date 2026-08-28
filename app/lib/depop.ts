@@ -13,8 +13,62 @@ import { getDepopTokens, updateDepopAccessToken } from "./depop-tokens-db";
 const PARTNER_API = "https://partnerapi.depop.com";
 const TAXONOMY_URL = "https://api.depop.com/api/v3/attributes/";
 
+// Configured = we can talk to Depop at all. Partner credentials OR a seller session both count:
+// the partner API was the original plan, the session is the route that actually works.
 export function depopConfigured(): boolean {
- return !!(process.env.DEPOP_CLIENT_ID && process.env.DEPOP_CLIENT_SECRET);
+ return !!(process.env.DEPOP_CLIENT_ID && process.env.DEPOP_CLIENT_SECRET) || process.env.DEPOP_SESSION_MODE === "1";
+}
+
+// ── Auth: bearer token OR captured session ───────────────────────────────────────────────────────
+//
+// The partner API authenticates with `Authorization: Bearer`. A session captured on the seller's
+// phone authenticates with cookies instead — same seller, same account, different credential shape.
+// Both land in the same `access_token` column, so this decides which it is by looking at the value.
+//
+// The heuristic, and why: a JWT is three base64 segments separated by dots and contains no "=" in
+// the middle; a cookie header is `name=value; name=value`. So a "=" means cookie. It is a guess made
+// deliberately loose because we have not yet seen a completed Depop login — once we have, this
+// becomes a stored `kind` column rather than a sniff.
+type DepopAuth = { kind: "session"; cookie: string } | { kind: "bearer"; token: string };
+
+const looksLikeJwt = (v: string) => /^[\w-]+\.[\w-]+\.[\w-]+$/.test(v.trim());
+
+async function depopAuth(storeSlug: string): Promise<DepopAuth | null> {
+ const t = await getDepopTokens(storeSlug);
+ if (!t?.accessToken) return null;
+ const v = t.accessToken.trim();
+ if (!looksLikeJwt(v) && v.includes("=")) return { kind: "session", cookie: v };
+ const token = await accessToken(storeSlug);
+ return token ? { kind: "bearer", token } : null;
+}
+
+/**
+ * One request to Depop, authenticated however this seller is connected.
+ *
+ * A session is only accepted by Depop if the request also LOOKS like the browser it was born in —
+ * a bare fetch with a Node user-agent gets the same Cloudflare 403 the server-side login got. So
+ * session requests carry browser headers. This is not evasion: it is the seller's own live session,
+ * presented the way the client that created it presents it.
+ *
+ * Returns the Response, or null if the request never completed.
+ */
+export async function depopFetch(storeSlug: string, url: string, init: RequestInit = {}): Promise<Response | null> {
+ const auth = await depopAuth(storeSlug);
+ if (!auth) return null;
+ const headers: Record<string, string> = { Accept: "application/json", ...((init.headers as Record<string, string>) || {}) };
+ if (auth.kind === "bearer") headers.Authorization = `Bearer ${auth.token}`;
+ else {
+  headers.Cookie = auth.cookie;
+  headers["User-Agent"] = process.env.DEPOP_USER_AGENT || "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+  headers["Accept-Language"] = "en-US,en;q=0.9";
+ }
+ return fetch(url, { ...init, headers, redirect: "follow" }).catch(() => null);
+}
+
+/** Which base a seller's requests go to — the partner API, or Depop's own, for a session. */
+export async function depopApiBase(storeSlug: string): Promise<string> {
+ const auth = await depopAuth(storeSlug);
+ return auth?.kind === "session" ? (process.env.DEPOP_WEB_API || "https://webapi.depop.com") : PARTNER_API;
 }
 
 // A valid per-seller access token, refreshing via OAuth if we have a refresh token +
@@ -126,6 +180,55 @@ export async function listOnDepop(storeSlug: string, item: DepopItem): Promise<D
  if (!res.ok) return { ok: false, error: `Depop: ${j?.error?.message || j?.message || res.status}` };
  const slug = j?.slug || j?.product?.slug || item.itemId;
  return { ok: true, listingUrl: `https://www.depop.com/products/${slug}` };
+}
+
+// ── Sold-sync read ───────────────────────────────────────────────────────────────────────────────
+export type DepopSale = { sku: string; orderId: string; soldPriceCents: number };
+export type DepopSoldResult = { sales: DepopSale[]; status: "ok" | "unmapped" | "unauthorized" | "error"; detail?: string };
+
+/**
+ * Recent Depop sales for one store.
+ *
+ * THE ENDPOINT IS NOT HARDCODED, ON PURPOSE. Depop's partner API is closed to us and its own web API
+ * is undocumented — we have never completed a login, so we have never seen a sold-items response.
+ * Writing a plausible URL here would produce code that looks finished, returns nothing, and gives no
+ * clue why. So the path comes from DEPOP_SOLD_PATH and, unset, this reports `unmapped` rather than
+ * an empty list: the cron then says "not mapped yet" instead of "no sales", which are very different
+ * facts. Point the probe route at a live session, read the real shape, set the env var.
+ *
+ * The parse is deliberately tolerant for the same reason — several plausible key names for the same
+ * field, so the first real response has a good chance of being understood without a code change.
+ */
+export async function getRecentDepopSoldSkus(storeSlug: string, sinceIso: string): Promise<DepopSoldResult> {
+ const path = process.env.DEPOP_SOLD_PATH;
+ if (!path) return { sales: [], status: "unmapped", detail: "DEPOP_SOLD_PATH is not set — the sold-items endpoint hasn't been mapped yet." };
+
+ const base = await depopApiBase(storeSlug);
+ const url = path.startsWith("http") ? path : `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+ const res = await depopFetch(storeSlug, url.replace("{since}", encodeURIComponent(sinceIso)));
+ if (!res) return { sales: [], status: "error", detail: "Couldn't reach Depop." };
+ if (res.status === 401 || res.status === 403) return { sales: [], status: "unauthorized", detail: `Depop rejected the session (${res.status}).` };
+ if (!res.ok) return { sales: [], status: "error", detail: `Depop returned ${res.status}.` };
+
+ const j: any = await res.json().catch(() => null);
+ if (!j) return { sales: [], status: "error", detail: "Depop returned a body we couldn't parse as JSON." };
+
+ // Find the list wherever it lives, then read each row tolerantly.
+ const rows: any[] = Array.isArray(j) ? j : (j.results || j.products || j.items || j.orders || j.data || []);
+ const since = new Date(sinceIso).getTime();
+ const sales: DepopSale[] = [];
+ for (const r of Array.isArray(rows) ? rows : []) {
+  // The SKU is our itemId — whatever we set when the listing was created.
+  const sku = String(r?.sku ?? r?.external_id ?? r?.reference ?? r?.seller_sku ?? "").trim();
+  if (!sku) continue;
+  const soldAt = r?.sold_at ?? r?.date_sold ?? r?.updated_at ?? r?.created_at;
+  const t = soldAt ? new Date(soldAt).getTime() : NaN;
+  if (!Number.isNaN(t) && t < since) continue; // older than the window
+  const priceRaw = r?.sold_price?.amount ?? r?.price?.amount ?? r?.price_amount ?? r?.price;
+  const soldPriceCents = Math.round(Number(priceRaw || 0) * (String(priceRaw).includes(".") || Number(priceRaw) < 1000 ? 100 : 1)) || 0;
+  sales.push({ sku, orderId: String(r?.id ?? r?.order_id ?? r?.transaction_id ?? sku), soldPriceCents });
+ }
+ return { sales, status: "ok" };
 }
 
 // Pull a Depop listing (delete by SKU) — used when it sells elsewhere.

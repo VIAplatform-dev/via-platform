@@ -13,7 +13,7 @@ import { Input } from "@/app/store/ui";
 type Platform = { key: string; name: string; hasApi: boolean; mode: "api" | "extension" | "soon" };
 type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { configured: boolean; connected: boolean; user: string | null };
-type EbayReady = { readyToList: boolean; tokenValid: boolean; policies: { fulfillment: boolean; payment: boolean; return: boolean } };
+type EbayReady = { readyToList: boolean; tokenValid: boolean; sellerRegistered?: boolean; hasLocation?: boolean; policies: { fulfillment: boolean; payment: boolean; return: boolean }; reason?: string | null };
 
 // Sort order in the list: real API first, extension channels next, coming-soon last.
 const RANK: Record<Platform["mode"], number> = { api: 0, extension: 1, soon: 2 };
@@ -69,8 +69,10 @@ export default function CrossListingSettingsPage() {
 
  async function runEbaySetup() {
  setEbaySetupBusy(true);
- const r = await fetch("/api/store/cross-listing/ebay/setup", { method: "POST" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
- if (r) setEbayReady({ readyToList: !!r.ok, tokenValid: true, policies: r.policies });
+ await fetch("/api/store/cross-listing/ebay/setup", { method: "POST" }).catch(() => null);
+ // Re-read the real status so the badge reflects the actual outcome (and its reason if still not ready).
+ const st = await fetch("/api/store/cross-listing/ebay/status").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ if (st?.ok) setEbayReady(st);
  setEbaySetupBusy(false);
  }
 
@@ -125,8 +127,12 @@ export default function CrossListingSettingsPage() {
  <p className="text-[11px] text-[var(--accent-ink,#0b7a5c)]">Ready to list — payment, shipping &amp; returns are set.</p>
  ) : (
  <div className="mt-0.5 flex flex-wrap items-center gap-2">
- <span className="text-[11px] text-amber-600">eBay needs business policies before it can list.</span>
+ <span className="text-[11px] text-amber-600">{ebayReady.reason || "Finish eBay setup before it can list."}</span>
+ {ebayReady.sellerRegistered === false ? (
+ <span className="text-[11px] text-stone-400">Reconnect your eBay seller account below.</span>
+ ) : (
  <button onClick={runEbaySetup} disabled={ebaySetupBusy} className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-50">{ebaySetupBusy ? "Setting up…" : "Set up automatically"}</button>
+ )}
  </div>
  ))}
  </div>
