@@ -8,6 +8,7 @@ import { getImportedOrderTitleSet } from "./imported-orders-db";
 import { extractMeasurements } from "./measurements";
 import { inferItemFields } from "./infer-item-fields";
 import type { ImportedProduct } from "./store-import";
+import { MAX_ITEM_IMAGES } from "./item-limits";
 
 const parseCents = (price?: string) => Math.round((parseFloat((price || "").replace(/[^0-9.]/g, "")) || 0) * 100);
 const detectCur = (price?: string) => (/£/.test(price || "") ? "GBP" : /€/.test(price || "") ? "EUR" : "USD");
@@ -36,7 +37,7 @@ export async function importProductsAsItems(slug: string, products: ImportedProd
  // Store the source URLs now (fast import); the rehost-images cron copies them onto
  // OUR storage in the background so the interactive import doesn't wait on hundreds of
  // image uploads. Durability without the slow import.
- const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, 8);
+ const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, MAX_ITEM_IMAGES);
  // Sort the unstructured signal (title + description) into brand/era/condition/category/material.
  const inf = inferItemFields(title, p.description);
  await createItem({
@@ -85,7 +86,7 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  let raw: string[] = [];
  if (p.images) { try { const a = JSON.parse(p.images); if (Array.isArray(a)) raw = a; } catch {} }
  if (!raw.length && p.image) raw = [p.image];
- const images = raw.slice(0, 8); // rehost-images cron copies these to our storage in the background
+ const images = raw.slice(0, MAX_ITEM_IMAGES); // rehost-images cron copies these to our storage in the background
  // Carry over what the source had; fill any blanks by inferring from title + description.
  const inf = inferItemFields(title, p.description, { brand: p.brand, era: p.era, material: p.materials, condition: p.condition, category: p.product_type });
  await createItem({

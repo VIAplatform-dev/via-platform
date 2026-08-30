@@ -120,9 +120,11 @@ export async function removePlatformAccount(storeSlug: string, platform: string)
 }
 
 /** On publish to VYA: queue a cross-listing for every connected, auto-list platform. */
-export async function createCrossListingsForItem(storeSlug: string, itemId: string): Promise<number> {
+export async function createCrossListingsForItem(storeSlug: string, itemId: string, only?: string[] | null): Promise<number> {
  await ensureTables();
- const accounts = (await getPlatformAccounts(storeSlug)).filter((a) => a.autoList);
+ const all = await getPlatformAccounts(storeSlug);
+ // `only` = the seller's explicit per-listing choice (overrides the per-channel autoList default).
+ const accounts = only && only.length ? all.filter((a) => only.includes(a.platform)) : all.filter((a) => a.autoList);
  if (!accounts.length) return 0;
  const sql = db();
  let n = 0;
@@ -135,11 +137,12 @@ export async function createCrossListingsForItem(storeSlug: string, itemId: stri
 
 // Actually POST to the platforms that have a real API (eBay + Depop). Best-effort +
 // background: on success we store the live listing URL, on failure the error message.
-export async function syncItemToApiPlatforms(storeSlug: string, itemId: string): Promise<void> {
+export async function syncItemToApiPlatforms(storeSlug: string, itemId: string, only?: string[] | null): Promise<void> {
+ const want = (k: string) => !only || !only.length || only.includes(k);
  const [ebayOn, depopOn, etsyOn] = await Promise.all([
- ebayConnected(storeSlug).catch(() => false),
- depopConnected(storeSlug).catch(() => false),
- etsyConnected(storeSlug).catch(() => false),
+ want("ebay") ? ebayConnected(storeSlug).catch(() => false) : Promise.resolve(false),
+ want("depop") ? depopConnected(storeSlug).catch(() => false) : Promise.resolve(false),
+ want("etsy") ? etsyConnected(storeSlug).catch(() => false) : Promise.resolve(false),
  ]);
  if (!ebayOn && !depopOn && !etsyOn) return;
  const item = await getItem(itemId).catch(() => null);

@@ -2,6 +2,7 @@ import { getSellerBySlug } from "./db/sellers";
 import { createItem, updateItem, removeItem, getItem, listAvailableItems, listSellerItems } from "./db/inventory";
 import { getOrCreateCollection, setItemCollections } from "./db/collections";
 import type { Item } from "./db/index";
+import { MAX_ITEM_IMAGES } from "./item-limits";
 
 // Resolve collection titles → ids (creating any new ones) and set an item's membership.
 // `titles === undefined` means "leave collections untouched" (so a plain title/price edit
@@ -138,7 +139,7 @@ export function sanitizeListingInput(body: any, defaultCurrency = "USD"): Listin
  title: (typeof body?.title === "string" ? body.title : "").trim().slice(0, 200),
  price: Math.max(0, Math.min(1_000_000, Number(body?.price) || 0)),
  currency: defaultCurrency,
- images: Array.isArray(body?.images) ? body.images.filter((x: any) => typeof x === "string" && x).slice(0, 8) : [],
+ images: Array.isArray(body?.images) ? body.images.filter((x: any) => typeof x === "string" && x).slice(0, MAX_ITEM_IMAGES) : [],
  size: s(body?.size, 40),
  measurements: s(body?.measurements, 300),
  description: s(body?.description, 2000),

@@ -463,6 +463,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  const token = await accessToken(storeSlug);
  if (!token) return { ok: false, error: "eBay isn’t connected — reconnect the account." };
  const sku = item.itemId;
+ // 12 is the cap we send EBAY, not VYA's own limit — see app/lib/item-limits.ts.
  const images = (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 12);
  if (!images.length) return { ok: false, error: "eBay needs at least one hosted image." };
 

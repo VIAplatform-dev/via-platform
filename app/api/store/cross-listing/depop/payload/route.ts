@@ -122,6 +122,7 @@ export async function GET(request: NextRequest) {
    size: depopSize(item.size, item.category),
    category: item.category || "",
    packageSize: depopPackageSize(item.weightOz),
+   // 8 is DEPOP's cap, not ours — see app/lib/item-limits.ts.
    photos: (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 8),
   },
  });

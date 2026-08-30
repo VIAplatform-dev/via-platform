@@ -149,6 +149,8 @@ export async function listOnDepop(storeSlug: string, item: DepopItem): Promise<D
  if (!depopConfigured()) return { ok: false, error: "Depop isn’t configured on the server." };
  const token = await accessToken(storeSlug);
  if (!token) return { ok: false, error: "Depop isn’t connected — reconnect the account." };
+ // 8 is DEPOP's cap, not ours (VYA allows MAX_ITEM_IMAGES). A listing with more
+ // photos sends Depop its first 8 rather than failing — don't raise this to match.
  const images = (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 8);
  if (!images.length) return { ok: false, error: "Depop needs at least one hosted image." };
 

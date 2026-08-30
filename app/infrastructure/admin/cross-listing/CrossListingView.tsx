@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download, ExternalLink } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD } from "../ui";
 
@@ -124,9 +124,9 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  await fetch("/api/store/cross-listing", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, platform }) });
  load();
  }
- async function retry(itemId: string) {
+ async function retry(itemId: string, channels?: string[]) {
  setRetrying(itemId);
- const r = await fetch("/api/store/cross-listing/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch("/api/store/cross-listing/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, channels }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  if (r?.ok && r.board) setBoard(r.board);
  setRetrying(null);
  }
@@ -285,7 +285,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  </div>
  )}
 
- {/* the products board */}
+ {/* the products board — a marketplace matrix: item on the left, one status cell per channel */}
  <TechCard className="overflow-hidden">
  <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-3">
  {board.length > 0 && (
@@ -293,7 +293,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  )}
  <div className="flex-1">
  <h3 className="text-[13px] font-semibold text-stone-900">Listings</h3>
- <p className="mt-0.5 text-[12px] text-stone-500">Where each active piece stands — select items to queue them in bulk.</p>
+ <p className="mt-0.5 text-[12px] text-stone-500">Where each piece stands on every channel — select items to queue them in bulk.</p>
  </div>
  </div>
  {board.length === 0 ? (
@@ -301,88 +301,75 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  <TechEmpty icon={<Tag size={28} strokeWidth={1.5} />} title="No active listings" body="Publish a piece to VYA and it’ll show here, ready to cross-list." />
  </div>
  ) : (
- <div className="divide-y divide-stone-100">
- {board.map((it) => (
- <div key={it.itemId} className={`px-5 py-3 ${selected.has(it.itemId) ? "bg-[var(--accent-ink,#0b7a5c)]/[0.04]" : ""}`}>
+ <div className="overflow-x-auto">
+ <table className="w-full min-w-[560px] text-[13px]">
+ <thead>
+ <tr className="border-b border-stone-100">
+ <th className="w-9 px-4 py-2.5"></th>
+ <th className="px-1 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">Item</th>
+ {connected.map((p) => (
+ <th key={p.key} className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] font-medium uppercase tracking-wide text-stone-400">{p.name}</th>
+ ))}
+ </tr>
+ </thead>
+ <tbody className="divide-y divide-stone-100">
+ {board.map((it) => {
+ const qs = queueState[it.itemId];
+ return (
+ <Fragment key={it.itemId}>
+ <tr className={selected.has(it.itemId) ? "bg-[var(--accent-ink,#0b7a5c)]/[0.04]" : "hover:bg-stone-50/60"}>
+ <td className="px-4 py-3"><input type="checkbox" checked={selected.has(it.itemId)} onChange={() => toggleSelect(it.itemId)} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent-ink,#0b7a5c)]" /></td>
+ <td className="px-1 py-3">
  <div className="flex items-center gap-3">
- <input type="checkbox" checked={selected.has(it.itemId)} onChange={() => toggleSelect(it.itemId)} className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--accent-ink,#0b7a5c)]" />
- <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-stone-100">{it.image && <img src={it.image} alt="" className="h-full w-full object-cover" />}</div>
- <div className="min-w-0 flex-1">
+ <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-stone-100">{it.image && <img src={it.image} alt="" className="h-full w-full object-cover" />}</div>
+ <div className="min-w-0 max-w-[240px]">
  <p className="truncate text-[13px] font-medium text-stone-800">{it.title}</p>
- <div className="flex items-center gap-2.5 text-[12px] text-stone-400">
+ <div className="flex items-center gap-2 text-[12px] text-stone-400">
  <span>{money(it.priceCents)}</span>
- {it.stats && (it.stats.totals.likes + it.stats.totals.offers + it.stats.totals.views + it.stats.totals.watchers) > 0 && (
- <span className="flex items-center gap-2.5" title={statTip(it.stats.byPlatform)}>
- {it.stats.totals.likes > 0 && <span className="inline-flex items-center gap-1 text-stone-500"><Heart size={11} className="text-rose-400" fill="currentColor" />{it.stats.totals.likes}</span>}
- {it.stats.totals.offers > 0 && <span className="inline-flex items-center gap-1 font-medium text-[var(--accent-ink,#0b7a5c)]"><Tag size={11} />{it.stats.totals.offers}</span>}
- {it.stats.totals.views > 0 && <span className="inline-flex items-center gap-1 text-stone-500"><Eye size={11} />{it.stats.totals.views}</span>}
- {it.stats.totals.watchers > 0 && <span className="inline-flex items-center gap-1 text-stone-500"><Bookmark size={11} />{it.stats.totals.watchers}</span>}
- </span>
- )}
+ {it.stats && it.stats.totals.offers > 0 && <span className="inline-flex items-center gap-1 font-medium text-[var(--accent-ink,#0b7a5c)]" title={statTip(it.stats.byPlatform)}><Tag size={11} />{it.stats.totals.offers}</span>}
+ {it.stats && it.stats.totals.likes > 0 && <span className="inline-flex items-center gap-1 text-stone-400"><Heart size={11} className="text-rose-400" fill="currentColor" />{it.stats.totals.likes}</span>}
  </div>
  </div>
- <div className="hidden flex-wrap justify-end gap-1 sm:flex">
+ </div>
+ </td>
  {connected.map((p) => {
  const st = it.listings[p.key];
- const meta = st ? STATUS[st] : null;
+ const isExt = p.mode === "extension" && QUEUEABLE.has(p.key);
  return (
- <StatusPill key={p.key} tone={meta?.tone || "neutral"} className="px-1.5 py-0.5 text-[10px]">
- {p.name}{meta ? `: ${meta.label}` : ""}
- </StatusPill>
+ <td key={p.key} className="whitespace-nowrap px-3 py-3 text-center">
+ {st === "listed" ? (
+ <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><Check size={13} strokeWidth={2.6} />Listed</span>
+ ) : st === "pending" ? (
+ <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Queued</span>
+ ) : st === "sold" ? (
+ <span className="text-[11px] text-stone-500">Sold</span>
+ ) : st === "error" ? (
+ <button onClick={() => retry(it.itemId)} disabled={retrying === it.itemId} className="text-[11px] font-medium text-rose-600 hover:underline disabled:opacity-50">{retrying === it.itemId ? "…" : "Failed"}</button>
+ ) : isExt ? (
+ <button onClick={() => queueForPlatform(it.itemId, it.title, p.key)} disabled={qs === "queuing" || qs === "ok"} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{qs === "queuing" ? "…" : qs === "ok" ? "Queued ✓" : "List"}</button>
+ ) : p.hasApi ? (
+ <button onClick={() => retry(it.itemId, [p.key])} disabled={retrying === it.itemId} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{retrying === it.itemId ? "Listing…" : "List"}</button>
+ ) : (
+ <span className="text-[13px] text-stone-300">—</span>
+ )}
+ </td>
  );
  })}
- </div>
- <div className="relative flex shrink-0 items-center gap-2">
- {extMarketplaces.filter((p) => QUEUEABLE.has(p.key) && it.listings[p.key] !== "listed" && it.listings[p.key] !== "sold").map((p) => (
- <button key={p.key} onClick={() => queueForPlatform(it.itemId, it.title, p.key)} disabled={queueState[it.itemId] === "queuing" || queueState[it.itemId] === "ok"} title={extInstalled ? `Stage this item and open it on ${p.name} from the extension` : `Marks it queued; install the VYA extension to auto-fill ${p.name}`} className="rounded bg-[var(--accent-ink,#0b7a5c)] px-2 py-0.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-60">
- {queueState[it.itemId] === "queuing" ? "Queuing…" : queueState[it.itemId] === "ok" ? "Queued ✓" : queueState[it.itemId] === "err" ? "Retry" : `Queue for ${p.name}`}
- </button>
- ))}
- <button onClick={() => openContent(it.itemId)} className="text-[12px] font-medium text-[var(--accent-ink,#0b7a5c)] hover:underline">Content</button>
- <button onClick={() => setSoldMenu(soldMenu === it.itemId ? null : it.itemId)} className="flex items-center gap-0.5 text-[12px] text-stone-500 hover:text-stone-800">Sold <ChevronDown size={13} /></button>
- {soldMenu === it.itemId && (
- <div className="absolute right-0 top-6 z-10 w-40 rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
- <p className="px-3 py-1 text-[10px] uppercase tracking-wide text-stone-400">Sold on…</p>
- {[{ key: "vya", name: "VYA" }, ...connected].map((p) => (
- <button key={p.key} onClick={() => markSold(it.itemId, p.key)} className="block w-full px-3 py-1.5 text-left text-[13px] text-stone-700 hover:bg-stone-50">{p.name}</button>
- ))}
- </div>
- )}
- </div>
- </div>
-
+  </tr>
  {it.errors && Object.keys(it.errors).length > 0 && (
- <div className="mt-2 rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2">
+ <tr><td colSpan={connected.length + 2} className="px-5 pb-3">
+ <div className="rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2">
  {Object.entries(it.errors).map(([k, msg]) => (
  <p key={k} className="text-[11px] leading-snug text-rose-700"><span className="font-semibold">{nameFor(k)} couldn’t list:</span> {msg}</p>
  ))}
- <button onClick={() => retry(it.itemId)} disabled={retrying === it.itemId} className="mt-1.5 rounded bg-rose-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-rose-700 disabled:opacity-50">{retrying === it.itemId ? "Retrying…" : "Retry"}</button>
  </div>
+ </td></tr>
  )}
-
- {open === it.itemId && (
- <div className="mt-3 rounded-lg border border-stone-200 bg-stone-50/60 p-3">
- {!content ? <p className="py-3 text-center text-[12px] text-stone-400">Generating…</p> : (
- <div className="space-y-3">
- {connected.length === 0 && <p className="text-[12px] text-stone-500">Connect a marketplace in settings to get tailored content.</p>}
- {(connected.length ? connected : platforms).map((p) => {
- const c = content[p.key]; if (!c) return null;
- return (
- <div key={p.key} className="rounded-md border border-stone-200 bg-white p-3">
- <p className="mb-1.5 text-[12px] font-semibold text-stone-700">{p.name} <span className="font-normal text-stone-400">· {c.price}</span></p>
- <div className="space-y-1.5 text-[12px]">
- <Field label="Title" val={c.title} k={`${it.itemId}-${p.key}-t`} copied={copied} copy={copy} />
- <Field label="Description" val={c.body} k={`${it.itemId}-${p.key}-b`} copied={copied} copy={copy} multiline />
- </div>
- </div>
+  </Fragment>
  );
  })}
- </div>
- )}
- </div>
- )}
- </div>
- ))}
+ </tbody>
+ </table>
  </div>
  )}
  </TechCard>

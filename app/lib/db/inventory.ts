@@ -30,6 +30,10 @@ export async function ensurePublishAtColumn(): Promise<void> {
  try {
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS publish_at timestamptz`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements text`);
+ // The seller's per-listing cross-listing choice, kept so a SCHEDULED piece still fans
+ // out to the channels they picked when the cron publishes it hours later. NULL means
+ // "no explicit choice" — fall back to each channel's auto-list default.
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS cross_list_channels text[]`);
  publishAtEnsured = true;
  } catch { /* db:push covers it; ignore if we lack DDL rights */ }
 }
@@ -272,4 +276,28 @@ export async function getItem(itemId: string): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.select().from(items).where(eq(items.id, itemId)).limit(1);
  return row ?? null;
+}
+
+/**
+ * Remember which marketplaces a listing should fan out to. Written at publish time
+ * (including when scheduled), read back by the scheduled-publish cron so a choice
+ * made in the form isn't silently replaced by the account defaults later.
+ */
+export async function setCrossListChannels(itemId: string, channels: string[] | null): Promise<void> {
+ await ensurePublishAtColumn();
+ await getDb()
+  .update(items)
+  .set({ crossListChannels: channels && channels.length ? channels : null })
+  .where(eq(items.id, itemId));
+}
+
+/** The stored choice, or null when the seller never made one. */
+export async function getCrossListChannels(itemId: string): Promise<string[] | null> {
+ await ensurePublishAtColumn();
+ const [row] = await getDb()
+  .select({ channels: items.crossListChannels })
+  .from(items)
+  .where(eq(items.id, itemId))
+  .limit(1);
+ return row?.channels?.length ? row.channels : null;
 }

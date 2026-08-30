@@ -6,6 +6,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, Toggle, cn } from "../ui"
 import { CategoryBreadcrumb } from "../CategoryPicker";
 import { toCategorySlug } from "@/app/lib/item-tags";
 import { PriceScale } from "../PriceScale";
+import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
 type Field = { value: string | null; confidence: number };
 type Draft = {
@@ -103,6 +104,10 @@ export default function IntakePage() {
  const [seoBusy, setSeoBusy] = useState(false);
  const [schedule, setSchedule] = useState(""); // datetime-local value for scheduled publish
  const [scheduledAt, setScheduledAt] = useState<string | null>(null); // set on the done screen
+ // Cross-listing: which connected marketplaces this piece goes to, and where it landed.
+ const [channelMeta, setChannelMeta] = useState<{ key: string; name: string; mode: string; autoList: boolean }[]>([]);
+ const [channels, setChannels] = useState<Record<string, boolean>>({});
+ const [crossResult, setCrossResult] = useState<{ platform: string; name: string; status: string; url: string | null }[]>([]);
  const [cols, setCols] = useState<Collection[]>([]);
  const [selectedCols, setSelectedCols] = useState<string[]>([]);
  const [newCol, setNewCol] = useState("");
@@ -140,6 +145,10 @@ export default function IntakePage() {
  draftId: draftIdRef.current,
  title: form.title,
  price: Number(form.price) || 0,
+ // Cost and measurements were missing here while publish sent them, so an autosaved
+ // draft quietly lost both — cost is what the profit reporting runs on.
+ cost: form.cost === "" ? null : Number(form.cost) || 0,
+ measurements: form.measurements || null,
  images: [ghost, ...photos].filter(Boolean),
  brand: form.brand || null,
  era: form.era || null,
@@ -230,7 +239,7 @@ export default function IntakePage() {
  // Upload photos only — AI is a separate, on-demand step ("Fill the rest with AI").
  async function onPick(files: FileList | File[] | null) {
  if (!files) return;
- const list = Array.from(files).filter((f) => !f.type || f.type.startsWith("image/")).slice(0, 8);
+ const list = Array.from(files).filter((f) => !f.type || f.type.startsWith("image/")).slice(0, MAX_ITEM_IMAGES);
  if (!list.length) return;
  setBusy(true);
  setBusyMsg(list.length > 1 ? `Uploading ${list.length} photos…` : "Uploading…");
@@ -245,7 +254,7 @@ export default function IntakePage() {
  if (!up.ok) throw new Error(ud.error || "Upload failed");
  urls.push(ud.url);
  }
- setPhotos(urls.slice(0, 8));
+ setPhotos(urls.slice(0, MAX_ITEM_IMAGES));
  } catch (e) {
  setErr(e instanceof Error ? e.message : "Something went wrong");
  }
@@ -423,6 +432,26 @@ export default function IntakePage() {
  }
 
  // publishAt (ISO) = schedule it: the server saves it as a draft now and the cron publishes it then.
+ // Connected marketplaces → the "List on" checklist. Each starts at its own auto-list
+ // setting: eBay/Etsy list through an API so they default on once connected; Depop and
+ // Vestiaire follow the per-channel autoList flag the seller set in cross-listing settings.
+ useEffect(() => {
+ fetch("/api/store/cross-listing").then((r) => (r.ok ? r.json() : null)).then((d) => {
+  if (!d) return;
+  const acct = (k: string) => (d.accounts || []).find((a: { platform: string }) => a.platform === k);
+  const connected = (d.platforms || []).filter((pl: { key: string }) =>
+   acct(pl.key) || (pl.key === "ebay" && d.ebay?.connected) || (pl.key === "etsy" && d.etsy?.connected));
+  const meta = connected.map((pl: { key: string; name: string; mode: string }) => ({
+   key: pl.key, name: pl.name, mode: pl.mode,
+   autoList: pl.key === "ebay" || pl.key === "etsy" ? true : Boolean(acct(pl.key)?.autoList),
+  }));
+  setChannelMeta(meta);
+  const init: Record<string, boolean> = {};
+  meta.forEach((m: { key: string; autoList: boolean }) => { init[m.key] = m.autoList; });
+  setChannels(init);
+ }).catch(() => {});
+ }, []);
+
  async function publish(status: "active" | "draft" = "active", publishAt?: string) {
  if (!form.title.trim()) { setErr("Add a title first."); return; }
  if (!photos.length) { setErr("Add at least one photo."); return; }
@@ -436,7 +465,7 @@ export default function IntakePage() {
  const r = await fetch("/api/store/intake/publish", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ ...form, status, publishAt: publishAt || null, draftId: draftIdRef.current, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
+ body: JSON.stringify({ ...form, status, publishAt: publishAt || null, draftId: draftIdRef.current, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, channels: Object.keys(channels).filter((k) => channels[k]), consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
@@ -456,7 +485,7 @@ export default function IntakePage() {
  draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
  setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null);
+ setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
  }
 
  // ── Done ──
@@ -467,6 +496,28 @@ export default function IntakePage() {
  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">✓</div>
  <p className="text-xl font-semibold text-stone-900">{scheduledAt ? "Scheduled" : savedDraft ? "Saved as draft" : "Listed"}</p>
  <p className="mt-1 text-sm text-stone-500">{scheduledAt ? `It’ll go live automatically on ${new Date(scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.` : savedDraft ? "It’s in your inventory — publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
+ {/* Where the piece actually landed. eBay/Etsy answer synchronously; Depop and
+     Vestiaire come back queued for the extension to finish. */}
+ {!scheduledAt && !savedDraft && crossResult.length > 0 && (
+  <div className="mx-auto mt-5 max-w-sm space-y-2 text-left">
+   {crossResult.map((c) => {
+    const listed = c.status === "listed";
+    const queued = c.status === "pending";
+    return (
+     <div key={c.platform} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-3.5 py-2.5">
+      <div className="min-w-0 flex-1">
+       <div className="text-[13px] font-medium text-stone-800">{c.name}</div>
+       <div className="text-[11px] text-stone-400">{listed ? "Live now" : queued ? "Open the extension to finish — it’s pre-filled" : "Couldn’t list — check the details"}</div>
+      </div>
+      {listed && c.url && <a href={c.url} target="_blank" rel="noopener" className="text-[11px] font-semibold text-[var(--accent,#0e9f76)] hover:underline">View</a>}
+      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", listed ? "bg-emerald-50 text-emerald-700" : queued ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700")}>
+       {listed ? "Listed" : queued ? "Queued" : "Failed"}
+      </span>
+     </div>
+    );
+   })}
+  </div>
+ )}
  <div className="mt-6 flex items-center justify-center gap-3">
  <TechButton onClick={reset}>List another</TechButton>
  <TechButton variant="secondary" onClick={() => { window.location.href = "/admin/inventory"; }}>View inventory</TechButton>
@@ -528,7 +579,15 @@ export default function IntakePage() {
  <img src={ghost || photos[0]} alt="" className="h-full w-full object-cover" />
  </div>
  </TechCard>
- <p className="mt-2 text-[11px] uppercase tracking-[0.08em] text-stone-400">{ghost ? "Ghost-mannequin cover" : "Your photo"}</p>
+ <p className="mt-2 flex items-baseline justify-between gap-2 text-[11px] uppercase tracking-[0.08em] text-stone-400">
+ <span>{ghost ? "Ghost-mannequin cover" : photos.length === 1 ? "Your photo" : "Your photos"}</span>
+ {photos.length > 0 && (
+  <span className="tabular-nums normal-case tracking-normal">
+   {photos.length} of {MAX_ITEM_IMAGES}
+   {photos.length >= MAX_ITEM_IMAGES ? " · full" : ""}
+  </span>
+ )}
+</p>
  <div className="mt-2 flex flex-wrap gap-1.5">
  {photos.map((p, i) => (
  <div
@@ -563,7 +622,7 @@ export default function IntakePage() {
  >
  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft,#eafaf3)] text-[var(--accent,#0e9f76)]"><Camera size={20} /></span>
  <p className="text-[13px] font-medium text-stone-700">{busy ? busyMsg : "Add photos"}</p>
- <p className="mt-1 text-[11px] text-stone-400">or drag here · up to 8 · include the tag</p>
+ <p className="mt-1 text-[11px] text-stone-400">or drag here · up to {MAX_ITEM_IMAGES} · include the tag</p>
  </div>
  )}
 
@@ -705,6 +764,84 @@ export default function IntakePage() {
  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const t = newCol.trim(); if (t && !selectedCols.includes(t)) setSelectedCols((s) => [...s, t]); setNewCol(""); } }}
  placeholder="New collection — type &amp; Enter (Y2K, Designer bags…)" />
  </div>
+
+
+ {channelMeta.length > 0 && (
+
+  <div className="w-full border-t border-stone-100 pt-4">
+
+   <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
+
+    <span className="pt-1 text-[11px] uppercase tracking-[0.14em] text-stone-400 sm:w-20 sm:shrink-0">List on</span>
+
+    <div className="flex-1 space-y-3">
+
+     {channelMeta.map((m) => {
+
+      const on = !!channels[m.key];
+
+      return (
+
+       <button
+
+        key={m.key}
+
+        type="button"
+
+        role="checkbox"
+
+        aria-checked={on}
+
+        onClick={() => setChannels((c) => ({ ...c, [m.key]: !c[m.key] }))}
+
+        className="flex w-full items-start gap-3 text-left"
+
+       >
+
+        <span className={cn("mt-[1px] flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md border transition",
+
+         on ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white" : "border-stone-300 bg-white")}>
+
+         {on && (
+
+          <svg viewBox="0 0 12 12" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+           <path d="M2.5 6.5 5 9l4.5-5" />
+
+          </svg>
+
+         )}
+
+        </span>
+
+        <span className="min-w-0">
+
+         <span className={cn("block text-[14px] font-semibold transition", on ? "text-stone-900" : "text-stone-400")}>{m.name}</span>
+
+         <span className="block text-[12px] text-stone-400">
+
+          {m.mode === "extension" ? "Queues for the extension to post" : "Lists automatically via API"}
+
+         </span>
+
+        </span>
+
+       </button>
+
+      );
+
+     })}
+
+    </div>
+
+   </div>
+
+   <p className="mt-3 text-[11px] text-stone-400 sm:pl-[104px]">Your storefront always goes live — these are the extra marketplaces.</p>
+
+  </div>
+
+ )}
+
 
  <div className="flex flex-wrap items-center gap-4 border-t border-stone-100 pt-4">
  <TechButton onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>

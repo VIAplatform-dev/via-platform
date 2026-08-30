@@ -26,6 +26,9 @@ export default function CrossListingSettingsPage() {
  const [handles, setHandles] = useState<Record<string, string>>({});
  const [ebayReady, setEbayReady] = useState<EbayReady | null>(null);
  const [ebaySetupBusy, setEbaySetupBusy] = useState(false);
+ const [extInstalled, setExtInstalled] = useState(false);
+ const [importStarted, setImportStarted] = useState(false);
+ const [importedAlready, setImportedAlready] = useState(false);
 
  async function load() {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
@@ -67,6 +70,23 @@ export default function CrossListingSettingsPage() {
  return () => { active = false; };
  }, [ebay?.connected]);
 
+ // The VYA extension tags the page when installed; the Depop import needs it.
+ useEffect(() => {
+ fetch("/api/store/onboarding-status").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && d.importedElsewhere) setImportedAlready(true); }).catch(() => {});
+ const check = () => setExtInstalled(document.documentElement.getAttribute("data-vya-ext") === "1");
+ check();
+ const obs = new MutationObserver(check);
+ obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-vya-ext"] });
+ return () => obs.disconnect();
+ }, []);
+
+ // One button to pull a Depop-native seller's whole shop into VYA: the page tells the extension, the
+ // extension opens Depop and imports, and the drafts land back here in Inventory.
+ function startImport() {
+ try { window.postMessage({ source: "vya-crosslist", type: "import-depop" }, window.location.origin); } catch { /* ignore */ }
+ setImportStarted(true);
+ }
+
  async function runEbaySetup() {
  setEbaySetupBusy(true);
  await fetch("/api/store/cross-listing/ebay/setup", { method: "POST" }).catch(() => null);
@@ -92,6 +112,20 @@ export default function CrossListingSettingsPage() {
  </div>
  <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener" className="shrink-0"><Download size={14} /> Add to Chrome</TechButtonLink>
  </TechCard>
+
+ {/* Onboarding: pull an existing Depop shop into VYA in one pass. Hidden once they've imported. */}
+ {!importedAlready && (
+ <TechCard className="mb-5 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+ <div>
+ <p className="text-[14px] font-semibold text-stone-900">Coming from Depop? Import your shop</p>
+ <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">Pull your whole Depop catalog — listings <span className="text-stone-400">and</span> sold history — into VYA as drafts in one pass, so you don&apos;t re-list a thing. {extInstalled ? "Opens Depop and imports on its own." : "Install the extension above first."}</p>
+ {importStarted && <p className="mt-1.5 text-[12px] font-medium text-[var(--accent-ink,#0b7a5c)]">Opening Depop and importing… watch the panel there, then come back — your drafts appear in Inventory.</p>}
+ </div>
+ {extInstalled
+ ? <TechButton onClick={startImport} disabled={importStarted} className="shrink-0">{importStarted ? "Importing…" : "Import my Depop shop"}</TechButton>
+ : <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener" className="shrink-0"><Download size={14} /> Get the extension</TechButtonLink>}
+ </TechCard>
+ )}
 
  <TechCard className="overflow-hidden">
  {loading ? (
