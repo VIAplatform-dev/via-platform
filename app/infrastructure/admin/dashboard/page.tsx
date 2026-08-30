@@ -1,538 +1,1145 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { AdminPage, AdminHeader, TechCard, TechEmpty, MetricCard, AreaChart, DonutChart, SegmentedControl, TH, TD, DONUT_COLORS } from "../ui";
+import { Fragment, Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BarChart3 } from "lucide-react";
+import type { AnalyticsSuite } from "@/app/lib/analytics/suite";
+import { AdminPage, AdminHeader, TechCard, TechEmpty, MetricCard, AreaChart, DonutChart, StatusPill, TechButton, TH, TD, DONUT_COLORS, cn } from "../ui";
+import { PeriodPicker, type PeriodValue } from "./PeriodPicker";
 
-type Overview = {
- periodDays: number | "all";
- revenueCents: number;
- orders: number;
- aovCents: number;
- revenueByDay: { day: string; cents: number }[];
- inventory: { active: number; draft: number; sold: number; activeValueCents: number };
- topBrands: { brand: string; sold: number; revenueCents: number }[];
- topCategories: { category: string; sold: number; revenueCents: number }[];
- recentSales: { title: string; amountCents: number; at: string | null }[];
- customers: number;
- buyers: number;
- newBuyers: number;
- returningBuyers: number;
- prior: { revenueCents: number; orders: number };
- sessions: number;
- productViews: number;
- favorites: number;
- topViewed: { itemId: string; title: string; count: number }[];
- topFavorited: { itemId: string; title: string; count: number }[];
- topSearches: { query: string; count: number }[];
-};
-
-type ChannelRow = { channel: string; clicks: number; orders: number; sales: number; convPct: number; aov: number };
-type Traffic = { total: number; byType: { type: string; sessions: number }[]; topSources: { source: string; type: string; sessions: number }[] };
-type TopPages = { total: number; byType: { type: string; views: number }[]; pages: { path: string; type: string; title: string | null; views: number; visitors: number }[] };
-type FunnelItem = { itemId: string; title: string; image: string | null; price: number | null; currency: string; status: string | null; views: number; favorites: number; checkouts: number; purchases: number; abandoned: number };
-type Trend = { days: string[]; series: { channel: string; counts: number[] }[] };
-type Perf = { rows: ChannelRow[]; attributedSales: number; totalSales: number; traffic: Traffic; topPages?: TopPages; trend?: Trend; newCustomers?: number; returningCustomers?: number };
+// The store analytics suite. Everything on this page comes from one endpoint and
+// one resolved period, so every number on screen is measuring the same window —
+// including the two comparisons (prior period and year-over-year) that turn a
+// figure into a direction.
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-const dollars = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const moneyExact = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const pct = (n: number | null | undefined) => (n == null ? "—" : `${n % 1 === 0 ? n : n.toFixed(1)}%`);
+const num = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString());
 const shortDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—");
-const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
-const B = "/admin";
+const longDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
 const TABS = [
  { key: "overview", label: "Overview" },
  { key: "sales", label: "Sales" },
+ { key: "customers", label: "Customers" },
+ { key: "catalog", label: "Pricing & catalog" },
+ { key: "products", label: "Products" },
  { key: "traffic", label: "Traffic" },
- { key: "demand", label: "Demand" },
+ { key: "quality", label: "What sells" },
+ { key: "margin", label: "Profit & loss" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-// Multi-line channel-click trend (renders nothing until there's UTM-tagged click traffic).
-function TrendChart({ days, series }: Trend) {
- if (!series.length || !days.length || series.every((s) => s.counts.every((c) => c === 0))) return null;
- const max = Math.max(1, ...series.flatMap((s) => s.counts));
- const W = 100, H = 36;
- const xAt = (i: number) => (days.length > 1 ? (i / (days.length - 1)) * W : 0);
- const yAt = (v: number) => H - (v / max) * H;
+function CardTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
  return (
- <TechCard className="p-5">
- <CardTitle>Channel trend</CardTitle>
- <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-3 h-28 w-full">
- {series.map((s, si) => (
- <polyline key={s.channel} fill="none" stroke={DONUT_COLORS[si % DONUT_COLORS.length]} strokeWidth="1" vectorEffect="non-scaling-stroke" strokeLinejoin="round" points={s.counts.map((c, i) => `${xAt(i)},${yAt(c)}`).join(" ")} />
- ))}
- </svg>
- <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
- {series.map((s, si) => (
- <span key={s.channel} className="flex items-center gap-1.5 text-[11px] text-stone-500"><i className="h-2 w-2 rounded-full" style={{ background: DONUT_COLORS[si % DONUT_COLORS.length] }} />{s.channel}</span>
- ))}
- </div>
- <div className="mt-0.5 flex justify-between text-[10px] text-stone-400"><span>{days[0]}</span><span>{days[days.length - 1]}</span></div>
- </TechCard>
+  <div className="mb-3">
+   <p className="text-[13px] font-medium text-stone-700">{children}</p>
+   {hint && <p className="mt-0.5 text-[11px] text-stone-400">{hint}</p>}
+  </div>
  );
 }
 
-// KPI stat — reskinned onto the shared MetricCard. A numeric delta becomes the
-// green/rose delta pill (up = delta >= 0); the "vs prior" copy moves to the sub line.
-function Stat({ label, value, hint, delta, data }: { label: string; value: React.ReactNode; hint?: string; delta?: number | null; data?: number[] }) {
- const hasDelta = delta != null;
+/** A KPI whose delta pill is the prior period and whose sub-line carries year-over-year. */
+function Kpi({ label, value, delta, yoy, hint, data }: {
+ label: string; value: React.ReactNode; delta?: number | null; yoy?: number | null; hint?: string; data?: number[];
+}) {
+ const sub = yoy != null ? `${yoy >= 0 ? "+" : ""}${yoy}% vs last year` : hint;
  return (
- <MetricCard
- label={label}
- value={value}
- delta={hasDelta ? `${Math.abs(delta!)}%` : undefined}
- up={hasDelta ? delta! >= 0 : true}
- sub={hasDelta ? "vs prior" : hint}
- data={data}
- />
+  <MetricCard
+   label={label}
+   value={value}
+   delta={delta != null ? `${Math.abs(delta)}%` : undefined}
+   up={delta == null ? true : delta >= 0}
+   sub={delta != null && !sub ? "vs prior period" : sub}
+   data={data}
+  />
  );
 }
 
-function CardTitle({ children }: { children: React.ReactNode }) {
- return <p className="mb-3 text-[13px] font-medium text-stone-700">{children}</p>;
-}
-
-function RevenueChart({ data }: { data: { day: string; cents: number }[] }) {
- if (data.length < 2) return null;
+function Funnel({ steps }: { steps: { label: string; count: number; ofPreviousPct: number }[] }) {
+ const top = Math.max(1, steps[0]?.count ?? 1);
  return (
- <div>
- <AreaChart data={data.map((d) => d.cents / 100)} />
- <div className="mt-1.5 flex justify-between text-[10px] text-stone-400"><span>{data[0].day}</span><span>{data[data.length - 1].day}</span></div>
- </div>
+  <div className="space-y-3">
+   {steps.map((s, i) => (
+    <div key={s.label}>
+     <div className="mb-1 flex items-baseline justify-between text-[12px]">
+      <span className="text-stone-600">{s.label}</span>
+      <span className="tabular-nums text-stone-500">
+       {s.count.toLocaleString()}
+       {i > 0 && <span className="ml-1.5 text-stone-400">{s.ofPreviousPct}% of prior</span>}
+      </span>
+     </div>
+     <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
+      <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${Math.max(2, (s.count / top) * 100)}%` }} />
+     </div>
+    </div>
+   ))}
+  </div>
  );
 }
 
-function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
- const top = Math.max(1, steps[0].value);
+/** A leaderboard of named rows with a proportional bar. */
+function Leaderboard({ rows, unit = "money" }: { rows: { name: string; value: number; sub?: string }[]; unit?: "money" | "count" }) {
+ if (!rows.length) return <p className="py-4 text-center text-[12px] text-stone-400">Nothing in this period.</p>;
+ const max = Math.max(1, ...rows.map((r) => r.value));
  return (
- <div className="space-y-3">
- {steps.map((s, i) => {
- const fromPrev = i === 0 ? null : pct(s.value, steps[i - 1].value);
- return (
- <div key={s.label}>
- <div className="mb-1 flex items-baseline justify-between text-[12px]">
- <span className="text-stone-600">{s.label}</span>
- <span className="tabular-nums text-stone-500">{s.value.toLocaleString()}{fromPrev !== null && <span className="ml-1.5 text-stone-400">{fromPrev}% of prior</span>}</span>
- </div>
- <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
- <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${Math.max(2, (s.value / top) * 100)}%` }} />
- </div>
- </div>
- );
- })}
- </div>
+  <div className="space-y-2.5">
+   {rows.map((r) => (
+    <div key={r.name}>
+     <div className="mb-1 flex items-center justify-between text-[13px]">
+      <span className="truncate text-stone-700">{r.name}</span>
+      <span className="shrink-0 tabular-nums text-stone-900">
+       {unit === "money" ? money(r.value) : r.value.toLocaleString()}
+       {r.sub && <span className="text-stone-400"> · {r.sub}</span>}
+      </span>
+     </div>
+     <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+      <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${Math.max(3, (r.value / max) * 100)}%` }} />
+     </div>
+    </div>
+   ))}
+  </div>
  );
 }
 
-// A brand/category leaderboard with revenue bars.
-function Leaderboard({ rows }: { rows: { name: string; sold: number; revenueCents: number }[] }) {
- if (rows.length === 0) return <p className="py-4 text-center text-[12px] text-stone-400">No sales in this period.</p>;
- const max = Math.max(1, ...rows.map((r) => r.revenueCents));
+function ProductTable({ rows, columns }: {
+ rows: { itemId: string; title: string; image: string | null; priceCents: number; status: string; views: number; favorites: number; revenueCents: number; daysLive: number | null; daysToSell: number | null }[];
+ columns: ("views" | "favorites" | "revenue" | "daysLive" | "daysToSell")[];
+}) {
+ if (!rows.length) return <p className="py-4 text-center text-[12px] text-stone-400">Nothing to show yet.</p>;
+ const head: Record<string, string> = { views: "Views", favorites: "Saves", revenue: "Revenue", daysLive: "Days live", daysToSell: "Days to sell" };
  return (
- <div className="space-y-2.5">
- {rows.map((r) => (
- <div key={r.name}>
- <div className="mb-1 flex items-center justify-between text-[13px]">
- <span className="truncate text-stone-700">{r.name}</span>
- <span className="shrink-0 tabular-nums text-stone-900">{money(r.revenueCents)} <span className="text-stone-400">· {r.sold}</span></span>
- </div>
- <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
- <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${Math.max(3, (r.revenueCents / max) * 100)}%` }} />
- </div>
- </div>
- ))}
- </div>
+  <div className="overflow-x-auto">
+   <table className="w-full">
+    <thead><tr><TH>Item</TH>{columns.map((c) => <TH key={c} right>{head[c]}</TH>)}</tr></thead>
+    <tbody>
+     {rows.map((r) => (
+      <tr key={r.itemId}>
+       <TD>
+        <div className="flex items-center gap-2.5">
+         <span className="h-9 w-9 shrink-0 rounded bg-stone-100 bg-cover bg-center ring-1 ring-black/5" style={r.image ? { backgroundImage: `url("${r.image.replace(/"/g, "%22")}")` } : undefined} />
+         <span className="min-w-0">
+          <span className="block max-w-[240px] truncate font-medium text-stone-800">{r.title}</span>
+          <span className="block text-[11px] text-stone-400">{money(r.priceCents)}{r.status === "sold" ? " · sold" : ""}</span>
+         </span>
+        </div>
+       </TD>
+       {columns.map((c) => (
+        <TD key={c} right>
+         {c === "revenue" ? money(r.revenueCents)
+          : c === "daysLive" ? num(r.daysLive)
+          : c === "daysToSell" ? (r.daysToSell == null ? "—" : r.daysToSell)
+          : num(r[c])}
+        </TD>
+       ))}
+      </tr>
+     ))}
+    </tbody>
+   </table>
+  </div>
+ );
+}
+
+/**
+ * The P&L. Reads as a statement rather than a grid, and every operating-cost line
+ * — including the empty ones — is the control that fills it. Adding a cost where
+ * you noticed it was missing is the whole idea.
+ */
+function ProfitAndLoss({ margin, period, onAdded }: {
+ margin: NonNullable<AnalyticsSuite["margin"]>;
+ period: AnalyticsSuite["period"];
+ onAdded: () => void;
+}) {
+ const [openCat, setOpenCat] = useState<string | null>(null);
+ const [amount, setAmount] = useState("");
+ const [label, setLabel] = useState("");
+ const [when, setWhen] = useState("");
+ const [saving, setSaving] = useState(false);
+ const [err, setErr] = useState<string | null>(null);
+
+ const cur = margin.current;
+ const op = margin.operating;
+
+ function openFor(cat: string) {
+  setOpenCat((c) => (c === cat ? null : cat));
+  setAmount(""); setLabel(""); setWhen(""); setErr(null);
+ }
+
+ async function save(category: string) {
+  const amountUsd = Number(amount);
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0) { setErr("Enter an amount above zero."); return; }
+  setSaving(true); setErr(null);
+  try {
+   const r = await fetch("/api/store/expenses", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amountUsd, label, category, occurredOn: when || null, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+   });
+   const d = await r.json();
+   if (!r.ok) throw new Error(d.error || "Couldn't save that cost.");
+   setOpenCat(null); setAmount(""); setLabel(""); setWhen("");
+   onAdded();
+  } catch (e) {
+   setErr(e instanceof Error ? e.message : "Couldn't save that cost.");
+  }
+  setSaving(false);
+ }
+
+ return (
+  <TechCard className="p-5">
+   <CardTitle hint={`${period.label} · ${num(cur.totalSales)} ${cur.totalSales === 1 ? "sale" : "sales"}`}>Profit &amp; loss</CardTitle>
+
+   <table className="w-full text-[13.5px] tabular-nums">
+    <tbody>
+     <tr>
+      <td className="border-b border-stone-100 py-2.5 text-stone-700">Revenue</td>
+      <td className="border-b border-stone-100 py-2.5 text-right font-medium">{money(cur.revenueCents)}</td>
+     </tr>
+     <tr>
+      <td className="border-b border-stone-100 py-2.5 text-stone-700">Cost of goods</td>
+      <td className="border-b border-stone-100 py-2.5 text-right font-medium text-stone-500">−{money(cur.costCents)}</td>
+     </tr>
+     <tr>
+      <td className="border-t border-stone-200 pt-3 font-semibold text-stone-900">Gross profit</td>
+      <td className="border-t border-stone-200 pt-3 text-right font-semibold">
+       {money(cur.grossProfitCents)} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(cur.grossMarginPct)}</span>
+      </td>
+     </tr>
+
+     <tr>
+      <td colSpan={2} className="pb-1 pt-6 font-mono text-[10px] uppercase tracking-[0.13em] text-stone-400">Operating costs</td>
+     </tr>
+     {op.byCategory.map((c) => (
+      <Fragment key={c.category}>
+       <tr>
+        <td className="border-b border-stone-100 py-2.5 pl-4">
+         <button
+          onClick={() => openFor(c.category)}
+          className={cn("rounded-md text-left transition", c.amountCents > 0
+           ? "text-stone-500 hover:text-stone-800"
+           : "border border-dashed border-[var(--accent,#0e9f76)]/45 bg-[var(--accent-soft,#eafaf3)] px-2 py-0.5 text-[12.5px] text-[var(--accent-ink,#0b7a5c)]")}
+         >
+          {c.amountCents > 0 ? c.label : `+ ${c.label}`}
+         </button>
+        </td>
+        <td className="border-b border-stone-100 py-2.5 text-right font-medium text-stone-500">
+         {c.amountCents > 0 ? <>−{money(c.amountCents)}</> : <span className="font-normal text-stone-300">not tracked</span>}
+        </td>
+       </tr>
+       {openCat === c.category && (
+        <tr>
+         <td colSpan={2} className="pb-3">
+          <div className="ml-4 max-w-sm rounded-xl border border-stone-200 bg-white p-3.5 shadow-sm">
+           <p className="mb-2.5 text-[12.5px] font-semibold text-stone-800">Add a {c.label.toLowerCase()} cost</p>
+           <div className="space-y-2">
+            <input autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="Amount, e.g. 84"
+             className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none placeholder:text-stone-400 focus:border-stone-400" />
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="What was it? e.g. poly mailers + tissue"
+             className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none placeholder:text-stone-400 focus:border-stone-400" />
+            <input value={when} onChange={(e) => setWhen(e.target.value)} type="date"
+             className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-600 outline-none focus:border-stone-400" />
+           </div>
+           {err && <p className="mt-2 text-[12px] text-rose-600">{err}</p>}
+           <div className="mt-3 flex items-center gap-2">
+            <TechButton className="px-3 py-1.5 text-[12px]" disabled={saving} onClick={() => save(c.category)}>{saving ? "Adding…" : "Add"}</TechButton>
+            <button onClick={() => setOpenCat(null)} className="text-[12px] text-stone-400 hover:text-stone-600">Cancel</button>
+            <span className="ml-auto text-[11px] text-stone-400">Leave the date blank for today</span>
+           </div>
+          </div>
+         </td>
+        </tr>
+       )}
+      </Fragment>
+     ))}
+     <tr>
+      <td className="border-t border-stone-200 pt-3 font-semibold text-stone-900">Total operating costs</td>
+      <td className="border-t border-stone-200 pt-3 text-right font-semibold text-stone-500">−{money(op.totalCents)}</td>
+     </tr>
+
+     <tr>
+      <td className="border-t-2 border-stone-900 pt-3.5 text-[15px] font-semibold text-stone-900">Net profit</td>
+      <td className="border-t-2 border-stone-900 pt-3.5 text-right text-[15px] font-semibold">
+       {margin.netProfitCents == null ? <span className="text-stone-300">—</span> : (
+        <span className={margin.netProfitCents < 0 ? "text-rose-600" : undefined}>
+         {money(margin.netProfitCents)} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(margin.netMarginPct)}</span>
+        </span>
+       )}
+      </td>
+     </tr>
+    </tbody>
+   </table>
+
+   <p className="mt-4 text-[11px] leading-relaxed text-stone-400">
+    You can also just tell VYA — &ldquo;spent 84 on poly mailers&rdquo; — and it files the cost for you.
+    {cur.coveragePct < 100 && cur.totalSales > 0 && (
+     <> Revenue and cost of goods cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.</>
+    )}
+   </p>
+  </TechCard>
+ );
+}
+
+type Rate = { id: string; label: string; amountCents: number; category: string; recurs: "monthly" | "per_order" };
+
+/**
+ * The two setup cards from approach two: what one order costs to pack, and what
+ * goes out every month regardless. Filled once, then counted automatically —
+ * which is what stops a P&L from becoming a bookkeeping chore.
+ */
+function RecurringCosts({ margin, onChanged }: { margin: NonNullable<AnalyticsSuite["margin"]>; onChanged: () => void }) {
+ const [rates, setRates] = useState<Rate[] | null>(null);
+ const [adding, setAdding] = useState<"per_order" | "monthly" | null>(null);
+ const [label, setLabel] = useState("");
+ const [amount, setAmount] = useState("");
+ const [category, setCategory] = useState("packaging");
+ const [busy, setBusy] = useState(false);
+
+ const load = () => {
+  fetch("/api/store/expenses?period=30d")
+   .then((r) => (r.ok ? r.json() : null))
+   .then((d) => setRates(d?.recurring ?? []))
+   .catch(() => setRates([]));
+ };
+ useEffect(load, []);
+
+ async function add(recurs: "per_order" | "monthly") {
+  const amountUsd = Number(amount);
+  if (!Number.isFinite(amountUsd) || amountUsd <= 0 || !label.trim()) return;
+  setBusy(true);
+  await fetch("/api/store/expenses", {
+   method: "POST",
+   headers: { "Content-Type": "application/json" },
+   body: JSON.stringify({ amountUsd, label, category, recurs, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+  }).catch(() => {});
+  setBusy(false); setAdding(null); setLabel(""); setAmount("");
+  load(); onChanged();
+ }
+
+ async function remove(id: string) {
+  setRates((rs) => (rs ?? []).filter((r) => r.id !== id));
+  await fetch(`/api/store/expenses?id=${id}`, { method: "DELETE" }).catch(() => {});
+  onChanged();
+ }
+
+ const rec = margin.operating.recurring;
+ const perOrder = (rates ?? []).filter((r) => r.recurs === "per_order");
+ const monthly = (rates ?? []).filter((r) => r.recurs === "monthly");
+
+ const form = (kind: "per_order" | "monthly") => adding === kind && (
+  <div className="mt-2.5 rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
+   <div className="flex flex-wrap gap-2">
+    <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)}
+     placeholder={kind === "per_order" ? "e.g. Poly mailer" : "e.g. Studio rent"}
+     className="min-w-[150px] flex-1 rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none placeholder:text-stone-400 focus:border-stone-400" />
+    <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal"
+     placeholder={kind === "per_order" ? "0.38" : "850"}
+     className="w-24 rounded-lg border border-stone-200 px-3 py-2 text-[13px] tabular-nums outline-none placeholder:text-stone-400 focus:border-stone-400" />
+    <select value={category} onChange={(e) => setCategory(e.target.value)}
+     className="rounded-lg border border-stone-200 px-2 py-2 text-[12px] text-stone-600 outline-none focus:border-stone-400">
+     {margin.operating.byCategory.map((c) => <option key={c.category} value={c.category}>{c.label}</option>)}
+    </select>
+   </div>
+   <div className="mt-2.5 flex items-center gap-2">
+    <TechButton className="px-3 py-1.5 text-[12px]" disabled={busy} onClick={() => add(kind)}>{busy ? "Adding…" : "Add"}</TechButton>
+    <button onClick={() => setAdding(null)} className="text-[12px] text-stone-400 hover:text-stone-600">Cancel</button>
+    <span className="ml-auto text-[11px] text-stone-400">
+     {kind === "per_order" ? "Cost of one, not the box" : "The monthly amount"}
+    </span>
+   </div>
+  </div>
+ );
+
+ const rows = (list: Rate[], empty: string) => (
+  list.length === 0
+   ? <p className="py-3 text-[12px] text-stone-400">{empty}</p>
+   : <table className="w-full text-[13px] tabular-nums">
+      <tbody>
+       {list.map((r) => (
+        <tr key={r.id}>
+         <td className="border-b border-stone-100 py-2 text-stone-700">{r.label}</td>
+         <td className="border-b border-stone-100 py-2 text-right text-stone-600">${(r.amountCents / 100).toFixed(2)}</td>
+         <td className="w-8 border-b border-stone-100 py-2 text-right">
+          <button onClick={() => remove(r.id)} aria-label={`Remove ${r.label}`} className="text-stone-300 transition hover:text-rose-500">×</button>
+         </td>
+        </tr>
+       ))}
+      </tbody>
+     </table>
+ );
+
+ return (
+  <div className="grid gap-4 sm:grid-cols-2">
+   <TechCard className="p-5">
+    <CardTitle hint="counted against every sale in the period">What it costs to pack one order</CardTitle>
+    {rows(perOrder, "Nothing yet — add a mailer, tissue, a dust bag.")}
+    <div className="mt-2.5 flex items-center justify-between border-t border-stone-200 pt-2.5 text-[13px]">
+     <span className="font-semibold text-stone-900">Per order</span>
+     <span className="font-semibold tabular-nums">${(rec.perOrder.rateCents / 100).toFixed(2)}</span>
+    </div>
+    {rec.perOrder.rateCents > 0 && (
+     <p className="mt-2 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-3 py-2 text-[12px] text-[var(--accent-ink,#0b7a5c)]">
+      × {num(rec.perOrder.sales)} {rec.perOrder.sales === 1 ? "sale" : "sales"} this period → <strong>{money(rec.perOrder.appliedCents)}</strong>
+     </p>
+    )}
+    {!adding && <button onClick={() => { setAdding("per_order"); setCategory("packaging"); }} className="mt-3 text-[12.5px] font-medium text-[var(--accent-ink,#0b7a5c)]">+ Add a supply</button>}
+    {form("per_order")}
+   </TechCard>
+
+   <TechCard className="p-5">
+    <CardTitle hint="charged to each period automatically">Every month, regardless</CardTitle>
+    {rows(monthly, "Nothing yet — studio rent, insurance, subscriptions.")}
+    <div className="mt-2.5 flex items-center justify-between border-t border-stone-200 pt-2.5 text-[13px]">
+     <span className="font-semibold text-stone-900">Per month</span>
+     <span className="font-semibold tabular-nums">${(rec.monthly.rateCents / 100).toFixed(2)}</span>
+    </div>
+    {rec.monthly.rateCents > 0 && (
+     <p className="mt-2 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-3 py-2 text-[12px] text-[var(--accent-ink,#0b7a5c)]">
+      × {rec.monthly.months} months in this period → <strong>{money(rec.monthly.appliedCents)}</strong>
+     </p>
+    )}
+    {!adding && <button onClick={() => { setAdding("monthly"); setCategory("studio"); }} className="mt-3 text-[12.5px] font-medium text-[var(--accent-ink,#0b7a5c)]">+ Add a monthly cost</button>}
+    {form("monthly")}
+   </TechCard>
+  </div>
  );
 }
 
 export default function AnalyticsPage() {
- const [range, setRange] = useState<"30" | "90" | "all">("all");
- const [tab, setTab] = useState<TabKey>("overview");
- // Deep-link a tab via ?tab= (e.g. the old Audience page redirects here to Traffic).
- useEffect(() => {
- const t = new URLSearchParams(window.location.search).get("tab");
- if (t && TABS.some((x) => x.key === t)) { const id = setTimeout(() => setTab(t as TabKey), 0); void id; }
- }, []);
- const [data, setData] = useState<Overview | null>(null);
- const [perf, setPerf] = useState<Perf | null>(null);
- const [funnelItems, setFunnelItems] = useState<FunnelItem[]>([]);
+ // useSearchParams needs a boundary; the fallback is the same spinner the fetch uses.
+ return (
+  <Suspense fallback={<AdminPage><div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div></AdminPage>}>
+   <Analytics />
+  </Suspense>
+ );
+}
+
+function Analytics() {
+ // Deep-link a tab via ?tab= (the older Audience / Performance pages redirect here).
+ const params = useSearchParams();
+ const linked = params.get("tab");
+ const initialTab: TabKey = TABS.some((x) => x.key === linked) ? (linked as TabKey) : "overview";
+
+ const [period, setPeriod] = useState<PeriodValue>({ period: "30d" });
+ const [tab, setTab] = useState<TabKey>(initialTab);
+ const [data, setData] = useState<AnalyticsSuite | null>(null);
  const [loading, setLoading] = useState(true);
+ // Bumped after a cost is added, so the statement re-reads instead of guessing.
+ const [reload, setReload] = useState(0);
 
  useEffect(() => {
- let active = true;
- (async () => {
- setLoading(true);
- try {
- const [ov, pf, fn] = await Promise.all([
- fetch(`/api/store/analytics/overview?days=${range}`).then((r) => (r.ok ? r.json() : null)),
- fetch(`/api/store/performance?days=${range}`).then((r) => (r.ok ? r.json() : null)),
- fetch(`/api/store/analytics/funnel?days=${range === "all" ? 365 : range}`).then((r) => (r.ok ? r.json() : null)),
- ]);
- if (active) { if (ov) setData(ov); setPerf(pf); setFunnelItems(fn?.items || []); }
- } catch { /* keep prior */ }
- if (active) setLoading(false);
- })();
- return () => { active = false; };
- }, [range]);
+  let active = true;
+  (async () => {
+   setLoading(true);
+   const q = new URLSearchParams({ period: period.period });
+   if (period.from) q.set("from", period.from);
+   if (period.to) q.set("to", period.to);
+   // The store's own clock decides where a day starts, so "best day" is their day.
+   q.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+   try {
+    const r = await fetch(`/api/store/analytics/suite?${q}`);
+    const j = r.ok ? await r.json() : null;
+    if (active && j?.ok) setData(j as AnalyticsSuite);
+   } catch { /* keep whatever is on screen */ }
+   if (active) setLoading(false);
+  })();
+  return () => { active = false; };
+ }, [period, reload]);
 
- const nothing = data && data.revenueCents === 0 && data.orders === 0 && data.inventory.active === 0 && data.inventory.sold === 0 && data.customers === 0;
+ const sales = data?.sales;
+ const customers = data?.customers;
+ const catalog = data?.catalog;
+ const products = data?.products;
+ const engagement = data?.engagement;
+ const quality = data?.quality;
+ const margin = data?.margin;
 
- // Derived rates + deltas — all from data we already collect.
- const sellThrough = data ? pct(data.inventory.sold, data.inventory.sold + data.inventory.active) : 0;
- const convRate = data && data.sessions > 0 ? (data.orders / data.sessions) * 100 : 0;
- const saveRate = data ? pct(data.favorites, data.productViews) : 0;
- const showDelta = data && data.periodDays !== "all";
- const revDelta = showDelta && data!.prior.revenueCents > 0 ? Math.round(((data!.revenueCents - data!.prior.revenueCents) / data!.prior.revenueCents) * 100) : null;
- const ordDelta = showDelta && data!.prior.orders > 0 ? Math.round(((data!.orders - data!.prior.orders) / data!.prior.orders) * 100) : null;
-
- const traffic = perf?.traffic || { total: 0, byType: [], topSources: [] };
- const channels = (perf?.rows || []).slice().sort((a, b) => b.clicks - a.clicks);
- const attributed = perf?.attributedSales || 0;
- const totalSales = perf?.totalSales || 0;
- const attribPct = pct(attributed, totalSales);
- const hasTraffic = traffic.total > 0 || channels.length > 0;
- const topPages = perf?.topPages || { total: 0, byType: [], pages: [] };
- const newC = perf?.newCustomers || 0;
- const retC = perf?.returningCustomers || 0;
-
- // Share a colour across the traffic donut, its legend, and the top-sources bars.
- const typeIdx = Object.fromEntries(traffic.byType.map((t, i) => [t.type, i] as const));
- const colorForType = (t: string) => DONUT_COLORS[(typeIdx[t] ?? 6) % DONUT_COLORS.length];
-
- // Period filter → shared segmented control (labels ↔ range state).
- const rangeOpts = ["30d", "90d", "All time"];
- const rangeVal = range === "all" ? "All time" : `${range}d`;
- const onRange = (v: string) => setRange(v === "All time" ? "all" : v === "90d" ? "90" : "30");
+ const nothing = data && !sales?.current.orders && !catalog?.activeListings && !catalog?.soldAllTime && !engagement?.sessions;
 
  return (
- <AdminPage>
- <AdminHeader
- eyebrow="Business · Analytics"
- title="Analytics"
- subtitle="Your store’s business — sales, demand, traffic, and what converts."
- actions={<SegmentedControl options={rangeOpts} value={rangeVal} onChange={onRange} />}
- />
+  <AdminPage>
+   <AdminHeader
+    eyebrow="Business · Analytics"
+    title="Analytics"
+    subtitle={data ? `${data.period.label} — sales, profit, customers, demand and what makes a piece sell.` : "Your store's business, end to end."}
+    actions={<PeriodPicker value={period} onChange={setPeriod} />}
+   />
 
- {loading && !data ? (
- <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>
- ) : nothing ? (
- <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="No activity yet" body="Once you publish listings and make sales, your revenue, demand, and traffic will show up here." />
- ) : data ? (
- <>
- {/* tab bar */}
- <div className="mb-6 flex gap-1 border-b border-stone-200">
- {TABS.map((t) => (
- <button key={t.key} onClick={() => setTab(t.key)} className={`relative px-3.5 py-2 text-[13px] font-medium transition ${tab === t.key ? "text-stone-900" : "text-stone-400 hover:text-stone-600"}`}>
- {t.label}
- {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-stone-900" />}
- </button>
- ))}
- </div>
+   {loading && !data ? (
+    <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>
+   ) : nothing ? (
+    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="No activity yet" body="Once you publish listings and make sales, your revenue, demand and traffic show up here." />
+   ) : data ? (
+    <>
+     <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] text-stone-400">
+      <span>{new Date(data.period.startISO).toLocaleDateString()} – {new Date(data.period.endISO).toLocaleDateString()}</span>
+      {data.period.comparisons.prior && <span>· compared with {data.period.comparisons.prior.label.toLowerCase()}</span>}
+      {loading && <span className="text-stone-300">· refreshing</span>}
+     </div>
 
- {/* ── OVERVIEW ── */}
- {tab === "overview" && (
- <div className="space-y-6">
- <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
- <Stat label="Revenue" value={money(data.revenueCents)} hint={data.periodDays === "all" ? "all time" : `last ${data.periodDays}d`} delta={revDelta} data={data.revenueByDay.length >= 2 ? data.revenueByDay.map((d) => d.cents) : undefined} />
- <Stat label="Orders" value={data.orders.toLocaleString()} delta={ordDelta} />
- <Stat label="Avg. order" value={data.orders ? money(data.aovCents) : "—"} />
- <Stat label="Items sold" value={data.inventory.sold.toLocaleString()} />
- </div>
+     <div className="mb-6 flex gap-1 overflow-x-auto border-b border-stone-200">
+      {TABS.map((t) => (
+       <button key={t.key} onClick={() => setTab(t.key)} className={cn("relative shrink-0 px-3.5 py-2 text-[13px] font-medium transition", tab === t.key ? "text-stone-900" : "text-stone-400 hover:text-stone-600")}>
+        {t.label}
+        {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-stone-900" />}
+       </button>
+      ))}
+     </div>
 
- <div className="grid grid-cols-3 gap-3">
- <Stat label="Conversion" value={data.sessions ? `${convRate.toFixed(convRate < 10 ? 1 : 0)}%` : "—"} hint="orders ÷ sessions" />
- <Stat label="Sell-through" value={data.inventory.sold + data.inventory.active ? `${sellThrough}%` : "—"} hint="sold ÷ listed" />
- <Stat label="Save rate" value={data.productViews ? `${saveRate}%` : "—"} hint="favorites ÷ views" />
- </div>
+     {/* ── OVERVIEW ── */}
+     {tab === "overview" && sales && catalog && engagement && (
+      <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Revenue" value={money(sales.current.gmvCents)} delta={sales.vsPrior?.gmvPct} yoy={sales.vsYoy?.gmvPct} data={sales.series.length >= 2 ? sales.series.map((s) => s.cents) : undefined} />
+        <Kpi label="Sales" value={num(sales.current.orders)} delta={sales.vsPrior?.ordersPct} yoy={sales.vsYoy?.ordersPct} />
+        <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "—"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
+        <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} hint="sold ÷ sold + listed" />
+       </div>
 
- {data.revenueByDay.length >= 2 && (
- <TechCard className="p-5"><CardTitle>Revenue over time</CardTitle><RevenueChart data={data.revenueByDay} /></TechCard>
- )}
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Avg. item price" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "—"} hint="what you ask" />
+        <Kpi label="Avg. sold price" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "—"} hint="what it goes for" />
+        <Kpi label="Days to sell" value={catalog.medianDaysToSell == null ? "—" : `${catalog.medianDaysToSell}`} delta={catalog.vsPrior?.daysToSellPct} hint="median" />
+        <Kpi label="Inventory value" value={money(catalog.inventoryValueCents)} hint={`${num(catalog.activeListings)} active listings`} />
+       </div>
 
- {(data.productViews > 0 || data.favorites > 0 || data.orders > 0) && (
- <TechCard className="p-5">
- <CardTitle>Demand funnel</CardTitle>
- <Funnel steps={[{ label: "Product views", value: data.productViews }, { label: "Favorites", value: data.favorites }, { label: "Orders", value: data.orders }]} />
- </TechCard>
- )}
+       {sales.undatedSales.count > 0 && (
+        <TechCard className="p-4">
+         <p className="text-[12px] text-stone-600">
+          <StatusPill tone="pending">Heads up</StatusPill>{" "}
+          {num(sales.undatedSales.count)} sold {sales.undatedSales.count === 1 ? "piece has" : "pieces have"} no sale date on record ({money(sales.undatedSales.valueCents)} at list price),
+          so they count in your catalog totals but can&apos;t appear in any date range. Usually items imported or marked sold in bulk.
+         </p>
+        </TechCard>
+       )}
 
- {/* Per-piece performance — which items get looked at, saved, and where shoppers drop off. */}
- {funnelItems.length > 0 && (
- <TechCard className="p-5">
- <CardTitle>Product performance</CardTitle>
- <p className="-mt-1 mb-3 text-[12px] text-stone-500">What shoppers view, save, and where they drop off — per piece{data.periodDays === "all" ? "" : `, last ${data.periodDays} days`}. A high <span className="font-medium text-amber-600">abandoned</span> count means people reach checkout but don’t finish — often a price or shipping nudge away.</p>
- <div className="overflow-x-auto">
- <table className="w-full">
- <thead><tr><TH>Item</TH><TH right>Views</TH><TH right>Saves</TH><TH right>Checkouts</TH><TH right>Abandoned</TH></tr></thead>
- <tbody>
- {funnelItems.slice(0, 15).map((it) => (
- <tr key={it.itemId}>
- <TD>
- <div className="flex items-center gap-2.5">
- <span className="h-9 w-9 shrink-0 rounded bg-stone-100 bg-cover bg-center ring-1 ring-black/5" style={it.image ? { backgroundImage: `url("${it.image.replace(/"/g, "%22")}")` } : undefined} />
- <span className="min-w-0">
- <span className="block max-w-[240px] truncate font-medium text-stone-800">{it.title}</span>
- <span className="block text-[11px] text-stone-400">{it.price != null ? money(Math.round(it.price * 100)) : ""}{it.status === "sold" ? " · sold" : ""}</span>
- </span>
- </div>
- </TD>
- <TD right>{it.views.toLocaleString()}</TD>
- <TD right>{it.favorites.toLocaleString()}</TD>
- <TD right>{it.checkouts.toLocaleString()}</TD>
- <TD right><span className={it.abandoned > 0 ? "font-semibold text-amber-600" : "text-stone-300"}>{it.abandoned.toLocaleString()}</span></TD>
- </tr>
- ))}
- </tbody>
- </table>
- </div>
- </TechCard>
- )}
+       {sales.series.length >= 2 && (
+        <TechCard className="p-5">
+         <CardTitle hint={`by ${sales.granularity}`}>Revenue over time</CardTitle>
+         <AreaChart data={sales.series.map((s) => s.cents / 100)} />
+         <div className="mt-1.5 flex justify-between text-[10px] text-stone-400"><span>{sales.series[0].bucket}</span><span>{sales.series[sales.series.length - 1].bucket}</span></div>
+        </TechCard>
+       )}
 
- <div className="grid gap-4 sm:grid-cols-2">
- <TechCard className="p-5">
- <CardTitle>Inventory</CardTitle>
- <div className="space-y-2 text-[13px]">
- <div className="flex justify-between"><span className="text-stone-500">Active listings</span><Link href={`${B}/inventory`} className="font-medium tabular-nums text-stone-900 hover:underline">{data.inventory.active}</Link></div>
- <div className="flex justify-between"><span className="text-stone-500">Inventory value</span><span className="font-medium tabular-nums text-stone-900">{money(data.inventory.activeValueCents)}</span></div>
- <div className="flex justify-between"><span className="text-stone-500">Drafts</span><Link href={`${B}/inventory/drafts`} className="font-medium tabular-nums text-stone-900 hover:underline">{data.inventory.draft}</Link></div>
- <div className="flex justify-between"><span className="text-stone-500">Sold (all time)</span><span className="font-medium tabular-nums text-stone-900">{data.inventory.sold}</span></div>
- </div>
- </TechCard>
- <TechCard className="p-5">
- <CardTitle>Audience</CardTitle>
- <div className="space-y-2 text-[13px]">
- <div className="flex justify-between"><span className="text-stone-500">Customers</span><Link href={`${B}/customers`} className="font-medium tabular-nums text-stone-900 hover:underline">{data.customers.toLocaleString()}</Link></div>
- <div className="flex justify-between"><span className="text-stone-500">New buyers</span><span className="font-medium tabular-nums text-stone-900">{data.newBuyers.toLocaleString()}</span></div>
- <div className="flex justify-between"><span className="text-stone-500">Returning buyers</span><span className="font-medium tabular-nums text-stone-900">{data.returningBuyers.toLocaleString()}</span></div>
- <div className="flex justify-between"><span className="text-stone-500">Sessions{data.periodDays === "all" ? "" : ` (${data.periodDays}d)`}</span><span className="font-medium tabular-nums text-stone-900">{data.sessions.toLocaleString()}</span></div>
- <div className="flex justify-between"><span className="text-stone-500">Product views</span><span className="font-medium tabular-nums text-stone-900">{data.productViews.toLocaleString()}</span></div>
- </div>
- </TechCard>
- </div>
- </div>
- )}
+       <div className="grid gap-4 sm:grid-cols-2">
+        <TechCard className="p-5">
+         <CardTitle hint="views → saves → checkout → sold">Demand funnel</CardTitle>
+         <Funnel steps={engagement.funnel.map((f) => ({ label: f.label, count: f.count, ofPreviousPct: f.ofPreviousPct }))} />
+        </TechCard>
+        <TechCard className="p-5">
+         <CardTitle>Best stretch</CardTitle>
+         <div className="space-y-2 text-[13px]">
+          <div className="flex justify-between"><span className="text-stone-500">Best day</span><span className="font-medium tabular-nums text-stone-900">{sales.bestDay ? `${longDate(sales.bestDay.day)} · ${money(sales.bestDay.cents)}` : "—"}</span></div>
+          <div className="flex justify-between"><span className="text-stone-500">Best week</span><span className="font-medium tabular-nums text-stone-900">{sales.bestWeek ? `${longDate(sales.bestWeek.weekStart)} · ${money(sales.bestWeek.cents)}` : "—"}</span></div>
+          <div className="flex justify-between"><span className="text-stone-500">Sessions</span><span className="font-medium tabular-nums text-stone-900">{num(engagement.sessions)}</span></div>
+          <div className="flex justify-between"><span className="text-stone-500">Session → sale</span><span className="font-medium tabular-nums text-stone-900">{pct(engagement.rates.sessionToOrderPct)}</span></div>
+         </div>
+        </TechCard>
+       </div>
 
- {/* ── SALES ── */}
- {tab === "sales" && (
- <div className="space-y-6">
- <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
- <Stat label="Revenue" value={money(data.revenueCents)} delta={revDelta} hint={data.periodDays === "all" ? "all time" : undefined} />
- <Stat label="Orders" value={data.orders.toLocaleString()} delta={ordDelta} />
- <Stat label="Avg. order" value={data.orders ? money(data.aovCents) : "—"} />
- <Stat label="Items sold" value={data.inventory.sold.toLocaleString()} />
- </div>
- {data.revenueByDay.length >= 2 && (
- <TechCard className="p-5"><CardTitle>Revenue over time</CardTitle><RevenueChart data={data.revenueByDay} /></TechCard>
- )}
- <div className="grid gap-4 sm:grid-cols-2">
- <TechCard className="p-5"><CardTitle>Top brands by revenue</CardTitle><Leaderboard rows={data.topBrands.map((b) => ({ name: b.brand, sold: b.sold, revenueCents: b.revenueCents }))} /></TechCard>
- <TechCard className="p-5"><CardTitle>Top categories by revenue</CardTitle><Leaderboard rows={data.topCategories.map((c) => ({ name: c.category, sold: c.sold, revenueCents: c.revenueCents }))} /></TechCard>
- </div>
- <TechCard className="p-5">
- <CardTitle>Recent sales</CardTitle>
- {data.recentSales.length === 0 ? <p className="py-4 text-center text-[12px] text-stone-400">No sales yet.</p> : (
- <table className="w-full">
- <thead><tr><TH>Item</TH><TH right>Amount</TH><TH right>Date</TH></tr></thead>
- <tbody>
- {data.recentSales.map((s, i) => (
- <tr key={i}>
- <TD><span className="block max-w-[260px] truncate font-medium text-stone-800">{s.title}</span></TD>
- <TD right className="font-semibold text-stone-900">{money(s.amountCents)}</TD>
- <TD right className="text-stone-400">{shortDate(s.at)}</TD>
- </tr>
- ))}
- </tbody>
- </table>
- )}
- </TechCard>
- </div>
- )}
+       <div className="grid gap-4 sm:grid-cols-2">
+        <TechCard className="p-5">
+         <CardTitle hint="revenue in this period">Top brands</CardTitle>
+         <Leaderboard rows={(catalog.topBrands ?? []).map((b) => ({ name: b.name, value: b.revenueCents, sub: `${b.sold} sold` }))} />
+        </TechCard>
+        <TechCard className="p-5">
+         <CardTitle hint="revenue in this period">Top categories</CardTitle>
+         <Leaderboard rows={(catalog.topCategories ?? []).map((c) => ({ name: c.name, value: c.revenueCents, sub: `${c.sold} sold` }))} />
+        </TechCard>
+       </div>
+      </div>
+     )}
 
- {/* ── TRAFFIC ── */}
- {tab === "traffic" && (
- hasTraffic ? (
- <div className="space-y-4">
- {(newC > 0 || retC > 0) && (
- <p className="text-[13px] text-stone-600"><b className="tabular-nums text-stone-900">{newC}</b> new · <b className="tabular-nums text-stone-900">{retC}</b> returning buyer{newC + retC === 1 ? "" : "s"} this period</p>
- )}
- {traffic.total > 0 && (
- <TechCard className="p-5">
- <div className="mb-4 flex items-baseline justify-between">
- <CardTitle>Where your visitors come from</CardTitle>
- <p className="text-[12px] text-stone-400"><b className="tabular-nums text-stone-700">{traffic.total.toLocaleString()}</b> sessions</p>
- </div>
- <div className="flex flex-col items-center gap-6 sm:flex-row">
- <DonutChart data={traffic.byType.map((t) => ({ label: t.type, value: t.sessions }))} />
- <div className="flex flex-1 flex-wrap gap-x-6 gap-y-2">
- {traffic.byType.map((t) => (
- <div key={t.type} className="flex items-center gap-2 text-[12px]">
- <span className="h-2.5 w-2.5 rounded-sm" style={{ background: colorForType(t.type) }} />
- <span className="text-stone-700">{t.type}</span>
- <span className="tabular-nums text-stone-400">{t.sessions.toLocaleString()} · {pct(t.sessions, traffic.total)}%</span>
- </div>
- ))}
- </div>
- </div>
- {traffic.topSources.length > 0 && (
- <div className="mt-5 border-t border-stone-100 pt-4">
- <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400">Top sources</p>
- <div className="space-y-1.5">
- {traffic.topSources.map((s) => (
- <div key={`${s.source}-${s.type}`} className="flex items-center gap-3 text-[13px]">
- <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: colorForType(s.type) }} />
- <span className="w-40 shrink-0 truncate text-stone-800">{s.source}</span>
- <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-stone-100">
- <div className="h-full rounded-full" style={{ width: `${(s.sessions / traffic.total) * 100}%`, background: colorForType(s.type) }} />
- </div>
- <span className="w-16 shrink-0 text-right tabular-nums text-stone-500">{s.sessions.toLocaleString()}</span>
- </div>
- ))}
- </div>
- </div>
- )}
- </TechCard>
- )}
+     {/* ── SALES ── */}
+     {tab === "sales" && sales && catalog && (
+      <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Revenue" value={money(sales.current.gmvCents)} delta={sales.vsPrior?.gmvPct} yoy={sales.vsYoy?.gmvPct} />
+        <Kpi label="Sales" value={num(sales.current.orders)} delta={sales.vsPrior?.ordersPct} yoy={sales.vsYoy?.ordersPct} />
+        <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "—"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
+        <Kpi label="Items sold" value={num(sales.current.unitsSold)} />
+       </div>
 
- {totalSales > 0 && (
- <TechCard className="p-5">
- <div className="flex items-baseline justify-between">
- <div>
- <CardTitle>Sales attributed to marketing</CardTitle>
- <p className="mt-1 text-2xl font-semibold tracking-tight text-stone-900">{dollars(attributed)} <span className="text-base font-normal text-stone-400">of {dollars(totalSales)} total</span></p>
- </div>
- <span className="text-2xl font-semibold tabular-nums text-stone-900">{attribPct}%</span>
- </div>
- <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
- <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${attribPct}%` }} />
- </div>
- </TechCard>
- )}
+       <TechCard className="p-5">
+        <CardTitle hint={`prior period and the same period last year, by ${sales.granularity}`}>How this period compares</CardTitle>
+        <div className="overflow-x-auto">
+         <table className="w-full">
+          <thead><tr><TH>Window</TH><TH right>Revenue</TH><TH right>Sales</TH><TH right>Avg. order</TH></tr></thead>
+          <tbody>
+           <tr><TD><span className="font-medium text-stone-800">{data.period.label}</span></TD><TD right>{money(sales.current.gmvCents)}</TD><TD right>{num(sales.current.orders)}</TD><TD right>{money(sales.current.aovCents)}</TD></tr>
+           {sales.prior && <tr><TD>{data.period.comparisons.prior?.label ?? "Prior period"}</TD><TD right>{money(sales.prior.gmvCents)}</TD><TD right>{num(sales.prior.orders)}</TD><TD right>{money(sales.prior.aovCents)}</TD></tr>}
+           {sales.yoy && <tr><TD>{data.period.comparisons.yoy?.label ?? "Last year"}</TD><TD right>{money(sales.yoy.gmvCents)}</TD><TD right>{num(sales.yoy.orders)}</TD><TD right>{money(sales.yoy.aovCents)}</TD></tr>}
+          </tbody>
+         </table>
+        </div>
+       </TechCard>
 
- {channels.length > 0 && (
- <div>
- <p className="mb-3 text-[13px] font-medium text-stone-700">Conversion by channel</p>
- <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
- {channels.map((r, i) => (
- <TechCard key={r.channel} className="p-4">
- <div className="flex items-center gap-2">
- <span className="h-2.5 w-2.5 rounded-sm" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
- <span className="text-[13px] font-medium text-stone-800">{r.channel}</span>
- </div>
- <p className="mt-3 text-xl font-semibold tracking-tight text-stone-900">{dollars(r.sales)}</p>
- <p className="text-[12px] text-stone-400">order value</p>
- <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3 text-[12px]">
- <span className="text-stone-500">{r.clicks.toLocaleString()} <span className="text-stone-400">clicks</span></span>
- <span className="font-medium tabular-nums text-stone-700">{r.convPct}%<span className="ml-1 font-normal text-stone-400">conv</span></span>
- </div>
- </TechCard>
- ))}
- </div>
- <p className="mt-3 text-[11px] text-stone-400">Add <span className="font-mono">?utm_source=</span> to the links you share to populate channel conversion.</p>
- </div>
- )}
+       {sales.series.length >= 2 && (
+        <TechCard className="p-5">
+         <CardTitle>Revenue trend</CardTitle>
+         <AreaChart data={sales.series.map((s) => s.cents / 100)} />
+         <div className="mt-1.5 flex justify-between text-[10px] text-stone-400"><span>{sales.series[0].bucket}</span><span>{sales.series[sales.series.length - 1].bucket}</span></div>
+        </TechCard>
+       )}
 
- <TrendChart {...(perf?.trend || { days: [], series: [] })} />
+       {sales.returns.orders > 0 && (
+        <TechCard className="p-4">
+         <p className="text-[12px] text-stone-600">
+          <StatusPill tone="down">Returns</StatusPill>{" "}
+          {num(sales.returns.orders)} refunded {sales.returns.orders === 1 ? "order" : "orders"} worth {money(sales.returns.valueCents)} in this period
+          — a {pct(sales.returns.ratePct)} return rate. Refunds are already excluded from the revenue above.
+         </p>
+        </TechCard>
+       )}
 
- {topPages.total > 0 && (
- <TechCard className="p-5">
- <div className="mb-3 flex items-baseline justify-between">
- <CardTitle>Top pages</CardTitle>
- <p className="text-[12px] text-stone-400"><b className="tabular-nums text-stone-700">{topPages.total.toLocaleString()}</b> views</p>
- </div>
- {topPages.byType.length > 0 && (
- <div className="mb-3 flex flex-wrap gap-1.5">
- {topPages.byType.map((t) => (
- <span key={t.type} className="inline-flex items-center gap-1.5 rounded-full bg-stone-50 px-2.5 py-1 text-[12px] text-stone-600 ring-1 ring-stone-200"><span className="capitalize">{t.type}</span> <span className="tabular-nums text-stone-400">{t.views.toLocaleString()}</span></span>
- ))}
- </div>
- )}
- <div className="overflow-x-auto">
- <table className="w-full text-[13px]">
- <thead>
- <tr>
- <TH className="pr-3">Page</TH>
- <TH className="px-3">Type</TH>
- <TH right className="px-3">Views</TH>
- <TH right className="pl-3">Visitors</TH>
- </tr>
- </thead>
- <tbody>
- {topPages.pages.map((p) => (
- <tr key={`${p.path}-${p.type}`}>
- <TD className="max-w-[240px] truncate pr-3 font-medium text-stone-800">{p.title || p.path}</TD>
- <TD className="px-3 capitalize text-stone-500">{p.type}</TD>
- <TD right className="px-3">{p.views.toLocaleString()}</TD>
- <TD right className="pl-3">{p.visitors.toLocaleString()}</TD>
- </tr>
- ))}
- </tbody>
- </table>
- </div>
- </TechCard>
- )}
- </div>
- ) : (
- <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="No traffic yet for this period" body="As shoppers find your storefront — from Google, Instagram, a link in your bio, or a direct visit — you’ll see exactly where they came from here." />
- )
- )}
+       <TechCard className="p-5">
+        <CardTitle hint="the price bands your sales actually land in">Where the money comes from</CardTitle>
+        <Leaderboard rows={(catalog.priceBands ?? []).filter((b) => b.sold > 0).map((b) => ({ name: b.label, value: b.revenueCents, sub: `${b.sold} sold` }))} />
+       </TechCard>
 
- {/* ── DEMAND ── */}
- {tab === "demand" && (
- <div className="space-y-6">
- {(data.productViews > 0 || data.favorites > 0 || data.orders > 0) && (
- <TechCard className="p-5">
- <CardTitle>Demand funnel</CardTitle>
- <Funnel steps={[{ label: "Product views", value: data.productViews }, { label: "Favorites", value: data.favorites }, { label: "Orders", value: data.orders }]} />
- </TechCard>
- )}
- <div className="grid gap-4 sm:grid-cols-2">
- <TechCard className="p-5">
- <CardTitle>Most viewed</CardTitle>
- {data.topViewed.length === 0 ? <p className="py-4 text-center text-[12px] text-stone-400">No views yet.</p> : (
- <div className="space-y-2">
- {data.topViewed.map((it) => (
- <div key={it.itemId} className="flex items-center justify-between text-[13px]">
- <span className="max-w-[200px] truncate text-stone-700">{it.title}</span>
- <span className="shrink-0 tabular-nums text-stone-500">{it.count} view{it.count === 1 ? "" : "s"}</span>
- </div>
- ))}
- </div>
- )}
- </TechCard>
- <TechCard className="p-5">
- <CardTitle>Most favorited</CardTitle>
- {data.topFavorited.length === 0 ? <p className="py-4 text-center text-[12px] text-stone-400">No favorites yet.</p> : (
- <div className="space-y-2">
- {data.topFavorited.map((it) => (
- <div key={it.itemId} className="flex items-center justify-between text-[13px]">
- <span className="max-w-[200px] truncate text-stone-700">{it.title}</span>
- <span className="shrink-0 tabular-nums text-[#e0245e]">♥ {it.count}</span>
- </div>
- ))}
- </div>
- )}
- </TechCard>
- </div>
- <TechCard className="p-5">
- <CardTitle>Top searches</CardTitle>
- {data.topSearches.length === 0 ? (
- <p className="py-2 text-[12px] text-stone-400">No searches yet — this fills in as shoppers search your storefront.</p>
- ) : (
- <div className="flex flex-wrap gap-2">
- {data.topSearches.map((s) => (
- <span key={s.query} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-[12px] text-stone-700">
- {s.query} <span className="tabular-nums text-stone-400">{s.count}</span>
- </span>
- ))}
- </div>
- )}
- </TechCard>
- </div>
- )}
- </>
- ) : null}
- </AdminPage>
+       <TechCard className="p-5">
+        <CardTitle>Recent sales</CardTitle>
+        {sales.recentSales.length ? (
+         <div className="overflow-x-auto">
+          <table className="w-full">
+           <thead><tr><TH>Item</TH><TH>When</TH><TH>Buyer</TH><TH right>Amount</TH></tr></thead>
+           <tbody>
+            {sales.recentSales.map((s, i) => (
+             <tr key={`${s.title}-${i}`}>
+              <TD><span className="block max-w-[260px] truncate font-medium text-stone-800">{s.title}</span></TD>
+              <TD>{shortDate(s.at)}</TD>
+              <TD>{s.buyerEmail ?? <span className="text-stone-300">not recorded</span>}</TD>
+              <TD right>{moneyExact(s.amountCents)}</TD>
+             </tr>
+            ))}
+           </tbody>
+          </table>
+         </div>
+        ) : <p className="py-4 text-center text-[12px] text-stone-400">No sales in this period.</p>}
+       </TechCard>
+      </div>
+     )}
+
+     {/* ── CUSTOMERS ── */}
+     {tab === "customers" && customers && (
+      <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Customers" value={num(customers.totalContacts)} hint={`${num(customers.buyersAllTime)} have bought`} />
+        <Kpi label="Avg. lifetime spend" value={customers.buyersAllTime ? money(customers.avgLifetimeSpendCents) : "—"} hint="per buyer, all time" />
+        <Kpi label="Repeat rate" value={customers.buyersAllTime ? pct(customers.repeatPurchaseRatePct) : "—"} hint="buyers with 2+ orders" />
+        <Kpi label="Orders per customer" value={customers.buyersAllTime ? customers.avgOrdersPerCustomer.toFixed(2) : "—"} />
+       </div>
+
+       {customers.identifiedRevenuePct < 100 && (
+        <TechCard className="p-4">
+         <p className="text-[12px] text-stone-600">
+          <StatusPill tone="info">Coverage</StatusPill>{" "}
+          {pct(customers.identifiedRevenuePct)} of this period&apos;s revenue is tied to a named buyer. Sales recorded by hand carry no email,
+          so customer numbers below describe only the part of your business that came through checkout.
+         </p>
+        </TechCard>
+       )}
+
+       <div className="grid gap-4 sm:grid-cols-2">
+        <TechCard className="p-5">
+         <CardTitle hint="buyers in this period">New vs returning</CardTitle>
+         {customers.buyersInPeriod ? (
+          <div className="flex items-center gap-5">
+           <DonutChart data={[{ label: "New", value: customers.newCustomers }, { label: "Returning", value: customers.returningCustomers }]} />
+           <div className="space-y-2 text-[13px]">
+            <div className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ background: DONUT_COLORS[0] }} /><span className="text-stone-600">New</span><span className="tabular-nums text-stone-900">{num(customers.newCustomers)} · {pct(customers.newVsReturningPct.newPct)}</span></div>
+            <div className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ background: DONUT_COLORS[1] }} /><span className="text-stone-600">Returning</span><span className="tabular-nums text-stone-900">{num(customers.returningCustomers)} · {pct(customers.newVsReturningPct.returningPct)}</span></div>
+           </div>
+          </div>
+         ) : <p className="py-4 text-center text-[12px] text-stone-400">No identified buyers in this period.</p>}
+        </TechCard>
+
+        <TechCard className="p-5">
+         <CardTitle hint="lifetime spend">Top customers</CardTitle>
+         {customers.topCustomers.length ? (
+          <div className="overflow-x-auto">
+           <table className="w-full">
+            <thead><tr><TH>Customer</TH><TH right>Orders</TH><TH right>Spent</TH></tr></thead>
+            <tbody>
+             {customers.topCustomers.map((c) => (
+              <tr key={c.email}>
+               <TD>
+                <span className="block max-w-[200px] truncate font-medium text-stone-800">{c.name || c.email}</span>
+                <span className="block text-[11px] text-stone-400">last {shortDate(c.lastOrderAt)}</span>
+               </TD>
+               <TD right>{c.orders}</TD>
+               <TD right>{money(c.spentCents)}</TD>
+              </tr>
+             ))}
+            </tbody>
+           </table>
+          </div>
+         ) : <p className="py-4 text-center text-[12px] text-stone-400">No named buyers yet.</p>}
+        </TechCard>
+       </div>
+
+       <TechCard className="p-5">
+        <CardTitle hint="everyone grouped by the month of their first order, and the share who came back">Acquisition cohorts</CardTitle>
+        {customers.cohorts.length ? (
+         <div className="overflow-x-auto">
+          <table className="w-full">
+           <thead><tr><TH>First bought</TH><TH right>Customers</TH><TH right>Came back</TH><TH right>Repeat rate</TH><TH right>Lifetime revenue</TH></tr></thead>
+           <tbody>
+            {customers.cohorts.map((c) => (
+             <tr key={c.month}>
+              <TD>{c.month}</TD>
+              <TD right>{c.customers}</TD>
+              <TD right>{c.repeatCustomers}</TD>
+              <TD right>{pct(c.repeatPct)}</TD>
+              <TD right>{money(c.revenueCents)}</TD>
+             </tr>
+            ))}
+           </tbody>
+          </table>
+         </div>
+        ) : <p className="py-4 text-center text-[12px] text-stone-400">Cohorts appear once buyers have emails on record.</p>}
+       </TechCard>
+      </div>
+     )}
+
+     {/* ── PRICING & CATALOG ── */}
+     {tab === "catalog" && catalog && (
+      <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Avg. listed" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "—"} hint={`median ${money(catalog.medianListedPriceCents)}`} />
+        <Kpi label="Avg. sold" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "—"} hint={catalog.soldInPeriod ? `median ${money(catalog.medianSoldPriceCents)}` : undefined} delta={catalog.vsPrior?.avgSoldPricePct} />
+        <Kpi label="Realisation" value={pct(catalog.realisationPct)} hint="sold ÷ asking" />
+        <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} />
+       </div>
+
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Active listings" value={num(catalog.activeListings)} />
+        <Kpi label="Inventory value" value={money(catalog.inventoryValueCents)} />
+        <Kpi label="Listed this period" value={num(catalog.listedInPeriod)} />
+        <Kpi label="Days to sell" value={catalog.medianDaysToSell == null ? "—" : `${catalog.medianDaysToSell}`} hint={catalog.avgDaysToSell == null ? "median" : `median · ${catalog.avgDaysToSell} avg`} />
+       </div>
+
+       <TechCard className="p-5">
+        <CardTitle hint="how your live catalog is spread across price, and what each band actually sold">Price distribution</CardTitle>
+        <div className="overflow-x-auto">
+         <table className="w-full">
+          <thead><tr><TH>Band</TH><TH right>Listed</TH><TH right>Share</TH><TH right>Sold</TH><TH right>Revenue</TH></tr></thead>
+          <tbody>
+           {catalog.priceBands.map((b) => (
+            <tr key={b.label}>
+             <TD><span className="font-medium text-stone-800">{b.label}</span></TD>
+             <TD right>{num(b.listed)}</TD>
+             <TD right>{pct(b.listedPct)}</TD>
+             <TD right>{num(b.sold)}</TD>
+             <TD right>{money(b.revenueCents)}</TD>
+            </tr>
+           ))}
+          </tbody>
+         </table>
+        </div>
+       </TechCard>
+
+       {(["topBrands", "topCategories"] as const).map((key) => (
+        <TechCard key={key} className="p-5">
+         <CardTitle hint="what you stock against what sells">{key === "topBrands" ? "Brand mix" : "Category mix"}</CardTitle>
+         <div className="overflow-x-auto">
+          <table className="w-full">
+           <thead><tr><TH>{key === "topBrands" ? "Brand" : "Category"}</TH><TH right>Listed</TH><TH right>Sold</TH><TH right>Sell-through</TH><TH right>Avg. sold</TH><TH right>Revenue</TH></tr></thead>
+           <tbody>
+            {catalog[key].map((r) => (
+             <tr key={r.name}>
+              <TD><span className="font-medium text-stone-800">{r.name}</span></TD>
+              <TD right>{num(r.listed)}</TD>
+              <TD right>{num(r.sold)}</TD>
+              <TD right>{pct(r.sellThroughPct)}</TD>
+              <TD right>{r.sold ? money(r.avgSoldPriceCents) : "—"}</TD>
+              <TD right>{money(r.revenueCents)}</TD>
+             </tr>
+            ))}
+           </tbody>
+          </table>
+         </div>
+        </TechCard>
+       ))}
+      </div>
+     )}
+
+     {/* ── PRODUCTS ── */}
+     {tab === "products" && products && (
+      <div className="space-y-6">
+       {products.aging.count > 0 && (
+        <TechCard className="p-4">
+         <p className="text-[12px] text-stone-600">
+          <StatusPill tone="pending">Aging</StatusPill>{" "}
+          {num(products.aging.count)} listings ({pct(products.aging.shareOfActivePct)} of your active catalog, {money(products.aging.valueCents)} at list)
+          have been live more than {products.aging.thresholdDays} days. Repricing or restaging these is usually the fastest revenue you have.
+         </p>
+        </TechCard>
+       )}
+
+       <TechCard className="p-5">
+        <CardTitle hint="what earned the most in this period">Best sellers</CardTitle>
+        <ProductTable rows={products.bestSellers} columns={["revenue", "daysToSell", "views"]} />
+       </TechCard>
+
+       <div className="grid gap-4 sm:grid-cols-2">
+        <TechCard className="p-5">
+         <CardTitle>Most viewed</CardTitle>
+         <ProductTable rows={products.mostViewed} columns={["views"]} />
+        </TechCard>
+        <TechCard className="p-5">
+         <CardTitle>Most saved</CardTitle>
+         <ProductTable rows={products.mostFavorited} columns={["favorites"]} />
+        </TechCard>
+       </div>
+
+       <TechCard className="p-5">
+        <CardTitle hint="live at least two weeks and earning the least attention per day — the ones to re-shoot, retitle or reprice">Getting the least attention</CardTitle>
+        <ProductTable rows={products.worstPerformers} columns={["views", "daysLive"]} />
+       </TechCard>
+
+       {products.aging.items.length > 0 && (
+        <TechCard className="p-5">
+         <CardTitle hint={`unsold for more than ${products.aging.thresholdDays} days`}>Aging inventory</CardTitle>
+         <ProductTable rows={products.aging.items} columns={["daysLive", "views", "favorites"]} />
+        </TechCard>
+       )}
+      </div>
+     )}
+
+     {/* ── TRAFFIC ── */}
+     {tab === "traffic" && engagement && (
+      <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Sessions" value={num(engagement.sessions)} delta={engagement.vsPrior?.sessionsPct} />
+        <Kpi label="Session → sale" value={pct(engagement.rates.sessionToOrderPct)} />
+        <Kpi label="Pages per session" value={engagement.pagesPerSession || "—"} hint={`${num(engagement.pageviews)} page views`} />
+        <Kpi label="Bounce rate" value={pct(engagement.bounceRatePct)} hint="left after one page" />
+       </div>
+
+       <div className="grid gap-4 sm:grid-cols-2">
+        <TechCard className="p-5">
+         <CardTitle hint="where visitors arrive from">Traffic sources</CardTitle>
+         {engagement.trafficByType.length ? (
+          <div className="flex items-center gap-5">
+           <DonutChart data={engagement.trafficByType.map((t) => ({ label: t.type, value: t.sessions }))} />
+           <div className="space-y-1.5 text-[13px]">
+            {engagement.trafficByType.map((t, i) => (
+             <div key={t.type} className="flex items-center gap-2">
+              <i className="h-2.5 w-2.5 rounded-full" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+              <span className="text-stone-600">{t.type}</span>
+              <span className="tabular-nums text-stone-900">{num(t.sessions)} · {pct(t.sharePct)}</span>
+             </div>
+            ))}
+           </div>
+          </div>
+         ) : <p className="py-4 text-center text-[12px] text-stone-400">No visits recorded in this period.</p>}
+         {(() => {
+          const direct = engagement.trafficByType.find((t) => t.type === "Direct");
+          if (!direct || direct.sharePct < 25) return null;
+          return (
+           <p className="mt-3 border-t border-stone-100 pt-3 text-[11px] leading-relaxed text-stone-500">
+            <span className="font-medium text-stone-700">{pct(direct.sharePct)} is direct</span> — that&apos;s visits that arrived with no source attached, not a channel.
+            Tapping a link inside Instagram or TikTok often sends nothing we can read.{" "}
+            <a href="/admin/marketing/share-links" className="font-medium text-[var(--accent-ink,#0b7a5c)] underline underline-offset-2">Use tagged share links</a>{" "}
+            and every post gets credited properly.
+           </p>
+          );
+         })()}
+        </TechCard>
+
+        <TechCard className="p-5">
+         <CardTitle>Top sources</CardTitle>
+         <Leaderboard unit="count" rows={engagement.topSources.map((s) => ({ name: s.source, value: s.sessions, sub: s.type }))} />
+        </TechCard>
+       </div>
+
+       <TechCard className="p-5">
+        <CardTitle hint="which channel the shopper came from on the visit that sold the piece">Revenue by channel</CardTitle>
+        {engagement.channels.length ? (
+         <div className="overflow-x-auto">
+          <table className="w-full">
+           <thead><tr><TH>Channel</TH><TH right>Sessions</TH><TH right>Sales</TH><TH right>Conversion</TH><TH right>Avg. order</TH><TH right>Revenue</TH></tr></thead>
+           <tbody>
+            {engagement.channels.map((c) => (
+             <tr key={c.channel}>
+              <TD><span className="font-medium text-stone-800">{c.channel}</span></TD>
+              <TD right>{num(c.sessions)}</TD>
+              <TD right>{num(c.orders)}</TD>
+              <TD right>{pct(c.convPct)}</TD>
+              <TD right>{money(c.aovCents)}</TD>
+              <TD right>{money(c.revenueCents)}</TD>
+             </tr>
+            ))}
+           </tbody>
+          </table>
+         </div>
+        ) : (
+         <p className="py-4 text-[12px] text-stone-500">
+          None of this period&apos;s {num(engagement.totalOrders)} sales could be traced back to a visit yet — channel revenue fills in as
+          shoppers browse and buy in the same tracked session. Sessions and sources above are recorded regardless.
+         </p>
+        )}
+        {engagement.channels.length > 0 && engagement.attributionCoveragePct < 100 && (
+         <p className="mt-3 text-[11px] text-stone-400">Covers {pct(engagement.attributionCoveragePct)} of sales in this period; the rest had no traceable visit.</p>
+        )}
+       </TechCard>
+
+       <div className="grid gap-4 sm:grid-cols-2">
+        <TechCard className="p-5">
+         <CardTitle>Most visited pages</CardTitle>
+         {engagement.topPages.length ? (
+          <div className="overflow-x-auto">
+           <table className="w-full">
+            <thead><tr><TH>Page</TH><TH right>Views</TH><TH right>Visitors</TH></tr></thead>
+            <tbody>
+             {engagement.topPages.map((p) => (
+              <tr key={p.path}>
+               <TD><span className="block max-w-[240px] truncate">{p.title || p.path}</span><span className="block text-[11px] text-stone-400">{p.type}</span></TD>
+               <TD right>{num(p.views)}</TD>
+               <TD right>{num(p.visitors)}</TD>
+              </tr>
+             ))}
+            </tbody>
+           </table>
+          </div>
+         ) : <p className="py-4 text-center text-[12px] text-stone-400">No page views in this period.</p>}
+        </TechCard>
+
+        <TechCard className="p-5">
+         <CardTitle hint="what shoppers searched for on your store — demand your catalog may not answer yet">Top searches</CardTitle>
+         <Leaderboard unit="count" rows={engagement.topSearches.map((s) => ({ name: s.query, value: s.count }))} />
+        </TechCard>
+       </div>
+
+       {(engagement.devices.length > 0 || engagement.countries.length > 0) ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+         <TechCard className="p-5">
+          <CardTitle hint="how shoppers are browsing — it decides how you shoot and crop">Devices</CardTitle>
+          {engagement.devices.length ? (
+           <Leaderboard unit="count" rows={engagement.devices.map((d) => ({ name: d.device[0].toUpperCase() + d.device.slice(1), value: d.sessions, sub: pct(d.sharePct) }))} />
+          ) : <p className="py-4 text-center text-[12px] text-stone-400">No device data in this period.</p>}
+         </TechCard>
+         <TechCard className="p-5">
+          <CardTitle hint="where your shoppers are">Locations</CardTitle>
+          {engagement.countries.length ? (
+           <>
+            <Leaderboard unit="count" rows={engagement.countries.map((c) => ({ name: c.country, value: c.sessions, sub: pct(c.sharePct) }))} />
+            {engagement.cities.length > 0 && (
+             <p className="mt-3 text-[11px] text-stone-400">Top cities: {engagement.cities.slice(0, 5).map((c) => c.city).join(", ")}</p>
+            )}
+           </>
+          ) : <p className="py-4 text-center text-[12px] text-stone-400">No location data in this period.</p>}
+         </TechCard>
+        </div>
+       ) : (
+        <TechCard className="p-4">
+         <p className="text-[12px] text-stone-600">
+          <StatusPill tone="info">New</StatusPill>{" "}
+          Device and location are now recorded on every visit. They&apos;ll appear here once shoppers arrive — earlier visits didn&apos;t capture them.
+         </p>
+        </TechCard>
+       )}
+
+       <TechCard className="p-5">
+        <CardTitle hint="the first page of each visit — where people actually enter the store">Landing pages</CardTitle>
+        <Leaderboard unit="count" rows={engagement.landingPages.map((p) => ({ name: p.title || p.path, value: p.sessions }))} />
+       </TechCard>
+
+       <TechCard className="p-5">
+        <CardTitle hint="revenue on pieces a shopper first met on the VYA marketplace">Attributed to VYA</CardTitle>
+        <div className="flex items-baseline gap-3">
+         <span className="text-[26px] font-semibold tabular-nums text-stone-900">{money(engagement.vyaAttributed.revenueCents)}</span>
+         <span className="text-[12px] text-stone-400">of {money(engagement.totalRevenueCents)} total · {pct(engagement.vyaAttributed.sharePct)}</span>
+        </div>
+       </TechCard>
+      </div>
+     )}
+
+
+     {/* ── WHAT SELLS ── */}
+     {tab === "quality" && quality && (
+      <div className="space-y-6">
+       <TechCard className="p-4">
+        <p className="text-[12px] text-stone-600">
+         <StatusPill tone="info">Whole catalog</StatusPill>{" "}
+         This tab compares your own listings against each other across the {num(quality.catalogSize)} pieces that have been live
+         long enough to judge — it ignores the date filter, because &ldquo;do measurements help?&rdquo; needs every listing it can get.
+         {quality.excludedImports > 0 && <> {num(quality.excludedImports)} imported {quality.excludedImports === 1 ? "piece that arrived" : "pieces that arrived"} already sold {quality.excludedImports === 1 ? "is" : "are"} left out — they never sat on a shelf here, so they can&apos;t tell you anything.</>}{" "}
+         These are associations, not proof: a piece you measured carefully was probably photographed carefully too.
+        </p>
+       </TechCard>
+
+       {!quality.enoughData ? (
+        <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Not enough listings yet"
+         body="Once you've listed enough pieces and made a handful of sales, this tab shows which listing habits actually move them." />
+       ) : (
+        <>
+         <TechCard className="p-5">
+          <CardTitle hint="sell-through for your listings with each signal against your listings without it">What moves your pieces</CardTitle>
+          <div className="overflow-x-auto">
+           <table className="w-full">
+            <thead><tr><TH>Signal</TH><TH right>With</TH><TH right>Without</TH><TH right>Lift</TH><TH right>Days to sell</TH><TH right>Live listings missing it</TH></tr></thead>
+            <tbody>
+             {quality.signals.map((sg) => (
+              <tr key={sg.key}>
+               <TD>
+                <span className="block font-medium text-stone-800">{sg.label}</span>
+                <span className="block text-[11px] text-stone-400">{sg.action}</span>
+               </TD>
+               <TD right>{sg.verdict === "not-enough-data" ? "—" : <>{pct(sg.with.sellThroughPct)}<span className="block text-[11px] text-stone-400">{num(sg.with.items)} listings</span></>}</TD>
+               <TD right>{sg.verdict === "not-enough-data" ? "—" : <>{pct(sg.without.sellThroughPct)}<span className="block text-[11px] text-stone-400">{num(sg.without.items)} listings</span></>}</TD>
+               <TD right>
+                {sg.verdict === "not-enough-data" ? <span className="text-stone-300">too few</span>
+                 : sg.verdict === "no-clear-effect" ? <StatusPill tone="neutral">no clear effect</StatusPill>
+                 : <StatusPill tone={sg.verdict === "helps" ? "live" : "down"}>{sg.liftPct != null && sg.liftPct > 0 ? "+" : ""}{sg.liftPct}%</StatusPill>}
+               </TD>
+               <TD right>{sg.daysDeltaPct == null || sg.verdict === "not-enough-data" ? "—" : <span className={sg.daysDeltaPct < 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-stone-500"}>{sg.daysDeltaPct > 0 ? "+" : ""}{sg.daysDeltaPct}%</span>}</TD>
+               <TD right>{sg.verdict === "helps" && sg.activeMissing > 0 ? <span className="font-semibold text-amber-600">{num(sg.activeMissing)}</span> : num(sg.activeMissing)}</TD>
+              </tr>
+             ))}
+            </tbody>
+           </table>
+          </div>
+          <p className="mt-3 text-[11px] text-stone-400">
+           Lift is the relative difference in sell-through. A negative days-to-sell figure means those pieces move faster.
+           Every verdict has to clear a 95% significance test first, so a gap that could be luck is reported as
+           no clear effect rather than dressed up as advice.
+          </p>
+         </TechCard>
+
+         <TechCard className="p-5">
+          <CardTitle hint="sell-through by how many photos the listing carries">How far photos take you</CardTitle>
+          <div className="space-y-2.5">
+           {quality.photoLadder.map((r) => (
+            <div key={r.bucket} className={r.sparse ? "opacity-45" : undefined}>
+             <div className="mb-1 flex items-center justify-between text-[13px]">
+              <span className="text-stone-700">{r.bucket} photo{r.bucket === "1" ? "" : "s"}</span>
+              <span className="tabular-nums text-stone-900">{pct(r.sellThroughPct)}<span className="text-stone-400"> · {num(r.items)} listings{r.sparse ? " · too few to read" : ""}</span></span>
+             </div>
+             <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
+              <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${Math.max(2, Math.min(100, r.sellThroughPct))}%` }} />
+             </div>
+            </div>
+           ))}
+          </div>
+         </TechCard>
+
+         <TechCard className="p-5">
+          <CardTitle hint="how complete your live listings are right now">Catalog completeness</CardTitle>
+          <div className="space-y-2.5">
+           {quality.completeness.map((c) => (
+            <div key={c.key}>
+             <div className="mb-1 flex items-center justify-between text-[13px]">
+              <span className="text-stone-700">{c.label}</span>
+              <span className="tabular-nums text-stone-900">{pct(c.pct)}<span className="text-stone-400"> · {num(c.filled)} of {num(c.total)}</span></span>
+             </div>
+             <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+              <div className="h-full rounded-full bg-[var(--accent,#0e9f76)]" style={{ width: `${Math.max(2, c.pct)}%` }} />
+             </div>
+            </div>
+           ))}
+          </div>
+         </TechCard>
+        </>
+       )}
+      </div>
+     )}
+
+     {/* ── PROFIT ── */}
+     {tab === "margin" && margin && (
+      <div className="space-y-6">
+       <ProfitAndLoss margin={margin} period={data.period} onAdded={() => setReload((n) => n + 1)} />
+
+       <RecurringCosts margin={margin} onChanged={() => setReload((n) => n + 1)} />
+
+       {!margin.available ? (
+        <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Add what your pieces cost"
+         body={`The statement above is ready for your running costs. To fill in cost of goods and gross margin too, add what you paid for a piece — ${num(margin.activeWithoutCost)} of your ${num(margin.activeTotal)} live listings don't have it yet.`} />
+       ) : (
+        <>
+         {margin.current.coveragePct < 100 && (
+          <TechCard className="p-4">
+           <p className="text-[12px] text-stone-600">
+            <StatusPill tone="info">Coverage</StatusPill>{" "}
+            Every figure here covers the {pct(margin.current.coveragePct)} of this period&apos;s sales ({num(margin.current.coveredSales)} of {num(margin.current.totalSales)})
+            where a cost was recorded. Extrapolating across the rest would be inventing profit, so we don&apos;t.
+           </p>
+          </TechCard>
+         )}
+
+         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Kpi label="Gross profit" value={money(margin.current.grossProfitCents)} delta={margin.vsPrior?.profitPct} />
+          <Kpi label="Gross margin" value={pct(margin.current.grossMarginPct)} delta={margin.vsPrior?.marginPct} />
+          <Kpi label="Return on cost" value={pct(margin.current.roiPct)} hint="profit ÷ what you paid" />
+          <Kpi label="Profit per sale" value={money(margin.current.avgProfitPerSaleCents)} />
+         </div>
+
+         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Kpi label="Revenue (costed)" value={money(margin.current.revenueCents)} />
+          <Kpi label="Cost of goods" value={money(margin.current.costCents)} />
+          <Kpi label="Stock at cost" value={money(margin.inventoryCostCents)} hint="unsold, at what you paid" />
+         </div>
+
+         {(["byBrand", "byCategory"] as const).map((key) => (
+          <TechCard key={key} className="p-5">
+           <CardTitle hint="ranked by profit, not revenue">{key === "byBrand" ? "Profit by brand" : "Profit by category"}</CardTitle>
+           <div className="overflow-x-auto">
+            <table className="w-full">
+             <thead><tr><TH>{key === "byBrand" ? "Brand" : "Category"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
+             <tbody>
+              {margin[key].map((r) => (
+               <tr key={r.name}>
+                <TD><span className="font-medium text-stone-800">{r.name}</span></TD>
+                <TD right>{num(r.sales)}</TD>
+                <TD right>{money(r.revenueCents)}</TD>
+                <TD right>{money(r.costCents)}</TD>
+                <TD right><span className={r.profitCents < 0 ? "text-rose-500" : undefined}>{money(r.profitCents)}</span></TD>
+                <TD right>{pct(r.marginPct)}</TD>
+               </tr>
+              ))}
+             </tbody>
+            </table>
+           </div>
+          </TechCard>
+         ))}
+
+         <div className="grid gap-4 sm:grid-cols-2">
+          {([["Best margin", margin.bestMargin], ["Thinnest margin", margin.worstMargin]] as const).map(([title, rows]) => (
+           <TechCard key={title} className="p-5">
+            <CardTitle>{title}</CardTitle>
+            {rows.length ? (
+             <div className="overflow-x-auto">
+              <table className="w-full">
+               <thead><tr><TH>Item</TH><TH right>Sold</TH><TH right>Cost</TH><TH right>Profit</TH></tr></thead>
+               <tbody>
+                {rows.map((i) => (
+                 <tr key={i.itemId}>
+                  <TD>
+                   <span className="block max-w-[200px] truncate font-medium text-stone-800">{i.title}</span>
+                   <span className="block text-[11px] text-stone-400">{pct(i.marginPct)} margin</span>
+                  </TD>
+                  <TD right>{money(i.priceCents)}</TD>
+                  <TD right>{money(i.costCents)}</TD>
+                  <TD right><span className={i.profitCents < 0 ? "text-rose-500" : undefined}>{money(i.profitCents)}</span></TD>
+                 </tr>
+                ))}
+               </tbody>
+              </table>
+             </div>
+            ) : <p className="py-4 text-center text-[12px] text-stone-400">Nothing to show yet.</p>}
+           </TechCard>
+          ))}
+         </div>
+        </>
+       )}
+      </div>
+     )}
+
+    </>
+   ) : (
+    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Analytics unavailable" body="We couldn't load your analytics just now. Try refreshing." />
+   )}
+  </AdminPage>
  );
 }
