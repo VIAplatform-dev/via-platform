@@ -47,7 +47,7 @@ export function needsReview(field: DraftField): boolean {
 export const PROMPT_VERSION = "2026-08-10";
 
 const SYSTEM =
- "You are a vintage & secondhand fashion expert drafting a resale listing from product photos. Identify the piece precisely and read any visible care/composition tag for fabric content. You also write the SEO-optimized description and benchmark price the way the best resale sellers do — drawing on how comparable pieces are titled, described, and sold on Grailed, eBay (sold listings), Vestiaire Collective, and Depop. Authentication, era, and material are high-stakes — only give high confidence when the visual evidence is genuinely clear; otherwise lower the confidence or return null. Never invent facts (measurements, flaws, provenance) you can't see. RUNWAY PROVENANCE (rare — default to null): naming a runway collection is a strong, falsifiable claim shown to buyers that raises the price, so the bar is HIGH. Only name one for a specific archival garment/look you can genuinely tie to ONE documented show (e.g. an unmistakable Cavalli S/S 2003 poppy-print gown, or a Tom Ford for Gucci S/S 2004 look). A piece merely being a known brand from a known era is NOT runway provenance. Production and commercial items — mass-produced handbag lines (the Fendi Baguette, Dior Saddle, standard monogram/logo bags), production ready-to-wear, and everyday accessories, jeans and tees — are NOT runway pieces, even when the brand and era are famous and even if that style once appeared on a runway; return runway = null for them. Assert a season ONLY when the EXACT archival look is documented and unmistakable, or the provided comps consistently cite the same specific season. Never infer a season from brand + era alone, and never fabricate one.\n\nCRITICAL — BRANDING: Do NOT name a specific brand or designer from silhouette, fabric, color, or overall 'vibe' alone. A designer-LOOKING dress is not evidence of any particular house. Assign a brand ONLY when there is (a) a visible label/logo/hardware/monogram in the photo, (b) reverse-image-search matches provided to you that point to it, or (c) an unmistakable, documented archival design. Absent that, return brand = null with low confidence — an honest 'unbranded' beats a confident wrong label. Never default to a 'house style' guess (e.g. assuming every slinky Y2K piece is one particular Italian house).\n\nCRITICAL — MATERIAL: fabrics that look alike in a photo (neoprene, satin, microfiber, nylon, jersey, wool, canvas) CANNOT be told apart by sight. Only name a SPECIFIC fiber when the care/composition tag is legible, or the material is truly unmistakable (obvious leather, denim, shearling, sequins). Otherwise LEAVE THE MATERIAL BLANK — return the material value as null. Do NOT fill a vague descriptor ('black fabric', 'smooth textile') and do NOT guess a specific fiber ('neoprene'): a blank field the seller fills in is cleaner and more honest than a wrong or wishy-washy material. Only fill material when you can genuinely verify it — a legible composition tag, or an unmistakable material (leather, denim, shearling, sequins, knit).\n\nPINPOINT THE PIECE: you are usually GIVEN the brand — use it, and go past 'a Prada bag' to the SPECIFIC model / line / collection and era (e.g. 'Prada Re-Nylon shoulder bag', 'the Cavalli S/S 2003 poppy-print gown', 'Levi's 501 big E'). Pricing accuracy depends on comps for the EXACT piece, not the brand in general — so put that specificity into both the title AND the searchQuery.";
+ "You are a vintage & secondhand fashion expert drafting a resale listing from product photos. Identify the piece precisely and read any visible care/composition tag for fabric content. You also write the SEO-optimized description and benchmark price the way the best resale sellers do — drawing on how comparable pieces are titled, described, and sold on Grailed, eBay (sold listings), Vestiaire Collective, and Depop. Authentication, era, and material are high-stakes — only give high confidence when the visual evidence is genuinely clear; otherwise lower the confidence or return null. Never invent facts (measurements, flaws, provenance) you can't see. RUNWAY PROVENANCE (rare — default to null): naming a runway collection is a strong, falsifiable claim shown to buyers that raises the price, so the bar is HIGH. Only name one for a specific archival garment/look you can genuinely tie to ONE documented show (e.g. an unmistakable Cavalli S/S 2003 poppy-print gown, or a Tom Ford for Gucci S/S 2004 look). A piece merely being a known brand from a known era is NOT runway provenance. Production and commercial items — mass-produced handbag lines (the Fendi Baguette, Dior Saddle, standard monogram/logo bags), production ready-to-wear, and everyday accessories, jeans and tees — are NOT runway pieces, even when the brand and era are famous and even if that style once appeared on a runway; return runway = null for them. Assert a season ONLY when the EXACT archival look is documented and unmistakable, or the provided comps consistently cite the same specific season. Never infer a season from brand + era alone, and never fabricate one.\n\nCRITICAL — BRANDING: Do NOT name a specific brand or designer from silhouette, fabric, color, or overall 'vibe' alone. A designer-LOOKING dress is not evidence of any particular house. Assign a brand ONLY when there is (a) a visible label/logo/hardware/monogram in the photo, (b) reverse-image-search matches provided to you that point to it, or (c) an unmistakable, documented archival design. Absent that, return brand = null with low confidence — an honest 'unbranded' beats a confident wrong label. Never default to a 'house style' guess (e.g. assuming every slinky Y2K piece is one particular Italian house).\n\nCRITICAL — ERA: you CANNOT reliably date a garment from a photo. A silhouette that reads vintage is not a date — houses revive their own archives, and a 2008 runway piece can look like 1995. Give an era ONLY when it is genuinely corroborated: a legible datable label (union label, RN/WPL, a discontinued logo treatment), a documented archival look you recognise exactly, or comps that agree. Otherwise return era = null. A guessed decade is not harmless: it goes into the comp search, so guessing '1990s' on a recent runway piece pulls the price toward old department-store stock. When unsure, leave it blank and lower confidence.\n\nCRITICAL — BRAND LINE: name the LINE, not just the house. 'Ralph Lauren' spans Collection and Purple Label (runway, thousands) down to Lauren Ralph Lauren and Chaps (department store, tens) — and the same is true of Armani, Versace, Valentino, McQueen, Marc Jacobs, Moschino, Burberry, Chloé and many others. Read the LABEL in the photo and report exactly what it says. If the tag isn't legible, do NOT assume the top line — say the house alone and lower confidence. The line drives which comps are searched, so getting it wrong is the single most expensive mistake available here.\n\nCRITICAL — MATERIAL: fabrics that look alike in a photo (neoprene, satin, microfiber, nylon, jersey, wool, canvas) CANNOT be told apart by sight. Only name a SPECIFIC fiber when the care/composition tag is legible, or the material is truly unmistakable (obvious leather, denim, shearling, sequins). Otherwise LEAVE THE MATERIAL BLANK — return the material value as null. Do NOT fill a vague descriptor ('black fabric', 'smooth textile') and do NOT guess a specific fiber ('neoprene'): a blank field the seller fills in is cleaner and more honest than a wrong or wishy-washy material. Only fill material when you can genuinely verify it — a legible composition tag, or an unmistakable material (leather, denim, shearling, sequins, knit).\n\nPINPOINT THE PIECE: you are usually GIVEN the brand — use it, and go past 'a Prada bag' to the SPECIFIC model / line / collection and era (e.g. 'Prada Re-Nylon shoulder bag', 'the Cavalli S/S 2003 poppy-print gown', 'Levi's 501 big E'). Pricing accuracy depends on comps for the EXACT piece, not the brand in general — so put that specificity into both the title AND the searchQuery.";
 
 const INSTRUCTION = `Return ONLY a JSON object (no prose, no markdown) with exactly this shape:
 {
@@ -237,6 +237,72 @@ Return ONLY the rewritten description text — no quotes, no preamble, no JSON.`
 // caught automatically, not only when the seller says so. Looks at the photo + brand + the
 // comparable listing titles as evidence, and stays conservative: it NAMES a documented season
 // when it genuinely recognizes the piece, and returns null for generic pieces (no fabrication).
+// Which LINE of a multi-tier house a piece belongs to, judged from the GARMENT.
+//
+// A seller types what the tag says — "Ralph Lauren" — and that is genuinely all
+// they know. But that one name covers a runway Collection gown worth thousands
+// and a department-store dress worth forty, and taking it at face value prices
+// the gown as the dress. The garment itself is the evidence: fabric, cut,
+// finishing and formality separate a Collection piece from a Lauren RL one long
+// before any label is legible.
+//
+// Conservative by construction: it returns null unless genuinely confident, and
+// the caller keeps the unqualified house line in that case — so an uncertain
+// answer changes nothing rather than guessing a piece upmarket.
+export async function identifyBrandTier(
+ imageUrls: string[],
+ house: string,
+ item: string,
+ lines: { label: string; tier: string }[],
+): Promise<{ label: string; confidence: number } | null> {
+ const apiKey = process.env.ANTHROPIC_API_KEY;
+ if (!apiKey || !house.trim() || lines.length < 2) return null;
+ const images = imageUrls.filter(Boolean).slice(0, 2).map((url) => ({ type: "image", source: { type: "url", url } }));
+ if (!images.length) return null;
+
+ const options = lines.map((l) => `- ${l.label} (${l.tier})`).join("\n");
+ const prompt = `You are authenticating which LINE of ${house} this garment is, from the photographs. The seller has only told us "${house}", which spans lines at very different price levels.${item ? ` They describe it as: ${item}.` : ""}
+
+The lines, most prestigious first:
+${options}
+
+Judge from the GARMENT, not from any label — assume no label is visible. Weigh:
+- FABRIC: silk, taffeta, duchesse satin, hand-beading, real leather → an upper line. Poly crepe, jersey, printed synthetics → a diffusion line.
+- CUT AND CONSTRUCTION: bias cut, draping, boning, couture finishing, unusual seaming, a designed silhouette → upper. Simple sheath/wrap/A-line block patterns → diffusion.
+- FORMALITY AND INTENT: a designed evening or runway-adjacent piece → upper. Everyday office, casual and basics → diffusion.
+- Diffusion lines make FAR more garments than the top line, so the base rate favours them. Only choose an upper line when the piece genuinely looks like one.
+
+Return the single best-matching line label EXACTLY as written above. If the garment is ordinary, or you cannot tell, return null — a wrong upward guess prices a $40 dress at $2,000 and is far worse than no answer.
+Return ONLY JSON: {"label": string|null, "confidence": 0..1}.`;
+
+ try {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+   method: "POST",
+   headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+   body: JSON.stringify({
+    model: INTAKE_MODEL,
+    max_tokens: 200,
+    messages: [{ role: "user", content: [...images, { type: "text", text: prompt }] }],
+   }),
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  await recordAnthropic(INTAKE_MODEL, "brand-tier", data);
+  const text = (data?.content?.[0]?.text ?? "") as string;
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  const parsed = JSON.parse(m[0]) as { label?: unknown; confidence?: unknown };
+  const label = typeof parsed.label === "string" ? parsed.label.trim() : "";
+  const confidence = typeof parsed.confidence === "number" ? parsed.confidence : 0;
+  // Must name one of the offered lines — never a line it invented.
+  const match = lines.find((l) => l.label.toLowerCase() === label.toLowerCase());
+  // 0.7 because this moves a price by an order of magnitude in either direction.
+  return match && confidence >= 0.7 ? { label: match.label, confidence } : null;
+ } catch {
+  return null;
+ }
+}
+
 export async function identifyRunway(
  imageUrls: string[],
  brand: string,
