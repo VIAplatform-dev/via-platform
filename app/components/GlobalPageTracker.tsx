@@ -187,7 +187,9 @@ export default function GlobalPageTracker() {
  // other short/mobile hosts); classifySource picks up everything else. When there is
  // genuinely no referrer, the honest answer is "direct" — not the browser name.
  if (!utmSource) {
- const c = classifySource({ referrer: document.referrer, selfHost: window.location.host });
+ // The user-agent recovers in-app taps (Instagram, TikTok, Facebook), which arrive
+ // with no referrer at all and would otherwise be filed as "direct".
+ const c = classifySource({ referrer: document.referrer, selfHost: window.location.host, userAgent: navigator.userAgent });
  utmSource = c.source.toLowerCase();
  utmMedium = utmMedium ?? (c.type === "Direct" ? "direct" : c.type.toLowerCase());
  }

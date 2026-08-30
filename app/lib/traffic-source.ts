@@ -5,6 +5,51 @@
 export type SourceType = "Direct" | "Search" | "Social" | "Email" | "Paid" | "Referral";
 export type ClassifiedSource = { type: SourceType; source: string; referrerHost: string };
 
+// ── In-app browsers ────────────────────────────────────────────────────────
+// The reason "Direct" swallows most social traffic. A tap from an Instagram bio
+// or a TikTok profile opens inside that app's own webview, which sends NO
+// referrer at all — so referrer-only classification files the visit as Direct
+// and the seller never learns Instagram sent it. The app is, however, plainly
+// identifiable in the user-agent, so we read it there when the referrer is
+// silent. TikTok in particular has never once appeared in our data by referrer.
+const IN_APP: { test: RegExp; type: SourceType; source: string }[] = [
+ { test: /bytedancewebview|musical_ly|\btiktok\b/i, type: "Social", source: "TikTok" },
+ { test: /instagram/i, type: "Social", source: "Instagram" },
+ { test: /\bFBAN\b|\bFBAV\b|FB_IAB|FB4A/i, type: "Social", source: "Facebook" },
+ { test: /pinterest/i, type: "Social", source: "Pinterest" },
+ { test: /snapchat/i, type: "Social", source: "Snapchat" },
+ { test: /\bLine\//i, type: "Social", source: "LINE" },
+ { test: /\bTwitter\b/i, type: "Social", source: "X" },
+ { test: /LinkedInApp/i, type: "Social", source: "LinkedIn" },
+ { test: /\bReddit\b/i, type: "Social", source: "Reddit" },
+ { test: /GSA\//i, type: "Search", source: "Google" },
+];
+
+/** The app a visit came from when the referrer is silent, or null when it's a plain browser. */
+export function classifyInAppBrowser(userAgent: string | null | undefined): { type: SourceType; source: string } | null {
+ const ua = userAgent || "";
+ if (!ua) return null;
+ for (const app of IN_APP) if (app.test.test(ua)) return { type: app.type, source: app.source };
+ return null;
+}
+
+// Android apps hand over a package name instead of a hostname. Without this they
+// read as a "Referral" from "Com.google.android.googlequicksearchbox".
+const ANDROID_PACKAGES: Record<string, { type: SourceType; source: string }> = {
+ "com.google.android.googlequicksearchbox": { type: "Search", source: "Google" },
+ "com.google.android.gm": { type: "Email", source: "Email" },
+ "com.instagram.android": { type: "Social", source: "Instagram" },
+ "com.zhiliaoapp.musically": { type: "Social", source: "TikTok" },
+ "com.facebook.katana": { type: "Social", source: "Facebook" },
+ "com.pinterest": { type: "Social", source: "Pinterest" },
+ "com.snapchat.android": { type: "Social", source: "Snapchat" },
+};
+
+// Hosts that look like a source but are really a round-trip back to us: the
+// Google OAuth screen is where a sign-in bounces through, not where a shopper
+// came from, and counting it as Search inflates Google with our own logins.
+const AUTH_BOUNCE = new Set(["accounts.google.com", "appleid.apple.com", "login.microsoftonline.com"]);
+
 // Search engines and social platforms we name explicitly; everything else with a
 // referrer becomes a Referral keyed by its domain.
 const SEARCH: Record<string, string> = {
@@ -41,7 +86,7 @@ function matchKnown(host: string): { type: SourceType; source: string } | null {
  return null;
 }
 
-export function classifySource(input: { referrer?: string | null; utmSource?: string | null; utmMedium?: string | null; selfHost?: string | null }): ClassifiedSource {
+export function classifySource(input: { referrer?: string | null; utmSource?: string | null; utmMedium?: string | null; selfHost?: string | null; userAgent?: string | null }): ClassifiedSource {
  const referrerHost = hostOf(input.referrer || "");
  const med = (input.utmMedium || "").toLowerCase().trim();
  const src = (input.utmSource || "").toLowerCase().trim();
@@ -57,13 +102,27 @@ export function classifySource(input: { referrer?: string | null; utmSource?: st
  return { type: "Referral", source: titleCase(src), referrerHost };
  }
 
- // 3. Fall back to the raw referrer.
- if (!referrerHost) return { type: "Direct", source: "Direct", referrerHost: "" };
+ // 3. The referrer, when there is a usable one.
+ const inApp = classifyInAppBrowser(input.userAgent);
  const self = (input.selfHost || "").replace(/^www\./, "").toLowerCase().split(":")[0];
- if (self && referrerHost === self) return { type: "Direct", source: "Direct", referrerHost };
- if (referrerHost.includes("vyaplatform")) return { type: "Referral", source: "VYA", referrerHost };
+ const selfReferred = Boolean(self) && referrerHost === self;
+
+ // No referrer, our own pages, or an auth bounce — none of those say where the
+ // shopper came from, so the in-app browser is the better answer when we have one.
+ if (!referrerHost || selfReferred || AUTH_BOUNCE.has(referrerHost)) {
+ if (inApp) return { ...inApp, referrerHost };
+ return { type: "Direct", source: "Direct", referrerHost };
+ }
+
+ const androidApp = ANDROID_PACKAGES[referrerHost];
+ if (androidApp) return { ...androidApp, referrerHost };
+
+ // Both VYA hosts are the marketplace sending a shopper on to a store.
+ if (referrerHost.includes("vyaplatform") || referrerHost.includes("getvya")) return { type: "Referral", source: "VYA", referrerHost };
  const known = matchKnown(referrerHost);
  if (known) return { ...known, referrerHost };
+ // A generic referrer beats nothing, but a named app beats a generic referrer.
+ if (inApp) return { ...inApp, referrerHost };
  return { type: "Referral", source: referrerHost, referrerHost };
 }
 

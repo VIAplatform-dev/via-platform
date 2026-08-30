@@ -29,7 +29,41 @@ async function ensureTable() {
  timestamp TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_store_visits_store_ts ON store_visits (store_slug, timestamp)`;
+ // Self-healing columns, added after the table shipped. Device comes from the
+ // user-agent; the geo fields come from Vercel's edge headers, which are present
+ // in production and absent locally — hence all four are nullable and every read
+ // treats NULL as "unknown" rather than dropping the visit.
+ await sql`ALTER TABLE store_visits ADD COLUMN IF NOT EXISTS device_type TEXT`;
+ await sql`ALTER TABLE store_visits ADD COLUMN IF NOT EXISTS country TEXT`;
+ await sql`ALTER TABLE store_visits ADD COLUMN IF NOT EXISTS region TEXT`;
+ await sql`ALTER TABLE store_visits ADD COLUMN IF NOT EXISTS city TEXT`;
  ensured = true;
+}
+
+/**
+ * Coarse device class from a user-agent. Three buckets is all a seller acts on —
+ * "most of my traffic is phones" changes how you shoot and crop, nothing finer does.
+ * Tablet is checked before mobile because iPads advertise both.
+ */
+export function classifyDevice(ua: string | null | undefined): "mobile" | "tablet" | "desktop" | "unknown" {
+ const s = (ua || "").toLowerCase();
+ if (!s) return "unknown";
+ if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/.test(s)) return "tablet";
+ if (/mobi|iphone|ipod|android|blackberry|iemobile|opera mini/.test(s)) return "mobile";
+ return "desktop";
+}
+
+export type GeoHint = { country: string | null; region: string | null; city: string | null };
+
+/** Vercel's edge geo headers. Empty everywhere else, which is fine — the fields are nullable. */
+export function geoFromHeaders(h: Headers): GeoHint {
+ const get = (k: string) => {
+  const v = h.get(k);
+  if (!v) return null;
+  // Vercel percent-encodes city names with non-ASCII characters.
+  try { return decodeURIComponent(v).trim().slice(0, 80) || null; } catch { return v.trim().slice(0, 80) || null; }
+ };
+ return { country: get("x-vercel-ip-country"), region: get("x-vercel-ip-country-region"), city: get("x-vercel-ip-city") };
 }
 
 export async function recordStoreVisit(v: {
@@ -41,10 +75,14 @@ export async function recordStoreVisit(v: {
  utmSource: string | null;
  utmMedium: string | null;
  path: string | null;
+ deviceType?: string | null;
+ country?: string | null;
+ region?: string | null;
+ city?: string | null;
 }): Promise<void> {
  await ensureTable();
- await db()`INSERT INTO store_visits (store_slug, session_id, source_type, source, referrer_host, utm_source, utm_medium, path)
- VALUES (${v.storeSlug}, ${v.sessionId}, ${v.sourceType}, ${v.source}, ${v.referrerHost}, ${v.utmSource}, ${v.utmMedium}, ${v.path})`;
+ await db()`INSERT INTO store_visits (store_slug, session_id, source_type, source, referrer_host, utm_source, utm_medium, path, device_type, country, region, city)
+ VALUES (${v.storeSlug}, ${v.sessionId}, ${v.sourceType}, ${v.source}, ${v.referrerHost}, ${v.utmSource}, ${v.utmMedium}, ${v.path}, ${v.deviceType ?? null}, ${v.country ?? null}, ${v.region ?? null}, ${v.city ?? null})`;
 }
 
 const SESSION_COOKIE = "via_sess";
@@ -62,8 +100,9 @@ export async function captureStorefrontEntry(req: NextRequest, slug: string): Pr
  const url = req.nextUrl;
  const utmSource = url.searchParams.get("utm_source");
  const utmMedium = url.searchParams.get("utm_medium");
- const c = classifySource({ referrer: req.headers.get("referer"), utmSource, utmMedium, selfHost: url.host });
+ const c = classifySource({ referrer: req.headers.get("referer"), utmSource, utmMedium, selfHost: url.host, userAgent: req.headers.get("user-agent") });
  const sessionId = crypto.randomUUID();
+ const geo = geoFromHeaders(req.headers);
  await recordStoreVisit({
  storeSlug: slug,
  sessionId,
@@ -73,6 +112,8 @@ export async function captureStorefrontEntry(req: NextRequest, slug: string): Pr
  utmSource,
  utmMedium,
  path: url.pathname,
+ deviceType: classifyDevice(req.headers.get("user-agent")),
+ ...geo,
  });
  return `${SESSION_COOKIE}=${sessionId}; Path=/; Max-Age=${SESSION_TTL_SECONDS}; HttpOnly; SameSite=Lax`;
  } catch {
@@ -88,14 +129,16 @@ export async function captureStorefrontEntry(req: NextRequest, slug: string): Pr
  */
 export async function captureStorefrontEntryClient(input: {
  slug: string; hasSession: boolean; referrer: string | null; utmSource: string | null; utmMedium: string | null; path: string; selfHost: string;
+ userAgent?: string | null; geo?: GeoHint;
 }): Promise<string | null> {
  try {
  if (input.hasSession) return null;
- const c = classifySource({ referrer: input.referrer, utmSource: input.utmSource, utmMedium: input.utmMedium, selfHost: input.selfHost });
+ const c = classifySource({ referrer: input.referrer, utmSource: input.utmSource, utmMedium: input.utmMedium, selfHost: input.selfHost, userAgent: input.userAgent });
  const sessionId = crypto.randomUUID();
  await recordStoreVisit({
  storeSlug: input.slug, sessionId, sourceType: c.type, source: c.source,
  referrerHost: c.referrerHost || null, utmSource: input.utmSource, utmMedium: input.utmMedium, path: input.path,
+ deviceType: classifyDevice(input.userAgent), ...(input.geo ?? { country: null, region: null, city: null }),
  });
  return sessionId;
  } catch {
