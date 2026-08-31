@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerPayments, updateSellerStatus } from "@/app/lib/seller-payments-db";
 import { stripeGet, stripeConfigured } from "@/app/lib/stripe";
+import { getRefundPolicy } from "@/app/lib/store-policy-db";
+import { payoutScheduleFor, payoutScheduleNotice } from "@/app/lib/payout-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,9 @@ export async function GET(request: NextRequest) {
  }
  }
 
+ // How long payouts wait, and why — derived from the store's OWN returns policy so the seller can
+ // see the connection between the two (see payout-schedule.ts).
+ const schedule = payoutScheduleFor(await getRefundPolicy(slug).catch(() => null));
  return NextResponse.json({
  ok: true,
  configured: stripeConfigured(),
@@ -35,5 +40,8 @@ export async function GET(request: NextRequest) {
  chargesEnabled,
  payoutsEnabled,
  detailsSubmitted,
+ payoutDelayDays: schedule.delayDays,
+ returnWindowDays: schedule.windowDays,
+ payoutNotice: payoutScheduleNotice(schedule),
  });
 }

@@ -311,3 +311,51 @@ export function TH({ children, right, className }: { children?: React.ReactNode;
 export function TD({ children, right, className }: { children?: React.ReactNode; right?: boolean; className?: string }) {
  return <td className={cn("border-b border-stone-100 py-3 text-[13px] text-stone-700", right ? "text-right tabular-nums" : "text-left", className)}>{children}</td>;
 }
+
+/**
+ * A confirmation dialog rendered IN the app — never `window.confirm`, which looks like a browser
+ * error and can't show the thing you're about to act on. Escape or the backdrop cancels; the
+ * destructive button is focused last so a stray Return doesn't delete anything.
+ */
+export function ConfirmDialog({ open, title, body, preview, confirmLabel, cancelLabel = "Cancel", tone = "danger", busy, onConfirm, onCancel }: {
+ open: boolean;
+ title: string;
+ body?: React.ReactNode;
+ preview?: React.ReactNode; // e.g. the item's photo + name
+ confirmLabel: string;
+ cancelLabel?: string;
+ tone?: "danger" | "primary";
+ busy?: boolean;
+ onConfirm: () => void;
+ onCancel: () => void;
+}) {
+ React.useEffect(() => {
+ if (!open) return;
+ const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+ window.addEventListener("keydown", onKey);
+ const prev = document.body.style.overflow;
+ document.body.style.overflow = "hidden"; // the page behind must not scroll under the dialog
+ return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+ }, [open, onCancel]);
+ if (!open) return null;
+ const confirmCls = tone === "danger"
+ ? "bg-[#5D0F17] text-white hover:bg-[#4a0c12]"
+ : "bg-stone-900 text-white hover:bg-stone-800";
+ return (
+ <div role="dialog" aria-modal="true" aria-label={title} onClick={onCancel}
+ className="fixed inset-0 z-[200] flex items-end justify-center bg-stone-900/40 p-4 backdrop-blur-[2px] sm:items-center">
+ <div onClick={(e) => e.stopPropagation()}
+ className="w-full max-w-[420px] rounded-3xl border border-stone-200 bg-white p-5 shadow-[0_24px_60px_-20px_rgba(16,24,40,.45)]">
+ <h2 className="text-[17px] font-semibold tracking-tight text-stone-900">{title}</h2>
+ {body && <div className="mt-1.5 text-[13.5px] leading-relaxed text-stone-500">{body}</div>}
+ {preview && <div className="mt-3.5 rounded-2xl border border-stone-200 bg-stone-50/60 p-2.5">{preview}</div>}
+ <div className="mt-5 flex gap-2">
+ <button type="button" onClick={onCancel} disabled={busy}
+ className="min-h-[44px] flex-1 rounded-xl border border-stone-200 bg-white text-[14px] font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-50">{cancelLabel}</button>
+ <button type="button" autoFocus onClick={onConfirm} disabled={busy}
+ className={cn("min-h-[44px] flex-1 rounded-xl text-[14px] font-semibold transition disabled:opacity-60", confirmCls)}>{busy ? "Working…" : confirmLabel}</button>
+ </div>
+ </div>
+ </div>
+ );
+}

@@ -41,7 +41,7 @@ async function ensure() {
 }
 
 export type EventType = "view" | "favorite" | "click" | "checkout_start" | "purchase";
-export type Surface = "marketplace" | "storefront";
+export type Surface = "marketplace" | "storefront" | "market"; // market = in-person (Market Mode) sale
 
 /**
  * The single writer for the clean event stream. Fire-safe: any DB hiccup is swallowed so analytics

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItem, reserveItem, releaseReservation, sweepExpiredReservations } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
+import { payableAccountId } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { getCartItemIds } from "@/app/lib/storefront-cart-db";
+import { requestBagSellerId } from "@/app/lib/storefront-cart-scope";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
@@ -33,7 +35,8 @@ export async function POST(request: NextRequest) {
 
  const token = request.cookies.get(COOKIE)?.value;
  if (!token) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
- const ids = await getCartItemIds(token);
+ // This store's bag — see storefront-cart-scope.
+ const ids = await getCartItemIds(token, await requestBagSellerId(request, token));
  if (!ids.length) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
 
  // We collect the address on VYA (so we can quote a live shipping rate first), then
@@ -70,7 +73,9 @@ export async function POST(request: NextRequest) {
  const seller = await getSellerById(sellerId);
  if (!seller) continue;
  const pay = await getSellerPayments(seller.slug);
- if (!pay?.stripeAccountId || !pay.chargesEnabled) continue; // store can't take payment yet
+ // Also skips an account from the other Stripe mode — see stripe-mode.ts.
+ const acctId = payableAccountId(pay);
+ if (!acctId) continue; // store can't take payment yet
 
  // Hold each of this seller's items (TTL lock). Skip any that lost the race.
  const reserved: Item[] = [];
@@ -102,7 +107,7 @@ export async function POST(request: NextRequest) {
  // Where a seller has no registration Stripe simply calculates nothing, which is
  // correct — but an account that never completed setup can fail the session, and
  // losing a sale is worse than not charging tax on it.
- const taxReady = taxPref.enabled ? await stripeTaxReady(pay.stripeAccountId).catch(() => ({ active: false, registrations: 0 })) : { active: false, registrations: 0 };
+ const taxReady = taxPref.enabled ? await stripeTaxReady(acctId).catch(() => ({ active: false, registrations: 0 })) : { active: false, registrations: 0 };
  const tax = { enabled: taxPref.enabled && taxReady.active, productTaxCode: taxPref.productTaxCode };
  // The tax CODE is per ITEM, not per store: New York exempts clothing and
  // footwear under $110 and PA/NJ exempt most apparel, but none of that covers
@@ -193,7 +198,7 @@ export async function POST(request: NextRequest) {
  metadata: meta,
  },
  },
- pay.stripeAccountId, // direct charge on the seller's connected account
+ acctId, // direct charge on the seller's connected account
  );
  sessions.push({ sellerSlug: seller.slug, url: session.url as string, itemIds });
  // Clean event stream: each item entering checkout, at the price actually charged.

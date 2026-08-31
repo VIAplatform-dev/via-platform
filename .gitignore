@@ -50,3 +50,15 @@ next-env.d.ts
 /SECURITY_AUDIT_2026-08.md
 /docs/architecture.md
 /.vscode
+.eval-cache/
+
+# Fleet evidence: screenshots, per-store JSON and census output. ~300MB and rewritten on every run —
+# it is a working artefact, not source. Its conclusions live in docs/handoff/.
+.verify/
+.next-pop/
+
+# Throwaway probes. Anything named .scratch-* or _* at the root is a one-off from an investigation.
+.scratch-*
+/_*.mts
+/_*.mjs
+/gc*.mts

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getCapturePage, updateCapturePageHtml, listCapturePaths } from "@/app/lib/site-capture-db";
 import { applyEdits, extractChromeEdits, applyChromeEditsToPage, hasChromeEdits, NEW_BLOCK_TYPES, type PageEdits, type NewBlock } from "@/app/lib/site-capture";
+import { planCaptureWrite } from "@/app/lib/capture-history";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,13 @@ export async function POST(request: NextRequest) {
  const html = await getCapturePage(slug, path).catch(() => null);
  if (html == null) return NextResponse.json({ error: "Page not found." }, { status: 404 });
 
- const ok = await updateCapturePageHtml(slug, path, applyEdits(html, p));
+ // A save that changes nothing is not written. Each save keeps a version of what it replaced, and
+ // this route propagates a header edit to every OTHER page — so letting no-op writes land would
+ // spend the seller's undo slots on copies of the page over itself.
+ const edited = applyEdits(html, p);
+ if (!planCaptureWrite(html, edited).write) return NextResponse.json({ ok: true, applied: 0, propagated: 0, unchanged: true });
+
+ const ok = await updateCapturePageHtml(slug, path, edited);
  if (!ok) return NextResponse.json({ error: "Save failed." }, { status: 500 });
 
  // Shared header/footer/nav edits → propagate to every other captured page so the whole site stays in

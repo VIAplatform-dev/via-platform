@@ -28,9 +28,8 @@ test("you cannot reserve an item that is already reserved", () => {
  assert.equal(canTransition("reserved", "reserved"), false);
 });
 
-test("draft cannot jump straight to sold or reserved", () => {
+test("draft cannot jump straight to sold (a sale always passes through a reservation)", () => {
  assert.equal(canTransition("draft", "sold"), false);
- assert.equal(canTransition("draft", "reserved"), false);
 });
 
 test("removed is terminal", () => {
@@ -52,4 +51,9 @@ test("reservation expiry math is exact at the boundary", () => {
 
 test("default TTL is a sane checkout hold", () => {
  assert.ok(DEFAULT_RESERVATION_TTL_SECONDS >= 120 && DEFAULT_RESERVATION_TTL_SECONDS <= 1800);
+});
+
+// ── Market Mode: a quick-listed draft can be sold in person ─────────────────────
+test("a draft can be reserved for an in-person sale (market checkout)", () => {
+ assert.equal(canTransition("draft", "reserved"), true);
 });

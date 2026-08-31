@@ -89,6 +89,9 @@ export default function OnboardingWizard() {
    });
    const data = await res.json().catch(() => ({}));
    if (!res.ok) { setError(data?.error || "Something went wrong — try again."); setBusy(false); return; }
+   // The workspace gate (whoami) reads store_users; the row was written a moment ago. Leave a
+   // breadcrumb so the gate retries instead of bouncing a brand-new seller back into this wizard.
+   try { sessionStorage.setItem("vya:just-onboarded", String(data?.slug || "1")); } catch { /* storage off */ }
    const importUrl = /^https?:\/\//i.test(websiteUrl.trim()) ? websiteUrl.trim() : `https://${websiteUrl.trim()}`;
    // If the import fails/blocks, route to the Bring-your-site page WITH the reason + URL, not an empty editor.
    const cap = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: importUrl, replaceBlocks: true }) }).catch(() => null);

@@ -8,6 +8,20 @@ import { toCategorySlug } from "@/app/lib/item-tags";
 import { PriceScale } from "../PriceScale";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
+/**
+ * Which store this listing is being created for.
+ *
+ * Without a ?store= the API resolves to whatever store the SESSION belongs to. Opening this page to
+ * add stock for a seller you're previewing therefore published it into YOUR store instead, and it
+ * never appeared on the storefront you were looking at.
+ */
+function withStore(path: string): string {
+ if (typeof window === "undefined") return path;
+ const s = new URLSearchParams(window.location.search).get("store");
+ return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+}
+
+
 type Field = { value: string | null; confidence: number };
 type Draft = {
  title: string;
@@ -134,8 +148,8 @@ export default function IntakePage() {
  // Load the store's markup-over-cost setting so entering cost auto-fills price; and
  // the store's collections for tagging.
  useEffect(() => {
- fetch("/api/store/pricing").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.minMarkupPct === "number") setMarkupPct(d.minMarkupPct); }).catch(() => {});
- fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ fetch(withStore("/api/store/pricing")).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.minMarkupPct === "number") setMarkupPct(d.minMarkupPct); }).catch(() => {});
+ fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  }, []);
 
  // ── Auto-save the in-progress listing as a DRAFT, so leaving before publish/schedule never loses it.
@@ -174,7 +188,7 @@ export default function IntakePage() {
  if (phase !== "form" || busy || !photos.length) return;
  const t = setTimeout(async () => {
   try {
-  const r = await fetch("/api/store/intake/autosave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draftPayload()) });
+  const r = await fetch(withStore("/api/store/intake/autosave"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(draftPayload()) });
   const d = await r.json().catch(() => null);
   if (d?.id) { draftIdRef.current = d.id; setAutoSavedAt(Date.now()); }
   } catch {}
@@ -210,7 +224,7 @@ export default function IntakePage() {
  if (form.description.trim().length < 10) { setErr("Write a description first, then I’ll polish it for search."); return; }
  setSeoBusy(true); setErr(null);
  try {
- const res = await fetch("/api/store/intake/seo", {
+ const res = await fetch(withStore("/api/store/intake/seo"), {
  method: "POST", headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ description: form.description, title: form.title, brand: form.brand, era: form.era, material: form.material, condition: form.condition, size: form.size, category: form.category }),
  });
@@ -249,7 +263,7 @@ export default function IntakePage() {
  for (const file of list) {
  const fd = new FormData();
  fd.append("file", file);
- const up = await fetch("/api/store/listings/upload", { method: "POST", body: fd });
+ const up = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd });
  const ud = await up.json();
  if (!up.ok) throw new Error(ud.error || "Upload failed");
  urls.push(ud.url);
@@ -269,7 +283,7 @@ export default function IntakePage() {
  if (priceUsd <= 0 || rawMarketCents) return; // no price, or market already known (client handles it)
  if ((!form.brand.trim() && !form.title.trim()) || !photos.length) return; // not enough to price yet
  try {
- const r = await fetch("/api/store/price-check", {
+ const r = await fetch(withStore("/api/store/price-check"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ price: priceUsd, brand: form.brand, title: form.title, era: form.era, material: form.material, category: form.category, photoUrl: photos[0] }),
@@ -300,7 +314,7 @@ export default function IntakePage() {
  const filled: Record<string, string> = {};
  (Object.keys(form) as (keyof Form)[]).forEach((k) => { const v = String(form[k]).trim(); if (v) filled[k] = v; });
  // Phase 1 — draft the FIELDS only (fast), so they render immediately; price/runway follow.
- const r = await fetch("/api/store/intake", {
+ const r = await fetch(withStore("/api/store/intake"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ imageUrls: photos, filled, draftOnly: true }),
@@ -371,7 +385,7 @@ export default function IntakePage() {
  runway: (d.runway ?? dr?.runway) || "",
  celebrity: d.celebrity || "",
  };
- const r2 = await fetch("/api/store/intake/pricing", {
+ const r2 = await fetch(withStore("/api/store/intake/pricing"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: d.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], editorialTitles: d.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
@@ -411,8 +425,8 @@ export default function IntakePage() {
  const next = !consigned;
  setConsigned(next);
  if (next && !consignCfg) {
- fetch("/api/store/consignment/consignors").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setConsignors(d.consignors || []); }).catch(() => {});
- fetch("/api/store/consignment/config").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setConsignCfg({ storeDefaultSplitPct: d.settings?.storeDefaultSplitPct ?? 50 }); }).catch(() => {});
+ fetch(withStore("/api/store/consignment/consignors")).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setConsignors(d.consignors || []); }).catch(() => {});
+ fetch(withStore("/api/store/consignment/config")).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setConsignCfg({ storeDefaultSplitPct: d.settings?.storeDefaultSplitPct ?? 50 }); }).catch(() => {});
  }
  }
  function pickConsignor(id: string) {
@@ -423,7 +437,7 @@ export default function IntakePage() {
  async function addConsignor() {
  const name = consign.newName.trim();
  if (!name) return;
- const r = await fetch("/api/store/consignment/consignors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+ const r = await fetch(withStore("/api/store/consignment/consignors"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
  const d = await r.json().catch(() => null);
  if (r.ok && d?.consignor) {
  setConsignors((cs) => [...cs, { id: d.consignor.id, name: d.consignor.name, defaultSplitPct: d.consignor.defaultSplitPct }]);
@@ -462,7 +476,7 @@ export default function IntakePage() {
  setErr(null);
  try {
  const images = [ghost, ...photos].filter(Boolean);
- const r = await fetch("/api/store/intake/publish", {
+ const r = await fetch(withStore("/api/store/intake/publish"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ ...form, status, publishAt: publishAt || null, draftId: draftIdRef.current, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, channels: Object.keys(channels).filter((k) => channels[k]), consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),

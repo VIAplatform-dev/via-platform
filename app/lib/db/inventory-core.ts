@@ -10,7 +10,7 @@ export const DEFAULT_RESERVATION_TTL_SECONDS = 600; // 10 minutes
 
 /** Allowed status transitions for a one-of-one item. */
 export const ITEM_TRANSITIONS: Record<ItemStatus, ItemStatus[]> = {
- draft: ["active", "removed"],
+ draft: ["active", "reserved", "removed"], // → reserved = an in-person (Market Mode) checkout of a quick-listed draft
  active: ["reserved", "draft", "removed"],
  reserved: ["sold", "active", "removed"], // → active = reservation released
  sold: ["removed"], // terminal except admin removal; never back to available

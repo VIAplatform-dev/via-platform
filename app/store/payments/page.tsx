@@ -11,6 +11,11 @@ type Status = {
  chargesEnabled: boolean;
  payoutsEnabled: boolean;
  detailsSubmitted: boolean;
+ /** How long Stripe holds a payout — the store's return window plus the return's journey back. */
+ payoutDelayDays?: number | "minimum";
+ returnWindowDays?: number;
+ /** Set only when their policy promises buyers longer than Stripe will hold the money. */
+ payoutNotice?: string | null;
 };
 
 export default function PaymentsPage() {
@@ -89,6 +94,21 @@ export default function PaymentsPage() {
  <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-600" /> Charges enabled</span>
  <span className="inline-flex items-center gap-1.5"><Landmark size={14} className="text-emerald-600" /> Payouts enabled</span>
  </div>
+ )}
+
+ {/* Why the money waits. Sellers notice a delayed first payout and assume something is wrong, so
+     say plainly that it tracks their own returns policy and where to change it. */}
+ {s?.connected && s.payoutDelayDays !== undefined && (
+ <p className="mt-3 text-[12px] leading-relaxed text-stone-500">
+ {s.payoutDelayDays === "minimum"
+ ? "Your sales are final, so payouts reach your bank as fast as Stripe allows."
+ : `Payouts reach your bank ${s.payoutDelayDays} days after a sale — your ${s.returnWindowDays}-day return window, plus time for a return to arrive. Until then the money sits in your Stripe balance, so a refund never comes out of your bank account.`}
+ {" "}Change it in your <a className="underline underline-offset-2 hover:text-stone-700" href="/store/settings?tab=policy">returns policy</a>.
+ </p>
+ )}
+
+ {s?.payoutNotice && (
+ <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900">{s.payoutNotice}</p>
  )}
 
  <div className="mt-5">

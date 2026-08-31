@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { stores, storeContactEmails } from "@/app/lib/stores";
 import { getSellerPayments, saveStripeAccount } from "@/app/lib/seller-payments-db";
+import { connectBlockedReason } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
+import { syncPayoutSchedule } from "@/app/lib/payout-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,13 @@ export async function POST(request: NextRequest) {
  const sp = await getSellerPayments(slug);
  let accountId = sp?.stripeAccountId || null;
 
+ // Refuse rather than overwrite. The row holds ONE account id, so connecting a store that is
+ // already live-connected while the server runs test keys would replace its real account with a
+ // sandbox one and take its checkout down. This is the check that makes a mis-pointed sandbox
+ // annoying instead of destructive — see stripe-mode.ts.
+ const blocked = connectBlockedReason(sp);
+ if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
+
  // Create the Express connected account on first use (same shape as the redirect flow).
  if (!accountId) {
  const acct = await stripePost("accounts", {
@@ -36,6 +45,12 @@ export async function POST(request: NextRequest) {
  accountId = acct.id as string;
  await saveStripeAccount(slug, accountId);
  }
+
+ // Payouts wait out the store's own return window, so a refund is always drawn from money still in
+ // their Stripe balance (see payout-schedule.ts). This is the path sellers ACTUALLY onboard
+ // through — the embedded components — so setting it only on the redirect route would have meant
+ // almost no real account ever got the schedule. Best-effort: never block onboarding.
+ await syncPayoutSchedule(slug).catch(() => null);
 
  // Enable the embedded surfaces: onboarding (KYC/bank), plus ongoing payouts + account
  // management so the seller never needs the Stripe-hosted Express dashboard.

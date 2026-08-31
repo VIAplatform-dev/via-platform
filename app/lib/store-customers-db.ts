@@ -271,3 +271,46 @@ export async function listCustomerTags(storeSlug: string): Promise<{ tag: string
  `.catch(() => [])) as any[];
  return rows.map((r) => ({ tag: r.tag, count: r.count }));
 }
+
+/**
+ * Every store this email holds a customer record at.
+ *
+ * FOR VYA ONLY. A seller must never see this. Showing Scottie that her buyer also shops at four
+ * other vintage stores hands her a competitor list assembled from other sellers' customers — the
+ * same rule the Data Layer runs on, where a seller sees market-level signal and never another
+ * store's individual numbers. Every caller must be an admin route or an internal job.
+ *
+ * Useful because it is exactly the marketplace-conversion signal: someone who is a customer of five
+ * of our stores and has never signed in to VYA is the best person there is to invite.
+ *
+ * An email is a strong hint at one person, not proof of it — households share addresses, people use
+ * different emails at different shops. Good enough to greet someone by name or to spot a good
+ * invitation; never good enough to merge order histories or show one seller's data on another's page.
+ */
+export async function listStoresForShopper(email: string): Promise<{ storeSlug: string; since: Date | null }[]> {
+ const e = (email || "").trim().toLowerCase();
+ if (!e) return [];
+ const rows = await db()`SELECT store_slug, min(created_at) AS since FROM store_customers
+  WHERE lower(email) = ${e} GROUP BY store_slug ORDER BY min(created_at)` as { store_slug: string; since: Date | null }[];
+ return rows.map((r) => ({ storeSlug: r.store_slug, since: r.since }));
+}
+
+/**
+ * Record that this person signed in on this seller's store, and return whether they are new here.
+ *
+ * `email_subscribed` is deliberately NOT set: signing in is not agreeing to be emailed marketing.
+ * The seller can ask for that separately, and the shopper can say yes to it.
+ */
+export async function upsertShopper(storeSlug: string, email: string, name: string | null): Promise<{ isNew: boolean }> {
+ const e = (email || "").trim().toLowerCase();
+ if (!e) return { isNew: false };
+ const existing = await db()`SELECT 1 FROM store_customers WHERE store_slug = ${storeSlug} AND lower(email) = ${e} LIMIT 1`;
+ if (existing.length) {
+  if (name) await db()`UPDATE store_customers SET name = COALESCE(name, ${name}) WHERE store_slug = ${storeSlug} AND lower(email) = ${e}`;
+  return { isNew: false };
+ }
+ await db()`INSERT INTO store_customers (store_slug, email, name, source, email_subscribed)
+  VALUES (${storeSlug}, ${e}, ${name}, ${"signed_in"}, false)
+  ON CONFLICT DO NOTHING`;
+ return { isNew: true };
+}

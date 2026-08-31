@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { randomId } from "@/app/lib/random-id";
 import { canonicalSource, classifySource } from "@/app/lib/traffic-source";
 
 // Alias resolution + referrer classification live in app/lib/traffic-source.ts so the
@@ -72,13 +73,13 @@ export default function GlobalPageTracker() {
  try {
  sid = sessionStorage.getItem("via_session_id");
  if (!sid) {
- sid = crypto.randomUUID();
+ sid = randomId();
  sessionStorage.setItem("via_session_id", sid);
  }
  } catch {
  // sessionStorage blocked (e.g. TikTok in-app browser) — keep in memory only
  if (!sessionIdRef.current) {
- sid = crypto.randomUUID();
+ sid = randomId();
  }
  }
  if (sid) sessionIdRef.current = sid;

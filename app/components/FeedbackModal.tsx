@@ -7,9 +7,10 @@ import { X } from "lucide-react";
 const FEEDBACK_URL = "https://form.typeform.com/to/ssrEgHZ1";
 const STORAGE_KEY = "vya_feedback_dismissed";
 
-// Paths where the feedback popup should never appear (auth/waiting + the
-// standalone /infrastructure landing page).
-const AUTH_PATHS = ["/login", "/register", "/pilot-pending", "/infrastructure"];
+// Paths where the feedback popup should never appear: auth/waiting pages, the standalone
+// /infrastructure landing page, and the seller back-offices (/admin Store OS, /store portal) —
+// a seller mid-checkout at a market must never get a survey over the payment screen.
+const AUTH_PATHS = ["/login", "/register", "/pilot-pending", "/infrastructure", "/admin", "/store"];
 
 export default function FeedbackModal() {
  const [open, setOpen] = useState(false);

@@ -5,7 +5,8 @@ import { getSellerById } from "@/app/lib/db/sellers";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
-import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderTax } from "@/app/lib/db/orders";
+import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderPickup, setOrderTax } from "@/app/lib/db/orders";
+import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { logError } from "@/app/lib/error-log";
 import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
@@ -15,6 +16,8 @@ import { fireAutomationTrigger } from "@/app/lib/automation-engine";
 import { markCheckoutRecovered } from "@/app/lib/checkout-attempts-db";
 import { delistEverywhere } from "@/app/lib/cross-listing-db";
 import { markOfferConsumed } from "@/app/lib/offers-db";
+import { finalizeMarketSale, closeCheckout } from "@/app/lib/market/checkout-db";
+import { MARKET_METADATA_CHANNEL } from "@/app/lib/market/stripe-market-core";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,7 +44,10 @@ type ShipAddr = { line1?: string | null; line2?: string | null; city?: string | 
 // flow (Buy-now / hosted) and the Payment Element flow (embedded card + wallets).
 // Idempotent on the PaymentIntent, so a session payment that also fires
 // payment_intent.succeeded never records twice.
-async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null; taxCents?: number | null; taxJurisdiction?: string | null }) {
+async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null; delivery?: { method: "ship" | "pickup"; collectFrom: string | null; instructions: string | null }; taxCents?: number | null; taxJurisdiction?: string | null }) {
+ // How this order leaves the shop. Read off OUR OWN metadata (written by cart-intent after
+ // resolveDelivery checked the store's settings), so a shopper never stamps her own order.
+ const delivery = o.delivery ?? { method: "ship" as const, collectFrom: null, instructions: null };
  if (!o.pi || !(await orderExistsForPaymentIntent(o.pi))) {
  // Resolve the store slug once (all items share the seller) for the clean event stream.
  const sellerSlug = (await getSellerById(o.sellerId).catch(() => null))?.slug || null;
@@ -64,6 +70,8 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  // Tax sits on the SESSION, not the line item, so it lands whole on the first
  // order of a multi-item checkout — the same rule shipping already follows.
  if (o.taxCents != null && idx === 0) await setOrderTax(order.id, o.taxCents, o.taxJurisdiction ?? null).catch(() => {});
+ // Collected in store: record it so the Orders view says "collection" and never offers a label.
+ if (delivery.method === "pickup") await setOrderPickup(String(order.id), { collectFrom: delivery.collectFrom, instructions: delivery.instructions }).catch((e) => logError("order-pickup-stamp", e, { context: { orderId: order.id } }));
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
  // Clean event stream: the purchase, canonical items.id, at the price actually charged.
  if (sellerSlug) recordEvent({ type: "purchase", storeSlug: sellerSlug, itemId, priceCents: salePriceCents, surface: "storefront" }).catch(() => {});
@@ -91,8 +99,10 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  const img = Array.isArray(ord.itemImages) ? (ord.itemImages[0] as string) : null;
  const ship = { line1: ord.shipLine1, line2: ord.shipLine2, city: ord.shipCity, state: ord.shipState, postal: ord.shipPostal, country: ord.shipCountry };
  try {
- if (ord.buyerEmail) await sendBuyerOrderConfirmation({ storeSlug: ord.sellerSlug || "", buyerEmail: ord.buyerEmail, orderId: ord.id, itemTitle: ord.itemTitle || "your item", imageUrl: img, subtotalCents: ord.amountCents, shippingCents: ord.shippingPaidCents || 0, currency: ord.currency, storeName: ord.sellerName || "the store", ship, replyTo: ord.sellerEmail });
- if (ord.sellerEmail) await sendSellerSaleNotification({ storeSlug: ord.sellerSlug || "", sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship, orderId: ord.id });
+ // A collection: tell her where to come, not that it's being posted.
+ const collect = delivery.method === "pickup" ? { address: delivery.collectFrom, instructions: delivery.instructions } : null;
+ if (ord.buyerEmail) await sendBuyerOrderConfirmation({ storeSlug: ord.sellerSlug || "", buyerEmail: ord.buyerEmail, orderId: ord.id, itemTitle: ord.itemTitle || "your item", imageUrl: img, subtotalCents: ord.amountCents, shippingCents: ord.shippingPaidCents || 0, currency: ord.currency, storeName: ord.sellerName || "the store", ship, collect, replyTo: ord.sellerEmail });
+ if (ord.sellerEmail) await sendSellerSaleNotification({ storeSlug: ord.sellerSlug || "", sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship, collect, orderId: ord.id });
  } catch (e) {
  // Email failed — un-claim so a later event retries it (no duplicate, no silent miss).
  await resetConfirmationSent(ord.id).catch(() => {});
@@ -140,6 +150,27 @@ export async function POST(request: NextRequest) {
  }
 
  try {
+ // ── Market Mode (in-person) payments ─────────────────────────────────────────────────────
+ // Tagged in metadata at creation. They have no shipping, no buyer address and no label, so they
+ // never go through fulfill(); the market engine records the sale (idempotent on the PI).
+ {
+ const obj = event.data.object as { metadata?: Record<string, string> | null; payment_intent?: string | { id: string } | null; id?: string; payment_status?: string; status?: string; customer_details?: { email?: string | null } | null; receipt_email?: string | null };
+ const md = (obj.metadata || {}) as Record<string, string>;
+ if (md.channel === MARKET_METADATA_CHANNEL && md.market_checkout_id) {
+ const tender = md.tender === "keyed" ? "keyed" : "qr";
+ if (event.type === "checkout.session.completed" && obj.payment_status === "paid") {
+ const pi = typeof obj.payment_intent === "string" ? obj.payment_intent : obj.payment_intent?.id ?? null;
+ await finalizeMarketSale({ checkoutId: md.market_checkout_id, paymentIntent: pi, tender, source: "webhook", receiptEmail: obj.customer_details?.email ?? null });
+ } else if (event.type === "payment_intent.succeeded") {
+ await finalizeMarketSale({ checkoutId: md.market_checkout_id, paymentIntent: String(obj.id), tender, source: "webhook", receiptEmail: obj.receipt_email ?? null });
+ } else if (event.type === "checkout.session.expired") {
+ await closeCheckout(md.market_checkout_id, "expired", "webhook"); // restores draft/active correctly (not releaseReservation)
+ }
+ // charge.refunded / dispute.closed fall through to unwindByPaymentIntent below — it works by PI.
+ if (event.type !== "charge.refunded" && event.type !== "charge.dispute.closed") return NextResponse.json({ received: true });
+ }
+ }
+
  if (event.type === "checkout.session.completed") {
  const s = event.data.object as Stripe.Checkout.Session;
  const itemIds = (s.metadata?.itemIds || s.metadata?.itemId || "").split(",").map((t) => t.trim()).filter(Boolean);
@@ -169,7 +200,7 @@ export async function POST(request: NextRequest) {
  }
  const buyerEmail = cust?.email ?? null;
  const shippingPaidCents = md.shipping_paid_cents ? parseInt(md.shipping_paid_cents, 10) || 0 : 0;
- await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null,
+ await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null, delivery: deliveryFromMetadata(md),
   // Stripe Tax's own total for this session, when the store has it switched on.
   taxCents: typeof s.total_details?.amount_tax === "number" ? s.total_details.amount_tax : null,
   taxJurisdiction: md.tax_jurisdiction || null,
@@ -199,7 +230,7 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
  const ship2: ShipAddr = md2.ship_line1
   ? { line1: md2.ship_line1, line2: md2.ship_line2 || null, city: md2.ship_city || null, state: md2.ship_state || null, postal: md2.ship_zip || null, country: md2.ship_country || "US" }
   : addr2 ? { line1: addr2.line1, line2: addr2.line2, city: addr2.city, state: addr2.state, postal: addr2.postal_code, country: addr2.country } : null;
- await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null });
+ await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || md2.buyer_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null, delivery: deliveryFromMetadata(md2) });
  // Per-store discount redemption for a single-item embedded checkout (idempotent per store+code+order).
  if (md2.discount_code && md2.discount_store) {
   recordDiscountRedemption({
@@ -219,7 +250,13 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
  } else if (event.type === "charge.refunded") {
  // Refund issued directly in Stripe (not via our order button) — unwind the sale so records + ledger stay true.
  const c = event.data.object as Stripe.Charge;
+ // A partial refund (one line of a Market Mode basket, or a restocking-fee refund) is already recorded
+ // by the endpoint that issued it; only a FULL refund of the charge unwinds every order on the intent.
+ if ((c.amount_refunded ?? 0) >= (c.amount_captured ?? c.amount ?? 0)) {
  await unwindByPaymentIntent(typeof c.payment_intent === "string" ? c.payment_intent : null, "charge.refunded");
+ } else {
+ console.log(`[connect-webhook] partial refund on ${typeof c.payment_intent === "string" ? c.payment_intent : "?"} (${c.amount_refunded}/${c.amount_captured}) — not unwinding`);
+ }
  } else if (event.type === "charge.dispute.closed") {
  // Chargeback resolved. Only unwind if the seller LOST (funds actually clawed back); a won dispute keeps the sale.
  const d = event.data.object as Stripe.Dispute;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItem, reserveItem, releaseReservation, currentReservationRef } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
+import { payableAccountId } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { recordCheckoutAttempt } from "@/app/lib/checkout-attempts-db";
@@ -59,7 +60,10 @@ export async function POST(request: NextRequest) {
  const seller = await getSellerById(item.sellerId);
  if (!seller) return NextResponse.json({ error: "Seller not found." }, { status: 404 });
  const pay = await getSellerPayments(seller.slug);
- if (!pay?.stripeAccountId || !pay.chargesEnabled) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
+ // payableAccountId, not acctId: an account from the OTHER Stripe mode is treated as
+ // no account at all, so a sandbox can never charge (or refund) a live seller. See stripe-mode.ts.
+ const acctId = payableAccountId(pay);
+ if (!acctId) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
 
  // Per-store discount code — applied to the native charge. validateDiscount is scoped by
  // seller.slug, so ONLY this store's codes ever apply (a code from another store won't match).
@@ -129,7 +133,7 @@ export async function POST(request: NextRequest) {
  metadata: meta,
  payment_intent_data: { ...(appFee > 0 ? { application_fee_amount: appFee } : {}), metadata: meta },
  },
- pay.stripeAccountId, // direct charge on the seller's account
+ acctId, // direct charge on the seller's account
  );
  // Log the checkout attempt — if they don't complete, abandoned-cart nudges them.
  recordCheckoutAttempt({ storeSlug: seller.slug, email: buyerEmail, name: String(buyer.name || "") || null, itemId, itemTitle: item.title, itemImage: item.images?.[0] || null }).catch(() => {});

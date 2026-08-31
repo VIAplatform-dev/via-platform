@@ -55,6 +55,27 @@ export async function embedImageResult(imageUrl: string): Promise<{ embedding: n
  return { embedding: null, status: "error" };
 }
 
+/** Embed an image the browser just captured (a data: URL), for Market Mode's photo search — no Blob
+ *  round-trip, so the seller isn't waiting on an upload before the match. Same model/space as the
+ *  URL-embedded item index. */
+export async function embedImageData(dataUrl: string): Promise<number[] | null> {
+ const key = process.env.VOYAGE_API_KEY;
+ if (!key || !dataUrl.startsWith("data:image/")) return null;
+ try {
+ const res = await fetch(VOYAGE_URL, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${key}`, "content-type": "application/json" },
+  body: JSON.stringify({ model: MODEL, inputs: [{ content: [{ type: "image_base64", image_base64: dataUrl }] }] }),
+  signal: AbortSignal.timeout(15000),
+ });
+ if (!res.ok) { console.error(`[embeddings] Voyage ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`); return null; }
+ const data = (await res.json()) as { data?: Array<{ embedding?: number[] }>; usage?: { total_tokens?: number } };
+ const emb = data?.data?.[0]?.embedding;
+ if (Array.isArray(emb) && emb.length > 0) { await recordVoyage(data); return emb; }
+ return null;
+ } catch (err) { console.error("[embeddings] data-url embed failed:", err); return null; }
+}
+
 /** Embed a single image by URL. Returns the vector, or null on any failure. */
 export async function embedImage(imageUrl: string): Promise<number[] | null> {
  return (await embedImageResult(imageUrl)).embedding;

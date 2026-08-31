@@ -6,6 +6,8 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import StoreMessages from "./StoreMessages";
+import HostedStoreReview from "./HostedStoreReview";
+import HostedStoreEntry from "./HostedStoreEntry";
 import {
  LayoutDashboard,
  BarChart3,
@@ -16,6 +18,7 @@ import {
  MessageSquareText,
  Sparkles,
  ClipboardCheck,
+ Globe,
 } from "lucide-react";
 
 // "3h ago" style relative time for the activity feed.
@@ -79,7 +82,7 @@ type ActivityItem = { type: "favorite" | "cart" | "sale"; title: string; at: str
 type Extras = { listing: ListingQuality | null; activity: ActivityItem[] };
 
 type RangeOption = "7d" | "30d" | "all";
-type Tab = "overview" | "performance" | "audience" | "listing" | "messages";
+type Tab = "overview" | "performance" | "audience" | "listing" | "messages" | "hosted";
 
 const DEFAULT_RATES: { upTo?: number; rate: number }[] = [
  { upTo: 1000, rate: 0.07 },
@@ -104,6 +107,7 @@ const NAV: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
  { id: "audience", label: "Audience", icon: Heart },
  { id: "listing", label: "Listing Health", icon: ClipboardCheck },
  { id: "messages", label: "Messages", icon: MessageSquareText },
+ { id: "hosted", label: "Hosted Store", icon: Globe },
 ];
 
 const TAB_META: Record<Tab, { title: string; subtitle: string }> = {
@@ -112,6 +116,7 @@ const TAB_META: Record<Tab, { title: string; subtitle: string }> = {
  audience: { title: "Audience", subtitle: "The community following and saving your work." },
  listing: { title: "Listing Health", subtitle: "Listings missing details that help pieces sell." },
  messages: { title: "Messages", subtitle: "Questions from shoppers about your pieces." },
+ hosted: { title: "Hosted Store", subtitle: "Your VYA-hosted copy — open it, edit any page, and check it against your own site." },
 };
 
 const FEEDBACK_URL = "https://form.typeform.com/to/L13186Wp";
@@ -424,6 +429,16 @@ function StoreDashboardInner() {
  <div className="px-6 pb-16 md:px-9">
  {/* ── MESSAGES ── */}
  {tab === "messages" && <StoreMessages previewStore={previewStore} />}
+ {tab === "hosted" && (
+ <div className="space-y-10">
+ {/* The way in to the editor comes FIRST: "here is your hosted store and how to change it",
+     before the side-by-side check of whether it came over correctly. */}
+ <HostedStoreEntry previewStore={previewStore} />
+ <div id="hosted-review">
+ <HostedStoreReview previewStore={previewStore} />
+ </div>
+ </div>
+ )}
 
  {/* ── OVERVIEW ── */}
  {tab === "overview" && (

@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   // can run alongside the marketplace one without fighting over `.next/dev/lock`. Defaults to `.next`
   // everywhere (build/start/CI unchanged); only dev:os sets NEXT_DIST_DIR=.next-os.
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  // Plan B serves each store from its own hostname, and in DEV those are `{slug}.vyasites.test`.
+  // Next blocks cross-origin requests for dev-only assets by default, so on a store host every
+  // `/_next/static/chunks/*.js` came back 403 — which meant VYA's own checkout page, the one page
+  // every hosted-store shopper is sent to, never hydrated and sat on "Loading…" forever. Dev only:
+  // in production those assets are served normally and this setting does nothing.
+  allowedDevOrigins: ["*.vyasites.test", "*.vyasites.com"],
   // Don't advertise the framework/version.
   poweredByHeader: false,
   // Baseline security headers on every response. Deliberately NOT a full content-security-policy

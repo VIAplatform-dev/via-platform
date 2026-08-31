@@ -6,6 +6,19 @@
  * - storeDomain: The Shopify store domain (e.g., "mystore.myshopify.com" or custom domain)
  * - storefrontAccessToken: Public Storefront API access token
  */
+import { safeFetch } from "./safe-url.ts";
+import type { ReadOutcome } from "./feed-completeness";
+
+/** JSON.parse that tolerates the raw control characters real storefronts embed in product
+ *  descriptions (every Shopify feed profiled had them; strict parsing rejects the whole payload).
+ *  Only the illegal C0 range is stripped — \t, \n and \r are left for JSON's own escaping. */
+export function parseLooseJson(text: string): any { // eslint-disable-line @typescript-eslint/no-explicit-any
+ try {
+  return JSON.parse(text);
+ } catch {
+  return JSON.parse(text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ""));
+ }
+}
 
 export type ShopifyProduct = {
  title: string;
@@ -25,6 +38,9 @@ export type ShopifyProduct = {
  shopifyProductId: string | null;
  size: string | null;
  tags?: string[];
+ /** Source identity for the import engine: the product's stable handle, and its full size run. */
+ handle?: string | null;
+ variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
  // Captured from the product page (scrapeProductPage stores) — the seller's own words.
  condition?: string | null;
  materials?: string | null;
@@ -34,6 +50,13 @@ export type ShopifyProduct = {
 export type ShopifyFetchResult = {
  products: ShopifyProduct[];
  skippedCount: number;
+ /**
+  * How the read finished. The import's sold-sweep is only allowed to run on a read that reached the
+  * END of the catalogue — see app/lib/feed-completeness.ts. Optional so the other reader in this
+  * file (and any caller that does not sweep) need not supply it; absent is treated as "unknown",
+  * which refuses the sweep.
+  */
+ outcome?: ReadOutcome;
 };
 
 type ShopifyImageNode = {
@@ -175,302 +198,25 @@ const PRODUCTS_QUERY = `
  }
 `;
 
-const SIZE_VALUE_PATTERN = `(?:US|UK|EU|IT)?\\s*\\d[\\d.]*|XS|S|M|L|XL|XXL|2XL|3XL|XXXL|OS|OSFM|One\\s+Size`;
-// Matches sizes that are ONLY generic clothing letters (not numeric, not EU/UK etc.)
-export const GENERIC_CLOTHING_SIZE = /^(XS|S|M|L|XL|XXL|2XL|3XL|XXXL|OS|OSFM|One\s+Size)$/i;
-// Full-string size validator — used to reject color/other values stored as size
-const SIZE_VALUE_REGEX = new RegExp(`^(${SIZE_VALUE_PATTERN})$`, "i");
-// Exported so other modules can validate DB-stored sizes (e.g. reject "Gold", "Black")
-export function isValidSizeValue(val: string): boolean {
- return SIZE_VALUE_REGEX.test(val.trim());
-}
+import {
+ normalizeCompoundSize,
+ GENERIC_CLOTHING_SIZE,
+ extractSizeFromTitle,
+ extractTaggedSizeFromDescription,
+ extractSizeFromDescription,
+} from "./size-parse.ts";
 
-/**
- * Normalizes compound size values from Shopify variant options.
- * e.g. "EU: 37 / UK: 4" → "EU 37"
- * "EU 37 / UK 4" → "EU 37"
- * "EU: 37" → "EU 37"
- * "M" → "M"
- * Returns null if no recognizable size can be extracted.
- */
-function normalizeCompoundSize(val: string): string | null {
- if (!val || val === "Default Title") return null;
- // Take the first component of compound sizes like "EU: 37 / UK: 4"
- const firstPart = val.split(/\s*\/\s*/)[0].trim();
- // Remove colon between size prefix and number: "EU: 37" → "EU 37"
- const normalized = firstPart.replace(/^(EU|UK|US|IT|FR|DE)\s*:\s*/i, (_, prefix: string) => prefix.toUpperCase() + " ").trim();
- if (SIZE_VALUE_REGEX.test(normalized)) return normalized;
- if (SIZE_VALUE_REGEX.test(firstPart)) return firstPart;
- if (SIZE_VALUE_REGEX.test(val.trim())) return val.trim();
- return null;
-}
-
-/**
- * Extracts a size from a product title as a fallback when no variant size option exists.
- * Matches patterns like "Size M", "Size 38", "/ Size 9.5", "- Size US 8", "(Size L)"
- * Also matches bare trailing numbers common in vintage listings: "Dior Heels 35", "Gucci Slides 40.5"
- */
-export function extractSizeFromTitle(title: string): string | null {
- const parenMatch = /\(\s*(?:size|sz)\s*:?\s*([^)]+)\)/i.exec(title);
- if (parenMatch) return parenMatch[1].trim();
-
- // Match bare size in parentheses: "(S)", "(M)", "(38)", "(EU 38)"
- const bareParenRe = new RegExp(`\\(\\s*(${SIZE_VALUE_PATTERN})\\s*\\)`, "i");
- const bareParenMatch = bareParenRe.exec(title);
- if (bareParenMatch && SIZE_VALUE_REGEX.test(bareParenMatch[1].trim())) return bareParenMatch[1].trim();
-
- const re = new RegExp(`(?:[-–—|\\/,]\\s*|\\s+)(?:size|sz)\\s*:?\\s*(${SIZE_VALUE_PATTERN})`, "i");
- const sepMatch = re.exec(title);
- if (sepMatch) return sepMatch[1].trim();
-
- // Match size letter(s) after separator at end of title (no "size" keyword).
- // Catches "Dress – XS-S", "Top – S/M", "Blouse - XS" etc.
- const LETTER_SIZE = `XS|XXL|XL|X|S|M|L`;
- const trailingSizeSepRe = new RegExp(
- `[-\u2013\u2014\\/|,]\\s*((?:${LETTER_SIZE})(?:[\\/-](?:${LETTER_SIZE}))?)\\s*$`,
- "i"
- );
- const trailingSizeSepMatch = trailingSizeSepRe.exec(title);
- if (trailingSizeSepMatch) return trailingSizeSepMatch[1].trim().toUpperCase();
-
- // Match a bare size at the very end of the title (no "size" keyword needed).
- // Handles "Dior Heels 35", "Jimmy Choo Pumps 40.5", "Loafers EU 38".
- // Capped at 50 to exclude years (2024, 2025) and other large numbers.
- const trailingRe = new RegExp(`\\s((?:US|UK|EU|IT)\\s*\\d[\\d.]*|\\d{1,2}(?:\\.\\d)?)$`);
- const trailingMatch = trailingRe.exec(title);
- if (trailingMatch) {
- const val = trailingMatch[1].trim();
- const num = parseFloat(val.replace(/[^\d.]/g, ""));
- if (SIZE_VALUE_REGEX.test(val) && num >= 1 && num <= 50) return val;
- }
-
- return null;
-}
-
-// Map full word sizes to abbreviations
-const WORD_SIZE_MAP: Record<string, string> = {
- "extra small": "XS",
- "extrasmall": "XS",
- "small": "S",
- "medium": "M",
- "large": "L",
- "extra large": "XL",
- "extralarge": "XL",
- "x-large": "XL",
- "xlarge": "XL",
- "xx-large": "XXL",
- "xxlarge": "XXL",
- "xxl": "XXL",
- "one size": "One Size",
- "onesize": "One Size",
-};
-
-/**
- * Extracts an explicit US fit size the seller calls out as how the item actually
- * wears, e.g. "runs true to a 6", "true to size 6", "fits like a 6",
- * "best fits a 6.5", "best fits US 2-4". This is the seller's real-world fit
- * guidance and is treated as the most authoritative DISPLAY size — it beats a
- * marked EU tag size because it tells a US buyer what to actually order.
- *
- * Handles ranges ("US 2-4", "2 to 4"). An explicit "US" lets it match without an
- * "a"/"size" filler word; without "US" it still requires "a"/"size" so it won't
- * grab measurements like "fits 40 inch". Requires a number (bare "true to size"
- * doesn't match) and ignores years/large numbers. Returns "US N", "US N-M", or null.
- */
-export function extractFitSizeFromDescription(description: string | null): string | null {
- if (!description) return null;
- const text = description.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
- // Captures a number and an optional second number (range), guarded against
- // being part of a longer number (years, measurements).
- const RANGE = `(\\d{1,2}(?:\\.\\d)?)(?:\\s*(?:[-–—/]|to)\\s*(\\d{1,2}(?:\\.\\d)?))?(?!\\d)`;
- const patterns = [
- // "(runs) true to (a/size)? (us)? N(-M)?"
- new RegExp(`\\btrue\\s+to\\s+(?:(?:a|size)\\s+)*(?:us\\s*)?${RANGE}`, "i"),
- // "(best) fits/runs/wears (like)? (a/size)? US N(-M)?" — explicit US, filler optional
- new RegExp(`\\b(?:best\\s+)?(?:fits?|runs?|wears?)\\s+(?:best\\s+)?(?:like\\s+)?(?:a\\s+|size\\s+)?us\\s*${RANGE}`, "i"),
- // "(best) fits/runs/wears like a N(-M)?"
- new RegExp(`\\b(?:fits?|runs?|wears?)\\s+(?:best\\s+)?like\\s+a\\s+(?:us\\s*)?${RANGE}`, "i"),
- // "(best) fits/runs/wears a/size N(-M)?" — require a/size (1 or 2) when there's no "US"
- new RegExp(`\\b(?:best\\s+)?(?:fits?|runs?|wears?)\\s+(?:like\\s+)?(?:(?:a|size)\\s+){1,2}(?:us\\s*)?${RANGE}`, "i"),
- ];
- const valid = (s: string) => { const n = parseFloat(s); return n >= 1 && n <= 49; };
- for (const re of patterns) {
- const m = re.exec(text);
- if (m && valid(m[1])) {
- if (m[2] != null && valid(m[2])) return `US ${m[1]}-${m[2]}`;
- return `US ${m[1]}`;
- }
- }
- return null;
-}
-
-/**
- * Extracts an explicit US size the seller listed in a size-conversion table, e.g.
- * "UK 10 / EU 40 / US 6". The seller's own US number is authoritative for a US buyer
- * and beats formula-converting the EU/UK tag — the generic "EU − 32" rule would turn
- * this designer's EU 40 into US 8, but she states US 6. Only trusted when a UK/EU/IT/
- * FR/DE size sits alongside it, so stray text like "ships from US in 2 days" can't match.
- */
-export function extractUSConversionFromDescription(description: string | null): string | null {
- if (!description) return null;
- const text = description.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
- const hasUkEu = /\b(?:UK|EU|IT|FR|DE)\s*\d{1,2}\b/i.test(text);
- if (!hasUkEu) return null;
- const m = /\bUS\s*(\d{1,2}(?:\.5)?)\b/i.exec(text);
- if (!m) return null;
- const n = parseFloat(m[1]);
- if (n < 0 || n > 24) return null;
- return `US ${m[1]}`;
-}
-
-/**
- * Extracts a LETTER fit the seller explicitly states — "Best Fit M - XL",
- * "fits like a large", "Fit: M-L", "best fits medium to large". Returns a single
- * letter ("L") or a range ("M-XL"), normalized + uppercased. Like the numeric
- * fit note this is the seller's own fit guidance, so it must beat a marked
- * numeric/IT tag (which would otherwise be CONVERTED to a US number the seller
- * never stated, e.g. IT 54 → "US 18"). Conservative on purpose — only clear
- * "best fit / fits like a / fit:" phrasings — so we never guess a size.
- */
-export function extractFitLetterFromDescription(description: string | null): string | null {
- if (!description) return null;
- const text = description.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
- // Longest tokens first so "medium" wins over "m", "large" over "l", etc.
- const TOK = `extra\\s+small|extra\\s+large|x-?large|xx-?large|small|medium|large|xxxl|xxl|xl|xs|s|m|l`;
- // (?![a-z]) after each token stops a bare letter matching the START of a word —
- // e.g. "Fit: Labeled IT" must not read the "L" of "Labeled" as size Large.
- const re = new RegExp(
- `\\b(?:best\\s+fits?|fits?\\s+like\\s+a|fit\\s*:)\\s+(?:a\\s+|size\\s+)?(${TOK})(?![a-z])(?:\\s*(?:[-\\u2013\\u2014/]|to)\\s*(${TOK})(?![a-z]))?`,
- "i",
- );
- const m = re.exec(text);
- if (!m) return null;
- const norm = (s: string): string | null => {
- const word = s.toLowerCase().replace(/\s+/g, " ").trim();
- if (WORD_SIZE_MAP[word] || WORD_SIZE_MAP[word.replace(/-/g, "")]) return WORD_SIZE_MAP[word] ?? WORD_SIZE_MAP[word.replace(/-/g, "")];
- const up = s.toUpperCase().replace(/[\s-]+/g, "");
- return /^(XS|S|M|L|XL|XXL|XXXL)$/.test(up) ? up : null;
- };
- const a = norm(m[1]);
- if (!a) return null;
- const b = m[2] ? norm(m[2]) : null;
- return b && b !== a ? `${a}-${b}` : a;
-}
-
-/**
- * Extracts size using ONLY authoritative label keywords: "tagged size", "labeled size",
- * "marked size", "label". Used as the top-priority source so "Tagged size: XS" always
- * beats "Size: Large [store bucket]" that appears earlier in the description.
- */
-export function extractTaggedSizeFromDescription(description: string | null): string | null {
- if (!description) return null;
- const text = description.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
- const STRICT = `tagged\\s+size|labeled\\s+size|marked\\s+size|label(?:\\s+size)?`;
-
- // EU/IT/FR/DE prefix: "Tagged size: EU 37"
- const euRe = new RegExp(`(?:${STRICT})\\s*:?\\s*((?:EU|IT|FR|DE)\\s*:?\\s*\\d[\\d.]*)`, "i");
- const euM = euRe.exec(text);
- if (euM) return euM[1].trim().replace(/:\s*/, " ").replace(/\s+/, " ");
-
- // Parenthetical abbreviation: "Label: Medium (M)" → "M"
- const parenRe = new RegExp(`(?:${STRICT})\\s*:?[^(\\n]*?\\(\\s*(${SIZE_VALUE_PATTERN})\\s*\\)`, "i");
- const parenM = parenRe.exec(text);
- if (parenM) return parenM[1].trim();
-
- // Abbreviated size: "Tagged size: XS"
- const abbrRe = new RegExp(`(?:${STRICT})\\s*:?\\s*(${SIZE_VALUE_PATTERN})`, "i");
- const abbrM = abbrRe.exec(text);
- if (abbrM) return abbrM[1].trim();
-
- // Full word size: "Tagged size: Medium"
- const wordRe = new RegExp(
- `(?:${STRICT})\\s*:?\\s*(extra\\s+small|extra\\s+large|x-?large|xx-?large|small|medium|large)(?:\\s|$|[^a-z])`,
- "i"
- );
- const wordM = wordRe.exec(text);
- if (wordM) {
- const key = wordM[1].toLowerCase().replace(/\s+/g, " ").trim();
- return WORD_SIZE_MAP[key.replace(/-/g, "")] ?? WORD_SIZE_MAP[key] ?? wordM[1];
- }
-
- return null;
-}
-
-/**
- * Extracts a size from product description HTML using all available heuristics.
- * For highest-priority extraction (tagged/labeled/marked keywords), use
- * extractTaggedSizeFromDescription instead — it won't be fooled by an earlier
- * "Size: Large [store bucket]" before "Tagged size: XS [actual tag]".
- */
-export function extractSizeFromDescription(description: string | null): string | null {
- if (!description) return null;
- const text = description.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
-
- const STRICT_KW = `tagged\\s+size|labeled\\s+size|marked\\s+size|label(?:\\s+size)?`;
-
- // 0. EU/IT/FR/DE prefixed size after any label keyword (strict or bare "size:")
- const euLabelRe = new RegExp(
- `(?:(?:${STRICT_KW})\\s*:?|size\\s*:)\\s*((?:EU|IT|FR|DE)\\s*:?\\s*\\d[\\d.]*)`,
- "i"
- );
- const euLabelMatch = euLabelRe.exec(text);
- if (euLabelMatch) return euLabelMatch[1].trim().replace(/:\s*/, " ").replace(/\s+/, " ");
-
- // 1. Parenthetical abbreviation after any label keyword or "size:"
- const parenKw = `${STRICT_KW}|size`;
- const parenRe = new RegExp(
- `(?:${parenKw})\\s*:?[^(\\n]*?\\(\\s*(${SIZE_VALUE_PATTERN})\\s*\\)`,
- "i"
- );
- const parenMatch = parenRe.exec(text);
- if (parenMatch) return parenMatch[1].trim();
-
- // 2. Full word size — requires colon after bare "size" to avoid freeform matches
- // ("size large" in narrative text, "I'd recommend size large" etc.)
- const wordRe = new RegExp(
- `(?:(?:${STRICT_KW})\\s*:?|size\\s*:)\\s*(extra\\s+small|extra\\s+large|x-?large|xx-?large|small|medium|large)(?:\\s|$|[^a-z])`,
- "i"
- );
- const wordMatch = wordRe.exec(text);
- if (wordMatch) {
- const key = wordMatch[1].toLowerCase().replace(/\s+/g, " ").trim();
- return WORD_SIZE_MAP[key.replace(/-/g, "")] ?? WORD_SIZE_MAP[key] ?? wordMatch[1];
- }
-
- // 3. Abbreviated size after strict label or "size:" (with colon). The trailing
- // (?![a-z]) stops a letter size matching the FIRST letter of a word — e.g.
- // "Size: Marked 36" must not return "M" (the M of "Marked"); it falls through
- // so the real "36" is found from the title/elsewhere.
- const re = new RegExp(
- `(?:(?:${STRICT_KW})\\s*:?|size\\s*:)\\s*(${SIZE_VALUE_PATTERN})(?![a-z])`,
- "i"
- );
- const match = re.exec(text);
- if (match) return match[1].trim();
-
- // 3b. "Size 39." / "Size 38.5" — bare "size" + space + numeric (no colon needed; low false-positive)
- const bareNumericRe = /\bsize\s+((?:US|UK|EU|IT)?\s*\d[\d.]*)\.?(?:\s|$)/i;
- const bareNumericMatch = bareNumericRe.exec(text);
- if (bareNumericMatch) return bareNumericMatch[1].trim();
-
- // 3c. "Size XS," / "Size M." — bare "size" + space + letter abbreviation (no colon)
- const bareLetterRe = new RegExp(`\\bsize\\s+(${SIZE_VALUE_PATTERN})(?:[,.]|\\s|$)`, "i");
- const bareLetterMatch = bareLetterRe.exec(text);
- if (bareLetterMatch) return bareLetterMatch[1].trim();
-
- // 4. Standalone EU/IT/FR/DE size anywhere in description (e.g. "• EU 39" as a bullet point)
- const euStandaloneRe = /\b((?:EU|IT|FR|DE)\s*\d[\d.]*)\b/i;
- const euStandaloneMatch = euStandaloneRe.exec(text);
- if (euStandaloneMatch) return euStandaloneMatch[1].trim();
-
- // 5. Fallback: "fits XS", "best fits M" — (?![a-z]) so "fits Marked"/"fits like"
- // can't match the leading letter of the next word.
- const fitsRe = new RegExp(`(?:best\\s+)?fits?\\s+(${SIZE_VALUE_PATTERN})(?![a-z])`, "i");
- const fitsMatch = fitsRe.exec(text);
- if (fitsMatch) return fitsMatch[1].trim();
-
- return null;
-}
+// Re-exported so the modules that already import these from here keep working.
+export {
+ GENERIC_CLOTHING_SIZE,
+ isValidSizeValue,
+ extractSizeFromTitle,
+ extractFitSizeFromDescription,
+ extractUSConversionFromDescription,
+ extractFitLetterFromDescription,
+ extractTaggedSizeFromDescription,
+ extractSizeFromDescription,
+} from "./size-parse.ts";
 
 /**
  * Normalizes a Shopify store domain to the correct format
@@ -729,12 +475,27 @@ export async function fetchShopifyProductsPublic(
  storeName: string,
  maxProducts: number = 250,
  defaultCurrency: string = "USD",
- skipSoldOutFilter: boolean = false
+ skipSoldOutFilter: boolean = false,
+ /** The shop's HOME country (Shopify's `countryCode`). Sent as the `localization` cookie so Shopify
+  *  Markets serves the seller's own market. Without it the feed is priced in whatever market the
+  *  request's geography suggests — a UK store imported from a US-looking crawler came back in USD at
+  *  a converted rate, and every price on the hosted store disagreed with the seller's. Proven: the
+  *  same request with `localization=GB` returns £290.00 GBP; without it, $401.00 USD. */
+ homeCountry: string | null = null
 ): Promise<ShopifyFetchResult> {
  const normalizedDomain = normalizeStoreDomain(storeDomain);
  const products: ShopifyProduct[] = [];
  let skippedCount = 0;
  let page = 1;
+ // Recorded so the caller can tell "that is the whole catalogue" from "that is where I stopped".
+ const outcome: ReadOutcome = { pagesRead: 0, lastPageFull: false, hitCap: false, failed: false };
+ // The currency the FEED is actually priced in. Shopify Markets serves a storefront in different
+ // presentment currencies depending on how it reads the request, and products.json carries bare
+ // price strings with no currency at all — so the same URL can return "245.00" (GBP) or "341.00"
+ // (USD converted). It does tell us which, via the `cart_currency` cookie on that same response.
+ // Reading it HERE keeps price and currency from the same response; taking currency from a
+ // separately-fetched homepage can disagree with the feed and mislabel every price in the import.
+ let feedCurrency: string | null = null;
  // Use 50 per page — some stores cap their public API at 50 regardless of the
  // limit param, so requesting 50 ensures correct page-based pagination.
  const limit = 50;
@@ -744,7 +505,14 @@ export async function fetchShopifyProductsPublic(
 
  let response: Response | null = null;
  for (let attempt = 0; attempt < 4; attempt++) {
- response = await fetch(url, { headers: { Accept: "application/json" } });
+ // safeFetch, not bare fetch: `storeDomain` is user-supplied on the import path, so this call
+ // has to go through the same SSRF guard (DNS resolution + private-IP rejection + per-hop
+ // redirect revalidation) as every other outbound request. The timeout also means a hung store
+ // can't pin the invocation open — the outer Promise.race can't cancel this work on its own.
+ response = await safeFetch(url, {
+  headers: { Accept: "application/json", ...(homeCountry ? { Cookie: `localization=${homeCountry}` } : {}) },
+  signal: AbortSignal.timeout(15000),
+ });
  if (response.status !== 429) break;
  const retryAfter = parseInt(response.headers.get("Retry-After") ?? "5", 10);
  const waitMs = Math.min(retryAfter * 1000, 30_000);
@@ -753,6 +521,7 @@ export async function fetchShopifyProductsPublic(
  }
 
  if (!response!.ok) {
+ outcome.failed = true;
  if (response!.status === 401 || response!.status === 403) {
  throw new Error(
  "Store requires authentication. Please provide a Storefront Access Token."
@@ -763,10 +532,57 @@ export async function fetchShopifyProductsPublic(
  );
  }
 
- const data = await response!.json();
+ // Which currency THIS response is priced in (see feedCurrency above).
+ if (!feedCurrency) {
+ const setCookie = response!.headers.get("set-cookie") || "";
+ const m = setCookie.match(/cart_currency=([A-Z]{3})/);
+ if (m) feedCurrency = m[1];
+ }
+
+ // Real storefronts ship raw control characters inside product descriptions, which strict
+ // JSON.parse rejects outright — every one of the 13 Shopify feeds profiled did it. Strip the
+ // C0 range (except the legal \t\n\r escapes) so one bad description can't fail a whole import.
+ const data = parseLooseJson(await response!.text());
 
  if (!data.products || data.products.length === 0) {
+ // A `200 {"products":[]}` is what a throttled Shopify returns mid-catalogue — and ALSO what the
+ // real end of the catalogue looks like when its size is an exact multiple of the page size
+ // (shop-vintage-charm holds exactly 1,550 and we page by 50). The two are indistinguishable in
+ // one request, so ask twice: a throttle clears, an ending does not.
+ if (page > 1) {
+ // Ask again, with room for a throttle to clear. One quick retry is not enough: a shop that is
+ // busy enough to answer empty is often busy for more than two seconds, and a sustained throttle
+ // that survives the retry would be read as the end of the catalogue — the exact mistake this is
+ // here to prevent, just harder to spot.
+ let refilled: ReturnType<typeof parseLooseJson> | null = null;
+ let reachable = false;
+ // Backoff kept short on purpose: the whole read runs under a single outer timeout, and waiting
+ // 30s here spent the entire budget, turning a good read of shop-vintage-charm into an empty one.
+ for (const waitMs of [1500, 5000]) {
+ await new Promise((r) => setTimeout(r, waitMs));
+ const retry = await safeFetch(url, {
+  headers: { Accept: "application/json", ...(homeCountry ? { Cookie: `localization=${homeCountry}` } : {}) },
+  signal: AbortSignal.timeout(15000),
+ }).catch(() => null);
+ if (!retry?.ok) continue;
+ reachable = true;
+ const again = parseLooseJson(await retry.text());
+ if (again?.products?.length) { refilled = again; break; }
+ }
+ if (refilled?.products?.length) {
+  // It was a throttle. Take this page's products and carry on rather than stopping short.
+  console.log(`[Shopify] ${storeName}: page ${page} came back empty and refilled on retry (throttle)`);
+  data.products = refilled.products;
+ } else if (!reachable) {
+  outcome.failed = true; // never got an answer — cannot tell an ending from an outage
+  break;
+ } else {
+  outcome.lastPageFull = false; // answered, and empty every time: the catalogue really does end here
+  break;
+ }
+ } else {
  break;
+ }
  }
 
  for (const product of data.products) {
@@ -865,7 +681,7 @@ export async function fetchShopifyProductsPublic(
  title: product.title,
  price: isNaN(price as number) ? null : price,
  compareAtPrice: compareAtPricePublic,
- currency: defaultCurrency, // Public endpoint doesn't include currency; use store's configured currency
+ currency: feedCurrency || defaultCurrency, // what THIS feed response was priced in (cart_currency cookie)
  image: imageUrl,
  images: allImageUrls,
  videoUrl: null,
@@ -879,8 +695,24 @@ export async function fetchShopifyProductsPublic(
  shopifyProductId,
  size,
  tags: productTags,
+ // Stable identity + the full size run, so the importer can match on re-sync instead of
+ // guessing by title, and multi-size listings survive as more than their first variant.
+ handle: product.handle || null,
+ variants: variants.map((v: { id?: unknown; title?: string; option1?: string | null; option2?: string | null; price?: string; available?: boolean }) => {
+ const vPrice = v.price ? parseFloat(v.price) : null;
+ return {
+ sourceVariantId: v.id != null ? String(v.id) : null,
+ size: v.title && v.title !== "Default Title" ? v.title : (v.option1 ?? null),
+ color: v.option2 ?? null,
+ priceCents: vPrice != null && !isNaN(vPrice) ? Math.round(vPrice * 100) : null,
+ available: v.available !== false,
+ };
+ }),
  });
  }
+
+ outcome.pagesRead = page;
+ outcome.lastPageFull = data.products.length >= limit;
 
  if (data.products.length < limit) {
  break;
@@ -889,8 +721,10 @@ export async function fetchShopifyProductsPublic(
  page++;
  }
 
- console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)`);
- return { products, skippedCount };
+ // The while-condition itself: we stopped because our own ceiling was reached, not the shop's end.
+ if (products.length >= maxProducts) outcome.hitCap = true;
+ console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)${outcome.hitCap ? " — STOPPED AT OUR LIMIT, not the end of the catalogue" : ""}`);
+ return { products, skippedCount, outcome };
 }
 
 /**

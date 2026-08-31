@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getShippingSettings, setShippingSettings, type ShipMode, type ShipFrom } from "@/app/lib/store-shipping-db";
+import { pickupOffered } from "@/app/lib/pickup-core.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,14 @@ export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const s = await getShippingSettings(slug);
- return NextResponse.json({ mode: s.mode, freeThresholdUsd: s.freeThresholdCents != null ? s.freeThresholdCents / 100 : null, shipFrom: s.shipFrom });
+ return NextResponse.json({
+  mode: s.mode,
+  freeThresholdUsd: s.freeThresholdCents != null ? s.freeThresholdCents / 100 : null,
+  shipFrom: s.shipFrom,
+  // Collect in store. `offered` is the truth the shopper's checkout uses — the toggle alone isn't it.
+  pickup: s.pickup,
+  pickupOffered: pickupOffered(s.pickup),
+ });
 }
 
 // POST { mode, freeThresholdUsd, shipFrom } — set the policy (each store its own).
@@ -31,6 +39,26 @@ export async function POST(request: NextRequest) {
  state: str(f.state), zip: str(f.zip), country: str(f.country) || "US", phone: str(f.phone),
  };
 
- await setShippingSettings(slug, { mode, freeThresholdCents, shipFrom });
- return NextResponse.json({ ok: true });
+ // Collect in store. Saved as the seller typed it; whether it is actually OFFERED is decided by
+ // pickupOffered, which requires somewhere to collect from — a toggle with no address is not an
+ // offer, and that is the likeliest way this setting goes wrong.
+ const pk = body?.pickup || {};
+ const pickup = pk.enabled
+  ? {
+   enabled: true,
+   address: {
+    street1: str(pk.street1), street2: str(pk.street2), city: str(pk.city),
+    state: str(pk.state), zip: str(pk.zip), country: str(pk.country) || "US",
+   },
+   instructions: typeof pk.instructions === "string" && pk.instructions.trim() ? pk.instructions.trim().slice(0, 400) : null,
+  }
+  : null;
+ // Refuse the half-filled setting rather than saving a toggle that quietly does nothing. Without
+ // this she'd flip it on, see it saved, and wonder why no shopper is ever offered collection.
+ if (pk.enabled && !pickupOffered(pickup)) {
+  return NextResponse.json({ error: "Add the street and city buyers will collect from before turning collection on." }, { status: 400 });
+ }
+
+ await setShippingSettings(slug, { mode, freeThresholdCents, shipFrom, pickup });
+ return NextResponse.json({ ok: true, pickupOffered: pickupOffered(pickup) });
 }

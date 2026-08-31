@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
 type Listing = {
@@ -32,6 +32,15 @@ const input =
 const label = "block text-[11px] uppercase tracking-[0.18em] text-[#5D0F17]/55 mb-2";
 
 export default function ListingsManager() {
+ // Admin preview: the page URL carries ?store={slug}, and every API call has to carry it too.
+ // Without this the page rendered the previewed store but SAVED against whichever store the session
+ // belongs to — so a listing added while previewing simply never appeared on that storefront.
+ const withStore = useCallback((path: string) => {
+  if (typeof window === "undefined") return path;
+  const s = new URLSearchParams(window.location.search).get("store");
+  return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+ }, []);
+
  const [loading, setLoading] = useState(true);
  const [authErr, setAuthErr] = useState<string | null>(null);
  const [listings, setListings] = useState<Listing[]>([]);
@@ -42,9 +51,9 @@ export default function ListingsManager() {
  const [err, setErr] = useState<string | null>(null);
  const fileRef = useRef<HTMLInputElement>(null);
 
- async function load() {
+ const load = useCallback(async function load() {
  try {
- const r = await fetch("/api/store/listings");
+ const r = await fetch(withStore("/api/store/listings"));
  if (!r.ok) {
  setAuthErr(r.status === 401 ? "Sign in as your store to manage listings." : "Couldn't load listings.");
  setLoading(false);
@@ -56,10 +65,10 @@ export default function ListingsManager() {
  setAuthErr("Couldn't load listings.");
  }
  setLoading(false);
- }
+ }, [withStore]);
  useEffect(() => {
  load();
- }, []);
+ }, [load]);
 
  function startNew() {
  setErr(null);
@@ -88,7 +97,7 @@ export default function ListingsManager() {
  for (const file of picked.slice(0, 8)) {
  const fd = new FormData();
  fd.append("file", file);
- const r = await fetch("/api/store/listings/upload", { method: "POST", body: fd });
+ const r = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Upload failed");
  setDraft((x) => (x ? { ...x, images: [...x.images, d.url].slice(0, MAX_ITEM_IMAGES) } : x));
@@ -121,7 +130,7 @@ export default function ListingsManager() {
  images: draft.images,
  };
  try {
- const r = await fetch(draft.id ? `/api/store/listings/${draft.id}` : "/api/store/listings", {
+ const r = await fetch(withStore(draft.id ? `/api/store/listings/${draft.id}` : "/api/store/listings"), {
  method: draft.id ? "PATCH" : "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify(body),
@@ -140,7 +149,7 @@ export default function ListingsManager() {
 
  async function remove(id: number) {
  if (!confirm("Delete this listing?")) return;
- await fetch(`/api/store/listings/${id}`, { method: "DELETE" });
+ await fetch(withStore(`/api/store/listings/${id}`), { method: "DELETE" });
  await load();
  }
 

@@ -2,12 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Package, Search } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, cn } from "../ui";
+import { Package, Search, List, LayoutGrid, Check, X } from "lucide-react";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, ConfirmDialog, cn } from "../ui";
 import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
+
+/**
+ * Which store these calls act on.
+ *
+ * Without a ?store= the API resolves to whatever store the SESSION belongs to — so opening this page
+ * to look at another seller's inventory silently read and edited your own store instead, and an item
+ * "added to inventory" never reached the storefront being looked at.
+ */
+function withStore(path: string): string {
+ if (typeof window === "undefined") return path;
+ const s = new URLSearchParams(window.location.search).get("store");
+ return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+}
+
 type Item = {
  id: string;
  sku: number; // per-store sequence by creation order (1 = the store's first item)
@@ -30,6 +44,7 @@ type Item = {
  widthIn: number | null;
  heightIn: number | null;
  collections?: string[];
+ source?: string; // manual | imported | ai | market (quick-listed at a market)
 };
 
 const TONE = STATUS_TONE;
@@ -44,6 +59,16 @@ export default function ItemsPage() {
  const pathname = usePathname();
  const searchParams = useSearchParams();
  const deepLinkId = searchParams.get("item"); // ?item=<id> from global search → open its editor
+ // ?missing=photo|price — Market Mode's "Before you sell" list deep-links straight to the items that
+ // need fixing. Seeded from the URL once; the seller can clear it like any other filter.
+ const missingParam = searchParams.get("missing");
+ const [missingTag, setMissingTag] = useState<"photo" | "price" | "details" | null>(missingParam === "photo" || missingParam === "price" || missingParam === "details" ? missingParam : null);
+ const [quickOnly, setQuickOnly] = useState(searchParams.get("source") === "market");
+ // List vs thumbnail grid (?layout=grid deep-links; the choice is remembered per device).
+ const [layout, setLayout] = useState<"list" | "grid">(searchParams.get("layout") === "grid" ? "grid" : "list");
+ useEffect(() => { try { if (!searchParams.get("layout") && localStorage.getItem("inventory:layout") === "grid") void Promise.resolve().then(() => setLayout("grid")); } catch { /* storage off */ } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+ const changeLayout = (v: "list" | "grid") => { setLayout(v); try { localStorage.setItem("inventory:layout", v); } catch { /* */ } };
+ const [colTag, setColTag] = useState<string | null>(null); // collection filter
  const handledDeepLink = useRef<string | null>(null);
  const statusFilter = pathname.endsWith("/drafts") ? "draft" : pathname.endsWith("/sold") ? "sold" : null;
  const [loading, setLoading] = useState(true);
@@ -60,6 +85,11 @@ export default function ItemsPage() {
  const [channels, setChannels] = useState<Record<string, { key: string; status: string }[]>>({});
  const [platformNames, setPlatformNames] = useState<Record<string, string>>({});
  const [busyId, setBusyId] = useState<string | null>(null);
+ // In-page confirmations (never browser dialogs): the row × becomes "Remove? Remove · Keep"; the bulk bar
+ // and owner reset do the same two-step in place.
+ const [confirmRow, setConfirmRow] = useState<string | null>(null);
+ const [confirmBulk, setConfirmBulk] = useState(false);
+ const [confirmReset, setConfirmReset] = useState(false);
  const [soldNotice, setSoldNotice] = useState<string | null>(null);
  const [isAdmin, setIsAdmin] = useState(false);
  const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -80,7 +110,7 @@ export default function ItemsPage() {
 
  async function load() {
  try {
- const r = await fetch("/api/store/items");
+ const r = await fetch(withStore("/api/store/items"));
  if (!r.ok) {
  setAuthErr(r.status === 401 ? "Sign in as your store to manage items." : "Couldn’t load items.");
  setLoading(false);
@@ -96,10 +126,10 @@ export default function ItemsPage() {
  }
  useEffect(() => {
  (async () => { await load(); })();
- fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  // Cross-listing board → which channels each item is ACTUALLY published on. "Posted on" should
  // only reflect a real, completed listing — not a started-but-unpublished ('pending') or failed one.
- fetch("/api/store/cross-listing").then((r) => (r.ok ? r.json() : null)).then((r) => {
+ fetch(withStore("/api/store/cross-listing")).then((r) => (r.ok ? r.json() : null)).then((r) => {
  if (!r) return;
  const names: Record<string, string> = {};
  (r.platforms || []).forEach((p: { key: string; name: string }) => { names[p.key] = p.name; });
@@ -124,14 +154,14 @@ export default function ItemsPage() {
  }, [deepLinkId, items]);
 
  // A new search or sub-tab resets to the first page.
- useEffect(() => { setPage(1); }, [q, statusFilter, statusTag, famTag, catTag]);
+ useEffect(() => { setPage(1); }, [q, statusFilter, statusTag, famTag, catTag, colTag, missingTag]);
  // The Drafts / Sold sub-tabs already pin a status — don't let a stale tag filter fight them.
  useEffect(() => { setStatusTag(null); }, [statusFilter]);
 
  async function act(id: string, action: "sold" | "remove" | "publish") {
- if (action === "remove" && !confirm("Remove this item?")) return;
+ setConfirmRow(null);
  setBusyId(id);
- const r = await fetch(`/api/store/items/${id}`, {
+ const r = await fetch(withStore(`/api/store/items/${id}`), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action }),
@@ -196,9 +226,9 @@ export default function ItemsPage() {
  async function bulk(action: "publish" | "remove") {
  const ids = [...selected];
  if (!ids.length) return;
- if (action === "remove" && !confirm(`Remove ${ids.length} selected item${ids.length > 1 ? "s" : ""}?`)) return;
+ setConfirmBulk(false);
  setBulkBusy(true);
- await fetch("/api/store/items", {
+ await fetch(withStore("/api/store/items"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action, ids }),
@@ -213,7 +243,7 @@ export default function ItemsPage() {
  const ids = [...selected];
  if (!ids.length) return;
  setBulkBusy(true); setAiNotice(null);
- const r = await fetch("/api/store/items/categorize", {
+ const r = await fetch(withStore("/api/store/items/categorize"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ ids }),
@@ -236,10 +266,10 @@ export default function ItemsPage() {
  const ids = [...selected];
  if (!name || !ids.length) return;
  setBulkBusy(true);
- await fetch("/api/store/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "addToCollection", ids, collection: name }) }).catch(() => {});
+ await fetch(withStore("/api/store/items"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "addToCollection", ids, collection: name }) }).catch(() => {});
  setBulkColOpen(false); setBulkColName(""); setSelected(new Set());
  await load();
- fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  setBulkBusy(false);
  }
 
@@ -263,7 +293,7 @@ export default function ItemsPage() {
  setUploading(true);
  for (const file of Array.from(files)) {
  const fd = new FormData(); fd.append("file", file);
- const r = await fetch("/api/store/listings/upload", { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  if (r?.url) setEditImages((imgs) => [...imgs, r.url]);
  }
  setUploading(false);
@@ -275,7 +305,7 @@ export default function ItemsPage() {
  if (!editing) return;
  const n = (s: string) => (s.trim() === "" ? null : Number(s));
  setSavingEdit(true);
- await fetch(`/api/store/items/${editing.id}`, {
+ await fetch(withStore(`/api/store/items/${editing.id}`), {
  method: "PATCH",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({
@@ -293,10 +323,9 @@ export default function ItemsPage() {
  }
 
  async function clearAll() {
- const n = items.length;
- if (!confirm(`OWNER RESET: permanently delete ALL ${n} items — including sold — plus their orders and collections from this store? This can’t be undone.`)) return;
+ setConfirmReset(false);
  setLoading(true);
- await fetch("/api/store/items", { method: "DELETE" }).catch(() => {});
+ await fetch(withStore("/api/store/items"), { method: "DELETE" }).catch(() => {});
  setCols([]);
  await load();
  }
@@ -323,7 +352,7 @@ export default function ItemsPage() {
  // Tag counts come from the OTHER filters' results, so a chip's number is what you'd actually get.
  const base = items
  .filter((i) => (statusFilter ? i.status === statusFilter : true))
- .filter((i) => (term ? `${i.title} ${i.category || ""}`.toLowerCase().includes(term) : true));
+ .filter((i) => (term ? `${i.title} ${i.brand || ""} ${i.category || ""} ${i.size || ""} sku-${1000 + i.sku} ${(i.collections || []).join(" ")} ${i.status}`.toLowerCase().includes(term) : true));
  // An item matches the category filter if it's the exact tag, or — when only a family is
  // picked — anything inside that family (so "Bags" catches Totes, Clutches and Crossbody too).
  const inCategory = (i: Item) => {
@@ -355,11 +384,20 @@ export default function ItemsPage() {
  ...(customPresent.size ? [{ label: OTHER_FAMILY, values: [...customPresent].sort() }] : []),
  ];
  const untagged = base.filter((i) => !slugOf.get(i.id)).length;
- const filtering = !!(statusTag || famTag || catTag);
- const clearFilters = () => { setStatusTag(null); setFamTag(null); setCatTag(null); };
+ const filtering = !!(statusTag || famTag || catTag || missingTag || colTag || quickOnly);
+ const clearFilters = () => { setStatusTag(null); setFamTag(null); setCatTag(null); setMissingTag(null); setColTag(null); setQuickOnly(false); };
+ const colCounts: Record<string, number> = {};
+ for (const i of items) for (const c of i.collections || []) colCounts[c] = (colCounts[c] || 0) + 1;
+ const needsDetails = (i: Item) => i.costCents == null || !i.size || !i.brand;
+ const lacks = (i: Item) => (missingTag === "photo" ? !(i.images?.length) : missingTag === "price" ? !(i.priceCents > 0) : missingTag === "details" ? needsDetails(i) : true);
+ const quickCount = items.filter((i) => i.source === "market").length;
+ const detailsCount = items.filter((i) => i.source === "market" && needsDetails(i)).length;
  const shown = base
  .filter((i) => (statusTag ? i.status === statusTag : true))
- .filter(inCategory);
+ .filter(inCategory)
+ .filter(lacks)
+ .filter((i) => (colTag ? (i.collections || []).includes(colTag) : true))
+ .filter((i) => (quickOnly ? i.source === "market" : true));
  const allChecked = shown.length > 0 && shown.every((i) => selected.has(i.id));
 
  // Exports everything currently filtered, not just the rendered page — an export
@@ -385,11 +423,21 @@ export default function ItemsPage() {
 
  const heading = statusFilter === "draft" ? "Drafts" : statusFilter === "sold" ? "Sold" : "Inventory";
 
- // "Posted on" cell — Store (live on the VYA storefront) + each real cross-listed channel.
+ // Collections cell — every collection the item sits in, as small chips (tap = filter by it).
  const chipCls = "inline-flex items-center rounded-full px-2 py-[3px] text-[10.5px] font-medium leading-none";
+ const collectionsCell = (it: Item) => {
+ const cs = it.collections || [];
+ if (!cs.length) return <span className="text-stone-300">—</span>;
+ return (
+ <div className="flex flex-wrap items-center gap-1">
+ {cs.slice(0, 3).map((c) => <button key={c} type="button" onClick={() => setColTag(c)} className={cn(chipCls, "bg-stone-100 text-stone-600 hover:bg-stone-200")}>{c}</button>)}
+ {cs.length > 3 && <span className="text-[10.5px] text-stone-400">+{cs.length - 3}</span>}
+ </div>
+ );
+ };
+ // "Posted on" cell — Store (live on the VYA storefront) + each real cross-listed channel.
  const postedCell = (it: Item) => {
  const chs = channels[it.id] || [];
- // Every item here is VYA-native, so it always carries the VYA "Store" chip; live items get a green dot.
  const live = it.status === "active" || it.status === "reserved";
  return (
  <div className="flex flex-wrap items-center gap-1">
@@ -400,9 +448,7 @@ export default function ItemsPage() {
  {live && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[var(--accent-bright,#2fd39b)]" />}
  </span>
  {chs.map((c) => (
- <span key={c.key} title="Live listing" className={cn(chipCls, "bg-stone-100 text-stone-600")}>
- {platformNames[c.key] || c.key}
- </span>
+ <span key={c.key} title="Live listing" className={cn(chipCls, "bg-stone-100 text-stone-600")}>{platformNames[c.key] || c.key}</span>
  ))}
  </div>
  );
@@ -417,7 +463,7 @@ export default function ItemsPage() {
  subtitle="Text a photo — VYA writes the listing and prices it from real comps."
  actions={
  <>
- {isAdmin && items.length > 0 && <button onClick={clearAll} className="text-[12px] text-rose-500/80 underline hover:text-rose-600">Clear all (owner)</button>}
+ {isAdmin && items.length > 0 && <button onClick={() => setConfirmReset(true)} className="text-[12px] text-rose-500/80 underline hover:text-rose-600">Clear all (owner)</button>}
  <div className="relative">
  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search items…" aria-label="Search items"
@@ -425,7 +471,7 @@ export default function ItemsPage() {
  </div>
  <TechButton variant="secondary" onClick={exportCsv}>Export</TechButton>
  <TechButton variant="secondary" onClick={() => setImportOpen(true)}>Import</TechButton>
- <TechButtonLink href="/admin/add-listing">+ New listing</TechButtonLink>
+ <TechButtonLink href={withStore("/admin/add-listing")}>+ New listing</TechButtonLink>
  </>
  }
  />
@@ -495,7 +541,7 @@ export default function ItemsPage() {
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={tagWithAi} title="Re-read each item&rsquo;s photo and set its category">
  {bulkBusy ? "Working…" : "Tag with AI"}
  </TechButton>
- <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => bulk("remove")}>Remove</TechButton>
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => setConfirmBulk(true)}>Remove</TechButton>
  <TechButton variant="ghost" className="px-3 py-1.5 text-[12px]" onClick={() => setSelected(new Set())}>Clear</TechButton>
  </div>
  </div>
@@ -508,10 +554,37 @@ export default function ItemsPage() {
  body={term || filtering ? "Try a different search, or clear the filters in the table headers." : "Snap a photo and VYA drafts the listing for you — title, description, and a ghost-mannequin image."}
  action={term ? undefined : filtering
  ? <TechButton variant="secondary" onClick={clearFilters}>Clear filters</TechButton>
- : <TechButtonLink href="/admin/add-listing">Snap your first piece</TechButtonLink>}
+ : <TechButtonLink href={withStore("/admin/add-listing")}>Snap your first piece</TechButtonLink>}
  />
+ ) : layout === "grid" ? (
+ <div>
+ <ViewToggle value={layout} onChange={changeLayout} count={shown.length} q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} />
+ <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+ {paged.map((it) => (
+ <div key={it.id} className={cn("group overflow-hidden rounded-2xl border bg-white transition", selected.has(it.id) ? "border-[var(--accent,#0e9f76)]" : "border-stone-200 hover:border-stone-300")}>
+ <button type="button" onClick={() => openEdit(it)} className="relative block aspect-[4/5] w-full bg-stone-100">
+ {it.images[0] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={it.images[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-[11px] text-stone-400">no photo</span>}
+ <span className="absolute left-2 top-2"><StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{statusLabel(it.status)}</StatusPill></span>
+ <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} onClick={(e) => e.stopPropagation()} className="absolute right-2 top-2 h-4 w-4 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${it.title}`} />
+ </button>
+ <div className="p-2.5">
+ <p className="truncate text-[13px] font-medium text-stone-900">{it.title}</p>
+ <div className="mt-0.5 flex items-center justify-between text-[12px] text-stone-500"><span className="truncate">{it.size || slugOf.get(it.id) || `SKU-${1000 + it.sku}`}</span><span className="font-semibold text-stone-900">${(it.priceCents / 100).toFixed(0)}</span></div>
+ <div className="mt-2 flex items-center justify-between gap-2">{collectionsCell(it)}{postedCell(it)}</div>
+ </div>
+ </div>
+ ))}
+ </div>
+ {totalPages > 1 && (
+ <div className="mt-3 flex items-center justify-between text-[12px] text-stone-500">
+ <span className="tabular-nums">Showing {(pageSafe - 1) * PAGE_SIZE + 1}–{Math.min(pageSafe * PAGE_SIZE, shown.length)} of {shown.length}</span>
+ <span className="flex gap-1"><TechButton variant="ghost" className="px-2 py-1 text-[12px]" disabled={pageSafe <= 1} onClick={() => setPage(pageSafe - 1)}>Prev</TechButton><TechButton variant="ghost" className="px-2 py-1 text-[12px]" disabled={pageSafe >= totalPages} onClick={() => setPage(pageSafe + 1)}>Next</TechButton></span>
+ </div>
+ )}
+ </div>
  ) : (
  <TechCard className="overflow-hidden">
+ <ViewToggle value={layout} onChange={changeLayout} count={shown.length} inCard q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} />
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
@@ -539,7 +612,6 @@ export default function ItemsPage() {
  <TH right className="px-3">Revenue</TH>
  <TH right className="px-3">Cost</TH>
  <TH right className="px-3">Margin</TH>
- <TH className="px-3">Size</TH>
  <TH className="px-3">
  {statusFilter ? "Status" : (
  <HeaderFilter label="Status" value={statusTag ? statusLabel(statusTag) : null} onClear={() => setStatusTag(null)}>
@@ -553,6 +625,20 @@ export default function ItemsPage() {
  )}
  </HeaderFilter>
  )}
+ </TH>
+ <TH className="px-3">
+ {cols.length > 0 ? (
+ <HeaderFilter label="Collection" value={colTag} onClear={() => setColTag(null)}>
+ {(close) => (
+ <>
+ <HeaderFilterItem label="All collections" count={base.length} selected={!colTag} onClick={() => { setColTag(null); close(); }} />
+ {cols.map((c) => (
+ <HeaderFilterItem key={c.id} label={c.title} count={colCounts[c.title] ?? 0} selected={colTag === c.title} onClick={() => { setColTag(c.title); close(); }} />
+ ))}
+ </>
+ )}
+ </HeaderFilter>
+ ) : "Collection"}
  </TH>
  <TH className="px-3">Posted on</TH>
  <TH right className="pl-3 pr-4">Actions</TH>
@@ -596,7 +682,6 @@ export default function ItemsPage() {
  return <span className={cn("font-semibold tabular-nums", m >= 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-rose-500")}>{m}%</span>;
  })()}
  </TD>
- <TD className="px-3 text-stone-500">{it.size || "—"}</TD>
  <TD className="px-3">
  {it.status === "draft" && it.publishAt ? (
  <div className="flex flex-col gap-0.5">
@@ -607,13 +692,18 @@ export default function ItemsPage() {
  <StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{statusLabel(it.status)}</StatusPill>
  )}
  </TD>
+ <TD className="px-3">{collectionsCell(it)}</TD>
  <TD className="px-3">{postedCell(it)}</TD>
  <TD right className="pl-3 pr-4">
  <div className="flex items-center justify-end gap-0.5">
- <TechButton variant="ghost" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => openEdit(it)}>Edit</TechButton>
  {it.status === "draft" && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "publish")}>Publish</TechButton>}
  {(it.status === "active" || it.status === "reserved") && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "sold")}>Mark sold</TechButton>}
- {it.status !== "removed" && <TechButton variant="ghost" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "remove")}>Remove</TechButton>}
+ {it.status !== "removed" && (
+ <button type="button" aria-label={`Remove ${it.title}`} title="Remove from sale" disabled={busyId === it.id} onClick={() => setConfirmRow(it.id)}
+ className="ml-1 grid h-7 w-7 place-items-center rounded-full text-[#5D0F17]/70 transition hover:bg-[#5D0F17]/10 hover:text-[#5D0F17] disabled:opacity-40">
+ <X size={15} strokeWidth={2.2} />
+ </button>
+ )}
  </div>
  </TD>
  </tr>
@@ -636,6 +726,9 @@ export default function ItemsPage() {
  <span className="flex flex-wrap items-center gap-1.5">
  {statusTag && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{statusLabel(statusTag)}</span>}
  {(catTag || famTag) && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{catTag ? categoryValueLabel(catTag) : famTag}</span>}
+ {missingTag && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">{missingTag === "photo" ? "No photo" : missingTag === "price" ? "No price" : "Needs details"}</span>}
+ {quickOnly && <span className="rounded-full bg-[#5D0F17]/10 px-2 py-0.5 text-[11px] text-[#5D0F17]">Quick-listed</span>}
+ {colTag && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{colTag}</span>}
  </span>
  <button type="button" onClick={clearFilters} className="font-medium text-stone-500 underline-offset-2 transition hover:text-stone-800 hover:underline">Clear filters</button>
  </>
@@ -771,6 +864,51 @@ export default function ItemsPage() {
  </div>
  </div>
  )}
+ {(() => {
+ const it = items.find((x) => x.id === confirmRow);
+ return (
+ <ConfirmDialog
+ open={!!it}
+ title="Remove this item?"
+ body={it?.status === "sold" ? "It comes off your storefront and every connected channel. The sale and its order history stay untouched." : "It comes off your storefront and every connected channel. You can re-add it later from a new listing."}
+ preview={it && (
+ <div className="flex items-center gap-3">
+ <div className="h-12 w-10 shrink-0 overflow-hidden rounded-md bg-stone-100 ring-1 ring-stone-200">
+ {it.images[0] && /* eslint-disable-next-line @next/next/no-img-element */ <img src={it.images[0]} alt="" className="h-full w-full object-cover" />}
+ </div>
+ <span className="min-w-0">
+ <span className="block truncate text-[13.5px] font-medium text-stone-900">{it.title}</span>
+ <span className="block font-mono text-[11px] text-stone-400">SKU-{1000 + it.sku} · ${(it.priceCents / 100).toFixed(0)}</span>
+ </span>
+ </div>
+ )}
+ confirmLabel="Remove item"
+ cancelLabel="Keep it"
+ busy={busyId === confirmRow}
+ onConfirm={() => confirmRow && act(confirmRow, "remove")}
+ onCancel={() => setConfirmRow(null)}
+ />
+ );
+ })()}
+ <ConfirmDialog
+ open={confirmBulk}
+ title={`Remove ${selected.size} item${selected.size === 1 ? "" : "s"}?`}
+ body="They come off your storefront and every connected channel. Sold items keep their order history."
+ confirmLabel={`Remove ${selected.size}`}
+ cancelLabel="Keep them"
+ busy={bulkBusy}
+ onConfirm={() => bulk("remove")}
+ onCancel={() => setConfirmBulk(false)}
+ />
+ <ConfirmDialog
+ open={confirmReset}
+ title="Delete everything in this store?"
+ body={<>All <b className="text-stone-700">{items.length}</b> items — including sold — plus their orders, payouts and collections are permanently deleted. This can’t be undone.</>}
+ confirmLabel="Delete everything"
+ busy={loading}
+ onConfirm={clearAll}
+ onCancel={() => setConfirmReset(false)}
+ />
  </AdminPage>
  );
 }
@@ -791,7 +929,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
  async function importCatalog() {
  setBusy(true); setMsg(null);
  try {
- const r = await fetch("/api/store/inventory/convert", { method: "POST" });
+ const r = await fetch(withStore("/api/store/inventory/convert"), { method: "POST" });
  const d = await r.json();
  if (!r.ok) { setMsg(d.error || "Couldn’t import your catalog."); return; }
  setMsg(d.added > 0 ? `✓ Imported ${d.added} item${d.added === 1 ? "" : "s"} from your synced catalog — they’re now editable inventory.` : "Nothing new to import — your catalog is already in your inventory.");
@@ -802,7 +940,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
  if (!csv.trim()) { setMsg("Paste or upload your inventory file first."); return; }
  setBusy(true); setMsg(null);
  try {
- const r = await fetch("/api/store/items/import", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv, status: goLive ? "active" : "draft" }) });
+ const r = await fetch(withStore("/api/store/items/import"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv, status: goLive ? "active" : "draft" }) });
  const d = await r.json();
  if (!r.ok) { setMsg(d.error || "Couldn’t read that file."); return; }
  setMsg(`✓ Added ${d.added} of ${d.found} item${d.found === 1 ? "" : "s"}${goLive ? " — live now." : " as drafts — review and publish when ready."}`);
@@ -845,6 +983,34 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
  {msg && <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-[13px] text-stone-700">{msg}</p>}
  </div>
+ </div>
+ );
+}
+
+
+/** List ↔ thumbnail grid switch, same look as Market Mode's. */
+function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick }: { value: "list" | "grid"; onChange: (v: "list" | "grid") => void; count: number; inCard?: boolean; q: string; onQuery: (v: string) => void; quick?: { total: number; needs: number; on: boolean; needsOn: boolean; toggle: () => void; toggleNeeds: () => void } }) {
+ const btn = (v: "list" | "grid", Icon: typeof List, label: string) => (
+ <button type="button" onClick={() => onChange(v)} aria-label={label} aria-pressed={value === v} className={cn("flex h-8 items-center gap-1 px-2.5 text-[12px] transition", value === v ? "bg-[#5D0F17]/10 text-[#5D0F17]" : "bg-white text-stone-500 hover:text-stone-800")}>
+ {value === v && <Check size={12} strokeWidth={2.5} />}<Icon size={15} strokeWidth={2} />
+ </button>
+ );
+ return (
+ <div className={cn("flex items-center justify-between gap-3", inCard ? "border-b border-stone-100 px-4 py-2" : "mb-3")}>
+ <span className="flex shrink-0 items-center gap-2 text-[12px] text-stone-400"><span><span className="font-medium text-stone-600">{count}</span> item{count === 1 ? "" : "s"}</span>
+ {quick && quick.total > 0 && (
+ <>
+ <button type="button" onClick={quick.toggle} aria-pressed={quick.on} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium transition", quick.on ? "border-transparent bg-[#5D0F17] text-white" : "border-stone-200 bg-white text-stone-600 hover:border-stone-400")}>Quick-listed · {quick.total}</button>
+ {quick.needs > 0 && <button type="button" onClick={quick.toggleNeeds} aria-pressed={quick.needsOn} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium transition", quick.needsOn ? "border-transparent bg-amber-600 text-white" : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400")}>Needs details · {quick.needs}</button>}
+ </>
+ )}
+ </span>
+ <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 focus-within:border-stone-400 sm:max-w-md">
+ <Search size={14} className="shrink-0 text-stone-400" />
+ <input value={q} onChange={(e) => onQuery(e.target.value)} placeholder="Filter by name, brand, size, SKU, collection…" className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-stone-400" />
+ {q && <button type="button" onClick={() => onQuery("")} className="text-[11px] text-stone-400 hover:text-stone-700">Clear</button>}
+ </label>
+ <div className="flex overflow-hidden rounded-xl border border-stone-200 divide-x divide-stone-200">{btn("list", List, "List view")}{btn("grid", LayoutGrid, "Thumbnail view")}</div>
  </div>
  );
 }

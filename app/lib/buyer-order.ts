@@ -1,4 +1,4 @@
-import { getOrderDetail } from "@/app/lib/db/orders";
+import { getOrderDetail, getOrderDelivery } from "@/app/lib/db/orders";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { makeOrderToken } from "@/app/lib/orderToken";
@@ -21,6 +21,8 @@ export type BuyerOrderView = {
  buyerName: string | null;
  buyerEmail: string | null;
  ship: { line1: string | null; line2: string | null; city: string | null; state: string | null; postal: string | null; country: string | null };
+ /** Set when this order is being collected in store: nothing is posted and there is no tracking. */
+ collect: { address: string | null; instructions: string | null } | null;
  trackingNumber: string | null;
  trackingUrl: string | null;
  paidAt: Date | null;
@@ -36,6 +38,9 @@ export async function loadBuyerOrder(orderId: string): Promise<BuyerOrderView | 
  const sf = slug ? await getStorefrontBySlug(slug).catch(() => null) : null;
  const theme = sf?.theme ?? {};
  const images = Array.isArray(o.itemImages) ? (o.itemImages as string[]) : [];
+ // Delivered or collected — additive raw-SQL columns, so read alongside the drizzle row. Any
+ // failure reads as a delivery, which is what every order placed before collection existed is.
+ const del = await getOrderDelivery(o.id).catch(() => ({ method: "ship" as const, collectFrom: null, instructions: null }));
  return {
  orderId: o.id,
  orderNo: o.orderNo,
@@ -58,6 +63,7 @@ export async function loadBuyerOrder(orderId: string): Promise<BuyerOrderView | 
  buyerName: o.buyerName,
  buyerEmail: o.buyerEmail,
  ship: { line1: o.shipLine1, line2: o.shipLine2, city: o.shipCity, state: o.shipState, postal: o.shipPostal, country: o.shipCountry },
+ collect: del.method === "pickup" ? { address: del.collectFrom, instructions: del.instructions } : null,
  trackingNumber: o.trackingNumber,
  trackingUrl: o.trackingUrl,
  paidAt: o.paidAt ? new Date(o.paidAt as unknown as string) : null,

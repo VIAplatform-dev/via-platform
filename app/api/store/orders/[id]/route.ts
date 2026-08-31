@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, type OrderStatus, setOrderNote } from "@/app/lib/db/orders";
+import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, getOrderDelivery, setOrderNote, type OrderStatus } from "@/app/lib/db/orders";
+import { chargedTotalCents } from "@/app/lib/checkout-delivery.ts";
+import { getOrdersByPaymentIntent } from "@/app/lib/db/orders";
 import { relistItem } from "@/app/lib/db/inventory";
 import { reverseConsignedSale } from "@/app/lib/consignment-db";
 import { voidOrderLabel, generateReturnLabel, generateShipBackLabel } from "@/app/lib/order-label";
@@ -49,7 +51,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  stripeFeeCents = stripeOnly || bt?.fee || 0;
  } catch { /* fee just won't show */ }
  }
- return NextResponse.json({ order: r.order, stripeFeeCents });
+ // Delivered or collected. Lives in additive raw-SQL columns (see ensurePickupOrderCols), so it's
+ // read alongside the drizzle row rather than inside it.
+ const delivery = await getOrderDelivery(id).catch(() => ({ method: "ship" as const, collectFrom: null, instructions: null }));
+ return NextResponse.json({ order: { ...r.order, ...delivery, deliveryMethod: delivery.method }, stripeFeeCents });
 }
 
 // PATCH { status } — lifecycle. "refunded" performs the REAL refund (#9): refund
@@ -74,7 +79,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  const feeOverride = new URL(request.url).searchParams.get("fee");
  const policy = await getRefundPolicy(r.slug).catch(() => null);
  const feePct = feeOverride != null ? Math.max(0, Math.min(50, Number(feeOverride) || 0)) : (policy?.restockingFeePct ?? 0);
- const fullCharge = r.order.amountCents + (r.order.shippingPaidCents || 0);
+ // Everything the buyer actually paid. A collected order was charged no postage, so this is the
+ // item price alone — refunding it never hands back shipping that was never taken.
+ const fullCharge = chargedTotalCents(r.order);
+ const sharedIntent = r.order.stripePaymentIntent ? (await getOrdersByPaymentIntent(r.order.stripePaymentIntent).catch(() => [])).length > 1 : false;
  const restockingFeeCents = Math.round((r.order.amountCents * feePct) / 100);
  // If the store's policy is buyer-pays-return-shipping AND a return label was bought, the buyer
  // covers it — deduct that label cost from their refund too.
@@ -112,7 +120,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  await stripePost("refunds", {
  payment_intent: pi,
  refund_application_fee: "true",
- ...(totalDeduction > 0 ? { amount: String(refundAmountCents) } : {}),
+ // Always scope to this order's amount when the intent carries several orders (a Market Mode
+ // basket): a bare refund would return the WHOLE charge for one returned item.
+ ...(totalDeduction > 0 || sharedIntent ? { amount: String(refundAmountCents) } : {}),
  }, acct);
  }
  } catch (e) {
@@ -196,6 +206,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, status: "shipped" });
  }
 
+ // A collection is never posted — there's no address and there must be no label. Checked before
+ // the provider/ship-from checks so the seller is told the real reason, not a shipping-setup one.
+ const del = await getOrderDelivery(id).catch(() => ({ method: "ship" as const }));
+ if (del.method === "pickup") return NextResponse.json({ error: "This order is being collected in store — there’s nothing to post." }, { status: 400 });
  if (!isShipConfigured()) return NextResponse.json({ error: "Shipping labels aren’t enabled yet." }, { status: 503 });
  const shipping = await getShippingSettings(slug);
  if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping first." }, { status: 400 });

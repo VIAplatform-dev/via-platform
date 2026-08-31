@@ -55,6 +55,36 @@ export async function listSellerOrders(sellerId: string): Promise<SellerOrderRow
  .limit(200);
 }
 
+/**
+ * One shopper's orders at one store, for her own account panel.
+ *
+ * Scoped by seller AND email in SQL rather than filtered afterwards: the row must never leave the
+ * database if it isn't hers. Only the columns a shopper may see are selected — see shopper-orders.ts.
+ */
+export async function listOrdersForShopper(sellerId: string, email: string) {
+ const key = (email || "").trim().toLowerCase();
+ if (!sellerId || !key.includes("@")) return [];
+ const db = getDb();
+ return db
+ .select({
+ id: orders.id,
+ orderNo: sql<number>`row_number() over (order by ${orders.createdAt} asc, ${orders.id} asc)`.mapWith(Number),
+ itemTitle: items.title,
+ amountCents: orders.amountCents,
+ currency: orders.currency,
+ status: orders.status,
+ buyerEmail: orders.buyerEmail,
+ createdAt: orders.createdAt,
+ trackingNumber: orders.trackingNumber,
+ trackingUrl: orders.trackingUrl,
+ })
+ .from(orders)
+ .leftJoin(items, eq(items.id, orders.itemId))
+ .where(and(eq(orders.sellerId, sellerId), sql`lower(trim(${orders.buyerEmail})) = ${key}`))
+ .orderBy(desc(orders.createdAt))
+ .limit(100);
+}
+
 // Order + payout records. With direct charges the money settles to the seller's
 // own account automatically (seller is merchant of record); these rows are VYA's
 // record of the sale + the seller's net.
@@ -314,6 +344,128 @@ export async function recordPayout(o: { orderId: string; sellerId: string; amoun
 }
 
 /** Webhook idempotency — Stripe can deliver the same event twice. */
+// ── Market Mode (in-person sales) ─────────────────────────────────────────────────────────────
+// Additive columns so an order knows which channel/tender it came through and which market
+// session + checkout produced it. Raw SQL (like the refund cols) so nothing needs `db:push`.
+let marketColsEnsured = false;
+export async function ensureMarketOrderCols(): Promise<void> {
+ if (marketColsEnsured) return;
+ try {
+ const s = rawSql();
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel text NOT NULL DEFAULT 'online'`; // online | market
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tender text`; // card | cash | …
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS market_session_id uuid`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS market_checkout_id uuid`;
+ // One order per (PaymentIntent, item): a cart is N orders on ONE intent, so the intent alone can't be
+ // unique — but the same item can never be recorded twice for the same payment (closes the
+ // check-then-act gap in fulfill()). Drops the earlier intent-only index if it was ever created.
+ await s`DROP INDEX IF EXISTS orders_pi_uniq`;
+ await s`DROP INDEX IF EXISTS orders_market_checkout_uniq`;
+ await s`CREATE UNIQUE INDEX IF NOT EXISTS orders_pi_item_uniq ON orders (stripe_payment_intent, item_id) WHERE stripe_payment_intent IS NOT NULL`;
+ await s`CREATE UNIQUE INDEX IF NOT EXISTS orders_market_checkout_item_uniq ON orders (market_checkout_id, item_id) WHERE market_checkout_id IS NOT NULL`;
+ // Per-sale pricing (a market discount never rewrites the listing) + cash handling.
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS list_price_cents integer`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_cents integer`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tendered_cents integer`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS change_cents integer`;
+ await s`CREATE INDEX IF NOT EXISTS orders_market_session_idx ON orders (market_session_id) WHERE market_session_id IS NOT NULL`;
+ marketColsEnsured = true;
+ } catch { /* db:push covers it */ }
+}
+
+export async function setOrderMarketFields(orderId: string, f: { tender: string; sessionId: string | null; checkoutId: string; listPriceCents?: number | null; discountCents?: number | null; tenderedCents?: number | null; changeCents?: number | null }): Promise<void> {
+ await ensureMarketOrderCols();
+ await rawSql()`UPDATE orders SET channel = 'market', tender = ${f.tender}, market_session_id = ${f.sessionId}, market_checkout_id = ${f.checkoutId},
+ list_price_cents = ${f.listPriceCents ?? null}, discount_cents = ${f.discountCents ?? null}, tendered_cents = ${f.tenderedCents ?? null}, change_cents = ${f.changeCents ?? null} WHERE id = ${orderId}`;
+}
+
+/** Cash bookkeeping recorded after the fact (change is computed once the tender is known). */
+export async function setOrderCash(checkoutId: string, f: { tenderedCents: number | null; changeCents: number | null }): Promise<void> {
+ await ensureMarketOrderCols();
+ await rawSql()`UPDATE orders SET tendered_cents = ${f.tenderedCents}, change_cents = ${f.changeCents} WHERE market_checkout_id = ${checkoutId}`;
+}
+
+export type MarketOrderRow = {
+ id: string; itemId: string; itemTitle: string | null; itemImage: string | null; itemBrand: string | null; itemCategory: string | null;
+ amountCents: number; listPriceCents: number | null; discountCents: number | null; feeCents: number | null; currency: string; status: string; tender: string | null;
+ stripePaymentIntent: string | null; checkoutId: string | null; paidAt: string | null; buyerEmail: string | null;
+};
+
+/** The in-person sales of one market session, newest first. */
+export async function listMarketOrders(sellerId: string, sessionId: string): Promise<MarketOrderRow[]> {
+ await ensureMarketOrderCols();
+ const rows = (await rawSql()`
+ SELECT o.id, o.item_id, i.title, i.images, i.brand, i.category, o.amount_cents, o.list_price_cents, o.discount_cents, o.fee_cents, o.currency, o.status, o.tender,
+ o.stripe_payment_intent, o.market_checkout_id, o.paid_at, o.buyer_email
+ FROM orders o LEFT JOIN items i ON i.id = o.item_id
+ WHERE o.seller_id = ${sellerId} AND o.market_session_id = ${sessionId}
+ ORDER BY o.paid_at DESC NULLS LAST, o.created_at DESC`) as Array<Record<string, unknown>>;
+ return rows.map((r) => ({
+ id: String(r.id), itemId: String(r.item_id), itemTitle: (r.title as string) ?? null, itemBrand: (r.brand as string) ?? null, itemCategory: (r.category as string) ?? null,
+ itemImage: Array.isArray(r.images) && r.images.length ? String(r.images[0]) : null,
+ amountCents: Number(r.amount_cents), listPriceCents: r.list_price_cents == null ? null : Number(r.list_price_cents), discountCents: r.discount_cents == null ? null : Number(r.discount_cents),
+ feeCents: r.fee_cents == null ? null : Number(r.fee_cents), currency: String(r.currency),
+ status: String(r.status), tender: (r.tender as string) ?? null, stripePaymentIntent: (r.stripe_payment_intent as string) ?? null,
+ checkoutId: (r.market_checkout_id as string) ?? null, paidAt: r.paid_at ? new Date(r.paid_at as string).toISOString() : null, buyerEmail: (r.buyer_email as string) ?? null,
+ }));
+}
+
+/** The orders a market checkout already produced (one per item) — for crash-safe retries. */
+export async function getOrdersByMarketCheckout(checkoutId: string): Promise<{ id: string; itemId: string }[]> {
+ await ensureMarketOrderCols();
+ const rows = (await rawSql()`SELECT id, item_id FROM orders WHERE market_checkout_id = ${checkoutId}`) as Array<{ id: string; item_id: string }>;
+ return rows.map((r) => ({ id: String(r.id), itemId: String(r.item_id) }));
+}
+
+// ── Collect in store ──────────────────────────────────────────────────────────────────────────
+// How the buyer got the piece, and where she collected it from. Additive raw-SQL columns like the
+// Market Mode ones above, so nothing needs `db:push`. `delivery_method` defaults to 'ship' — every
+// order placed before collection existed IS a delivery, and that must stay true.
+let pickupColsEnsured = false;
+export async function ensurePickupOrderCols(): Promise<void> {
+ if (pickupColsEnsured) return;
+ try {
+ const s = rawSql();
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_method text NOT NULL DEFAULT 'ship'`; // ship | pickup
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS collect_from text`;
+ await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS collect_instructions text`;
+ pickupColsEnsured = true;
+ } catch { /* db:push covers it */ }
+}
+
+/**
+ * Record that this order is being collected, not posted.
+ *
+ * Called from the webhook with what the SERVER decided at payment time (see checkout-delivery), so
+ * a shopper can never stamp her own order as a collection.
+ */
+export async function setOrderPickup(orderId: string, f: { collectFrom: string | null; instructions: string | null }): Promise<void> {
+ await ensurePickupOrderCols();
+ await rawSql()`UPDATE orders SET delivery_method = 'pickup', collect_from = ${f.collectFrom}, collect_instructions = ${f.instructions} WHERE id = ${orderId}`;
+}
+
+/**
+ * Which of a seller's orders are collections. A SEPARATE query rather than a join into
+ * listSellerOrders, and swallowed on failure: a store's whole orders list must never go dark
+ * because one additive column isn't there yet.
+ */
+export async function listPickupOrderIds(sellerId: string): Promise<string[]> {
+ await ensurePickupOrderCols();
+ try {
+ const rows = (await rawSql()`SELECT id FROM orders WHERE seller_id = ${sellerId} AND delivery_method = 'pickup'`) as Array<{ id: string }>;
+ return rows.map((r) => String(r.id));
+ } catch { return []; }
+}
+
+/** How one order leaves the shop. Read separately from getOrderDetail — these columns aren't in the drizzle schema. */
+export async function getOrderDelivery(orderId: string): Promise<{ method: "ship" | "pickup"; collectFrom: string | null; instructions: string | null }> {
+ await ensurePickupOrderCols();
+ const rows = (await rawSql()`SELECT delivery_method, collect_from, collect_instructions FROM orders WHERE id = ${orderId}`) as Array<Record<string, unknown>>;
+ const r = rows[0];
+ if (!r || r.delivery_method !== "pickup") return { method: "ship", collectFrom: null, instructions: null };
+ return { method: "pickup", collectFrom: (r.collect_from as string) ?? null, instructions: (r.collect_instructions as string) ?? null };
+}
+
 export async function orderExistsForPaymentIntent(pi: string): Promise<boolean> {
  const db = getDb();
  const rows = await db.select({ id: orders.id }).from(orders).where(eq(orders.stripePaymentIntent, pi)).limit(1);

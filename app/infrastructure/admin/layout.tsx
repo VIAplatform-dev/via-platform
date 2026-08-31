@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, Gem, type LucideIcon } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, Gem, Camera, Plus, Receipt, Boxes, ClipboardList, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
 import CommandBar from "./CommandBar";
 
@@ -77,6 +77,36 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  ] },
 ];
 
+// ── Market Mode ──────────────────────────────────────────────────────────────────────────────
+// A temporary operating mode for selling in person. When ON (per store, server-persisted so every
+// device agrees), the nav collapses to just what a market needs and a phone gets a bottom tab bar.
+// Turning it off is instant and never touches a checkout in flight — those live on the server.
+const M = `${B}/market`;
+const MARKET_GROUPS: { label?: string; items: NavItem[] }[] = [
+ { items: [{ href: M, label: "Market home", icon: Home }] },
+ { label: "Sell", items: [
+ { href: `${M}/find`, label: "Find item", icon: Camera },
+ { href: `${M}/quick`, label: "Quick list", icon: Plus },
+ { href: `${M}/sales`, label: "Sales today", icon: Receipt },
+ ] },
+ { label: "Inventory", items: [{ href: `${M}/inventory`, label: "At this market", icon: Boxes }, { href: `${M}/bring`, label: "Bring list", icon: ClipboardList }] },
+ { label: "Market", items: [{ href: `${M}/setup`, label: "Setup", icon: SlidersHorizontal }, { href: `${B}/payments`, label: "Payments", icon: CreditCard }] },
+];
+const MARKET_TABS = [
+ { href: M, label: "Home", icon: Home },
+ { href: `${M}/find`, label: "Find", icon: Camera },
+ { href: `${M}/quick`, label: "Quick list", icon: Plus },
+ { href: `${M}/sales`, label: "Sales", icon: Receipt },
+ { href: `${M}/inventory`, label: "Items", icon: Boxes },
+ { href: `${M}/bring`, label: "Bring", icon: ClipboardList },
+];
+
+function withPreview(path: string): string {
+ if (typeof window === "undefined") return path;
+ const s = new URLSearchParams(window.location.search).get("store");
+ return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+}
+
 export default function InfrastructureLayout({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
  const router = useRouter();
@@ -88,6 +118,8 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  // (ADMIN_PASSWORD, i.e. via-admin), NOT a signed-in store partner.
  const [isOwner, setIsOwner] = useState(false);
  const [storeSetUp, setStoreSetUp] = useState(false);
+ const [marketMode, setMarketMode] = useState<boolean | null>(null); // null = not loaded yet
+ const [marketBusy, setMarketBusy] = useState(false);
 
  // The onboarding wizard lives at /admin/onboarding but is self-contained — it renders
  // WITHOUT the workspace shell and does its own auth, so we skip the gate below for it
@@ -100,10 +132,23 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  .then(async (r) => {
  if (!r.ok) { setOk(false); return; }
  const data = await r.json().catch(() => ({}));
- // Signed in but not attached to a store yet → send them through the signup wizard.
- if (data?.needsOnboarding) { router.replace("/admin/onboarding"); return; }
+ // Signed in but not attached to a store yet → send them through the signup wizard. Unless they
+ // JUST finished it: the store row is seconds old, so retry once before bouncing them backwards.
+ if (data?.needsOnboarding) {
+ let justOnboarded: string | null = null;
+ try { justOnboarded = sessionStorage.getItem("vya:just-onboarded"); } catch { /* storage off */ }
+ if (justOnboarded) {
+ await new Promise((res) => setTimeout(res, 1200));
+ const retry = await fetch("/api/infrastructure/whoami").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ try { sessionStorage.removeItem("vya:just-onboarded"); } catch { /* */ }
+ if (retry && !retry.needsOnboarding) { setIsOwner(retry.admin === true); setOk(true); return; }
+ }
+ router.replace("/admin/onboarding"); return;
+ }
+ try { sessionStorage.removeItem("vya:just-onboarded"); } catch { /* */ }
  setIsOwner(data?.admin === true);
  setOk(true);
+ fetch(withPreview("/api/store/market/mode")).then((m) => (m.ok ? m.json() : null)).then((m) => setMarketMode(Boolean(m?.enabled))).catch(() => setMarketMode(false));
  // For a store partner, check whether they've already set up (storefront live or listings)
  // so we can retire the one-time "Bring your site" step from their nav.
  if (data?.admin !== true) {
@@ -118,7 +163,23 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
 
  // Hide the one-time import step for a set-up store; the owner always keeps it.
  const hideImport = !isOwner && storeSetUp;
- const visibleGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => !(hideImport && n.href === `${B}/import`)) })).filter((g) => g.items.length > 0);
+ const normalGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => !(hideImport && n.href === `${B}/import`)) })).filter((g) => g.items.length > 0);
+ const visibleGroups = marketMode ? MARKET_GROUPS : normalGroups;
+ const inMarketArea = pathname === M || pathname.startsWith(M + "/");
+
+ async function toggleMarketMode() {
+ if (marketBusy || marketMode === null) return;
+ const next = !marketMode;
+ setMarketBusy(true);
+ setMarketMode(next); // the nav swaps instantly; the server call makes every other device agree
+ try {
+ const r = await fetch(withPreview("/api/store/market/mode"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next }) });
+ if (!r.ok) throw new Error();
+ router.push(withPreview(next ? M : `${B}/home`));
+ } catch {
+ setMarketMode(!next);
+ } finally { setMarketBusy(false); }
+ }
 
 
  useEffect(() => {
@@ -141,7 +202,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet" />
  <div
- className="infra flex min-h-screen bg-[#f7f6f3] text-stone-900"
+ className="infra flex min-h-screen overflow-x-clip bg-[#f7f6f3] text-stone-900"
  style={{
  fontFamily: "'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
  // Green accent theme, scoped to the admin — the shared @/app/store/ui components pick these up
@@ -157,7 +218,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  {/* Mobile top bar — hamburger opens the drawer */}
  <div className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-stone-200 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
  <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="text-stone-600"><Menu size={20} /></button>
- <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">Infrastructure</span>
+ <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">{marketMode ? "Market Mode" : "Infrastructure"}</span>
  </div>
  {/* Backdrop when the mobile drawer is open */}
  {navOpen && <div onClick={() => setNavOpen(false)} className="fixed inset-0 z-40 bg-black/30 md:hidden" aria-hidden="true" />}
@@ -170,12 +231,27 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  <img src="/via-logo-mark.png" alt="VYA" className="h-[18px] w-[18px] object-contain" style={{ filter: "brightness(0) invert(1)" }} />
  </span>
  <div className="leading-tight">
- <p className="text-[13px] font-semibold tracking-tight text-stone-900">Infrastructure</p>
+ <p className="text-[13px] font-semibold tracking-tight text-stone-900">{marketMode ? "Market Mode" : "Infrastructure"}</p>
  <p className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-stone-400">
- <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent-bright)]" /> Owner workspace
+ <span className={`h-1.5 w-1.5 rounded-full ${marketMode ? "bg-[#5D0F17]" : "bg-[var(--accent-bright)]"}`} /> {marketMode ? "Selling in person" : "Owner workspace"}
  </p>
  </div>
  </div>
+ {/* The Market Mode switch — the one control that changes what this whole shell is for. */}
+ <button
+ type="button"
+ onClick={toggleMarketMode}
+ disabled={marketMode === null || marketBusy}
+ className={`mx-3 mb-3 flex items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${marketMode ? "border-[#5D0F17]/30 bg-[#5D0F17]/5" : "border-stone-200 bg-white hover:border-stone-300"}`}
+ >
+ <span>
+ <span className="block text-[12.5px] font-semibold text-stone-900">Market Mode</span>
+ <span className="block text-[10.5px] text-stone-500">{marketMode ? "On — tap to exit" : "Sell in person at a market"}</span>
+ </span>
+ <span aria-hidden className={`relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition ${marketMode ? "bg-[#5D0F17]" : "bg-stone-200"}`}>
+ <span className={`inline-block h-[17px] w-[17px] rounded-full bg-white shadow transition ${marketMode ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
+ </span>
+ </button>
  {/* Global search trigger — opens the ⌘K command bar */}
  <button
  onClick={() => window.dispatchEvent(new Event("vya:search"))}
@@ -190,7 +266,8 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  {g.label && <p className="px-3 pb-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.15em] text-stone-400">{g.label}</p>}
  <div className="space-y-0.5">
  {g.items.map((n) => {
- const active = within(n.href) || (n.match?.some((m) => within(m)) ?? false);
+ // Market home is the parent of every market route, so it only lights up on an exact hit.
+ const active = (n.href === M ? pathname === M : within(n.href)) || (n.match?.some((m) => within(m)) ?? false);
  const Icon = n.icon;
  return (
  <div key={n.href}>
@@ -228,8 +305,24 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </Link>
  </div>
  </aside>
- <main className="ml-0 flex-1 pt-14 md:ml-[228px] md:pt-0">{children}</main>
- <Sidekick />
+ {/* min-w-0: a flex child's min-width defaults to its content's, which let a long unbreakable row push
+ the whole page wider than a phone; clipping the root stops any stray overflow from adding a sideways scroll. */}
+ <main className={`ml-0 min-w-0 flex-1 pt-14 md:ml-[228px] md:pt-0 ${marketMode && inMarketArea ? "pb-16 md:pb-0" : ""}`}>{children}</main>
+ {/* Phone bottom tab bar — Market Mode is used one-handed at a table, so the core loop is thumb-reachable. */}
+ {marketMode && inMarketArea && (
+ <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+ {MARKET_TABS.map((t) => {
+ const on = t.href === M ? pathname === M : within(t.href);
+ const Icon = t.icon;
+ return (
+ <Link key={t.href} href={withPreview(t.href)} className={`flex min-h-[64px] flex-col items-center justify-center gap-1 text-[10.5px] font-medium ${on ? "text-stone-900" : "text-stone-400"}`}>
+ <Icon size={22} strokeWidth={on ? 2.2 : 1.8} />{t.label}
+ </Link>
+ );
+ })}
+ </nav>
+ )}
+ {!marketMode && <Sidekick />}
  <CommandBar />
  </div>
  </>
