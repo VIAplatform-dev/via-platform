@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { keepVersion, latestVersion, pagesWithEdits, dropVersion } from "./capture-versions-db.ts";
 
 // Storage for high-fidelity site captures — one row per page of a seller's real
 // site, hosted on VYA. (store_slug, path) → the self-contained HTML.
@@ -25,8 +26,20 @@ async function ensure() {
 
 export async function saveCapturePage(slug: string, path: string, html: string, sourceUrl: string): Promise<void> {
  await ensure();
+ // Keep what is about to be destroyed. A re-crawl of a seller mid-redesign, or of a server handing
+ // back a cookie wall, used to overwrite the good page with no way back at all.
+ await keepCurrent(slug, path, "crawl");
  await sql()`INSERT INTO site_captures (store_slug, path, html, source_url) VALUES (${slug}, ${path}, ${html}, ${sourceUrl})
  ON CONFLICT (store_slug, path) DO UPDATE SET html = ${html}, source_url = ${sourceUrl}, captured_at = now()`;
+}
+
+/** Snapshot a page's CURRENT html before a caller overwrites it. Silent on failure by design — the
+ *  save is the job and the history is the safety net; a net that can break the thing it protects is
+ *  worse than no net. `keepVersion` already swallows its own errors and reports them in its result. */
+async function keepCurrent(slug: string, path: string, reason: "crawl" | "edit" | "rewrite"): Promise<void> {
+ const rows = (await sql()`SELECT html FROM site_captures WHERE store_slug = ${slug} AND path = ${path} LIMIT 1`) as { html: string }[];
+ const current = rows[0]?.html;
+ if (current) await keepVersion(slug, path, current, reason);
 }
 
 /** Rewrite a stored page's HTML WITHOUT claiming it was re-crawled. For post-processing passes
@@ -34,6 +47,7 @@ export async function saveCapturePage(slug: string, path: string, html: string, 
  *  `captured_at` there would make every touched page look freshly crawled. */
 export async function rewriteCapturePage(slug: string, path: string, html: string): Promise<void> {
  await ensure();
+ await keepCurrent(slug, path, "rewrite");
  await sql()`UPDATE site_captures SET html = ${html} WHERE store_slug = ${slug} AND path = ${path}`;
 }
 
@@ -62,64 +76,54 @@ export async function hasCaptures(slug: string): Promise<boolean> {
 // Captured pages stay editable: update one page's HTML in place, or store a blob
 // of custom CSS that's injected into every served page (site-wide restyling).
 
-// ONE STEP BACK. This table keeps one row per page and overwrites it, so before this every seller
-// edit destroyed the version it replaced with nothing to fall back to. `previous_html` carries the
-// html the row held immediately before its last save — a single step, not a history (these rows
-// hold whole pages; half a megabyte each is normal). See app/lib/capture-history.ts for the rules.
+// HISTORY. This table keeps one row per page and overwrites it, so every write — a seller's edit, a
+// re-crawl, or the asset-rehosting pass — used to destroy the version it replaced. The three writers
+// below now snapshot the page first; capture-versions-db.ts holds the versions, gzipped, three deep.
 //
-// Additive and self-healing, in the shape of ensurePublishAtColumn in app/lib/db/inventory.ts: the
-// column appears the first time this code runs against a database that lacks it, and if the ALTER
-// is refused the writes below fall back to the historyless UPDATE rather than failing the save.
-let historyReady: boolean | null = null;
-async function ensurePreviousHtmlColumn(): Promise<boolean> {
- if (historyReady !== null) return historyReady;
- try {
-  await sql()`ALTER TABLE site_captures ADD COLUMN IF NOT EXISTS previous_html TEXT`;
-  await sql()`ALTER TABLE site_captures ADD COLUMN IF NOT EXISTS previous_html_at TIMESTAMPTZ`;
-  historyReady = true;
- } catch { historyReady = false; /* no DDL rights — saves still work, undo simply isn't offered */ }
- return historyReady;
-}
+// The seller's undo reads only her own edits out of that history. The operator's recovery view reads
+// all of it, because a re-import that went wrong is exactly what it exists to undo.
 
 export async function updateCapturePageHtml(slug: string, path: string, html: string): Promise<boolean> {
  await ensure();
- // `previous_html = html` reads the row's OLD html (Postgres evaluates the right-hand side against
- // the pre-update row), so the snapshot is taken in the same statement as the overwrite — atomic,
- // and without shipping half a megabyte of page back and forth to take it.
- if (await ensurePreviousHtmlColumn()) {
-  try {
-   const r = (await sql()`UPDATE site_captures SET previous_html = html, previous_html_at = now(), html = ${html}, captured_at = now()
-   WHERE store_slug = ${slug} AND path = ${path} RETURNING store_slug`) as unknown[];
-   return r.length > 0;
-  } catch { historyReady = false; /* fall through: a save must never fail for want of an undo point */ }
- }
+ await keepCurrent(slug, path, "edit");
+ const r = (await sql()`UPDATE site_captures SET html = ${html}, captured_at = now() WHERE store_slug = ${slug} AND path = ${path} RETURNING store_slug`) as unknown[];
+ return r.length > 0;
+}
+
+/** Put a page back to a specific stored version. Used by the operator's recovery view, and itself a
+ *  write — so it keeps a version of what it replaces. Undoing a bad restore is the same operation
+ *  again; there is no state this can strand a page in. */
+export async function restoreCapturePageVersion(slug: string, path: string, html: string): Promise<boolean> {
+ await ensure();
+ await keepCurrent(slug, path, "crawl");
  const r = (await sql()`UPDATE site_captures SET html = ${html}, captured_at = now() WHERE store_slug = ${slug} AND path = ${path} RETURNING store_slug`) as unknown[];
  return r.length > 0;
 }
 
 /** Pages of this store whose last save can still be undone, newest first. Deliberately does NOT
- *  select `previous_html` — the portal only needs to know which pages offer the button. */
+ *  read any page's html — the portal only needs to know which pages offer the button. */
 export async function listUndoablePages(slug: string): Promise<{ path: string; savedAt: string | null }[]> {
  await ensure();
- if (!(await ensurePreviousHtmlColumn())) return [];
+ // Only her OWN edits. The history also holds re-imports and asset rehosting, but offering those as
+ // undo points would ask a seller to reason about our plumbing.
  try {
-  const r = (await sql()`SELECT path, previous_html_at FROM site_captures
-  WHERE store_slug = ${slug} AND previous_html IS NOT NULL AND previous_html <> ''
-  ORDER BY previous_html_at DESC NULLS LAST`) as { path: string; previous_html_at: string | null }[];
-  return r.map((x) => ({ path: x.path, savedAt: x.previous_html_at }));
- } catch { return []; }
+  return (await pagesWithEdits(slug)).map((p) => ({ path: p.path, savedAt: p.savedAt }));
+ } catch { return []; /* allow-swallow: no undo offered beats a broken tab */ }
 }
 
 /** Put one page back to the version stored before its last save, and clear the slot — undo is one
  *  step, so the button disappears once used. Returns false when there is nothing to undo. */
 export async function undoCapturePageEdit(slug: string, path: string): Promise<boolean> {
  await ensure();
- if (!(await ensurePreviousHtmlColumn())) return false;
- const r = (await sql()`UPDATE site_captures
- SET html = previous_html, previous_html = NULL, previous_html_at = NULL, captured_at = now()
- WHERE store_slug = ${slug} AND path = ${path} AND previous_html IS NOT NULL AND previous_html <> ''
- RETURNING store_slug`) as unknown[];
- return r.length > 0;
+ const v = await latestVersion(slug, path, "edit");
+ if (!v?.html) return false; // restoring "" would blank the page, which is worse than refusing
+ const r = (await sql()`UPDATE site_captures SET html = ${v.html}, captured_at = now()
+ WHERE store_slug = ${slug} AND path = ${path} RETURNING store_slug`) as unknown[];
+ if (!r.length) return false;
+ // The step just taken back is spent, so pressing undo again goes back FURTHER rather than toggling
+ // between the same two versions for ever.
+ await dropVersion(v.id);
+ return true;
 }
 
 const CSS_PATH = "__vya_custom_css__";

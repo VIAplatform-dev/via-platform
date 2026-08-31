@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
  const html = await getCapturePage(slug, path).catch(() => null);
  if (html == null) return NextResponse.json({ error: "Page not found." }, { status: 404 });
 
- // A save that changes nothing is not written. The row now carries the version before its last save
- // (see capture-history.ts) — writing a copy of the page over itself would replace the seller's one
- // undo point with the very thing she wanted to go back from.
+ // A save that changes nothing is not written. Each save keeps a version of what it replaced, and
+ // this route propagates a header edit to every OTHER page — so letting no-op writes land would
+ // spend the seller's undo slots on copies of the page over itself.
  const edited = applyEdits(html, p);
  if (!planCaptureWrite(html, edited).write) return NextResponse.json({ ok: true, applied: 0, propagated: 0, unchanged: true });
 
