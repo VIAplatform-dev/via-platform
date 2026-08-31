@@ -1,9 +1,10 @@
-import { and, desc, eq, inArray, isNull, isNotNull, lt, lte, ne, sql, getTableColumns } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, isNotNull, lt, lte, ne, notLike, sql, getTableColumns } from "drizzle-orm";
 import { getDb, items, reservations, orders, payouts } from "./index";
 import type { Item, NewItem, Reservation } from "./index";
 import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-core";
 import { logError } from "@/app/lib/error-log";
 import { cleanDescription } from "@/app/lib/clean-description";
+import { reasonForVanished } from "../unavailable-label";
 
 // ───────────────────────────────────────────────────────────────────────────
 // One-of-one inventory engine. Every mutation that changes availability is a
@@ -34,6 +35,9 @@ export async function ensurePublishAtColumn(): Promise<void> {
  // and any code that doesn't know about them keep working untouched.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_platform text`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_id text`);
+ // Why a piece is unbuyable, recorded rather than inferred. See app/lib/unavailable-label.ts.
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS unavailable_reason text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS compare_at_cents integer`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_url text`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS content_hash text`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS variants jsonb DEFAULT '[]'::jsonb`);
@@ -105,7 +109,7 @@ export async function listItemsBySource(sellerId: string, source: string): Promi
  *  the caller checks that, because a seller's own edit must outlive any re-sync. */
 export async function updateItemFromSource(
  id: string,
- patch: Partial<Pick<Item, "title" | "priceCents" | "currency" | "images" | "description" | "size" | "status" | "variants" | "contentHash" | "sourcePlatform" | "sourceId" | "sourceUrl">>,
+ patch: Partial<Pick<Item, "title" | "priceCents" | "currency" | "images" | "description" | "size" | "status" | "variants" | "contentHash" | "sourcePlatform" | "sourceId" | "sourceUrl" | "unavailableReason" | "compareAtCents" | "imagesRehosted">>,
 ): Promise<void> {
  await ensurePublishAtColumn();
  const db = getDb();
@@ -122,7 +126,8 @@ export async function markItemsMissingFromSource(ids: string[]): Promise<number>
  await ensurePublishAtColumn();
  const db = getDb();
  const rows = await db.update(items)
-  .set({ status: "sold", soldAt: new Date(), updatedAt: new Date() })
+  // An inference, labelled as one: the feed stopped listing it and we do not know why.
+  .set({ status: "sold", soldAt: new Date(), unavailableReason: reasonForVanished(), updatedAt: new Date() })
   .where(and(inArray(items.id, ids), eq(items.origin, "source"), ne(items.status, "sold")))
   .returning({ id: items.id });
  return rows.length;
@@ -215,6 +220,39 @@ export async function reserveItem(
  }
 }
 
+/**
+ * Reserve an item for an IN-PERSON (Market Mode) checkout. Same atomic flip as reserveItem, but a
+ * quick-listed `draft` is also sellable — the piece is physically on the table. Contends on the same
+ * row as online buyers, so exactly one of any concurrent online/in-person attempts wins.
+ */
+export async function reserveItemForMarket(itemId: string, buyerRef: string, ttlSeconds: number): Promise<Reservation | null> {
+ const db = getDb();
+ const [locked] = await db
+ .update(items)
+ .set({ status: "reserved", updatedAt: new Date() })
+ .where(and(eq(items.id, itemId), inArray(items.status, ["active", "draft"])))
+ .returning({ id: items.id });
+ if (!locked) return null;
+ try {
+ const [res] = await db.insert(reservations).values({ itemId, buyerRef, expiresAt: reservationExpiry(ttlSeconds) }).returning();
+ return res ?? null;
+ } catch (e) {
+ await db.update(items).set({ status: "active", updatedAt: new Date() }).where(and(eq(items.id, itemId), eq(items.status, "reserved"))).catch(() => {});
+ logError("reserve-item-market-revert", e, { context: { itemId } });
+ return null;
+ }
+}
+
+/** Release a Market Mode hold, restoring the status the item had before (active or draft). A
+ *  quick-listed draft that doesn't sell must stay a draft — releasing it to `active` would publish
+ *  it online without the ship-from address a live listing requires. Guarded on 'reserved'. */
+export async function releaseMarketReservation(itemId: string, restoreTo: "active" | "draft"): Promise<void> {
+ const db = getDb();
+ const now = new Date();
+ await db.update(reservations).set({ releasedAt: now }).where(and(eq(reservations.itemId, itemId), isNull(reservations.releasedAt)));
+ await db.update(items).set({ status: restoreTo, updatedAt: now }).where(and(eq(items.id, itemId), eq(items.status, "reserved")));
+}
+
 /** The owner tag (`buyerRef`) of the item's current live reservation, or null if none is held.
  * Lets a caller tell WHO holds a 'reserved' piece — e.g. whether it's the buyer's own accepted
  * binding offer (`offer-<token>`) vs. someone else mid-checkout. */
@@ -246,11 +284,13 @@ export async function releaseReservation(itemId: string): Promise<void> {
  */
 export async function releaseExpiredReservations(now: Date = new Date()): Promise<number> {
  const db = getDb();
+ // Market Mode holds (buyer_ref 'market-…') are expired by the market reconciler, which knows the
+ // status to restore (a draft must stay a draft); this sweeper would wrongly flip them to active.
  const stale = await db
  .select({ itemId: reservations.itemId })
  .from(reservations)
  .innerJoin(items, eq(items.id, reservations.itemId))
- .where(and(isNull(reservations.releasedAt), lt(reservations.expiresAt, now), eq(items.status, "reserved")));
+ .where(and(isNull(reservations.releasedAt), lt(reservations.expiresAt, now), eq(items.status, "reserved"), notLike(reservations.buyerRef, "market-%")));
  const ids = [...new Set(stale.map((r) => r.itemId))];
  if (!ids.length) return 0;
  await db.update(reservations).set({ releasedAt: now }).where(and(inArray(reservations.itemId, ids), isNull(reservations.releasedAt)));

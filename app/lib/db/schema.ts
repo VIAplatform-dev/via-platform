@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgEnum, uuid, text, integer, timestamp, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, uuid, text, integer, boolean, timestamp, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 
 // ───────────────────────────────────────────────────────────────────────────
 // The transactional core of the VYA recommerce platform (Drizzle + Neon).
@@ -71,6 +71,18 @@ export const items = pgTable(
  // Who last set this item's values. `source` = the importer owns it and a re-sync may update it;
  // `user` = a human edited it, so the importer must never overwrite their work.
  origin: text("origin").notNull().default("source"), // source | user
+ // WHY a piece cannot be bought: `sold_out` = the seller's platform said so; `vanished` = it left
+ // their feed and we inferred it. NULL = recorded before we started keeping the reason. Drives the
+ // wording a shopper sees — see app/lib/unavailable-label.ts.
+ unavailableReason: text("unavailable_reason"),
+ // What the piece was before the seller marked it down, when a markdown is running. NULL = not on
+ // sale. Refreshed from the feed every import, so unlike a compare-at frozen at capture time it is
+ // a discount we can vouch for.
+ compareAtCents: integer("compare_at_cents"),
+ // Whether every photo on this listing lives on OUR storage. Set by the copier, and cleared by the
+ // importer whenever it writes the seller's own URLs back — otherwise a re-sync silently undoes the
+ // copying while the marker still claims it is done. See app/lib/rehost-images-core.ts.
+ imagesRehosted: boolean("images_rehosted").default(false),
  // Scheduled publish: a draft with publish_at in the future is "scheduled" — the cron flips it to
  // active at that time. NULL = not scheduled (a normal draft or an already-live item).
  publishAt: timestamp("publish_at", { withTimezone: true }),

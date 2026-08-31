@@ -1,6 +1,8 @@
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
 import { fetchShopifyProductsPublic, parseLooseJson } from "./shopifyClient.ts";
+import { readEndedCleanly } from "./feed-completeness.ts";
+import { readCollectionMembership, type CollectionPageResult } from "./collection-membership.ts";
 import { formatPrice } from "./formatPrice.ts";
 import { assertPublicUrl, safeFetch } from "./safe-url.ts";
 import { makeBlock, type BlockType } from "./storefront-blocks.ts";
@@ -24,6 +26,8 @@ export type ImportedProduct = {
   *  back out of "£120.00" is how imported GBP catalogues ended up labelled USD). */
  price: string;
  priceCents?: number | null;
+ /** What it was before the seller marked it down, when a markdown is running. */
+ compareAtCents?: number | null;
  currency?: string | null; // ISO code read from the platform, never guessed from a £/€ glyph
  image: string;
  images?: string[];
@@ -101,6 +105,16 @@ export type ImportResult = {
  products: ImportedProduct[];
  blocks?: HomeBlock[]; // section-by-section replica of the source homepage, for the visual studio
  error?: string;
+ /**
+  * Did this read reach the END of the seller's catalogue? Only a complete read may license the
+  * import's sold-sweep. Absent means unknown, which refuses the sweep — see feed-completeness.ts.
+  */
+ feedComplete?: boolean;
+ /**
+  * Every source id the feed listed, including pieces that never became items (no photo, filtered
+  * out). The sold-sweep must treat these as SEEN: they are on the seller's site, just not importable.
+  */
+ feedSourceIds?: string[];
 };
 
 // SSRF guard lives in ./safe-url so the site-capture crawler shares the exact same allow-list.
@@ -344,6 +358,12 @@ function verbatimHtml($: cheerio.CheerioAPI, el: Element): string {
  *  Shopify's public products.json carries bare price strings with no currency, so importing a UK
  *  store used to label its GBP prices as USD. The shop states it in `Shopify.currency` (and most
  *  platforms in an og/meta/JSON-LD field); everything else is a guess and we'd rather have none. */
+/** The shop's home country — Shopify's `countryCode` in the shop object, present whatever market
+ *  the page was served in. It is what lets the feed be requested in the seller's OWN currency. */
+function readHomeCountry(html: string): string | null {
+ return html.match(/"countryCode"\s*:\s*"([A-Z]{2})"/)?.[1] || html.match(/Shopify\.country\s*=\s*"([A-Z]{2})"/)?.[1] || null;
+}
+
 function readCurrency(html: string): string | null {
  const pats = [
   /Shopify\.currency\s*=\s*\{[^}]*"active"\s*:\s*"([A-Z]{3})"/,
@@ -357,7 +377,7 @@ function readCurrency(html: string): string | null {
 }
 
 async function readHomepage(origin: string) {
- const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string, blocks: [] as HomeBlock[], currency: null as string | null, html: "" };
+ const empty = { name: null as string | null, color: null as string | null, hero: null as string | null, theme: null as StorefrontTheme | null, platformHint: "unknown" as string, blocks: [] as HomeBlock[], currency: null as string | null, country: null as string | null, html: "" };
  try {
  const res = await safeFetch(origin, {
  headers: { "User-Agent": BROWSER_UA },
@@ -395,7 +415,7 @@ async function readHomepage(origin: string) {
  // Shopify.currency in a footer script.
  // `html` rides along so platform detection can run on the SAME response we already fetched —
  // a second request could be served a different market/variant of the page.
- return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint, blocks, currency: readCurrency(html), html };
+ return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint, blocks, currency: readCurrency(html), country: readHomeCountry(html), html };
  } catch {
  return empty;
  }
@@ -502,7 +522,21 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  if (!image) continue;
  const description = String(it.excerpt || it.body || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000) || null;
  const tags = [...(Array.isArray(it.categories) ? it.categories : []), ...(Array.isArray(it.tags) ? it.tags : [])].filter((t: any) => typeof t === "string");
- out.push({ name: (it.title || "").trim(), price: price > 0 ? formatPrice(price, "USD") : "", image, images: gallery.length ? gallery : [image], description, size: sizeFromVariant(variant), available, tags });
+ // Source identity, straight off the feed. Squarespace gives every product an `id`, a `urlSlug`
+ // and the `fullUrl` of its own page, and this reader used to keep NONE of them — so every
+ // Squarespace-imported piece arrived anonymous, linked on the mirrored storefront by its VYA
+ // uuid, and the product route (which looks for `/products/{handle}`, Shopify's shape) had nothing
+ // to resolve: every product click on those stores ended at "Couldn't load that product."
+ // `urlSlug` over `id` because the slug is what the store's own URLs are keyed by.
+ const urlSlug = typeof it.urlSlug === "string" ? it.urlSlug : "";
+ const fullUrl = typeof it.fullUrl === "string" ? it.fullUrl : "";
+ out.push({
+  name: (it.title || "").trim(), price: price > 0 ? formatPrice(price, "USD") : "", image,
+  images: gallery.length ? gallery : [image], description, size: sizeFromVariant(variant), available, tags,
+  sourcePlatform: "squarespace",
+  sourceId: urlSlug || (typeof it.id === "string" ? it.id : null) || null,
+  sourceUrl: fullUrl ? new URL(fullUrl, base).toString() : null,
+ });
  if (out.length >= max) break;
  }
  // Follow Squarespace's own pagination cursor to pull every page.
@@ -524,36 +558,77 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  *
  * Bounded on purpose: at most 25 collections × 6 pages, so a huge catalog can't turn one import
  * into thousands of outbound requests. */
-export async function getShopifyCollectionMembership(domain: string, slugs: string[]): Promise<Map<string, string[]>> {
+export type CollectionMembershipRead = {
+ /** product handle → the collection handles it belongs to. */
+ membership: Map<string, string[]>;
+ /** collection handle → its product handles in the SELLER'S OWN ORDER. Complete reads only; a
+  *  collection missing from here has no live order and falls back to the captured page. */
+ order: Map<string, string[]>;
+ /** collection handle → how much of it SHE lists as unavailable. Absent for an unread collection:
+  *  zero-of-zero would read as "she has no sold pieces", which is how a failed read would come to
+  *  empty a seller's archive. See app/lib/collection-sold-policy.ts. */
+ stock: Map<string, { unavailable: number; total: number }>;
+ /** Collections whose listing could NOT be read in full. Whatever they contributed to `membership`
+  *  is partial, so the caller must never read it as "these are all the members". */
+ incomplete: string[];
+};
+
+/** One page of a collection listing, retried through the transient throttling that a full-site
+ *  crawl provokes — the membership pass runs seconds after we've just pulled ~60 pages and the
+ *  product feed off the same host, which is exactly when a storefront starts refusing.
+ *  Returns null when the page still won't read, so the caller can mark the collection UNREAD
+ *  rather than silently treating it as empty. */
+async function collectionPage(host: string, slug: string, page: number): Promise<CollectionPageResult> {
+ const url = `https://${host}/collections/${slug}/products.json?limit=250&page=${page}`;
+ // Server wobbles are retried here; a 429 is NOT. It is handed back to the caller, which knows the
+ // store's pace and slows everything down — retrying it here for a second and giving up is what lost
+ // blummier every collection from "ralph-lauren" to the end of the alphabet.
+ for (let attempt = 0; attempt < 3; attempt++) {
+  if (attempt) await new Promise((r) => setTimeout(r, 600 * 2 ** attempt));
+  try {
+   // Same browser UA as every other outbound import fetch. A bare request is the shape bot rules
+   // reject first, and this was the only import fetch that didn't send one.
+   const r = await safeFetch(url, { headers: { Accept: "application/json", "User-Agent": BROWSER_UA }, signal: AbortSignal.timeout(15000) });
+   if (r.ok) {
+    const d = parseLooseJson(await r.text()); // storefront feeds carry raw control chars
+    return Array.isArray(d.products) ? d.products : [];
+   }
+   if (r.status === 429) {
+    // The store's own Retry-After, in seconds, when it sends one.
+    const after = parseInt(r.headers.get("Retry-After") ?? "", 10);
+    return { throttled: true, ...(Number.isFinite(after) && after > 0 ? { retryAfterMs: Math.min(after * 1000, 60000) } : {}) };
+   }
+   // 404/403 is a settled answer — retrying it just hammers the store.
+   if (r.status < 500) return null;
+  } catch {
+   /* timeout or transport error — retry, then give up as unread */
+  }
+ }
+ return null;
+}
+
+export async function getShopifyCollectionMembership(domain: string, slugs: string[]): Promise<CollectionMembershipRead> {
  const host = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
- const membership = new Map<string, Set<string>>();
- for (const slug of slugs.slice(0, 25)) {
- try {
- for (let page = 1; page <= 6; page++) {
- const r = await safeFetch(`https://${host}/collections/${slug}/products.json?limit=250&page=${page}`, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10000) });
- if (!r.ok) break;
- const d = parseLooseJson(await r.text()); // storefront feeds carry raw control chars
- const prods: any[] = Array.isArray(d.products) ? d.products : [];
- if (!prods.length) break;
- for (const p of prods) {
- const key = String(p.handle || "").trim();
- if (!key) continue;
- if (!membership.has(key)) membership.set(key, new Set());
- membership.get(key)!.add(slug);
+ // The loop lives in collection-membership.ts so it can be tested without a network: it used to stop
+ // after 25 collections, which is why ~500 collections across the fleet held nothing at all.
+ const read = await readCollectionMembership(slugs, { fetchPage: (slug, page) => collectionPage(host, slug, page) });
+ if (read.notAttempted.length) {
+  console.log(`[collections] ${host}: ${read.notAttempted.length} collections past the ceiling were not read`);
  }
- if (prods.length < 250) break;
- }
- } catch {
- /* skip a collection that errors */
- }
- }
+ if (read.throttleHits) console.log(`[collections] ${host}: asked to slow down ${read.throttleHits}\u00d7 — paced accordingly`);
+ // A collection bigger than one pass. What we read is used; the shortfall is ours, not the seller's.
+ if (read.truncated.length) console.log(`[collections] ${host}: ${read.truncated.length} collection(s) larger than one read (${read.truncated.slice(0, 3).join(", ")}) — filed as much as we could`);
  const out = new Map<string, string[]>();
- for (const [k, v] of membership) out.set(k, [...v]);
- return out;
+ for (const [k, v] of read.membership) out.set(k, [...v]);
+ // The order comes off the very same pages — no extra request. See syncCollectionOrder().
+ return { membership: out, order: read.order, stock: read.stock, incomplete: read.incomplete };
 }
 
 /** Pull a store from a URL: Shopify public products.json, then Squarespace JSON. */
-export async function importStoreFromUrl(raw: string, max = 1500): Promise<ImportResult> {
+// 1,500 stopped short of three stores in the fleet (chill-boutique 1,837). The ceiling still exists
+// so a runaway feed can't pin the process open — but hitting it is now recorded, and a read that
+// hits it is never allowed to mark anything sold. See feed-completeness.ts.
+export async function importStoreFromUrl(raw: string, max = 5000): Promise<ImportResult> {
  const u = await assertPublicUrl(raw); // DNS-resolves + rejects internal IPs (SSRF)
  if (!u) {
  return { ok: false, storeName: "", platform: "unknown", brandColor: null, hero: null, theme: null, products: [], error: "Enter a valid store URL." };
@@ -568,12 +643,27 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
 
  let products: ImportedProduct[] = [];
  let platform: "shopify" | "squarespace" | "unknown" = "unknown";
+ // Only the Shopify rung reports how its read finished; every other rung leaves this false, so a
+ // store imported another way never licenses the sold-sweep. Safe by default, on purpose.
+ let feedComplete = false;
+ // See the note where this is filled: the ids the feed listed, whether or not each became an item.
+ let feedSourceIds: string[] = [];
 
  // 1) Shopify public products.json (no token needed)
  try {
  // Pass the shop's REAL currency (read from its storefront) instead of assuming USD.
  const shopCurrency = meta.currency || "USD";
- const r = await withTimeout(fetchShopifyProductsPublic(domain, storeName, max, shopCurrency, true), 25000, { products: [], skippedCount: 0 });
+ // On timeout the fallback carries NO outcome — which readEndedCleanly treats as an incomplete
+ // read, so an empty feed from a slow store can never be read as "the shop is empty now".
+ // 25s was not enough for a real catalogue: chill-boutique's 1,791 pieces are 36 sequential
+ // requests, and a throttle retry on top pushed it over, which returned an EMPTY feed. Harmless now
+ // that an empty read can never sweep — but it also meant the store simply did not import.
+ const r = await withTimeout(fetchShopifyProductsPublic(domain, storeName, max, shopCurrency, true, meta.country), 60000, { products: [], skippedCount: 0 });
+ const shopifyComplete = r.outcome ? readEndedCleanly(r.outcome) : false;
+ // Every source id the read SAW, before the image filter below drops any. A piece with no photo is
+ // not a piece that has been taken down, and without this it fell out of `products`, looked gone,
+ // and was marked sold.
+ feedSourceIds = r.products.map((p) => p.handle || p.shopifyProductId || null).filter(Boolean) as string[];
  const mapped = r.products
  .filter((p) => p.image)
  .slice(0, max)
@@ -581,6 +671,9 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
  name: p.title,
  price: p.price != null ? formatPrice(p.price, p.currency) : "",
  priceCents: p.price != null ? Math.round(p.price * 100) : null,
+ // The seller's markdown. Their feed carries it and the client already parses it; it used to be
+ // dropped here, so a shop running a sale showed a flat price and lost the markdown.
+ compareAtCents: p.compareAtPrice != null ? Math.round(p.compareAtPrice * 100) : null,
  currency: p.currency || shopCurrency,
  image: p.image as string,
  images: p.images?.length ? p.images : p.image ? [p.image] : [],
@@ -597,6 +690,9 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
  if (mapped.length) {
  platform = "shopify";
  products = mapped;
+ // Only now: the completeness of the Shopify read describes the Shopify read. Setting it earlier
+ // meant a complete-but-unusable Shopify read licensed a sweep against a LATER rung's partial data.
+ feedComplete = shopifyComplete;
  }
  } catch {
  /* fall through to squarespace */
@@ -664,7 +760,7 @@ export async function importStoreFromUrl(raw: string, max = 1500): Promise<Impor
  };
  }
 
- return { ok: true, storeName, platform, brandColor: meta.color, hero: meta.hero, theme: meta.theme, products, blocks: meta.blocks };
+ return { ok: true, storeName, platform, brandColor: meta.color, hero: meta.hero, theme: meta.theme, products, blocks: meta.blocks, feedComplete, feedSourceIds: feedComplete ? feedSourceIds : [] };
 }
 
 /** Homepage-only: a section-by-section replica of the source home as studio blocks.

@@ -11,9 +11,9 @@ import { importStoreFromUrl, importStoreThemeAndBlocks, type ImportedProduct } f
 import { importProductsAsItems, syncCollectionMembership, syncCollectionOrder } from "@/app/lib/capture-commerce";
 import { getConnection } from "@/app/lib/store-connections-db";
 import { getPlatform } from "@/app/lib/platforms";
-import { getSellerBySlug, getOrCreateSeller } from "@/app/lib/db/sellers";
+import { getSellerBySlug, getOrCreateSeller, setSellerNameIfPlaceholder } from "@/app/lib/db/sellers";
+import { storeDisplayName } from "@/app/lib/store-display-name";
 import { ensureCollection } from "@/app/lib/db/collections";
-import { isJunkCollection } from "@/app/lib/collections-sync";
 import { getStorefrontBySlug, setStorefrontTheme } from "@/app/lib/storefront-db";
 import { buildStorefrontFromUrl } from "@/app/lib/storefront-from-brand";
 import { runImport, type ImportDeps, type RunOutcome } from "./run-import";
@@ -31,11 +31,17 @@ export function looksPasswordProtected(html: string): boolean {
 
 const hostOf = (u: string) => new URL(u.startsWith("http") ? u : `https://${u}`).hostname;
 
+// Set by pullProducts, read (and cleared) by importItems — see the note on importItems below.
+// Cleared at the START of every pull as well: if a pull throws, a stale `true` left here from an
+// earlier import would license a sweep against whatever the next one managed to read.
+const feedComplete = new Map<string, { complete: boolean; sourceIds: string[] }>();
+
 export function buildImportDeps(jobId: string): ImportDeps<ImportedProduct> {
  return {
   // Keep the seller's JavaScript in the capture whenever Plan B is configured — it's what their
   // hosted storefront will need in order to behave like their real site. Storing it is safe on its
   // own: the serve path strips every script on any VYA origin, so only the isolated store domain
+
   // ever runs it.
   crawl: async ({ slug, url, maxPages, resume, budgetMs, onProgress }) =>
    crawlAndStore(slug, url, maxPages, { resume, budgetMs, onProgress, keepScripts: Boolean(storeHostSuffix()) }),
@@ -44,18 +50,30 @@ export function buildImportDeps(jobId: string): ImportDeps<ImportedProduct> {
   // feed. Errors propagate into the step record rather than returning an empty list, so "no products
   // found" and "the product import crashed" stop looking the same.
   pullProducts: async (slug, url) => {
+   feedComplete.set(slug, { complete: false, sourceIds: [] });
    const conn = await getConnection(slug);
    if (conn) {
     const adapter = getPlatform(conn.platform);
     if (adapter?.getProducts) {
      const api = await adapter.getProducts(conn.credentials);
-     if (api.length) return api;
+     // A connected store's own API returns the whole catalogue by contract; the public feed only
+     // sometimes does. Either way, importItems below is told which it got — see feed-completeness.
+     if (api.length) { feedComplete.set(slug, { complete: true, sourceIds: [] }); return api; }
     }
    }
-   return (await importStoreFromUrl(url)).products || [];
+   const pulled = await importStoreFromUrl(url);
+   feedComplete.set(slug, { complete: pulled.feedComplete === true, sourceIds: pulled.feedSourceIds || [] });
+   return pulled.products || [];
   },
 
-  importItems: async (slug, products) => importProductsAsItems(slug, products),
+  // Whether the pull above reached the end of the seller's catalogue. The two ports are called in
+  // sequence for one import, and only a complete read may mark a seller's stock sold; a slug with
+  // no entry (a pull that never ran) is treated as incomplete, which refuses the sweep.
+  importItems: async (slug, products) => {
+   const pull = feedComplete.get(slug);
+   feedComplete.delete(slug); // one pull, one import — never reused by a later run
+   return importProductsAsItems(slug, products, { feedComplete: pull?.complete === true, feedSourceIds: pull?.sourceIds });
+  },
 
   // Pre-create VYA collections mirroring the store's captured /collections/{handle} pages, so the
   // seller can assign items to them (slug = the source handle → items render on that page).
@@ -66,12 +84,13 @@ export function buildImportDeps(jobId: string): ImportDeps<ImportedProduct> {
    for (const p of paths) { const m = p.match(/^\/collections\/([^/]+)\/?$/); if (m && m[1] !== "all") handles.add(m[1]); }
    const titleize = (h: string) => h.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
    let made = 0;
-   // Skip the store's operational collections (price bands, presales/drops, demo data, catch-alls) —
-   // importing 100+ junk collections just floods the seller's picker.
+   // EVERY captured collection page gets a collection — no junk filter here. isJunkCollection was
+   // written for the marketplace catalog sync, where "Under $500" or "New Arrivals" carries no
+   // product meaning. On a captured storefront those are nav destinations the seller built and
+   // linked; filtering them left 6 of 15 collections on one store with no VYA collection at all,
+   // so their pages rendered only from a frozen fallback and never tracked live inventory.
    for (const h of handles) {
-    const title = titleize(h);
-    if (isJunkCollection(title)) continue;
-    await ensureCollection(seller.id, h, title);
+    await ensureCollection(seller.id, h, titleize(h));
     made++;
    }
    return made;
@@ -80,12 +99,16 @@ export function buildImportDeps(jobId: string): ImportDeps<ImportedProduct> {
   syncMembership: async (slug, url, products) => {
    const r = await syncCollectionMembership(slug, hostOf(url), products);
    // Then adopt the source's own ordering for those collections — membership without order still
-   // reads as a different shop, because nothing is where the seller put it.
-   const o = await syncCollectionOrder(slug).catch((e) => {
+   // reads as a different shop, because nothing is where the seller put it. `r.order` is TODAY's
+   // order, read off the same collection listings the membership pass just paged through; without
+   // it the ordering falls back to the captured page, which is frozen at crawl day.
+   const o = await syncCollectionOrder(slug, r.order).catch((e) => {
     r.warnings = [...(r.warnings || []), `We couldn’t copy the order of your collections (${e instanceof Error ? e.message : String(e)}); they’ll show newest first.`];
-    return { collections: 0, ordered: 0 };
+    return { collections: 0, ordered: 0, live: 0 };
    });
-   return { ...r, collections: Math.max(r.collections, o.collections) };
+   // Only the report travels on. `r.order` is plumbing between these two steps — a Map spread into
+   // the run record would serialise as `{}`.
+   return { collections: Math.max(r.collections, o.collections), links: r.links, warnings: r.warnings };
   },
 
   // Seed the visual studio with a section-by-section replica of the real homepage. Only when they
@@ -94,6 +117,11 @@ export function buildImportDeps(jobId: string): ImportDeps<ImportedProduct> {
    const sf = await getStorefrontBySlug(slug);
    if (!replaceBlocks && sf?.theme?.blocks?.length) return 0;
    const imported = await importStoreThemeAndBlocks(url);
+   // The shop's own name, read off its homepage (og:site_name, else the page title with the tagline
+   // trimmed). This is the one moment in the pipeline where we learn it, and until now it was used
+   // for the storefront wordmark but never written to the seller — so the store stayed "slug" to
+   // every buyer-facing surface that reads the seller row.
+   if (imported.name) await setSellerNameIfPlaceholder(slug, imported.name).catch(() => false); /* allow-swallow: the store's display name is a nicety — never fail an import over it, and the next import retries */
    if (!imported.blocks.length) return 0;
    const prev = sf?.theme || {};
    await setStorefrontTheme(slug, {
@@ -149,7 +177,10 @@ export async function runImportJob(job: ImportJob, opts: { replaceBlocks?: boole
  // fix, or that was created by another process. Idempotent (`onConflictDoNothing`), so it's a cheap
  // no-op read once the seller exists.
  const knownStore = stores.find((st) => st.slug === job.slug);
- await getOrCreateSeller(job.slug, knownStore?.name || job.slug, storeContactEmails[job.slug] || "");
+ // NEVER the bare slug: whatever goes in here is what a shopper reads on the checkout page, in the
+ // bag's messages and on their receipt. A curated store has a real name; an imported one gets its
+ // slug read back as words until the homepage below tells us better. See store-display-name.ts.
+ await getOrCreateSeller(job.slug, storeDisplayName(job.slug, knownStore?.name), storeContactEmails[job.slug] || "");
 
  // A page-count cap, unlike the time budget, doesn't pause and resume — it just stops and marks
  // the job "done", silently truncating a big catalog's DESIGN capture (individual product pages,
