@@ -36,7 +36,7 @@ function CountdownCentered({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
  if (noDate(kit)) return null;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-3xl px-6 py-16 @xl:py-24 text-center">
+  <section className="vya-free-canvas relative mx-auto max-w-3xl px-6 py-10 @lg:py-16 @xl:py-24 text-center">
    <Heading kit={kit} className="text-2xl @xl:text-3xl leading-tight" />
    <Sub kit={kit} className="mx-auto mt-2 max-w-md text-sm opacity-65" />
    <div className="mt-10"><Clock kit={kit} /></div>
@@ -72,7 +72,7 @@ function CountdownDisplay({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
  if (noDate(kit)) return null;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-4xl px-6 py-20 @xl:py-28 text-center">
+  <section className="vya-free-canvas relative mx-auto max-w-4xl px-6 py-12 @lg:py-20 @xl:py-28 text-center">
    <div className="mb-8 scale-110 @xl:scale-125"><Clock kit={kit} /></div>
    <Heading kit={kit} className="text-3xl leading-tight @xl:text-5xl" />
    <Sub kit={kit} className="mx-auto mt-4 max-w-lg text-sm opacity-65" />
@@ -89,7 +89,7 @@ function FormPreview({ kit, stacked }: { kit: EditKit; stacked?: boolean }) {
  if (!ctx.edit) return <NewsletterForm accent={ctx.colors.accent} label={p.cta || "Sign up"} />;
  return (
   <div className={stacked ? "mx-auto flex max-w-sm flex-col items-center gap-3" : "flex w-full max-w-md items-center gap-2"}>
-   <input disabled placeholder="Email address" className="w-full border border-black/20 bg-white/70 px-4 py-2.5 text-sm opacity-60 outline-none" />
+   <input disabled placeholder="Email address" className="vya-field w-full border border-current/20 bg-current/[0.03] px-4 py-2.5 text-sm opacity-60 outline-none" />
    <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Sign up"} className="vya-cta inline-block whitespace-nowrap px-8 py-2.5 text-[11px] uppercase tracking-[0.18em]" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>
  );
@@ -98,7 +98,7 @@ function FormPreview({ kit, stacked }: { kit: EditKit; stacked?: boolean }) {
 function NewsletterCentered({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  return (
-  <section className="vya-free-canvas relative px-6 py-20 @xl:py-24 text-center" style={{ borderTop: `1px solid ${ctx.fg}1a` }}>
+  <section className="vya-free-canvas relative px-6 py-12 @lg:py-20 @xl:py-24 text-center" style={{ borderTop: `1px solid ${ctx.fg}1a` }}>
    <Heading kit={kit} className="text-3xl @xl:text-4xl leading-tight" value={p.heading || (ctx.edit ? "" : "Join the list")} />
    <Sub kit={kit} className="mt-3 mx-auto max-w-md text-sm opacity-65" />
    <div className="mt-7 flex justify-center"><FormPreview kit={kit} stacked /></div>
@@ -111,7 +111,7 @@ function NewsletterCentered({ kit }: { kit: EditKit }) {
 function NewsletterSplit({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  return (
-  <section className="vya-free-canvas relative px-6 py-16 @xl:py-24" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
+  <section className="vya-free-canvas relative px-6 py-10 @lg:py-16 @xl:py-24" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
    <div className="mx-auto grid max-w-5xl items-center gap-8 @lg:grid-cols-2 @lg:gap-16">
     <div>
      <Heading kit={kit} className="text-2xl leading-tight @xl:text-3xl" />
@@ -141,7 +141,7 @@ function NewsletterBar({ kit }: { kit: EditKit }) {
 // this layout is deliberately transparent and just sets its own contrast.
 function NewsletterPhoto({ kit }: { kit: EditKit }) {
  return (
-  <section className="vya-free-canvas vya-fill relative flex min-h-[46vh] flex-col items-center justify-center px-6 py-24 text-center">
+  <section className="vya-free-canvas vya-fill relative flex min-h-[46vh] flex-col items-center justify-center px-6 py-14 @lg:py-24 text-center">
    <Heading kit={kit} className="text-3xl leading-tight @xl:text-5xl" />
    <Sub kit={kit} className="mx-auto mt-4 max-w-md text-sm opacity-80" />
    <div className="mt-8 flex justify-center"><FormPreview kit={kit} stacked /></div>
@@ -157,10 +157,10 @@ function ContactFields({ kit }: { kit: EditKit }) {
  if (!ctx.edit && ctx.storeSlug) return <ContactForm accent={ctx.colors.accent} storeSlug={ctx.storeSlug} />;
  return (
   <div className="flex flex-col gap-2.5">
-   <input disabled placeholder="Name" className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
-   <input disabled placeholder="Email" className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
-   <textarea disabled placeholder="Message" rows={4} className="rounded-md border border-current/20 bg-transparent px-3 py-2.5 text-[14px] opacity-60" />
-   <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Send"} fullWidth className="vya-cta mt-1 grid place-items-center rounded-md py-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ background: ctx.colors.accent, color: "#fff" }} />
+   <input disabled placeholder="Name" className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   <input disabled placeholder="Email" className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   <textarea disabled placeholder="Message" rows={4} className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Send"} fullWidth className="vya-cta mt-1 grid place-items-center py-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>
  );
 }
@@ -172,7 +172,7 @@ function ContactEmail({ kit }: { kit: EditKit }) {
 
 function ContactCentered({ kit }: { kit: EditKit }) {
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-xl px-6 py-16 @xl:py-24 text-center">
+  <section className="vya-free-canvas relative mx-auto max-w-xl px-6 py-10 @lg:py-16 @xl:py-24 text-center">
    <Heading kit={kit} className="text-3xl @xl:text-4xl leading-tight" />
    <Sub kit={kit} className="mt-3 mx-auto max-w-md text-sm opacity-65" />
    <div className="mt-8 text-left"><ContactFields kit={kit} /></div>
@@ -186,7 +186,7 @@ function ContactCentered({ kit }: { kit: EditKit }) {
 function ContactSplit({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  return (
-  <section className="mx-auto grid max-w-5xl gap-10 px-6 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-16">
+  <section className="mx-auto grid max-w-5xl gap-10 px-6 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-16">
    <div className="vya-free-canvas relative">
     <Heading kit={kit} className="text-3xl leading-tight @xl:text-4xl" />
     <Sub kit={kit} className="mt-4 max-w-md text-sm leading-relaxed opacity-70" />
@@ -202,7 +202,7 @@ function ContactSplit({ kit }: { kit: EditKit }) {
 function ContactCard({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  return (
-  <section className="px-6 py-16 @xl:py-24" style={{ background: `${ctx.fg}08` }}>
+  <section className="px-6 py-10 @lg:py-16 @xl:py-24" style={{ background: `${ctx.fg}08` }}>
    <div className="vya-free-canvas vya-round relative mx-auto max-w-lg p-8 @xl:p-10" style={{ background: ctx.colors.bg, border: `1px solid ${ctx.fg}1f` }}>
     <Heading kit={kit} className="text-2xl leading-tight @xl:text-3xl" />
     <Sub kit={kit} className="mt-2 text-sm opacity-65" />

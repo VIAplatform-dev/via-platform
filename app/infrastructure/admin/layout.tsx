@@ -26,7 +26,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { href: `${B}/inventory/sold`, label: "Sold" },
  ],
  },
- { href: `${B}/cross-listing`, label: "Cross-listing", icon: Share2, children: [{ href: `${B}/cross-listing/settings`, label: "Marketplaces" }] },
+ { href: `${B}/cross-listing`, label: "Cross-listing", icon: Share2, match: [`${B}/cross-listing/analytics`], children: [{ href: `${B}/cross-listing`, label: "Listings" }, { href: `${B}/cross-listing/analytics`, label: "Analytics" }, { href: `${B}/cross-listing/settings`, label: "Marketplaces" }] },
  { href: `${B}/consignment`, label: "Consignment", icon: Handshake, children: [{ href: `${B}/consignment/consignors`, label: "Consignors" }, { href: `${B}/consignment/payouts`, label: "Payouts" }, { href: `${B}/consignment/settings`, label: "Settings" }] },
  { href: `${B}/orders`, label: "Orders", icon: ShoppingBag },
  { href: `${B}/inbox`, label: "Inbox", icon: MessageCircle },

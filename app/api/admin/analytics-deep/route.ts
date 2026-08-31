@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LEGACY_NON_SOURCES, normalizeStoredSource, rollUpBySource } from "@/app/lib/traffic-source";
 import { neon } from "@neondatabase/serverless";
 
 export const runtime = "edge";
@@ -502,50 +503,61 @@ export async function GET(request: NextRequest) {
  ORDER BY clicks DESC
  `.catch(() => []),
 
- // conversionsBySource — orders + revenue by utm_source.
- // Primary: click.utm_source via via_click_id.
- // Fallback: most recent utm_visit for the conversion's user_id (catches email-matched & Collabs orders).
+ // conversionsBySource — ONE ROW PER ORDER, carrying every attribution candidate,
+ // so first-touch and last-touch can both be computed without running the join twice.
+ // There are fewer than a hundred orders, so aggregating in JS is cheaper than two
+ // GROUP BY passes and keeps the two definitions provably consistent.
+ //
+ // Orders with NO source at all are no longer dropped (the old query had
+ // `WHERE ... IS NOT NULL`, which silently hid them and made the column totals
+ // disagree with the Orders KPI). They normalize to "Direct", which is what they are.
  cutoffIso
  ? sql`
  SELECT
- COALESCE(c.utm_source, uv.utm_source) AS source,
- COUNT(DISTINCT conv.id)::int AS conversions,
- COALESCE(SUM(conv.order_total), 0)::float AS revenue
+ conv.id,
+ conv.order_total,
+ c.utm_source AS click_source,
+ fv.utm_source AS first_visit_source,
+ lv.utm_source AS last_visit_source
  FROM conversions conv
  LEFT JOIN clicks c ON c.click_id = conv.via_click_id
  LEFT JOIN LATERAL (
- SELECT utm_source
- FROM utm_visits
- WHERE user_id = conv.user_id
- AND utm_source IS NOT NULL
- ORDER BY timestamp DESC
- LIMIT 1
- ) uv ON true
- WHERE COALESCE(c.utm_source, uv.utm_source) IS NOT NULL
- AND (conv.returned IS NULL OR conv.returned = false)
- AND conv.timestamp >= ${cutoffIso}
- GROUP BY COALESCE(c.utm_source, uv.utm_source)
- ORDER BY revenue DESC
+ SELECT utm_source FROM utm_visits
+ WHERE user_id = conv.user_id AND utm_source IS NOT NULL
+  AND lower(utm_source) <> ALL(${LEGACY_NON_SOURCES})
+ ORDER BY timestamp ASC LIMIT 1
+ ) fv ON true
+ LEFT JOIN LATERAL (
+ SELECT utm_source FROM utm_visits
+ WHERE user_id = conv.user_id AND utm_source IS NOT NULL
+ ORDER BY timestamp DESC LIMIT 1
+ ) lv ON true
+ WHERE (conv.returned IS NULL OR conv.returned = false)
+  AND conv.order_total > 0
+  AND conv.timestamp >= ${cutoffIso}
  `.catch(() => [])
  : sql`
  SELECT
- COALESCE(c.utm_source, uv.utm_source) AS source,
- COUNT(DISTINCT conv.id)::int AS conversions,
- COALESCE(SUM(conv.order_total), 0)::float AS revenue
+ conv.id,
+ conv.order_total,
+ c.utm_source AS click_source,
+ fv.utm_source AS first_visit_source,
+ lv.utm_source AS last_visit_source
  FROM conversions conv
  LEFT JOIN clicks c ON c.click_id = conv.via_click_id
  LEFT JOIN LATERAL (
- SELECT utm_source
- FROM utm_visits
- WHERE user_id = conv.user_id
- AND utm_source IS NOT NULL
- ORDER BY timestamp DESC
- LIMIT 1
- ) uv ON true
- WHERE COALESCE(c.utm_source, uv.utm_source) IS NOT NULL
- AND (conv.returned IS NULL OR conv.returned = false)
- GROUP BY COALESCE(c.utm_source, uv.utm_source)
- ORDER BY revenue DESC
+ SELECT utm_source FROM utm_visits
+ WHERE user_id = conv.user_id AND utm_source IS NOT NULL
+  AND lower(utm_source) <> ALL(${LEGACY_NON_SOURCES})
+ ORDER BY timestamp ASC LIMIT 1
+ ) fv ON true
+ LEFT JOIN LATERAL (
+ SELECT utm_source FROM utm_visits
+ WHERE user_id = conv.user_id AND utm_source IS NOT NULL
+ ORDER BY timestamp DESC LIMIT 1
+ ) lv ON true
+ WHERE (conv.returned IS NULL OR conv.returned = false)
+  AND conv.order_total > 0
  `.catch(() => []),
  ]);
 
@@ -632,22 +644,51 @@ export async function GET(request: NextRequest) {
  pageType: r.page_type,
  views: r.views,
  })),
- trafficSources: (trafficSourcesResult as { utm_source: string; utm_medium: string | null; utm_campaign: string | null; visits: number; known_users: number }[]).map((r) => ({
- source: r.utm_source,
- medium: r.utm_medium,
- campaign: r.utm_campaign,
- visits: r.visits,
- knownUsers: r.known_users,
- })),
- clicksBySource: (clicksBySourceResult as { utm_source: string; clicks: number }[]).map((r) => ({
- source: r.utm_source,
- clicks: r.clicks,
- })),
- conversionsBySource: (conversionsBySourceResult as { source: string; conversions: number; revenue: number }[]).map((r) => ({
- source: r.source,
- conversions: r.conversions,
- revenue: r.revenue,
- })),
+// Rolled up through normalizeStoredSource so legacy browser-name rows (chrome,
+ // safari, edge — written by the old user-agent fallback in GlobalPageTracker)
+ // collapse into a single honest "Direct" row instead of showing as four fake
+ // sources. Same helper the customers list uses, so the two now reconcile.
+ trafficSources: rollUpBySource(
+  (trafficSourcesResult as { utm_source: string; utm_medium: string | null; utm_campaign: string | null; visits: number; known_users: number }[]).map((r) => ({
+   source: r.utm_source,
+   medium: r.utm_medium,
+   campaign: r.utm_campaign,
+   visits: r.visits,
+   knownUsers: r.known_users,
+  })),
+  "source",
+  ["visits", "knownUsers"],
+ ).sort((a, b) => b.visits - a.visits),
+ clicksBySource: rollUpBySource(
+  (clicksBySourceResult as { utm_source: string; clicks: number }[]).map((r) => ({ source: r.utm_source, clicks: r.clicks })),
+  "source",
+  ["clicks"],
+ ),
+ // FIRST touch  = the earliest REAL channel this customer ever arrived through.
+ //                (Same rule the customer list uses, so the two pages agree.)
+ // LAST touch   = the click that carried them to the order, else their most recent visit.
+ //                (What the panel showed before, and all it showed.)
+ // Both are computed from the SAME order rows, so the two columns always sum to the
+ // same order count and the same revenue — they only disagree about who gets credit.
+ ...(() => {
+  const orderRows = conversionsBySourceResult as {
+   order_total: number;
+   click_source: string | null;
+   first_visit_source: string | null;
+   last_visit_source: string | null;
+  }[];
+  const tally = (pick: (r: (typeof orderRows)[number]) => string | null) =>
+   rollUpBySource(
+    orderRows.map((r) => ({ source: normalizeStoredSource(pick(r)), conversions: 1, revenue: Number(r.order_total) || 0 })),
+    "source",
+    ["conversions", "revenue"],
+   ).sort((a, b) => b.revenue - a.revenue);
+
+  const firstTouch = tally((r) => r.first_visit_source ?? r.click_source ?? r.last_visit_source);
+  const lastTouch = tally((r) => r.click_source ?? r.last_visit_source);
+  // conversionsBySource stays on last touch so any existing consumer is unaffected.
+  return { conversionsByFirstTouch: firstTouch, conversionsByLastTouch: lastTouch, conversionsBySource: lastTouch };
+ })(),
  dropOffProducts: (dropOffProductsResult as { productId: string; name: string; store: string; views: number; clicks: number }[]).map((r) => ({
  productId: r.productId,
  name: r.name,

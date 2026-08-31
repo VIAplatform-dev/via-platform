@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { captureStorefrontEntryClient, recordStorePageview } from "@/app/lib/store-visits-db";
+import { captureStorefrontEntryClient, recordStorePageview, geoFromHeaders } from "@/app/lib/store-visits-db";
 import { recordProductView, recordSearch } from "@/app/lib/store-favorites-db";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 
@@ -37,6 +37,10 @@ export async function POST(request: NextRequest) {
  const newSession = await captureStorefrontEntryClient({
   slug, hasSession, referrer, utmSource, utmMedium, path,
   selfHost: request.headers.get("host") || "vyaplatform.com",
+  // The beacon runs on the shopper's own request, so its UA and edge geo headers
+  // are the shopper's — not the storefront server's.
+  userAgent: request.headers.get("user-agent"),
+  geo: geoFromHeaders(request.headers),
  });
  if (newSession) sessionId = newSession;
 

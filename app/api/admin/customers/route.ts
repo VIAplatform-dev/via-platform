@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
+import { LEGACY_NON_SOURCES, canonicalSource, normalizeStoredSource, sourceChannel } from "@/app/lib/traffic-source";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -120,8 +121,10 @@ export async function GET(request: NextRequest) {
   WHERE user_id IS NOT NULL
   ORDER BY user_id,
    CASE
-    WHEN utm_source IS NULL OR lower(utm_source) IN ('direct', '') THEN 2
-    WHEN lower(utm_source) IN ('safari', 'chrome', 'firefox', 'edge', 'samsung', 'web') THEN 1
+    WHEN utm_source IS NULL OR btrim(utm_source) = '' THEN 2
+    -- Browser names and placeholders, from ONE shared list (app/lib/traffic-source.ts)
+    -- rather than a literal that drifts away from the other three copies.
+    WHEN lower(utm_source) = ANY(${LEGACY_NON_SOURCES}) THEN 1
     ELSE 0
    END,
    timestamp ASC
@@ -161,9 +164,13 @@ export async function GET(request: NextRequest) {
  COALESCE(MAX(ord.cnt), 0) AS order_count,
  COALESCE(MAX(pg.cnt), 0) AS page_view_count,
  COALESCE(MAX(ltv.total), 0) AS total_spend,
+ -- Prefer a REAL source wherever we have one, in order of trustworthiness:
+ -- what the signup form captured, then the earliest real utm_visit, then the
+ -- waitlist row, and only then whatever is left (which normalizes to "Direct").
+ -- The exclusion list is shared with every other reader, so it cannot drift.
  COALESCE(
-  CASE WHEN lower(MAX(ac.source)) NOT IN ('direct','','unknown','waitlist','register','giveaway_modal','safari','chrome','firefox','edge','samsung','web') THEN MAX(ac.source) END,
-  CASE WHEN lower(MAX(fs.source)) NOT IN ('direct','','safari','chrome','firefox','edge','samsung','web') THEN MAX(fs.source) END,
+  CASE WHEN lower(MAX(ac.source)) <> ALL(${LEGACY_NON_SOURCES}) THEN MAX(ac.source) END,
+  CASE WHEN lower(MAX(fs.source)) <> ALL(${LEGACY_NON_SOURCES}) THEN MAX(fs.source) END,
   MAX(wl.source),
   MAX(fs.source)
  ) AS source,
@@ -216,14 +223,14 @@ export async function GET(request: NextRequest) {
  approvedAt: (r.approved_at as string | null) ?? null,
  referralCode: (r.referral_code as string | null) ?? null,
  referredBy: (r.referred_by as string | null) ?? null,
+ // Three fields, because the UI needs all three: the raw slug for CSV/debugging,
+ // a display label ("TikTok", "Direct"), and the channel the filter chips group by.
  source: (() => {
- let s = (r.source as string | null) ?? null;
- if (!s && r.referred_by) s = "referral";
- if (!s) return null;
- const A: Record<string, string> = { ig: "instagram", fb: "facebook", tw: "twitter", tt: "tiktok", yt: "youtube", li: "linkedin" };
- s = s.toLowerCase();
- return A[s] ?? s;
+ const raw = (r.source as string | null) ?? (r.referred_by ? "referral" : null);
+ return raw ? canonicalSource(raw) : null;
  })(),
+ sourceLabel: normalizeStoredSource((r.source as string | null) ?? (r.referred_by ? "referral" : null)),
+ sourceChannel: sourceChannel((r.source as string | null) ?? (r.referred_by ? "referral" : null)),
  loginMethod,
  emailSubscribe: r.email_subscribe as boolean,
  activityScore: Number(r.activity_score ?? 0),

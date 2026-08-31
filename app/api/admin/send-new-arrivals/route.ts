@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { getApprovedPilotEmails } from "@/app/lib/pilot-db";
-import { sendNewArrivalsEmail } from "@/app/lib/email";
+import { sendNewArrivalsEmail, NEW_ARRIVALS_SUBJECT_KEY } from "@/app/lib/email";
 import { getEmailPickProducts } from "@/app/lib/editors-picks-db";
 import { getSetting, saveSetting } from "@/app/lib/settings-db";
 import type { DBProduct } from "@/app/lib/db";
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, message: "No approved users to email.", sent: 0 });
  }
 
- const { sent, failed } = await sendNewArrivalsEmail(emails, products, usingPicks);
+ const { sent, failed } = await sendNewArrivalsEmail(emails, products, usingPicks, await getSetting(NEW_ARRIVALS_SUBJECT_KEY).catch(() => null));
 
  // Reset the cron lock so the scheduled job won't double-send this week
  if (sendForReal) {

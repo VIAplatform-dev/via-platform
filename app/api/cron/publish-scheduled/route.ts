@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { publishDueScheduledItems } from "@/app/lib/db/inventory";
+import { publishDueScheduledItems, getCrossListChannels } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { createCrossListingsForItem, syncItemToApiPlatforms } from "@/app/lib/cross-listing-db";
 import { maybeAutoPostStory } from "@/app/lib/instagram-publish";
@@ -36,8 +36,10 @@ export async function GET(request: Request) {
   const slug = seller.slug;
   for (const it of its) {
    published++;
-   createCrossListingsForItem(slug, it.id).catch(() => {});
-   syncItemToApiPlatforms(slug, it.id).catch(() => {});
+   // Honour the channels the seller picked when they scheduled it, not today's defaults.
+   const channels = await getCrossListChannels(it.id).catch(() => null);
+   createCrossListingsForItem(slug, it.id, channels).catch(() => {});
+   syncItemToApiPlatforms(slug, it.id, channels).catch(() => {});
    maybeAutoPostStory(slug, it.id).catch(() => {});
   }
   const digestItems: NewListingItem[] = its.map((it) => ({

@@ -13,8 +13,9 @@ export async function POST(request: NextRequest) {
  const b = await request.json().catch(() => ({}));
  const itemId = String(b?.itemId || "");
  if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
+ const channels = Array.isArray(b?.channels) ? b.channels.filter((c: unknown): c is string => typeof c === "string") : null;
  try {
- await syncItemToApiPlatforms(slug, itemId);
+ await syncItemToApiPlatforms(slug, itemId, channels);
  return NextResponse.json({ ok: true, board: await getCrossListBoard(slug) });
  } catch (e) {
  return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Retry failed." }, { status: 500 });

@@ -10,7 +10,8 @@ import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import SandboxEmbed from "./SandboxEmbed";
 // The shared editing kit + the per-family layout files. See blocks/kit.tsx for why the editing
 // affordances live outside this file.
-import { ff, makeKit, inlineHtml, decodeEntities, HANDLE_SET, HANDLE_POS, type Ctx, type Colors, type BlockProduct, type OverlayEdit, type FreeEdit, type FaqDnd } from "./blocks/kit";
+import { ff, makeKit, inlineHtml, decodeEntities, panBgImg, HANDLE_SET, HANDLE_POS, type Ctx, type Colors, type BlockProduct, type OverlayEdit, type FreeEdit, type FaqDnd } from "./blocks/kit";
+import { PLACEHOLDER_MARK } from "@/app/lib/storefront-placeholder-image";
 import { renderHero } from "./blocks/hero";
 import { renderFeatured } from "./blocks/featured";
 import ContactForm from "./ContactForm";
@@ -106,9 +107,9 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
    ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} compact />
    : (
    <div className="flex flex-col gap-2 opacity-70">
-    <input disabled placeholder="Name" className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
-    <input disabled placeholder="Email" className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
-    <textarea disabled placeholder="Message" rows={3} className="rounded border border-black/15 px-2.5 py-1.5 text-[12px]" />
+    <input disabled placeholder="Name" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    <input disabled placeholder="Email" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    <textarea disabled placeholder="Message" rows={3} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
     <span className="mt-0.5 self-start rounded px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white" style={{ background: accent }}>{p.cta || "Send"}</span>
    </div>
    )}
@@ -158,6 +159,10 @@ function bgFor(bg: string | undefined, colors: Colors): { background?: string; f
 // Emitted as a <style> scoped to `.vya-b-<id>`, with !important so friendly controls reliably beat
 // the section's utility classes. Same output in the editor preview and on the live site.
 const PAD_SCALE: Record<string, string> = { sm: "1rem", md: "2.5rem", lg: "4.5rem", xl: "7rem" };
+// The same scale for a phone. 7rem of air above and below reads as generous on a 1440px canvas and as
+// a blank screen on a 390px one, so the preset has a narrow-screen twin rather than being applied
+// literally. Kept beside PAD_SCALE so the two can't drift apart.
+const PAD_SCALE_MOBILE: Record<string, string> = { sm: "0.75rem", md: "1.5rem", lg: "2.25rem", xl: "3rem" };
 const HEAD_SCALE: Record<string, string> = { sm: "1.6rem", md: "2.3rem", lg: "3.2rem", xl: "4.3rem" };
 const ALIGN_FLEX: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
 const SHADOW_CSS: Record<string, string> = { sm: "0 1px 3px rgba(20,16,12,.12)", md: "0 8px 24px -6px rgba(20,16,12,.18)", lg: "0 20px 44px -12px rgba(20,16,12,.28)", xl: "0 30px 70px -18px rgba(20,16,12,.38)" };
@@ -191,6 +196,14 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  // emitted after this, so they win for the fields they cover without touching the others.
  out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{text-align:${st.align}!important}`);
  out.push(`${sel} .vya-hero-inner{align-items:${ALIGN_FLEX[st.align]}!important;text-align:${st.align}!important}`);
+ // Headings and subtext carry `mx-auto` so they centre inside a wide hero. That auto-margin wins
+ // over the flex alignment above, so an aligned section ended up with a CENTRED box containing
+ // right-aligned text — which reads as a broken layout rather than a right-aligned one. Releasing
+ // the margin on the side we're aligning to lets the box itself move.
+ if (st.align !== "center") {
+  const [ml, mr] = st.align === "right" ? ["auto", "0"] : ["0", "auto"];
+  out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{margin-left:${ml}!important;margin-right:${mr}!important}`);
+ }
  }
  // Per-field alignment: heading/subtext/cta/body can each be aligned independently of one another and
  // of the section-wide default above — targeted by `data-field`, not by class, since the class alone
@@ -199,7 +212,14 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  // repositions the field within a flex hero, where align-items alone would otherwise move every field together.
  for (const [field, a] of [["heading", st.headingAlign], ["subtext", st.subtextAlign], ["body", st.bodyAlign]] as const) {
  if (!a) continue;
- out.push(`${sel} [data-field="${field}"]{text-align:${a}!important;align-self:${ALIGN_FLEX[a]}!important}`);
+ const decls = [`text-align:${a}!important`, `align-self:${ALIGN_FLEX[a]}!important`];
+ // If the field has an explicit width (dragged narrower), text-align can only move the text INSIDE
+ // that shrunk box — the box itself stays pinned left, so "center" looked off-center. Position the
+ // box with auto margins too (same idea as the button below), so the alignment actually lands.
+ if (st.free?.[field]?.w != null) {
+  decls.push("display:block!important", `margin-left:${a === "left" ? "0" : "auto"}!important`, `margin-right:${a === "right" ? "0" : "auto"}!important`);
+ }
+ out.push(`${sel} [data-field="${field}"]{${decls.join(";")}}`);
  }
  // The button needs a DIFFERENT technique: it's a small inline-block pill, not full-width running
  // text, so `text-align` on itself has nothing to do — text-align only matters to a box's OWN wrapped
@@ -240,6 +260,25 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  if (fv.lh != null) d.push(`line-height:${(fv.lh / 100).toFixed(2)}`);
  if (fv.transform) d.push(`text-transform:${fv.transform}`);
  if (d.length) out.push(`${sel} [data-field="${field}"]{${d.map((x) => x + "!important").join(";")}}`);
+ // Alignment has to move the BOX, not only the words in it.
+ //
+ // Every one of these fields runs to a measure — a hero heading is capped at max-w-3xl, a subtext at
+ // max-w-xl — so the box is narrower than the space it sits in. `text-align` can only shuffle text
+ // WITHIN that box, and the box itself stays wherever the layout left it. Which is why picking
+ // "Align · Centre" on a heading that was already centre-aligned visibly did nothing at all: it was
+ // already true, and the thing actually off-centre was the box.
+ //
+ // Auto margins place the box; text-align then places the text inside it. `align-self` covers the
+ // flex heroes, where the parent's align-items would otherwise move every field at once. Emitted for
+ // the element (the live storefront, which has no wrapper) AND for the editor's selection wrapper,
+ // which is the box there — so both surfaces land in the same place.
+ //
+ // The built-in button is excluded: it's a shrink-to-fit pill with its own ctaAlign rule above,
+ // and a second set of margin declarations here would fight it.
+ if (fv.align && field !== "cta") {
+  const ml = fv.align === "left" ? "0" : "auto", mr = fv.align === "right" ? "0" : "auto";
+  out.push(`${sel} [data-field="${field}"],${sel} [data-field-box="${field}"]{margin-left:${ml}!important;margin-right:${mr}!important;align-self:${ALIGN_FLEX[fv.align]}!important}`);
+ }
  }
  // The section's own built-in CTA (`.vya-cta`) — distinct from a free-form overlay button.
  // "Fill" (default) vs "No fill" (outline): the outline's border/text colour defaults to ctaBg, so
@@ -271,12 +310,22 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  const parts = [hoverBg ? `background:${hoverBg}!important;border-color:${hoverBg}!important` : "", hoverColor ? `color:${hoverColor}!important` : ""].filter(Boolean).join(";");
  if (parts) out.push(`${sel} .vya-cta:hover{${parts}}`);
  }
- // Padding: explicit px wins over the preset.
- if (st.padY != null || st.padX != null) {
- const py = st.padY != null ? `${st.padY}px` : (st.space ? PAD_SCALE[st.space] : null);
- const parts = [py != null ? `padding-top:${py}!important;padding-bottom:${py}!important` : "", st.padX != null ? `padding-left:${st.padX}px!important;padding-right:${st.padX}px!important` : ""].filter(Boolean).join(";");
+ // Padding. Vertical space resolves PER EDGE, most specific first: an explicit padTop/padBottom wins,
+ // then padY (which moves both edges together), then the `space` preset. That order is what makes
+ // "close the gap above this photo but keep the one below it" expressible at all — with only padY,
+ // the two edges could never disagree.
+ const preset = st.space ? PAD_SCALE[st.space] : null;
+ const bothY = st.padY != null ? `${st.padY}px` : preset;
+ const topY = st.padTop != null ? `${st.padTop}px` : bothY;
+ const botY = st.padBottom != null ? `${st.padBottom}px` : bothY;
+ {
+ const parts = [
+  topY != null ? `padding-top:${topY}!important` : "",
+  botY != null ? `padding-bottom:${botY}!important` : "",
+  st.padX != null ? `padding-left:${st.padX}px!important;padding-right:${st.padX}px!important` : "",
+ ].filter(Boolean).join(";");
  if (parts) out.push(`${sel}{${parts}}`);
- } else if (st.space) out.push(`${sel}{padding-top:${PAD_SCALE[st.space]}!important;padding-bottom:${PAD_SCALE[st.space]}!important}`);
+ }
  if (st.minH) {
  // A HARD height, not a floor: `min-height` can only ever grow a box, never shrink it below its
  // content's natural size — so dragging a resize handle inward (smaller) would silently do nothing.
@@ -289,6 +338,47 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  // it, so a NEW variant participates in section resizing without this compiler learning about it.
  out.push(`${sel} .vya-fill,${sel} .vya-hero-frame,${sel} .vya-hero-inner,${sel} .vya-fill .vya-slide{height:${st.minH}px!important;min-height:0!important}`);
  }
+ // ── Mobile adaptation ─────────────────────────────────────────────────────────────────────────
+ // Whatever the merchant builds on desktop gets scaled down for a phone, automatically.
+ //
+ // Every number in this compiler is authored against a ~1440px canvas: a 700px section height, 96px
+ // of padding, a 51px headline. Applied unchanged at 390px they are absurd — the section becomes a
+ // screen and a half of empty colour with five lines of oversized type stranded in it. That is not a
+ // layout bug (nothing overflows or clips, which is why a structural audit passes it) — it is a
+ // proportion bug, and it appears the moment anyone touches a size control.
+ //
+ // So the same values are re-emitted, scaled, inside a narrow-container query. Floors stop anything
+ // collapsing, ceilings stop a deliberately enormous desktop headline staying enormous. Nothing here
+ // fires unless the merchant actually set the value, so an untouched section is unaffected.
+ const scale = (v: number, factor: number, floor: number, ceil?: number) => {
+  const n = Math.max(floor, Math.round(v * factor));
+  return ceil ? Math.min(ceil, n) : n;
+ };
+ const mob: string[] = [];
+ if (st.minH) {
+  const h = scale(st.minH, 0.62, 160);
+  mob.push(`${sel}{height:${h}px!important}`);
+  mob.push(`${sel} .vya-fill,${sel} .vya-hero-frame,${sel} .vya-hero-inner,${sel} .vya-fill .vya-slide{height:${h}px!important;min-height:0!important}`);
+ }
+ // Padding resolves per edge exactly as it does above, so the mobile version follows the same order.
+ const mTop = st.padTop ?? st.padY, mBot = st.padBottom ?? st.padY;
+ const mPreset = st.space ? PAD_SCALE_MOBILE[st.space] : null;
+ if (mTop != null) mob.push(`${sel}{padding-top:${scale(mTop, 0.5, 12)}px!important}`);
+ else if (mPreset) mob.push(`${sel}{padding-top:${mPreset}!important}`);
+ if (mBot != null) mob.push(`${sel}{padding-bottom:${scale(mBot, 0.5, 12)}px!important}`);
+ else if (mPreset) mob.push(`${sel}{padding-bottom:${mPreset}!important}`);
+ if (st.padX != null) mob.push(`${sel}{padding-left:${scale(st.padX, 0.45, 16)}px!important;padding-right:${scale(st.padX, 0.45, 16)}px!important}`);
+ if (st.headingSizePx) mob.push(`${sel} .vya-heading{font-size:${scale(st.headingSizePx, 0.6, 22, 34)}px!important}`);
+ if (st.subtextSizePx) mob.push(`${sel} .vya-sub{font-size:${scale(st.subtextSizePx, 0.85, 13, 18)}px!important}`);
+ // Per-field sizes the merchant set by corner-dragging a heading. A button scales more gently: it is
+ // already small, and shrinking its label further makes it look broken rather than neat.
+ if (st.free) for (const [field, fv] of Object.entries(st.free)) {
+  if (!fv.fontPx) continue;
+  const isBtn = field === "cta" || field.startsWith("cta");
+  mob.push(`${sel} [data-field="${field}"]{font-size:${isBtn ? scale(fv.fontPx, 0.8, 11, 16) : scale(fv.fontPx, 0.6, 20, 34)}px!important}`);
+ }
+ if (mob.length) out.push(`@container (max-width:640px){${mob.join("")}}`);
+
  // Border · radius · shadow — the section reads as a styled card.
  const box: string[] = [];
  if (st.radius) box.push(`border-radius:${st.radius}px`, "overflow:hidden");
@@ -464,21 +554,73 @@ export default function Blocks({
  const br = BTN_RADIUS[radius] ?? 0;
  // Corner style, scoped to this storefront's sections. `.vya-round` marks the image/card frames that
  // should curve; the full-bleed hero, announcement bar, and marquee deliberately stay square.
- const radiusCss = ir || br ? `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}` : "";
+ // Always emitted, including for "sharp" where both values are 0. Skipping it when there is nothing
+ // to round looked like a harmless optimisation and wasn't: a block carrying its own Tailwind
+ // rounding (the contact form's `rounded-md` CTA) had nothing to override it, so a template set to
+ // sharp corners still drew a rounded button. The token has to be authoritative, not conditional.
+ // `.vya-field` keeps form inputs on the same curve as the images rather than a fixed 6px.
+ const radiusCss = `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}.vya-field{border-radius:${ir}px}`;
  // Overlay elements are absolutely placed (% coords) on wide layouts; on a narrow container they stack
  // into normal flow — centred, padded — so a button dragged over the hero never overlaps or runs off a
  // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.
  // z-index:20 so overlays float ABOVE section content that sets its own stacking (e.g. the hero's
  // z-10 inner) instead of hiding behind it. Layer is click-through; only the elements catch pointers.
  // Skin rules are emitted LAST so they lose to nothing but the merchant's own !important overrides.
+ // Every photo WE supply reads as ours, everywhere, in the builder only.
+ //
+ // ImageSlot and PhotoFrame each label their own placeholder, but they aren't the only things that
+ // render one: category tiles, blog thumbnails, column images and spotlight photos all draw their own
+ // markup. Covering them one by one means covering nine renderers and missing the tenth — and a
+ // placeholder that looks like a real photograph is one a seller publishes by accident.
+ //
+ // So it's an attribute selector on the source path: one rule, no renderer can escape it, and a new
+ // layout added tomorrow inherits it for free. Desaturated and dimmed so it reads as scaffolding
+ // rather than as a photo someone chose. Editor only — on the live storefront these render normally,
+ // which is the entire point of shipping a template with pictures in it.
+ const placeholderCss = edit
+  ? `.vya-sec img[src*="${PLACEHOLDER_MARK}"]{filter:grayscale(1) contrast(.92) opacity(.62)}`
+  : "";
  const skinRules = skinCss(skin);
- const overlayCss = ".vya-ovl-layer{position:absolute;inset:0;z-index:20;pointer-events:none}.vya-ovl{position:absolute;pointer-events:auto}@container (max-width:640px){.vya-ovl-layer{position:static;display:flex;flex-direction:column;align-items:center;gap:.85rem;padding:1.75rem 1.25rem}.vya-ovl{position:static!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;max-width:100%}.vya-ovl-shape{width:52%!important}.vya-ovl-line{width:82%!important}.vya-hero-free{position:static!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;margin:0 auto;padding:6rem 1.25rem}.vya-free,.vya-free-el{position:static!important;left:auto!important;top:auto!important;transform:none!important;max-width:100%!important}.vya-free-spacer{display:none!important}}";
+ // A photo that has been MOVED is positioned, and a positioned element later in the DOM paints over
+ // its siblings — so dragging a hero's photo put it on top of the headline. Content sits above it by
+ // default; overlays (z-20) stay above both. Moving a picture should rearrange the picture, not bury
+ // the words.
+ // Whatever a merchant builds has to survive a phone.
+ //
+ // A framed photo carries a desktop position, a percentage width and an aspect ratio. None of that
+ // reflows: on a narrow screen the frames keep their desktop proportions, so they overlap each other,
+ // bury the copy, and run off the side. So below the same 640px breakpoint the overlay layer already
+ // uses, a framed photo gives up its framing entirely and returns to the flow as a full-width band —
+ // stacked, in order, nothing on top of anything else.
+ //
+ // Only `.vya-photo-framed` is touched. A photo the merchant never moved or resized keeps rendering
+ // exactly as its layout draws it, at every width, which is what makes this safe to apply globally.
+ const photoLayerCss = ".vya-free-canvas,.vya-hero-inner{position:relative;z-index:2}.vya-photo{z-index:0}"
+  // RELATIVE, not static. Every photo frame holds an `<img class="absolute inset-0">`, so the frame
+  // has to stay a containing block — made static it stops being one, the image resolves against the
+  // whole section instead, and it renders far too large and spills out of its frame. That is the
+  // overflow on the phone: not the position of the frame, but what un-positioning it did to the
+  // picture inside. `position:relative` with left/top/transform reset puts the frame back in normal
+  // flow while keeping the image anchored to it.
+  + "@container (max-width:640px){.vya-photo-framed{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;aspect-ratio:auto!important;height:auto!important;min-height:38vh!important;flex:initial!important;z-index:0!important}}";
+ // A field the merchant DRAGGED somewhere is an inline-flex box positioned by x/y. On a phone the
+ // position is dropped (it can't survive a reflow), and what's left is an inline box that falls to
+ // the left edge — a centred hero headline came out hard against the margin. A positioned field never
+ // carries the layout's own `mx-auto`, because on desktop its wrapper is placed absolutely and a
+ // margin would nudge it; so once the position is gone there is nothing left to centre it. Give it
+ // back here, for narrow screens only. Same treatment `.vya-hero-free` already gets.
+ const freePosCss = "@container (max-width:640px){.vya-free-pos{display:block!important;margin-left:auto!important;margin-right:auto!important;text-align:inherit}}";
+ // `width:auto` in that rule is load-bearing. A merchant who narrows a headline to 32% of a 1440px
+ // canvas means "about 460px of measure" — applied literally at 390px it is 125px, and a three-word
+ // store name breaks onto three lines. A width chosen against the desktop canvas cannot survive the
+ // phone, so on narrow screens the field takes its natural measure and the text re-wraps sanely.
+ const overlayCss = ".vya-ovl-layer{position:absolute;inset:0;z-index:20;pointer-events:none}.vya-ovl{position:absolute;pointer-events:auto}@container (max-width:640px){.vya-ovl-layer{position:static;display:flex;flex-direction:column;align-items:center;gap:.85rem;padding:1.75rem 1.25rem}.vya-ovl{position:static!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;max-width:100%}.vya-ovl-shape{width:52%!important}.vya-ovl-line{width:82%!important}.vya-hero-free{position:static!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;margin:0 auto;padding:6rem 1.25rem}.vya-free,.vya-free-el{position:static!important;left:auto!important;top:auto!important;transform:none!important;max-width:100%!important;width:auto!important}.vya-free-spacer{display:none!important}}";
  return (
  // `@container` makes the sections respond to THIS element's width, not the viewport — so the
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
  <div className={`@container${skinRules ? ` vya-skin-${skin}` : ""}`} style={{ fontFamily: body, color: colors.text }}>
- <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + overlayCss + skinRules }} />
+ <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + photoLayerCss + freePosCss + overlayCss + skinRules + placeholderCss }} />
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
@@ -489,7 +631,16 @@ export default function Blocks({
  const secClass = `vya-sec vya-${b.type} vya-b-${b.id}`;
  const dragging = reorder?.dragIndex ?? null;
  const showLine = editable && reorder && reorder.overIndex === i && dragging !== null && dragging !== i;
- const overrideCss = (b.style ? sectionOverrideCss(b.id, b.style) : "") + (b.overlays?.length ? b.overlays.map(overlayOverrideCss).join("") : "");
+ // An image section set to "Fill" is edge to edge, which has to include the section's OWN padding —
+ // the layout can drop its margins but not the preset spacing the section box carries above it.
+ const imgFill = b.type === "image" && b.props?.fill === "1";
+ // Fill zeroes the section's own padding as well as the layout's margins — but it yields to an edge
+ // the merchant set deliberately, so "edge to edge, with 60px of air above it" is reachable by using
+ // both controls rather than by them cancelling each other out.
+ const fillCss = imgFill
+  ? `.vya-b-${b.id}{${b.style?.padTop == null ? "padding-top:0!important;" : ""}${b.style?.padBottom == null ? "padding-bottom:0!important;" : ""}padding-left:0!important;padding-right:0!important}`
+  : "";
+ const overrideCss = (b.style ? sectionOverrideCss(b.id, b.style) : "") + (b.overlays?.length ? b.overlays.map(overlayOverrideCss).join("") : "") + fillCss;
  // A section background photo (full-bleed, behind everything). Wins over a bg colour; a soft scrim
  // keeps overlaid text legible without forcing the seller to fiddle. url() is quote-escaped.
  // Hero/image sections render their OWN picture (props.image), so they ignore this layer — otherwise a
@@ -504,10 +655,23 @@ export default function Blocks({
  const bgEmbed = media?.kind === "embed" ? backgroundEmbedSrc(media.url) : null;
  const ov = (b.style?.bgOverlay ?? 24) / 100; // scrim strength over a photo/video (keeps text legible)
  const scrim = `linear-gradient(rgba(0,0,0,${(ov * 0.75).toFixed(2)}),rgba(0,0,0,${ov.toFixed(2)}))`;
+ // A section's background PHOTO is a real <img> layer, not a CSS background-image.
+ //
+ // As a CSS background it could only ever be `cover` at `center`: there was no way to say which part
+ // of the picture mattered, no way to scale it, and the merchant's only recourse was to crop the file
+ // and re-upload. Every other photo in the product — hero, split, spotlight, gallery tile — is an
+ // <img> that drags to reposition and zooms about that focal point. This makes the section background
+ // the same kind of object, so one gesture works everywhere.
+ //
+ // `object-fit:cover` + `object-position:center` is pixel-identical to what the CSS background did, so
+ // a storefront that never touches the new controls renders exactly as it does today. The framing
+ // lives in `props` (bgPos/bgZoom) beside imagePos/imageZoom rather than in `style`, which also means
+ // it round-trips through sanitizeBlocks with no whitelist to keep in sync.
  const secStyle: React.CSSProperties = bgImg
- ? { backgroundImage: `${scrim}, url("${bgImg.replace(/"/g, "%22")}")`, backgroundSize: "cover", backgroundPosition: "center", color: b.style?.textColor || "#ffffff" }
+ ? { background: background || undefined, color: b.style?.textColor || "#ffffff" }
  : (bgVideo || bgEmbed) ? { background: background || "#000", color: b.style?.textColor || "#ffffff" }
  : background ? { background, color: b.style?.textColor || fg } : {};
+ const bgPan = bgImg ? panBgImg({ edit, onEditField }, b, "bgPos", "bgZoom") : null;
  return (
  <div
  key={b.id}
@@ -560,6 +724,32 @@ export default function Blocks({
  <span className="pointer-events-none absolute inset-0 m-auto h-2 w-10 rounded-full border border-white bg-[#5D0F17] shadow" />
  </span>
  ))}
+ {/* Full-bleed background PHOTO. Click-through on the live storefront; in the editor the photo
+     itself catches the pointer so it can be dragged to reposition, exactly like a hero's. */}
+ {bgImg && (
+ <div
+  className={`absolute inset-0 z-0 overflow-hidden ${edit ? "" : "pointer-events-none"}`}
+  // Decorative on the live site. In the editor it's a drag target, and hiding a thing you can
+  // manipulate from the accessibility tree would be a lie.
+  aria-hidden={edit ? undefined : true}
+  // Selecting the section by clicking it has to keep working. The pan handler calls preventDefault
+  // on pointerdown (to kill the browser's image-drag), which also suppresses the click that
+  // normally reaches the section — and this layer covers the whole section, so without this a
+  // section with a background photo would become unselectable by clicking. pointerup still fires,
+  // and selecting the section you just finished panning is the right outcome either way.
+  onPointerUp={editable ? (e) => { e.stopPropagation(); onSelect!(b.id); } : undefined}
+ >
+ <img
+  src={bgImg}
+  alt=""
+  draggable={false}
+  {...bgPan}
+  className={`absolute inset-0 h-full w-full select-none object-cover ${edit ? "cursor-grab touch-none" : ""}`}
+  title={edit ? "Drag to reposition — zoom is in the section toolbar" : undefined}
+ />
+ <div className="pointer-events-none absolute inset-0" style={{ background: scrim }} />
+ </div>
+ )}
  {/* Full-bleed video / embed background behind the section — click-through, muted, looping. */}
  {(bgVideo || bgEmbed) && (
  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
@@ -569,7 +759,7 @@ export default function Blocks({
  <div className="absolute inset-0" style={{ background: scrim }} />
  </div>
  )}
- {(bgVideo || bgEmbed) ? <div className="relative z-[1]">{inner}</div> : inner}
+ {(bgVideo || bgEmbed || bgImg) ? <div className="relative z-[1]">{inner}</div> : inner}
  {b.overlays?.length ? (
  <div className="vya-ovl-layer">
  {b.overlays.map((o) => {

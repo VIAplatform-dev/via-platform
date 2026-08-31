@@ -11,6 +11,7 @@ import { getImportedOrderTitleSet } from "./imported-orders-db";
 import { extractMeasurements } from "./measurements";
 import { inferItemFields } from "./infer-item-fields";
 import type { ImportedProduct } from "./store-import";
+import { MAX_ITEM_IMAGES } from "./item-limits";
 
 // Pure helpers (money, identity, hashing) live in capture-commerce-core.ts so they can be unit
 // tested without the database layer — same split as inventory-core.ts.
@@ -105,7 +106,8 @@ export async function importProductsAsItems(
  // Store the source URLs now (fast import); the rehost-images cron copies them onto
  // OUR storage in the background so the interactive import doesn't wait on hundreds of
  // image uploads. Durability without the slow import.
- const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, 8);
+ // MAX_ITEM_IMAGES is main's — a deliberate raise from 8 so a seller's fuller galleries survive.
+ const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, MAX_ITEM_IMAGES);
  // A re-sync writes the seller's own image URLs back over our copies. Left alone, that undoes the
  // photo copying AND keeps the "copied" marker set — we-thieves lost all 163 of its items that way
  // an hour after they were copied. Hand the work back instead. See needsCopyAfterImport.
@@ -520,7 +522,7 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  let raw: string[] = [];
  if (p.images) { try { const a = JSON.parse(p.images); if (Array.isArray(a)) raw = a; } catch {} }
  if (!raw.length && p.image) raw = [p.image];
- const images = raw.slice(0, 8); // rehost-images cron copies these to our storage in the background
+ const images = raw.slice(0, MAX_ITEM_IMAGES); // rehost-images cron copies these to our storage in the background
  // Carry over what the source had; fill any blanks by inferring from title + description.
  const inf = inferItemFields(title, p.description, { brand: p.brand, era: p.era, material: p.materials, condition: p.condition, category: p.product_type });
  await createItem({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
 import { stores as storeList } from "@/app/lib/stores";
+import { canonicalSource, normalizeStoredSource, sourceChannel } from "@/app/lib/traffic-source";
 
 function isAdminAuthenticated(request: NextRequest): boolean {
  const adminPassword = process.env.ADMIN_PASSWORD;
@@ -272,9 +273,13 @@ export async function GET(
  // that's genuinely all we captured. Form/import names ("waitlist","newsletter",
  // "mailchimp") aren't channels either — they describe HOW the email was captured,
  // so they're shown only as a last resort.
- const SRC_ALIAS: Record<string, string> = { ig: "instagram", fb: "facebook", tw: "twitter", tt: "tiktok", yt: "youtube", li: "linkedin" };
+ // Alias resolution comes from app/lib/traffic-source.ts — this file used to carry its
+ // own fifth copy of the map. NON_CHANNEL stays local because it is deliberately WIDER
+ // than the shared list here: on a single customer's page a form name ("waitlist") is
+ // worth showing as a last resort, so it is excluded from "real channel" but not from
+ // display.
  const NON_CHANNEL = new Set(["direct", "unknown", "", "waitlist", "newsletter", "mailchimp", "giveaway_modal", "manual", "test", "email-capture"]);
- const norm = (s: string | null | undefined) => (s ? (SRC_ALIAS[s.toLowerCase()] ?? s.toLowerCase()) : null);
+ const norm = (s: string | null | undefined) => (s ? canonicalSource(s) || null : null);
  let acquisitionSource: string | null = null;
  let hadDirect = false;
  if (userId) {
@@ -309,6 +314,45 @@ export async function GET(
  // Last resort: we saw them but never a real channel.
  if (!acquisitionSource && hadDirect) acquisitionSource = "direct";
 
+ // ── Visit history ────────────────────────────────────────────────────────
+ // Every recorded visit for this account, newest first, so the page can show
+ // first-touch vs. every touch after it — "found us on TikTok, came back through
+ // Instagram". Only visits made while SIGNED IN carry a user_id, so this is the
+ // attributable subset, not necessarily every visit they ever made; the page says so.
+ const visitRows = userId
+ ? ((await sql`
+  SELECT utm_source, utm_medium, utm_campaign, landing_path, timestamp
+  FROM utm_visits
+  WHERE user_id = ${userId}
+  ORDER BY timestamp DESC
+  LIMIT 200
+ `.catch(() => [])) as { utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; landing_path: string | null; timestamp: Date | string }[])
+ : [];
+
+ const visits = visitRows.map((v) => ({
+ source: normalizeStoredSource(v.utm_source),
+ channel: sourceChannel(v.utm_source),
+ medium: v.utm_medium ?? null,
+ campaign: v.utm_campaign ?? null,
+ landingPath: v.landing_path ?? null,
+ timestamp: v.timestamp instanceof Date ? v.timestamp.toISOString() : v.timestamp,
+ }));
+
+ // One row per distinct source, with how often and when — the "where do they keep
+ // coming back from" summary that sits above the raw list.
+ const bySource = new Map<string, { source: string; channel: string; visits: number; firstAt: string; lastAt: string }>();
+ for (const v of visits) {
+ const e = bySource.get(v.source);
+ if (!e) {
+  bySource.set(v.source, { source: v.source, channel: v.channel, visits: 1, firstAt: v.timestamp, lastAt: v.timestamp });
+  continue;
+ }
+ e.visits += 1;
+ if (v.timestamp < e.firstAt) e.firstAt = v.timestamp;
+ if (v.timestamp > e.lastAt) e.lastAt = v.timestamp;
+ }
+ const visitSources = [...bySource.values()].sort((a, b) => b.visits - a.visits);
+
  return NextResponse.json({
  profile: {
  email,
@@ -342,6 +386,10 @@ export async function GET(
  daysSinceLastSeen,
  isReturning: distinctDays >= 2,
  },
+ visits,
+ visitSources,
+ // True when the raw list hit the cap, so the UI doesn't imply it's the whole history.
+ visitsTruncated: visitRows.length >= 200,
  sessions: sessions.reverse().map((s) => ({
  start: s.start,
  end: s.end,

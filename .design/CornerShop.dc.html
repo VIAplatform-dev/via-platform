@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap">
+  <style>
+    body { margin:0; background:#F5F2E8; font-family:'Public Sans','Helvetica Neue',sans-serif; color:#1F2421; }
+    a { color:#2D5F4C; text-decoration:none; } a:hover { color:#1B3D31; }
+    .disp { font-family:'Zilla Slab',Georgia,serif; }
+    .ph { background-image:linear-gradient(155deg,#DDDBCD 0%,#C4C2B1 55%,#ABA895 100%); }
+    .ph2 { background-image:linear-gradient(155deg,#D2D1C2 0%,#B8B7A4 55%,#9E9C88 100%); }
+    .ph3 { background-image:linear-gradient(155deg,#E7E5D9 0%,#D0CEBF 55%,#B8B5A3 100%); }
+    .ph4 { background-image:linear-gradient(155deg,#C7C6B5 0%,#ADAB98 55%,#93907C 100%); }
+  </style>
+</helmet>
+
+<div style="width:1200px; background:#F5F2E8;">
+
+  <div style="background:#2D5F4C; color:#F5F2E8; text-align:center; padding:10px 0; font-size:13px; font-weight:500;">Open today until 3pm · Free local pickup, or we ship anywhere</div>
+
+  <!-- header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:20px 48px; border-bottom:1px solid #DFDCCE;">
+    <span class="disp" style="font-size:26px; font-weight:700; letter-spacing:0.01em;">YOUR STORE</span>
+    <div style="display:flex; gap:24px; font-size:14px; font-weight:500;"><span>Just dropped</span><span>Shop all</span><span>Visit us</span><span>Consign with us</span><span>Events</span></div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1F2421" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1F2421" stroke-width="1.7"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+    </div>
+  </div>
+
+  <!-- hero: diptych, centred text band beneath -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:0;">
+    <div class="ph2" style="height:400px;"></div>
+    <div class="ph3" style="height:400px;"></div>
+  </div>
+  <div style="padding:52px 48px 46px; display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; border-bottom:1px solid #DFDCCE;">
+    <div style="display:flex; align-items:center; gap:9px; background:#E4EDE7; border-radius:999px; padding:7px 16px;">
+      <span style="width:8px; height:8px; border-radius:999px; background:#2D5F4C; display:inline-block;"></span>
+      <span style="font-size:12.5px; font-weight:600; color:#2D5F4C;">Open today until 3pm</span>
+    </div>
+    <h1 class="disp" style="margin:0; font-size:50px; font-weight:600; line-height:1.06; max-width:20ch;">A real shop, and everything is online too</h1>
+    <p style="margin:0; font-size:16px; line-height:1.65; color:#4A524D; max-width:56ch;">Consignment and vintage, added to the rail every week. Come and see it in person, or shop the same rail online.</p>
+    <div style="display:flex; gap:12px; margin-top:6px;">
+      <span style="background:#2D5F4C; color:#FFF; padding:14px 30px; border-radius:6px; font-size:14px; font-weight:600;">Shop online</span>
+      <span style="border:1px solid #1F2421; padding:14px 30px; border-radius:6px; font-size:14px; font-weight:600;">Directions &amp; hours</span>
+    </div>
+  </div>
+
+  <!-- THE SHOP CARD — signature: above the products -->
+  <div style="padding:44px 48px;">
+    <div style="background:#FFFFFF; border:1px solid #DFDCCE; border-radius:10px; display:grid; grid-template-columns:1.15fr 0.85fr; overflow:hidden;">
+      <div style="padding:36px 40px; display:flex; flex-direction:column; gap:22px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="width:9px; height:9px; border-radius:999px; background:#2D5F4C; display:inline-block;"></span>
+          <span style="font-size:13px; font-weight:600; color:#2D5F4C;">Open now — until 3:00pm</span>
+        </div>
+        <div style="display:flex; gap:44px;">
+          <div style="display:flex; flex-direction:column; gap:7px;">
+            <span class="disp" style="font-size:17px; font-weight:600;">Find us</span>
+            <span style="font-size:14px; line-height:1.65; color:#4A524D;">[YOUR STREET ADDRESS]<br>[CITY, STATE ZIP]<br>[YOUR PHONE]</span>
+            <span style="font-size:13.5px; font-weight:600; color:#2D5F4C; border-bottom:1px solid #2D5F4C; align-self:flex-start; padding-bottom:2px; margin-top:4px;">Open in maps</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:7px;">
+            <span class="disp" style="font-size:17px; font-weight:600;">Hours</span>
+            <div style="display:grid; grid-template-columns:auto auto; gap:3px 20px; font-size:14px; color:#4A524D;">
+              <span>Tue – Sat</span><span style="font-variant-numeric:tabular-nums;">9:00 – 3:00</span>
+              <span>Sunday</span><span style="font-variant-numeric:tabular-nums;">11:00 – 3:00</span>
+              <span>Monday</span><span>Closed</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="ph3" style="min-height:250px;"></div>
+    </div>
+  </div>
+
+  <!-- featured: just dropped -->
+  <div style="padding:16px 48px 56px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:22px;">
+      <h2 class="disp" style="margin:0; font-size:28px; font-weight:600;">Just dropped</h2>
+      <span style="font-size:14px; font-weight:500; color:#2D5F4C;">On the rail this week →</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:20px;">
+      <div style="display:flex; flex-direction:column; gap:10px;"><div class="ph" style="aspect-ratio:1; border-radius:8px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:14px; line-height:1.4;">Wool Blazer Size M</span><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:14px; font-weight:600;">$0.00</span><span style="font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; background:#E4EDE7; color:#2D5F4C; padding:3px 8px; border-radius:4px;">In store</span></div></div></div>
+      <div style="display:flex; flex-direction:column; gap:10px;"><div class="ph3" style="aspect-ratio:1; border-radius:8px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:14px; line-height:1.4;">Silk Scarf</span><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:14px; font-weight:600;">$0.00</span><span style="font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; background:#F3E6DC; color:#A04D19; padding:3px 8px; border-radius:4px;">Ships</span></div></div></div>
+      <div style="display:flex; flex-direction:column; gap:10px;"><div class="ph4" style="aspect-ratio:1; border-radius:8px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:14px; line-height:1.4;">Leather Tote</span><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:14px; font-weight:600;">$0.00</span><span style="font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; background:#E4EDE7; color:#2D5F4C; padding:3px 8px; border-radius:4px;">In store</span></div></div></div>
+      <div style="display:flex; flex-direction:column; gap:10px;"><div class="ph2" style="aspect-ratio:1; border-radius:8px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:14px; line-height:1.4;">Checked Shirt Jacket Size L</span><div style="display:flex; align-items:center; gap:8px;"><span style="font-size:14px; font-weight:600;">$0.00</span><span style="font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; background:#F3E6DC; color:#A04D19; padding:3px 8px; border-radius:4px;">Ships</span></div></div></div>
+    </div>
+  </div>
+
+  <!-- columns: three ways in -->
+  <div style="padding:52px 48px; background:#EFEBDE; border-top:1px solid #DFDCCE; border-bottom:1px solid #DFDCCE;">
+    <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:28px;">
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2D5F4C" stroke-width="1.5"><path d="M4 7h16l-1.4 12.2a2 2 0 0 1-2 1.8H7.4a2 2 0 0 1-2-1.8L4 7z"/><path d="M8.5 7V5.5a3.5 3.5 0 0 1 7 0V7"/></svg>
+        <h3 class="disp" style="margin:0; font-size:20px; font-weight:600;">Shop online</h3>
+        <p style="margin:0; font-size:14.5px; line-height:1.7; color:#4A524D;">Everything on the rail is listed online within a day of arriving. Collect it free from the shop, or we will post it to you.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2D5F4C" stroke-width="1.5"><path d="M12 21s-7-5.2-7-10a7 7 0 1 1 14 0c0 4.8-7 10-7 10z"/><circle cx="12" cy="11" r="2.6"/></svg>
+        <h3 class="disp" style="margin:0; font-size:20px; font-weight:600;">Come in</h3>
+        <p style="margin:0; font-size:14.5px; line-height:1.7; color:#4A524D;">The shop always holds more than fits online. Worth a visit if you are nearby.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2D5F4C" stroke-width="1.5"><path d="M4 5h16v14H4z"/><path d="M4 10h16"/><path d="M9 14h6"/></svg>
+        <h3 class="disp" style="margin:0; font-size:20px; font-weight:600;">Consign with us</h3>
+        <p style="margin:0; font-size:14.5px; line-height:1.7; color:#4A524D;">Book a slot and bring what you have. We price everything together, and you keep the larger share of whatever sells.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- faq: how consignment works -->
+  <div style="padding:60px 48px;">
+    <h2 class="disp" style="margin:0 0 8px; font-size:28px; font-weight:600;">How consignment works</h2>
+    <p style="margin:0 0 26px; font-size:14.5px; color:#5A625C;">The short version. Ask us anything else in person.</p>
+    <div style="display:flex; flex-direction:column; gap:0; border-top:1px solid #DFDCCE;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 4px; border-bottom:1px solid #DFDCCE;"><span style="font-size:15.5px; font-weight:500;">What do you take?</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A625C" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div style="padding:0 4px 20px; border-bottom:1px solid #DFDCCE;"><p style="margin:0; font-size:14.5px; line-height:1.75; color:#4A524D; max-width:72ch;">Clean, well-kept clothing, shoes, bags and jewellery — designer labels and genuine vintage especially. Nothing with damage we cannot mend, and nothing from a fast-fashion label.</p></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 4px; border-bottom:1px solid #DFDCCE;"><span style="font-size:15.5px; font-weight:500;">How is it priced?</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A625C" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 4px; border-bottom:1px solid #DFDCCE;"><span style="font-size:15.5px; font-weight:500;">When do I get paid?</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A625C" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:18px 4px; border-bottom:1px solid #DFDCCE;"><span style="font-size:15.5px; font-weight:500;">What happens to what doesn't sell?</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A625C" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></div>
+    </div>
+  </div>
+
+  <!-- contact form -->
+  <div style="padding:0 48px 60px;">
+    <div style="background:#FFFFFF; border:1px solid #DFDCCE; border-radius:10px; display:grid; grid-template-columns:0.85fr 1.15fr; overflow:hidden;">
+      <div style="padding:36px 38px; display:flex; flex-direction:column; gap:12px; background:#EFEBDE;">
+        <h3 class="disp" style="margin:0; font-size:24px; font-weight:600;">Book an intake</h3>
+        <p style="margin:0; font-size:14.5px; line-height:1.7; color:#4A524D;">Tell us roughly what you have and when suits you. We will come back with a time.</p>
+        <span style="font-size:14px; color:#4A524D; margin-top:6px;">Or just call [YOUR PHONE].</span>
+      </div>
+      <div style="padding:36px 38px; display:flex; flex-direction:column; gap:14px;">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <div style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:12.5px; font-weight:600; color:#4A524D;">Name</span><span style="border:1px solid #DFDCCE; border-radius:6px; padding:11px 12px; font-size:14px; color:#9A9A8E;">Your name</span></div>
+          <div style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:12.5px; font-weight:600; color:#4A524D;">Email</span><span style="border:1px solid #DFDCCE; border-radius:6px; padding:11px 12px; font-size:14px; color:#9A9A8E;">you@example.com</span></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;"><span style="font-size:12.5px; font-weight:600; color:#4A524D;">What are you bringing?</span><span style="border:1px solid #DFDCCE; border-radius:6px; padding:11px 12px; font-size:14px; color:#9A9A8E; min-height:64px;">A rough idea of what you are bringing…</span></div>
+        <span style="background:#2D5F4C; color:#FFFFFF; padding:13px 28px; border-radius:6px; font-size:14px; font-weight:600; align-self:flex-start;">Request a time</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- newsletter -->
+  <div style="padding:52px 48px; background:#1F2421; color:#F5F2E8; display:flex; justify-content:space-between; align-items:center; gap:44px;">
+    <div style="display:flex; flex-direction:column; gap:7px;">
+      <h3 class="disp" style="margin:0; font-size:26px; font-weight:600;">Know what came in</h3>
+      <p style="margin:0; font-size:14.5px; color:#BDC2BC;">A short list of what reached the rail this week, plus any pop-up dates.</p>
+    </div>
+    <div style="display:flex; min-width:400px;">
+      <span style="flex:1; background:#2E3531; padding:14px 16px; border-radius:6px 0 0 6px; font-size:14px; color:#8E958F;">Your email</span>
+      <span style="background:#C8622B; color:#FFFFFF; padding:14px 26px; border-radius:0 6px 6px 0; font-size:14px; font-weight:600;">Sign up</span>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="padding:40px 48px; display:flex; justify-content:space-between; font-size:14px; color:#5A625C;">
+    <div style="display:flex; gap:48px;">
+      <div style="display:flex; flex-direction:column; gap:7px;"><span class="disp" style="font-size:13px; font-weight:700; color:#1F2421;">Shop</span><span>Just dropped</span><span>Everything</span><span>Sale rail</span></div>
+      <div style="display:flex; flex-direction:column; gap:7px;"><span class="disp" style="font-size:13px; font-weight:700; color:#1F2421;">Visit</span><span>Hours &amp; directions</span><span>Events &amp; pop-ups</span><span>Local pickup</span></div>
+      <div style="display:flex; flex-direction:column; gap:7px;"><span class="disp" style="font-size:13px; font-weight:700; color:#1F2421;">Consign</span><span>How it works</span><span>Book an intake</span><span>[YOUR EMAIL]</span></div>
+    </div>
+    <span style="align-self:flex-end;">© 2026 [YOUR STORE]</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

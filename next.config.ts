@@ -83,7 +83,14 @@ const nextConfig: NextConfig = {
     // The LEGACY internal panel lives at app/admin/* (served on vyaplatform.com). These are its
     // top-level segments — in local dev we DON'T rewrite them, so the owner's internal tools stay
     // reachable at /admin/* on localhost alongside the workspace.
-    const LEGACY_ADMIN = "login|set-password|analytics|category-sweep|collabs-links|collections|conversions|data|editors-picks|emails|giveaway|intake-accuracy|key-metrics|listing-quality|market-data|removed-items|returns|search-analytics|session-flows|sourcing|stores|summary|sync|users|waitlist|webhooks";
+    // NOTE: `customers` and `golden-review` exist in BOTH trees. In production the host
+    // decides which one you get, but local dev has a single host — so whichever tree is
+    // NOT listed here becomes unreachable at /admin/*. Listing them sends /admin/* to the
+    // legacy panel, and the workspace versions stay reachable at their real
+    // /infrastructure/admin/* paths, so nothing is lost either way. They were previously
+    // omitted, which made app/admin/customers (the marketplace buyer list) impossible to
+    // open on localhost at all.
+    const LEGACY_ADMIN = "login|set-password|analytics|category-sweep|collabs-links|collections|conversions|customers|data|editors-picks|emails|giveaway|golden-review|intake-accuracy|key-metrics|listing-quality|market-data|removed-items|returns|search-analytics|session-flows|sourcing|stores|summary|sync|users|waitlist|webhooks";
     const isDev = process.env.NODE_ENV !== "production";
     return {
       beforeFiles: [

@@ -1,0 +1,94 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "Heirloom \u2014 collector's editorial",
+      "x": 0,
+      "y": 0,
+      "w": 1200,
+      "h": 4450
+    },
+    {
+      "file": "Provenance.dc.html",
+      "title": "Provenance \u2014 authenticated archive",
+      "x": 1320,
+      "y": 0,
+      "w": 1200,
+      "h": 3600
+    },
+    {
+      "file": "TheIndex.dc.html",
+      "title": "The Index \u2014 deep catalogue",
+      "x": 2640,
+      "y": 0,
+      "w": 1200,
+      "h": 2500
+    },
+    {
+      "file": "Drop.dc.html",
+      "title": "Drop \u2014 release cadence",
+      "x": 3960,
+      "y": 0,
+      "w": 1200,
+      "h": 2850
+    },
+    {
+      "file": "DearReader.dc.html",
+      "title": "Dear Reader \u2014 founder voice",
+      "x": 0,
+      "y": 4610,
+      "w": 1200,
+      "h": 3800
+    },
+    {
+      "file": "Sugar.dc.html",
+      "title": "Sugar \u2014 Y2K maximalist",
+      "x": 1320,
+      "y": 4610,
+      "w": 1200,
+      "h": 3850
+    },
+    {
+      "file": "Vitrine.dc.html",
+      "title": "Vitrine \u2014 gallery minimal",
+      "x": 2640,
+      "y": 4610,
+      "w": 1200,
+      "h": 6050
+    },
+    {
+      "file": "CornerShop.dc.html",
+      "title": "Corner Shop \u2014 bricks and mortar",
+      "x": 3960,
+      "y": 4610,
+      "w": 1200,
+      "h": 3250
+    }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -250,
+      "w": 620,
+      "text": "Eight storefront templates for VYA sellers.\n\nEach one is a full homepage at 1200px, built from section types that already exist in storefront-blocks.ts. They differ on STRUCTURE first \u2014 grid density runs 2-up to 5-up, section count runs 6 to 10 \u2014 with palette and type following that, not leading it.\n\nTop row: Heirloom, Provenance, The Index, Drop.\nBottom row: Dear Reader, Sugar, Vitrine, Corner Shop."
+    },
+    {
+      "id": "copy",
+      "x": 680,
+      "y": -250,
+      "w": 560,
+      "text": "On the copy: this is DEFAULT text a template ships with \u2014 plain, concrete, and light to edit. No invented shop names, founders, cities or inventory, and no jokes or moralising at the shopper. It says what the thing is.\n\nAnything only the seller can supply is bracketed and shows through as a placeholder: YOUR STORE, [YOUR NAME], [YOUR EMAIL], [YOUR STREET ADDRESS], [AMOUNT], [DROP DATE], [Customer name]. Prices read $0.00 until real inventory fills them.\n\nVoice still differs between templates, but through register and typography rather than personality: Heirloom is formal, Dear Reader is first person, Sugar is lowercase, Vitrine says as little as it can."
+    },
+    {
+      "id": "signatures",
+      "x": 1300,
+      "y": -250,
+      "w": 560,
+      "text": "Each template turns on one structural move, and no two heroes are composed the same way:\n\nHeirloom \u2014 type-first hero on paper, image band below; philosophy statements interrupt the grid\nProvenance \u2014 hero text bottom-RIGHT over a proof strip; label wall AND era timeline\nThe Index \u2014 search bar IS the hero, centred, no full-bleed photo\nDrop \u2014 countdown above everything, then a giant centred poster and a three-image strip\nDear Reader \u2014 image LEFT, text RIGHT; a real letter at reading width\nSugar \u2014 a card overlapping the photo, rotated badge; categories named by feeling\nVitrine \u2014 one line dead centre; 2-up grid at 80px gutters\nCorner Shop \u2014 diptych with a centred band; address and hours above the first product"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

@@ -4,19 +4,13 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { randomId } from "@/app/lib/random-id";
+import { canonicalSource, classifySource } from "@/app/lib/traffic-source";
 
-const SOURCE_ALIASES: Record<string, string> = {
- ig: "instagram",
- fb: "facebook",
- tw: "twitter",
- tt: "tiktok",
- yt: "youtube",
- li: "linkedin",
-};
-
+// Alias resolution + referrer classification live in app/lib/traffic-source.ts so the
+// tracker, the storefront visit recorder, and both admin readers agree on what a
+// source IS. There used to be a private copy here, and it drifted.
 function normalizeSource(s: string): string {
- const lower = s.toLowerCase().trim();
- return SOURCE_ALIASES[lower] ?? lower;
+ return canonicalSource(s);
 }
 
 function inferPageType(pathname: string): string {
@@ -182,18 +176,23 @@ export default function GlobalPageTracker() {
  }
  }
 
- // No tracked source — label by the browser they arrived in (Safari, Chrome, …)
- // instead of a flat "direct", so typed/bookmarked/organic traffic is at least
- // categorized. These rank BELOW real sources but ABOVE bare "direct".
+ // Still no tagged source — classify the REFERRER (search engines, referral hosts).
+ //
+ // This used to label the visit by browser instead: Chrome, Safari, Edge, Samsung.
+ // A browser is not a traffic source, and because this branch ran BEFORE search was
+ // ever considered, every organic Google/Bing visit was recorded as "chrome" or
+ // "safari" and the real source was destroyed at write time. It also made the admin
+ // Source Attribution panel read as though Chrome sent us 2,644 visits.
+ //
+ // The social REFERRER_MAP above still runs first (it handles l.instagram.com and the
+ // other short/mobile hosts); classifySource picks up everything else. When there is
+ // genuinely no referrer, the honest answer is "direct" — not the browser name.
  if (!utmSource) {
- const ua = navigator.userAgent;
- if (/Edg/i.test(ua)) utmSource = "edge";
- else if (/SamsungBrowser/i.test(ua)) utmSource = "samsung";
- else if (/CriOS|Chrome/i.test(ua)) utmSource = "chrome";
- else if (/FxiOS|Firefox/i.test(ua)) utmSource = "firefox";
- else if (/Safari/i.test(ua)) utmSource = "safari";
- else utmSource = "web";
- utmMedium = utmMedium ?? "direct";
+ // The user-agent recovers in-app taps (Instagram, TikTok, Facebook), which arrive
+ // with no referrer at all and would otherwise be filed as "direct".
+ const c = classifySource({ referrer: document.referrer, selfHost: window.location.host, userAgent: navigator.userAgent });
+ utmSource = c.source.toLowerCase();
+ utmMedium = utmMedium ?? (c.type === "Direct" ? "direct" : c.type.toLowerCase());
  }
 
  const utmPayload = {

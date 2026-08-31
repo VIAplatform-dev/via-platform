@@ -74,18 +74,27 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
   ? <img src={logo} alt={storeName} className="h-7 w-auto shrink-0 object-contain" draggable={false} />
   : <NavItem n={{ ...(nav.find((n) => /^home/i.test(n.label)) || {}), label: storeName }} onNav={onNav} className="shrink-0 text-lg tracking-[0.12em]" style={headingFontFamily} />;
  const links = (items: ChromeNav[], className = "") => (
-  <div className={`hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex ${className}`}>
+  <div className={`hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 @3xl:flex ${className}`}>
    {items.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className={`hover:opacity-100 ${n.active ? "opacity-100 underline underline-offset-4" : ""}`} />)}
   </div>
  );
  const utils = <div className="flex shrink-0 items-center gap-4 opacity-70">{search}</div>;
- const bar = "sticky top-0 z-40 border-b border-black/[0.07] px-6 sm:px-8" as const;
+ const bar = "sticky top-0 z-40 border-b border-black/[0.07] px-6 @xl:px-8" as const;
  const style = { background: colors.bg, color: colors.text };
  // Split puts half the menu on each side of the brand. An odd number leans left, which reads as
  // deliberate; centring the extra item would make the brand sit visibly off-centre.
  const half = Math.ceil(nav.length / 2);
  return (
- <header>
+ // `@container`, and every breakpoint below is a CONTAINER variant.
+ //
+ // These were viewport breakpoints (`md:`), which is the wrong ruler for a storefront: the studio
+ // renders the page into a 390px artboard inside a 1440px window, so `md:flex` was true and the phone
+ // preview drew the DESKTOP nav — five items on one row, wrapping onto three lines and running off
+ // the edge. The header measured the window and reported on a phone that wasn't there.
+ //
+ // @3xl is 48rem/768px, the same number `md:` used, so a real desktop is unchanged — the threshold is
+ // now measured against the thing the header actually sits in.
+ <header className="@container">
  {announcement && (
  <div className="px-4 py-2 text-center text-[11px] tracking-wide text-white" style={{ background: colors.accent }}>{announcement}</div>
  )}
@@ -116,9 +125,14 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
   {utils}
  </nav>
  )}
- {/* Mobile nav row — one row of links under the brand, whatever the desktop layout does. */}
+ {/* Mobile nav — the links under the brand, whatever the desktop layout does. It WRAPS; it does not
+     scroll. A horizontally-scrollable strip is technically fine (nothing overflows the page) but it
+     reads as broken: the last label is sliced mid-word against the screen edge with nothing to say
+     the row can be swiped, so a store with seven pages looks like a store whose header is cut off.
+     Wrapping puts every link on screen at any width, which is what a nav is for. `whitespace-nowrap`
+     stays on each ITEM, so "Shipping & Returns" breaks between links rather than through one. */}
  {nav.length > 0 && (
- <div className="flex items-center gap-5 overflow-x-auto border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden" style={{ background: colors.bg }}>
+ <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 border-b border-black/[0.06] px-5 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 @3xl:hidden" style={{ background: colors.bg }}>
  {nav.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className="whitespace-nowrap" />)}
  </div>
  )}
@@ -129,8 +143,10 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
 export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFontFamily, year, socials, footerAbout, newsletter, onNav }: ChromeProps & { tagline?: string | null; socials?: Socials; footerAbout?: string; newsletter?: React.ReactNode }) {
  const links = socialList(socials);
  return (
- <footer className="mt-10 border-t border-black/[0.08]" style={{ color: colors.text }}>
- <div className="mx-auto max-w-6xl px-6 sm:px-8 py-16">
+ // Container, not viewport — same reasoning as the header above. The footer's columns stack at the
+ // storefront's own width, so a phone preview stacks them and a desktop doesn't.
+ <footer className="@container mt-10 border-t border-black/[0.08]" style={{ color: colors.text }}>
+ <div className="mx-auto max-w-6xl px-6 @xl:px-8 py-16">
  {/* Email signup band — every page ends with a chance to subscribe (the "Sign up" the seller asked for). */}
  {newsletter && (
  <div className="mb-14 flex flex-col items-center gap-3 border-b border-black/[0.06] pb-14 text-center">
@@ -139,16 +155,16 @@ export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFont
  <div className="mt-2 w-full max-w-sm">{newsletter}</div>
  </div>
  )}
- <div className="flex flex-col items-center gap-7 text-center sm:flex-row sm:items-start sm:justify-between sm:text-left">
+ <div className="flex flex-col items-center gap-7 text-center @xl:flex-row @xl:items-start @xl:justify-between @xl:text-left">
  <div className="max-w-xs">
  {logo ? (
- <img src={logo} alt={storeName} className="mx-auto h-7 w-auto object-contain sm:mx-0" draggable={false} />
+ <img src={logo} alt={storeName} className="mx-auto h-7 w-auto object-contain @xl:mx-0" draggable={false} />
  ) : (
  <p className="text-lg tracking-[0.14em]" style={{ fontFamily: headingFontFamily }}>{storeName}</p>
  )}
  {(footerAbout || tagline) && <p className="mt-3 text-xs leading-relaxed opacity-55">{footerAbout || tagline}</p>}
  {links.length > 0 && (
- <div className="mt-5 flex items-center justify-center gap-3.5 sm:justify-start">
+ <div className="mt-5 flex items-center justify-center gap-3.5 @xl:justify-start">
  {links.map(({ key, href }) => (
  <a key={key} href={href} target="_blank" rel="noopener noreferrer" aria-label={key} className="opacity-55 transition hover:opacity-100">
  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{SOCIAL_ICON[key]}</svg>
@@ -158,12 +174,12 @@ export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFont
  )}
  </div>
  {nav.length > 0 && (
- <nav className="flex flex-col items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] opacity-60 sm:items-end">
+ <nav className="flex flex-col items-center gap-2.5 text-[11px] uppercase tracking-[0.16em] opacity-60 @xl:items-end">
  {nav.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className="hover:opacity-100" />)}
  </nav>
  )}
  </div>
- <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-black/[0.06] pt-6 text-[10px] uppercase tracking-[0.22em] opacity-35 sm:flex-row">
+ <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-black/[0.06] pt-6 text-[10px] uppercase tracking-[0.22em] opacity-35 @xl:flex-row">
  <span>© {year ?? ""} {storeName}</span>
  <span>Powered by <span style={{ color: colors.accent }}>VYA</span></span>
  </div>

@@ -15,7 +15,7 @@ function AnnouncementBar({ kit }: { kit: EditKit }) {
  if (!p.text) return null;
  return (
   <div className="vya-fill flex items-center justify-center" style={{ background: ctx.colors.accent, color: "#fff" }}>
-   <div {...txt(p.text, "text")} className="w-full px-4 py-2.5 text-center text-[10px] uppercase tracking-[0.22em]" />
+   <div {...txt(p.text, "text")} className="w-full px-4 py-2.5 text-center text-[11px] @lg:text-[10px] uppercase tracking-[0.22em]" />
   </div>
  );
 }
@@ -27,7 +27,7 @@ function AnnouncementQuiet({ kit }: { kit: EditKit }) {
  if (!p.text) return null;
  return (
   <div className="vya-fill flex items-center justify-center" style={{ borderTop: `1px solid ${ctx.fg}1a`, borderBottom: `1px solid ${ctx.fg}1a` }}>
-   <div {...txt(p.text, "text")} className="w-full px-4 py-3 text-center text-[10px] uppercase tracking-[0.22em] opacity-70" />
+   <div {...txt(p.text, "text")} className="w-full px-4 py-3 text-center text-[11px] @lg:text-[10px] uppercase tracking-[0.22em] opacity-70" />
   </div>
  );
 }
@@ -44,7 +44,7 @@ function AnnouncementTicker({ kit }: { kit: EditKit }) {
   <div className={`vya-fill vya-annticker flex items-center overflow-hidden whitespace-nowrap py-2.5${ctx.edit ? " justify-center" : ""}`} style={{ background: ctx.colors.accent, color: "#fff" }}>
    <div className="vya-annticker-track inline-flex gap-16" style={ctx.edit ? { animation: "none" } : undefined}>
     {(ctx.edit ? [0] : [0, 1, 2, 3, 4, 5]).map((i) => (
-     <span key={i} className="text-[10px] uppercase tracking-[0.22em]">
+     <span key={i} className="text-[11px] @lg:text-[10px] uppercase tracking-[0.22em]">
       {i === 0 ? <span {...txt(p.text, "text")} className="inline" /> : p.text}
      </span>
     ))}
@@ -58,7 +58,7 @@ function AnnouncementTicker({ kit }: { kit: EditKit }) {
 function TextCentered({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-2xl px-6 py-20 @xl:py-24 text-center">
+  <section className="vya-free-canvas relative mx-auto max-w-2xl px-6 py-12 @lg:py-20 @xl:py-24 text-center">
    {p.heading && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading mb-5 text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: ctx.head }} />}
    {p.body && <p {...txtPlain(p.body, "body")} className="vya-body whitespace-pre-wrap text-sm leading-[1.9] opacity-75 @xl:text-[15px]" />}
   </section>
@@ -70,7 +70,7 @@ function TextCentered({ kit }: { kit: EditKit }) {
 function TextEditorial({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="mx-auto grid max-w-5xl gap-6 px-6 @xl:px-8 py-20 @xl:py-28 @lg:grid-cols-[1fr_1.6fr] @lg:gap-16">
+  <section className="mx-auto grid max-w-5xl gap-6 px-6 @xl:px-8 py-12 @lg:py-20 @xl:py-28 @lg:grid-cols-[1fr_1.6fr] @lg:gap-16">
    <div className="vya-free-canvas relative">
     {p.heading && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-2xl leading-tight @xl:text-3xl" style={{ fontFamily: ctx.head }} />}
    </div>
@@ -84,7 +84,7 @@ function TextEditorial({ kit }: { kit: EditKit }) {
 function TextColumns({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-5xl px-6 @xl:px-8 py-20 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-5xl px-6 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    {p.heading && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading mb-8 text-3xl leading-tight @xl:text-4xl" style={{ fontFamily: ctx.head }} />}
    {p.body && <p {...txtPlain(p.body, "body")} className="vya-body whitespace-pre-wrap text-sm leading-[1.9] opacity-75 @xl:text-[15px] @lg:[column-count:2] @lg:[column-gap:3.5rem]" />}
   </section>
@@ -96,8 +96,8 @@ function TextColumns({ kit }: { kit: EditKit }) {
 function TextLede({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-4xl px-6 py-20 @xl:py-28">
-   {p.heading && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-4xl leading-[1.08] tracking-tight @xl:text-6xl" style={{ fontFamily: ctx.head }} />}
+  <section className="vya-free-canvas relative mx-auto max-w-4xl px-6 py-12 @lg:py-20 @xl:py-28">
+   {p.heading && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-[1.75rem] @lg:text-4xl leading-[1.08] tracking-tight @xl:text-6xl" style={{ fontFamily: ctx.head }} />}
    {p.body && <p {...txtPlain(p.body, "body")} className="vya-body mt-8 max-w-xl whitespace-pre-wrap text-sm leading-[1.9] opacity-65 @xl:text-[15px]" />}
   </section>
  );
@@ -107,8 +107,8 @@ function TextLede({ kit }: { kit: EditKit }) {
 function StatementLarge({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-4xl px-6 py-20 @xl:py-28">
-   {p.quote && <p {...txtPlain(p.quote, "quote")} className="vya-heading whitespace-pre-wrap text-3xl leading-[1.1] tracking-tight @xl:text-5xl" style={{ fontFamily: ctx.head }} />}
+  <section className="vya-free-canvas relative mx-auto max-w-4xl px-6 py-12 @lg:py-20 @xl:py-28">
+   {p.quote && <p {...txtPlain(p.quote, "quote")} className="vya-heading whitespace-pre-wrap text-2xl @lg:text-3xl leading-[1.1] tracking-tight @xl:text-5xl" style={{ fontFamily: ctx.head }} />}
    {p.attribution && <FreeField b={b} ctx={ctx} fieldKey="attribution" tag="p" value={p.attribution} className="vya-sub mt-6 text-[11px] uppercase tracking-[0.22em] opacity-60" />}
   </section>
  );
@@ -119,7 +119,7 @@ function StatementLarge({ kit }: { kit: EditKit }) {
 function StatementBoxed({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-3xl px-6 py-16 @xl:py-20 text-center">
+  <section className="vya-free-canvas relative mx-auto max-w-3xl px-6 py-10 @lg:py-16 @xl:py-20 text-center">
    <div className="py-10" style={{ borderTop: `1px solid ${ctx.fg}26`, borderBottom: `1px solid ${ctx.fg}26` }}>
     {p.quote && <p {...txtPlain(p.quote, "quote")} className="vya-heading whitespace-pre-wrap text-2xl leading-[1.3] @xl:text-[2rem]" style={{ fontFamily: ctx.head }} />}
     {p.attribution && <FreeField b={b} ctx={ctx} fieldKey="attribution" tag="p" value={p.attribution} className="vya-sub mt-5 text-[11px] uppercase tracking-[0.22em] opacity-60" />}
@@ -133,7 +133,7 @@ function StatementBoxed({ kit }: { kit: EditKit }) {
 function StatementSide({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
  return (
-  <section className="mx-auto grid max-w-5xl gap-5 px-6 @xl:px-8 py-20 @xl:py-28 @lg:grid-cols-[1.8fr_1fr] @lg:gap-14">
+  <section className="mx-auto grid max-w-5xl gap-5 px-6 @xl:px-8 py-12 @lg:py-20 @xl:py-28 @lg:grid-cols-[1.8fr_1fr] @lg:gap-14">
    <div className="vya-free-canvas relative">
     {p.quote && <p {...txtPlain(p.quote, "quote")} className="vya-heading whitespace-pre-wrap text-3xl leading-[1.12] tracking-tight @xl:text-[2.8rem]" style={{ fontFamily: ctx.head }} />}
    </div>

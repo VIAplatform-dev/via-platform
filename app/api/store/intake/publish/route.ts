@@ -3,13 +3,14 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { createConsignmentItem, resolveSplitForIntake } from "@/app/lib/consignment-db";
 import { stores, storeContactEmails } from "@/app/lib/stores";
 import { getOrCreateSeller } from "@/app/lib/db/sellers";
-import { createItem, updateItem, getItem, ensurePublishAtColumn } from "@/app/lib/db/inventory";
-import { createCrossListingsForItem, syncItemToApiPlatforms } from "@/app/lib/cross-listing-db";
+import { createItem, updateItem, getItem, ensurePublishAtColumn, setCrossListChannels } from "@/app/lib/db/inventory";
+import { createCrossListingsForItem, syncItemToApiPlatforms, getCrossListingsForItem, PLATFORMS } from "@/app/lib/cross-listing-db";
 import { maybeAutoPostStory } from "@/app/lib/instagram-publish";
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
 import { logCorrections, logPredictions, rememberItem } from "@/app/lib/intake-memory-db";
 import { recordIntakeExample } from "@/app/lib/training-data-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
+import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
  const price = Math.max(0, Math.min(1_000_000, Number(body.price) || 0));
  const hasCost = body.cost !== undefined && body.cost !== null && body.cost !== "";
  const cost = Math.max(0, Math.min(1_000_000, Number(body.cost) || 0));
- const images = Array.isArray(body.images) ? body.images.filter((x: unknown) => typeof x === "string" && x).slice(0, 8) : [];
+ const images = Array.isArray(body.images) ? body.images.filter((x: unknown) => typeof x === "string" && x).slice(0, MAX_ITEM_IMAGES) : [];
 
  // The fields to write. Shared between "promote the autosaved draft" and "create fresh".
  const fields = {
@@ -128,9 +129,28 @@ export async function POST(request: NextRequest) {
  // Cross-listing: publishing to VYA queues the piece for the seller's other
  // marketplaces (whichever they've connected with auto-list on). Drafts don't fan out.
  // Handle-based platforms get a paste-ready record; eBay is pushed for real via its API.
+ // Which marketplaces to cross-list to. The publish form sends `channels` (the seller's per-item
+ // choice); absent it, fall back to each channel's auto-list default.
+ let crossListing: { platform: string; name: string; status: string; url: string | null }[] = [];
+ const channels = Array.isArray(body.channels)
+ ? body.channels.filter((c: unknown): c is string => typeof c === "string")
+ : null;
+ // Store the choice on the item first. A scheduled piece publishes hours later via
+ // the cron, which has no access to this request — without this the seller's picks
+ // would quietly fall back to the account defaults.
+ if (channels) await setCrossListChannels(item.id, channels).catch(() => {});
  if (item.status === "active") {
- createCrossListingsForItem(slug, item.id).catch(() => {});
- syncItemToApiPlatforms(slug, item.id).catch(() => {});
+ // Await so we can tell the seller exactly where it landed: eBay/Etsy list synchronously (listed or
+ // failed, with the reason), Depop/Vestiaire queue for the extension.
+ await createCrossListingsForItem(slug, item.id, channels).catch(() => {});
+ await syncItemToApiPlatforms(slug, item.id, channels).catch(() => {});
+ const rows = await getCrossListingsForItem(slug, item.id).catch(() => []);
+ crossListing = rows.map((r) => ({
+ platform: r.platform,
+ name: PLATFORMS.find((p) => p.key === r.platform)?.name || r.platform,
+ status: r.status,
+ url: r.externalUrl,
+ }));
  // If the store connected Instagram with auto-post on, post the new piece to their
  // Story (a card that drives to their own storefront). Best-effort — never blocks publish.
  maybeAutoPostStory(slug, item.id).catch(() => {});
@@ -198,5 +218,5 @@ export async function POST(request: NextRequest) {
  trust: !usedAi ? "high" : body.reviewed ? "high" : "medium",
  }).catch(() => {});
 
- return NextResponse.json({ ok: true, itemId: item.id, status: item.status, scheduled, publishAt: publishAt?.toISOString() ?? null });
+ return NextResponse.json({ ok: true, itemId: item.id, status: item.status, scheduled, publishAt: publishAt?.toISOString() ?? null, crossListing });
 }

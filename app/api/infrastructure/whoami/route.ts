@@ -10,6 +10,11 @@ export const dynamic = "force-dynamic";
 //  - signed in but no store yet (fresh signup) → { admin: false, needsOnboarding: true }
 //  - not signed in                             → 401 (layout sends them to login)
 export async function GET(request: NextRequest) {
+ // Local dev (`next dev`) → always the owner workspace, so localhost never bounces to the signup
+ // wizard. NODE_ENV is "production" on Vercel prod AND preview deployments, so this only ever
+ // applies to a developer's own machine — it can't leak to the live site.
+ if (process.env.NODE_ENV === "development") return NextResponse.json({ admin: true, slug: "via-admin" });
+
  // Owner / break-glass admin: full workspace as the synthetic via-admin store.
  if (isAdminRequest(request)) return NextResponse.json({ admin: true, slug: "via-admin" });
 

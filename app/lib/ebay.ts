@@ -27,6 +27,27 @@ function basicAuth(): string {
  return "Basic " + Buffer.from(`${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`).toString("base64");
 }
 
+// Application token (client_credentials) for eBay's PUBLIC catalog APIs — Taxonomy category
+// suggestions + item aspects. These aren't seller-scoped, and the seller's user token (sell.inventory
+// + sell.account) is NOT permitted to call them — it returns 403 "Insufficient permissions", which
+// silently left every listing without a category and failed publish. The base api_scope on an app
+// token is the right credential here. Cached until ~1min before expiry.
+let appTok: { token: string; exp: number } | null = null;
+async function appToken(): Promise<string | null> {
+ if (!ebayConfigured()) return null;
+ if (appTok && appTok.exp > Date.now() + 60_000) return appTok.token;
+ const res = await fetch(OAUTH_BASE, {
+ method: "POST",
+ headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: basicAuth() },
+ body: new URLSearchParams({ grant_type: "client_credentials", scope: "https://api.ebay.com/oauth/api_scope" }),
+ }).catch(() => null);
+ if (!res || !res.ok) return null;
+ const d = (await res.json().catch(() => null)) as { access_token?: string; expires_in?: number } | null;
+ if (!d?.access_token) return null;
+ appTok = { token: d.access_token, exp: Date.now() + (d.expires_in ?? 7200) * 1000 };
+ return appTok.token;
+}
+
 // Sign the OAuth `state` so the callback can trust which store it belongs to (CSRF guard).
 export function ebaySignState(slug: string): string {
  const secret = process.env.EBAY_CLIENT_SECRET || process.env.ADMIN_PASSWORD || "via";
@@ -201,7 +222,7 @@ const CAT_TYPES = [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }];
 // the `sell.account` write scope — so it only works after the seller reconnects under the new scope.
 export type EbaySetup = {
  ok: boolean; optedIn: boolean; created: string[];
- policies: { fulfillment: boolean; payment: boolean; return: boolean }; error?: string;
+ policies: { fulfillment: boolean; payment: boolean; return: boolean }; hasLocation?: boolean; error?: string;
 };
 export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  const empty = { ok: false, optedIn: false, created: [] as string[], policies: { fulfillment: false, payment: false, return: false } };
@@ -254,17 +275,26 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  });
  }
 
- // 3) Re-read to confirm the account can now list.
+ // 3) Ensure a ship-from inventory location exists — publish requires one, and the status check
+ //    (testEbayConnection) reports "not ready" without it. Creating it here (not just on first list)
+ //    is what makes "Set up automatically" actually stick on reload.
+ const locationKey = await ensureLocationKey(token);
+ const hasLocation = !!locationKey;
+ if (!hasLocation) problems.push("couldn’t create a ship-from inventory location");
+
+ // 4) Re-read to confirm the account can now list.
  const pol = await policyIds(token);
  const policies = { fulfillment: !!pol.fulfillment, payment: !!pol.payment, return: !!pol.return };
- const ok = policies.fulfillment && policies.payment && policies.return;
+ const ok = policies.fulfillment && policies.payment && policies.return && hasLocation;
  // If any policy exists, the account is provably opted in (creating one requires it) — reflect that.
  const opted = optedIn || policies.payment || policies.return || policies.fulfillment;
- return { ok, optedIn: opted, created, policies, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete — some business policies are still missing.") };
+ return { ok, optedIn: opted, created, policies, hasLocation, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete — some business policies are still missing.") };
 }
 
 // Suggest a leaf category from the title (eBay requires a categoryId to publish).
-async function suggestCategory(token: string, title: string): Promise<string | null> {
+async function suggestCategory(title: string): Promise<string | null> {
+ const token = await appToken();
+ if (!token) return null;
  const r = await ebayFetch(token, `/commerce/taxonomy/v1/category_tree/0/get_category_suggestions?q=${encodeURIComponent(title.slice(0, 60))}`);
  return r.json?.categorySuggestions?.[0]?.category?.categoryId || null;
 }
@@ -274,16 +304,89 @@ const CONDITION_MAP: Record<string, string> = {
  good: "USED_GOOD", fair: "USED_ACCEPTABLE", vintage: "USED_GOOD",
 };
 
+// eBay REST ConditionEnum → the numeric conditionId eBay maps it to. A category's policy lists which
+// IDs it ACCEPTS (fashion now uses the "Pre-owned" IDs 2990/3000/3010; the old 4000/5000/6000 "Used"
+// tiers are rejected on e.g. handbags). We map the piece's condition to an enum whose ID the category
+// actually allows — otherwise publish fails with "condition id is invalid for the primary category".
+const COND_ENUM_ID: Record<string, string> = {
+ NEW: "1000", NEW_OTHER: "1500", NEW_WITH_DEFECTS: "1750", LIKE_NEW: "2750",
+ PRE_OWNED_EXCELLENT: "2990", USED_EXCELLENT: "3000", PRE_OWNED_FAIR: "3010",
+ USED_VERY_GOOD: "4000", USED_GOOD: "5000", USED_ACCEPTABLE: "6000",
+};
+// For each of our condition words, the enums to try in order of preference (best fidelity first).
+const CONDITION_PREFS: Record<string, string[]> = {
+ new: ["NEW", "NEW_OTHER"],
+ "like new": ["LIKE_NEW", "USED_EXCELLENT", "PRE_OWNED_EXCELLENT"],
+ excellent: ["USED_EXCELLENT", "PRE_OWNED_EXCELLENT", "USED_VERY_GOOD"],
+ "very good": ["USED_VERY_GOOD", "USED_EXCELLENT", "PRE_OWNED_EXCELLENT"],
+ good: ["USED_GOOD", "USED_EXCELLENT", "PRE_OWNED_EXCELLENT", "USED_VERY_GOOD"],
+ fair: ["USED_ACCEPTABLE", "PRE_OWNED_FAIR", "USED_GOOD"],
+ vintage: ["USED_EXCELLENT", "PRE_OWNED_EXCELLENT", "USED_GOOD"],
+};
+
+// A category's accepted condition IDs (+ whether condition is required). Sell Metadata API — needs the
+// seller (user) token; the app token 404s here.
+async function conditionPolicies(token: string, categoryId: string): Promise<{ ids: string[]; required: boolean }> {
+ const r = await ebayFetch(token, `/sell/metadata/v1/marketplace/${MARKETPLACE}/get_item_condition_policies?filter=${encodeURIComponent("categoryIds:{" + categoryId + "}")}`);
+ const pol = r.json?.itemConditionPolicies?.[0];
+ return { ids: (pol?.itemConditions || []).map((c: any) => String(c.conditionId)).filter(Boolean), required: pol?.itemConditionRequired === true };
+}
+
+// Choose a ConditionEnum the category will accept, closest to the piece's actual condition.
+function pickCondition(raw: string, allowedIds: string[]): string {
+ const prefs = CONDITION_PREFS[(raw || "").toLowerCase()] || CONDITION_PREFS.good;
+ if (!allowedIds.length) return prefs[0]; // couldn't read the policy — send our best guess
+ for (const en of prefs) if (allowedIds.includes(COND_ENUM_ID[en])) return en;
+ // Nothing preferred matched — fall through any allowed used tier, then any new tier.
+ for (const en of ["USED_EXCELLENT", "PRE_OWNED_EXCELLENT", "PRE_OWNED_FAIR", "USED_VERY_GOOD", "USED_GOOD", "USED_ACCEPTABLE"]) if (allowedIds.includes(COND_ENUM_ID[en])) return en;
+ for (const en of ["NEW_OTHER", "NEW", "NEW_WITH_DEFECTS"]) if (allowedIds.includes(COND_ENUM_ID[en])) return en;
+ return prefs[0];
+}
+
 // A category's allowed Size values (+ whether Size is required) — for the 2026 fashion
 // size-standardization rule. Free-text sizes get blocked; we must send an allowed value.
-async function categoryAspects(token: string, categoryId: string): Promise<{ sizeValues: string[]; sizeRequired: boolean }> {
+type AspectMeta = { name: string; required: boolean; selectionOnly: boolean; values: string[] };
+async function categoryAspects(categoryId: string): Promise<{ sizeValues: string[]; sizeRequired: boolean; all: AspectMeta[] }> {
+ const token = await appToken();
+ if (!token) return { sizeValues: [], sizeRequired: false, all: [] };
  const r = await ebayFetch(token, `/commerce/taxonomy/v1/category_tree/0/get_item_aspects_for_category?category_id=${categoryId}`);
  const aspects: any[] = r.json?.aspects || [];
- const size = aspects.find((a) => String(a?.localizedAspectName || "").toLowerCase() === "size");
- return {
- sizeValues: (size?.aspectValues || []).map((v: any) => v?.localizedValue).filter(Boolean),
- sizeRequired: size?.aspectConstraint?.aspectRequired === true,
- };
+ const all: AspectMeta[] = aspects.map((a) => ({
+ name: String(a?.localizedAspectName || ""),
+ required: a?.aspectConstraint?.aspectRequired === true,
+ selectionOnly: a?.aspectConstraint?.aspectMode === "SELECTION_ONLY",
+ values: (a?.aspectValues || []).map((v: any) => v?.localizedValue).filter(Boolean),
+ }));
+ const size = all.find((a) => a.name.toLowerCase() === "size");
+ return { sizeValues: size?.values || [], sizeRequired: !!size?.required, all };
+}
+
+// Common colours to recover an "Exterior Color"/"Color" item-specific from the title/description, since
+// VYA doesn't store colour. Longer names first so "royal blue" → "Blue" not a partial miss.
+const COLOR_WORDS = ["multicolor","rose gold","royal blue","navy","black","white","ivory","cream","beige","tan","brown","camel","burgundy","maroon","red","pink","fuchsia","coral","orange","gold","yellow","olive","khaki","green","teal","turquoise","blue","purple","lavender","lilac","grey","gray","silver","charcoal"];
+function parseColor(item: EbayItem): string | null {
+ const hay = `${item.title || ""} ${item.description || ""}`.toLowerCase();
+ for (const c of COLOR_WORDS) if (new RegExp(`\\b${c}\\b`).test(hay)) return c.replace(/\\b\\w/g, (m) => m.toUpperCase());
+ return null;
+}
+
+// Resolve a publishable value for a REQUIRED category aspect eBay demands. Uses VYA data where we have
+// it (brand, material), recovers colour from text, and picks a safe default otherwise so publish
+// doesn't fail on a missing item specific. Selection-only aspects must match an allowed value exactly.
+function resolveAspect(a: AspectMeta, item: EbayItem): string | null {
+ const n = a.name.toLowerCase();
+ const inList = (v: string) => a.values.find((x) => x.toLowerCase() === v.toLowerCase()) || null;
+ const val = (v: string) => (a.selectionOnly ? inList(v) : v);
+ if (n === "brand") return val(item.brand || "Unbranded") || item.brand || "Unbranded";
+ if (n.includes("color") || n.includes("colour")) return val(parseColor(item) || "Multicolor") || "Multicolor";
+ if (n.includes("material")) return val(item.material || "Other") || (a.selectionOnly ? a.values[0] || null : item.material || "Other");
+ if (n === "department") return inList("Women") || inList("Unisex Adults") || a.values[0] || (a.selectionOnly ? null : "Women");
+ if (n === "type" || n.includes("style")) {
+ const t = (item.title || "").toLowerCase();
+ const m = a.values.find((v) => v && t.includes(v.toLowerCase()));
+ return m || (a.selectionOnly ? a.values[0] || null : "Other");
+ }
+ return a.selectionOnly ? a.values[0] || null : "Does Not Apply";
 }
 
 const SIZE_NORMAL: Record<string, string> = {
@@ -301,7 +404,7 @@ function standardizeSize(raw: string, allowed: string[]): string | null {
  return allowed.find((v) => v.toLowerCase() === norm.toLowerCase()) || allowed.find((v) => v.toLowerCase() === r.toLowerCase()) || null;
 }
 
-export type EbayItem = { itemId: string; title: string; description?: string | null; brand?: string | null; condition?: string | null; size?: string | null; priceCents: number; currency?: string; images: string[] };
+export type EbayItem = { itemId: string; title: string; description?: string | null; brand?: string | null; condition?: string | null; size?: string | null; material?: string | null; priceCents: number; currency?: string; images: string[] };
 
 export type EbayResult = { ok: boolean; listingUrl?: string; error?: string };
 
@@ -311,11 +414,11 @@ export type EbayResult = { ok: boolean; listingUrl?: string; error?: string };
 // exist — the #1 silent blocker of a real publish. Creates NOTHING on eBay; safe to run anytime.
 type PolicyProbe = { status: number; count: number; error: string | null };
 export async function testEbayConnection(storeSlug: string): Promise<{
- ok: boolean; configured: boolean; tokenValid: boolean; marketplace: string;
+ ok: boolean; configured: boolean; tokenValid: boolean; marketplace: string; sellerRegistered: boolean;
  policies: { fulfillment: boolean; payment: boolean; return: boolean };
  hasLocation: boolean; readyToList: boolean; debug?: { fulfillment: PolicyProbe; payment: PolicyProbe; return: PolicyProbe }; error?: string;
 }> {
- const base = { ok: false, configured: ebayConfigured(), tokenValid: false, marketplace: MARKETPLACE, policies: { fulfillment: false, payment: false, return: false }, hasLocation: false, readyToList: false };
+ const base = { ok: false, configured: ebayConfigured(), tokenValid: false, marketplace: MARKETPLACE, sellerRegistered: false, policies: { fulfillment: false, payment: false, return: false }, hasLocation: false, readyToList: false };
  if (!ebayConfigured()) return { ...base, error: "eBay app keys aren’t set on the server." };
  const token = await accessToken(storeSlug);
  if (!token) return { ...base, error: "No valid eBay token — the account isn’t connected, or the refresh token failed. Reconnect it." };
@@ -337,13 +440,21 @@ export async function testEbayConnection(storeSlug: string): Promise<{
  // A ship-from inventory location is also required to publish (missing one → error 25002 on publish).
  const locRes = await ebayFetch(token, `/sell/inventory/v1/location?limit=1`);
  const hasLocation = Array.isArray(locRes.json?.locations) && locRes.json.locations.length > 0;
+ // Is the connected account actually a registered seller? An account that only ever bought returns
+ // sellerRegistrationCompleted=false and CANNOT list — the "wrong account connected" case. This is the
+ // most fundamental gate, so it's checked and surfaced first.
+ const priv = await ebayFetch(token, `/sell/account/v1/privilege`);
+ const sellerRegistered = priv.json?.sellerRegistrationCompleted === true;
  const policiesOk = policies.fulfillment && policies.payment && policies.return;
- const readyToList = policiesOk && hasLocation;
+ const readyToList = sellerRegistered && policiesOk && hasLocation;
  return {
- ok: true, configured: true, tokenValid: true, marketplace: MARKETPLACE, policies, hasLocation, readyToList, debug,
- error: readyToList ? undefined : !policiesOk
- ? "No EBAY_US business policies found — see `debug` for eBay’s exact response per policy (opt-in required, wrong marketplace/country, or a specific error)."
- : "No eBay inventory location — a ship-from location is required to publish (it will be auto-created on first list).",
+ ok: true, configured: true, tokenValid: true, marketplace: MARKETPLACE, sellerRegistered, policies, hasLocation, readyToList, debug,
+ error: readyToList ? undefined
+ : !sellerRegistered
+ ? "This eBay account isn’t set up to sell — it hasn’t completed seller registration on eBay (or a non-seller account was connected). Reconnect your eBay seller account, or finish seller sign-up on eBay."
+ : !policiesOk
+ ? "eBay business policies aren’t set up yet — click “Set up automatically” to create them."
+ : "eBay needs a ship-from location — click “Set up automatically” to create one.",
  };
 }
 
@@ -352,13 +463,14 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  const token = await accessToken(storeSlug);
  if (!token) return { ok: false, error: "eBay isn’t connected — reconnect the account." };
  const sku = item.itemId;
+ // 12 is the cap we send EBAY, not VYA's own limit — see app/lib/item-limits.ts.
  const images = (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 12);
  if (!images.length) return { ok: false, error: "eBay needs at least one hosted image." };
 
  // 1) category + policies + the category's STANDARD aspects, up front. eBay's 2026
  // fashion update blocks free-text sizes on Apparel/Footwear — so we pull the leaf
  // category's allowed Size values from the Taxonomy API and map the piece's size to one.
- const [pol0, categoryId] = await Promise.all([policyIds(token), suggestCategory(token, `${item.brand || ""} ${item.title}`)]);
+ const [pol0, categoryId] = await Promise.all([policyIds(token), suggestCategory(`${item.brand || ""} ${item.title}`)]);
  let pol = pol0;
  if (!pol.fulfillment || !pol.payment || !pol.return) {
  // Self-heal: opt in + create default policies, then re-read. Fixes accounts connected before
@@ -370,16 +482,22 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  }
  }
  let sizeAspect: string | null = null;
+ let metaAll: AspectMeta[] = [];
  if (categoryId) {
- const asp = await categoryAspects(token, categoryId);
+ const asp = await categoryAspects(categoryId);
+ metaAll = asp.all;
  sizeAspect = standardizeSize(item.size || "", asp.sizeValues);
  if (asp.sizeRequired && !sizeAspect) {
  return { ok: false, error: `eBay now requires a standard size for this category — “${item.size || "no size"}” isn’t one eBay recognizes. Use a standard size (e.g. S/M/L or a numeric size).` };
  }
  }
 
- // 2) inventory item, with standardized aspects (Size + Brand).
- const cond = CONDITION_MAP[(item.condition || "").toLowerCase()] || "USED_GOOD";
+ // 2) inventory item, with standardized aspects (Size + Brand) and a category-valid condition.
+ let cond = CONDITION_MAP[(item.condition || "").toLowerCase()] || "USED_EXCELLENT";
+ if (categoryId) {
+ const cpol = await conditionPolicies(token, categoryId);
+ cond = pickCondition(item.condition || "", cpol.ids);
+ }
  const aspects: Record<string, string[]> = {};
  if (item.brand) aspects.Brand = [item.brand];
  if (sizeAspect) aspects.Size = [sizeAspect];
@@ -387,6 +505,14 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  // resale pieces don't have one, so send the value eBay mandates for that case, or publish fails
  // with "Input data for tag <BrandMPN> is invalid or missing".
  aspects.MPN = ["Does Not Apply"];
+ // Fill every OTHER required item-specific the category demands (Exterior Color, Material, Style,
+ // Department, …). Missing any required aspect fails publish; VYA lacks some, so resolveAspect picks a
+ // valid best value (colour recovered from the title, a safe default otherwise).
+ for (const a of metaAll) {
+ if (!a.required || aspects[a.name]) continue;
+ const v = resolveAspect(a, item);
+ if (v) aspects[a.name] = [v];
+ }
  const inv = await ebayFetch(token, `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`, {
  method: "PUT",
  body: JSON.stringify({

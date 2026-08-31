@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 // Editorial sections — blog (the journal row) and spotlight (one hero piece).
-import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item } from "./kit";
+import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item, panBgImg } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.blog;
@@ -27,7 +27,7 @@ function BlogRow({ kit }: { kit: EditKit }) {
  const { posts, set } = usePosts(kit);
  if (!posts.length) return emptyHint(ctx, "Blog — add posts");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
    <div className="grid gap-8 @lg:grid-cols-3 @lg:gap-10">
     {posts.slice(0, 3).map((a, i) => (
@@ -51,7 +51,7 @@ function BlogFeature({ kit }: { kit: EditKit }) {
  if (!posts.length) return emptyHint(ctx, "Blog — add posts");
  const [lead, ...rest] = posts;
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-3xl @xl:text-[2.4rem] leading-tight" />
    <div className="grid gap-8 @lg:grid-cols-[1.4fr_1fr] @lg:gap-14">
     <a href={href(kit, lead)} className="group block">
@@ -79,7 +79,7 @@ function BlogList({ kit }: { kit: EditKit }) {
  const { posts, set } = usePosts(kit);
  if (!posts.length) return emptyHint(ctx, "Blog — add posts");
  return (
-  <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-16 @xl:py-24">
+  <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-8 text-3xl @xl:text-[2.4rem] leading-tight" />
    <div style={{ borderTop: `1px solid ${ctx.fg}1f` }}>
     {posts.map((a, i) => (
@@ -112,8 +112,8 @@ const pickImage = (kit: EditKit) => (url: string) => kit.ctx.onEditField?.(kit.b
 
 function SpotlightHalf({ kit }: { kit: EditKit }) {
  return (
-  <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
-   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} ratio="aspect-square" rounded="vya-img" />
+  <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
+   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={kit.p.imageZoom} ratio="aspect-square" rounded="vya-img" />
    <div className="vya-free-canvas relative"><SpotlightBody kit={kit} /></div>
   </section>
  );
@@ -126,7 +126,7 @@ function SpotlightOverlay({ kit }: { kit: EditKit }) {
  return (
   <section className="vya-fill relative w-full">
    <div className="relative min-h-[70vh] w-full overflow-hidden" style={{ background: `${ctx.fg}0d` }}>
-    {p.image && <img src={p.image} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+    {p.image && <img src={p.image} alt="" {...panBgImg(kit.ctx, kit.b)} className={`absolute inset-0 h-full w-full object-cover ${kit.ctx.edit ? "cursor-grab touch-none" : ""}`} />}
     {p.image && <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.05) 55%)" }} />}
     <div className={`vya-free-canvas relative flex min-h-[70vh] flex-col justify-end p-8 @xl:p-14 ${p.image ? "text-white" : ""}`}>
      <SpotlightBody kit={kit} />
@@ -140,8 +140,8 @@ function SpotlightOverlay({ kit }: { kit: EditKit }) {
 // doesn't reflow between a phone and a desktop.
 function SpotlightStacked({ kit }: { kit: EditKit }) {
  return (
-  <section className="mx-auto max-w-3xl px-5 @xl:px-8 py-16 @xl:py-24">
-   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} ratio="aspect-[4/5]" rounded="vya-img" />
+  <section className="mx-auto max-w-3xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
+   <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={kit.p.imageZoom} ratio="aspect-[4/5]" rounded="vya-img" />
    <div className="vya-free-canvas relative mt-9 text-center [&_.vya-cta]:mx-auto"><SpotlightBody kit={kit} /></div>
   </section>
  );

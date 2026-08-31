@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600&display=swap">
+  <style>
+    body { margin:0; background:#FFFFFF; font-family:'Schibsted Grotesk','Helvetica Neue',sans-serif; color:#111111; }
+    a { color:#111111; text-decoration:none; } a:hover { color:#767066; }
+    .ph { background-image:linear-gradient(160deg,#E6E4DF 0%,#D2CFC8 55%,#BEBAB1 100%); }
+    .ph2 { background-image:linear-gradient(160deg,#DCD9D3 0%,#C5C1B9 55%,#AEA99F 100%); }
+    .ph3 { background-image:linear-gradient(160deg,#EFEEEA 0%,#DCDAD4 55%,#C8C5BC 100%); }
+    .ph4 { background-image:linear-gradient(160deg,#D2CEC6 0%,#B9B4AA 55%,#A09A8E 100%); }
+  </style>
+</helmet>
+
+<div style="width:1200px; background:#FFFFFF;">
+
+  <!-- header — minimal, no announcement bar -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:30px 80px;">
+    <span style="font-size:15px; font-weight:500; letter-spacing:0.3em;">YOUR STORE</span>
+    <div style="display:flex; gap:34px; font-size:13px; letter-spacing:0.04em;"><span>Shop</span><span>About</span><span>Contact</span></div>
+    <span style="font-size:13px; letter-spacing:0.04em;">Bag (0)</span>
+  </div>
+
+  <!-- hero: one image, one line, dead centre -->
+  <div class="ph2" style="height:660px; position:relative; display:flex; align-items:center; justify-content:center;">
+    <div style="position:absolute; inset:0; background-image:linear-gradient(to bottom, rgba(17,17,17,0.18), rgba(17,17,17,0.30));"></div>
+    <div style="position:relative; display:flex; flex-direction:column; align-items:center; gap:26px; text-align:center;">
+      <p style="margin:0; font-size:22px; font-weight:400; line-height:1.5; color:#FFFFFF; max-width:26ch; letter-spacing:0.01em;">A small collection, added to slowly.</p>
+      <span style="font-size:12px; letter-spacing:0.24em; text-transform:uppercase; color:#FFFFFF; border-bottom:1px solid rgba(255,255,255,0.7); padding-bottom:5px;">Shop</span>
+    </div>
+  </div>
+
+  <!-- opening text -->
+  <div style="padding:88px 80px 0;">
+    <div style="display:grid; grid-template-columns:0.4fr 0.6fr; gap:64px; align-items:start;">
+      <p style="margin:0; font-size:15px; font-weight:500; letter-spacing:0.2em; text-transform:uppercase;">What this is</p>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <p style="margin:0; font-size:22px; line-height:1.5; letter-spacing:-0.01em; max-width:52ch;">A small collection of secondhand clothing, added to a few pieces at a time.</p>
+        <p style="margin:0; font-size:15px; line-height:1.8; color:#3A3A3A; max-width:62ch;">Pieces are chosen for how they are made rather than for the label. There is no seasonal turnover and no sale rail, and when something sells it is not replaced with something similar.</p>
+        <p style="margin:0; font-size:15px; line-height:1.8; color:#3A3A3A; max-width:62ch;">Everything is photographed in daylight against the same background and measured flat. Any wear is described in the listing and shown in the photographs.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- featured: 2-up oversized — signature -->
+  <div style="padding:88px 80px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:44px; border-top:1px solid #EDEBE7; padding-top:28px;">
+      <h2 style="margin:0; font-size:15px; font-weight:500; letter-spacing:0.22em; text-transform:uppercase;">The current edit</h2>
+      <span style="font-size:13px; color:#767066;">Updated [MONTH]</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:80px;">
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">Unlined Wool Overcoat Size M</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Heavy wool, cut straight, no shoulder padding. Unlined.</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph3" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">Bias Cut Silk Dress Size S</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Cut on the bias. Slight bloom to the silk from age, shown in the photographs.</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph4" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">Leather Envelope Clutch</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Softened with handling. Interior clean, no ink marks. Hardware unpolished.</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph2" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">Cashmere Crew Neck Size M</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Two-ply cashmere. Light pilling under the arms.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- full-bleed editorial image -->
+  <div class="ph4" style="height:520px; margin-top:88px;"></div>
+
+  <!-- text block: how we work -->
+  <div style="padding:88px 80px 0;">
+    <div style="display:grid; grid-template-columns:0.4fr 0.6fr; gap:64px; align-items:start;">
+      <p style="margin:0; font-size:15px; font-weight:500; letter-spacing:0.2em; text-transform:uppercase;">On condition</p>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <p style="margin:0; font-size:15px; line-height:1.8; color:#3A3A3A; max-width:62ch;">Everything is graded on the same five-point scale. The grade appears on every listing with a note on what informed it: a repaired seam, a missing button, a mark that did not come out.</p>
+        <p style="margin:0; font-size:15px; line-height:1.8; color:#3A3A3A; max-width:62ch;">Photographs are not retouched, and everything is shot in the same light so pieces can be compared against each other.</p>
+        <div style="display:flex; gap:28px; margin-top:8px;">
+          <span style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase; border-bottom:1px solid #111111; padding-bottom:4px;">The condition scale</span>
+          <span style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase; border-bottom:1px solid #111111; padding-bottom:4px;">How to measure</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- featured: second group -->
+  <div style="padding:88px 80px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:44px; border-top:1px solid #EDEBE7; padding-top:28px;">
+      <h2 style="margin:0; font-size:15px; font-weight:500; letter-spacing:0.22em; text-transform:uppercase;">Also available</h2>
+      <span style="font-size:13px; color:#767066;">Shop all</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:80px;">
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph3" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">High Waisted Pleated Trouser Size 28</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Deep pleats, generous through the leg. Turned hem that can be let down.</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">Oversized Linen Shirt Size L</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Washed soft. Cut long enough to wear open.</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph2" style="aspect-ratio:4/5; position:relative;"><span style="position:absolute; bottom:14px; left:14px; background:#FFFFFF; color:#111111; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; padding:6px 12px;">Sold</span></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#767066;">Suede Mule Size 38</span><span style="font-size:15px; color:#767066;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#767066; max-width:44ch;">Sold pieces stay listed so you can see what comes through.</p>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="ph4" style="aspect-ratio:4/5;"></div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:16px;"><span style="font-size:15px; color:#111111;">Belted Gabardine Coat Size M</span><span style="font-size:15px; color:#111111;">$0.00</span></div>
+          <p style="margin:0; font-size:13px; line-height:1.7; color:#5A564E; max-width:44ch;">Cotton gabardine, still water resistant. Original belt, buckle unmarked.</p>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:center; margin-top:64px;">
+      <span style="font-size:13px; letter-spacing:0.16em; text-transform:uppercase; border-bottom:1px solid #111111; padding-bottom:4px;">See everything</span>
+    </div>
+  </div>
+
+  <!-- newsletter -->
+  <div style="padding:104px 80px 88px; margin-top:40px; border-top:1px solid #EDEBE7;">
+    <div style="display:grid; grid-template-columns:0.4fr 0.6fr; gap:64px; align-items:start;">
+      <p style="margin:0; font-size:15px; font-weight:500; letter-spacing:0.2em; text-transform:uppercase;">New arrivals</p>
+      <div style="display:flex; flex-direction:column; gap:22px;">
+        <p style="margin:0; font-size:15px; line-height:1.8; color:#3A3A3A; max-width:56ch;">Pieces are added in small groups rather than on a schedule. The list is sent no more than once a month.</p>
+        <div style="display:flex; align-items:baseline; gap:26px; border-bottom:1px solid #111111; padding-bottom:12px; max-width:480px;">
+          <span style="flex:1; font-size:14px; color:#767066;">Email address</span>
+          <span style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase;">Subscribe</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="padding:34px 80px 64px; display:flex; justify-content:space-between; align-items:baseline; border-top:1px solid #EDEBE7;">
+    <span style="font-size:13px; letter-spacing:0.24em;">YOUR STORE</span>
+    <div style="display:flex; gap:32px; font-size:13px; color:#767066;">
+      <span>About</span><span>Condition</span><span>Shipping &amp; returns</span><span>[YOUR EMAIL]</span><span>Instagram</span>
+    </div>
+    <span style="font-size:13px; color:#767066;">© 2026</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

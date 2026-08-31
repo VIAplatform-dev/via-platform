@@ -11,6 +11,10 @@ function db() {
 }
 
 let ensured = false;
+/** Exported so the analytics read-model views can guarantee their base tables exist. */
+export async function ensureStoreEngagementTables() {
+ return ensureTables();
+}
 async function ensureTables() {
  if (ensured) return;
  const sql = db();

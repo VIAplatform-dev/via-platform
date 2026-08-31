@@ -110,7 +110,11 @@
     },
     {
       "path": "/api/cron/send-new-arrivals",
-      "schedule": "0 20 * * 2"
+      "schedule": "0 21 * * 2"
+    },
+    {
+      "path": "/api/cron/send-new-arrivals",
+      "schedule": "0 22 * * 2"
     },
     {
       "path": "/api/cron/monthly-report",
@@ -155,6 +159,10 @@
     {
       "path": "/api/cron/sync-ebay-sales",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-depop-sales",
+      "schedule": "20 * * * *"
     },
     {
       "path": "/api/cron/sync-ebay-stats",

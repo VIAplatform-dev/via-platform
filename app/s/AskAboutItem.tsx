@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FIELD_SM, SUBMIT_SM } from "./formStyles";
 
 // A compact "Ask about this" affordance under a product. Opens an inline form,
 // posts a question tied to the item, and hands the buyer a private thread link.
@@ -46,12 +47,11 @@ export default function AskAboutItem({ storeSlug, itemTitle, accent }: { storeSl
  );
  }
 
- const field = "w-full border border-black/20 bg-white/70 px-2.5 py-1.5 text-[12px] outline-none focus:border-black/50";
  return (
  <form onSubmit={submit} className="mt-1.5 flex flex-col gap-1.5" onClick={(e) => e.preventDefault()}>
- <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email (for the reply)" className={field} />
- <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={2} placeholder={`Question about "${itemTitle}"`} className={field} />
- <button type="submit" disabled={busy} className="self-start px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white disabled:opacity-50" style={{ background: accent }}>
+ <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email (for the reply)" className={FIELD_SM} />
+ <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={2} placeholder={`Question about "${itemTitle}"`} className={FIELD_SM} />
+ <button type="submit" disabled={busy} className={SUBMIT_SM} style={{ background: accent }}>
  {busy ? "Sending…" : "Send"}
  </button>
  </form>

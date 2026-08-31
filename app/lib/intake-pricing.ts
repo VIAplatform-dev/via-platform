@@ -3,7 +3,9 @@ import { getMinMarkupBps } from "./store-pricing-db";
 import { getStorePricingSignal, getVisualVyaComps, RECALL_STALE_DAYS } from "./intake-memory-db";
 import { getStoreBrief, briefPricingTarget } from "./store-brief-db";
 import { fetchResaleTrend, type Comp } from "./comps";
-import { identifyRunway, identifyCelebrity, isIntakeConfigured } from "./ai-intake";
+import { resolveBrandLine, isFairComp, compQueryBrand, compExclusions, isAmbiguousHouse, linesOfHouse, lineByLabel } from "./brand-lines";
+import { identifyRunway, identifyCelebrity, isIntakeConfigured, identifyBrandTier } from "./ai-intake";
+import { matchRunwayByImage } from "./runway-index";
 import { getPieceRunway, savePieceRunway } from "./comp-cache-db";
 import { gate } from "./concurrency";
 
@@ -37,7 +39,12 @@ async function resolveStoreMultiplier(slug: string): Promise<{ mult: number; not
 export function titleHasBrand(title: string, brand: string): boolean {
  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
  const b = norm(brand);
- return b.length >= 3 && norm(title).includes(b);
+ if (b.length < 3 || !norm(title).includes(b)) return false;
+ // Stripping punctuation makes "Lauren Ralph Lauren" contain "ralphlauren", so a
+ // diffusion title passed as its runway parent — the bug that priced a Ralph
+ // Lauren Fall 2008 gown against $50 department-store dresses. Reject a comp
+ // that names a sibling line two or more tiers away.
+ return isFairComp(resolveBrandLine(brand), title);
 }
 
 // Resellers date archival pieces in their titles (e.g. "Prada F/W 1998 leather skirt").
@@ -108,13 +115,45 @@ export async function computeListingPricing(opts: {
  // A tight AI search phrase (brand + specific model + era) finds SAME-PIECE comps far better than
  // the SEO title — prefer it, but only when it actually carries the (authoritative) brand.
  const sq = (opts.searchQuery || "").trim();
- const query = sq && (!brandVal || sq.toLowerCase().includes(brandVal.toLowerCase())) ? sq : brandTitle;
+ const rawQuery = sq && (!brandVal || sq.toLowerCase().includes(brandVal.toLowerCase())) ? sq : brandTitle;
+ // Which LINE of the house this is. "Ralph Lauren" is four different markets;
+ // searching the bare house returns whichever line is most numerous, which is
+ // always the cheapest one.
+ let brandLine = resolveBrandLine(brandVal || rawQuery);
+ // The seller wrote what the tag says. If that is just the house — "Ralph Lauren",
+ // covering a runway Collection gown and a $40 department-store dress alike — work
+ // the line out from the GARMENT before any comp is fetched or filtered, because
+ // everything downstream keys off it. Returns null unless confident, in which case
+ // the unqualified house line stands and nothing changes.
+ if (isAmbiguousHouse(brandLine) && isIntakeConfigured()) {
+ const options = linesOfHouse(brandLine!.house).map((l) => ({ label: l.label, tier: l.tier }));
+ const judged = await AI_GATE().run(() => identifyBrandTier(opts.imageUrls, brandLine!.house, opts.title, options)).catch(() => null);
+ const resolved = judged ? lineByLabel(judged.label) : null;
+ if (resolved && resolved.label !== brandLine!.label) {
+  console.log(`[pricing] tier from garment: ${brandLine!.label} → ${resolved.label} (${judged!.confidence})`);
+  brandLine = resolved;
+ }
+ }
+ // Name the line in the search, and push the rival tiers out of the results.
+ const lineName = compQueryBrand(brandLine, brandVal);
+ const withLine = brandLine && !rawQuery.toLowerCase().includes(lineName.toLowerCase())
+ ? rawQuery.replace(new RegExp(brandVal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), lineName)
+ : rawQuery;
+ // Quoted, so the search engine treats each as one phrase to exclude.
+ const exclusions = compExclusions(brandLine).map((phrase) => `-"${phrase}"`).join(" ");
+ const query = exclusions ? `${withLine} ${exclusions}` : withLine;
  const needPrice = !opts.price || !opts.price.trim();
 
  // VYA pieces that LOOK like this one → strong comps, even when the brand is unknown/wrong.
  // Reuses the intake embedding, so no extra Voyage cost. Merged into the reverse-image comps.
  const visualComps = opts.embedding?.length ? await getVisualVyaComps(opts.embedding).catch(() => []) : [];
- const comps = [...opts.extraComps, ...visualComps];
+ // Filter BEFORE the model rather than instructing it to ignore them: when every
+ // candidate is diffusion, "discard diffusion comps" leaves nothing to anchor to
+ // and it anchors to them anyway. Removing them makes the shortage visible instead.
+ const allComps = [...opts.extraComps, ...visualComps];
+ const comps = allComps.filter((c) => isFairComp(brandLine, c.title || ""));
+ const droppedComps = allComps.length - comps.length;
+ if (droppedComps > 0) console.log(`[pricing] dropped ${droppedComps}/${allComps.length} cross-tier comps for ${brandLine?.label ?? brandVal}`);
 
  // Celebrity provenance — resolved BEFORE pricing so a verified "worn by" can lift the estimate.
  // Only runs when reverse-image surfaced editorial/Getty captions (the evidence), so the common
@@ -185,6 +224,13 @@ export async function computeListingPricing(opts: {
  let runway: string | null = opts.runwaySoFar;
  if (!runway && brandVal) {
  runway = await getPieceRunway(brandVal, opts.title).catch(() => null); // seen this exact piece before?
+ // Then the look index: matching the GARMENT against documented shows beats
+ // inferring a season from captions that happened to come back, and it costs one
+ // embedding instead of a vision call. Silent no-op until a corpus is loaded.
+ if (!runway) {
+  const matched = await matchRunwayByImage(opts.imageUrls, brandVal).catch(() => null);
+  if (matched?.runway) runway = matched.runway;
+ }
  if (!runway && !opts.draftRanFull) {
  // Editorial/Getty captions (e.g. "…walks the runway at the Prada F/W 2004 show") are prime
  // season evidence and are included here even though they skip the brand filter used for pricing.

@@ -3,6 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { createItem, listAvailableItems } from "@/app/lib/db/inventory";
 import { parseItems } from "@/app/lib/parse-items";
+import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
 // POST { csv, status? } — bulk-add inventory from a pasted/uploaded CSV. The on-ramp for
 // stores with no Shopify to connect. Accepts flexible exports (Shopify/Square/spreadsheet);
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
  let added = 0;
  for (const p of parsed) {
  if (have.has(p.title.toLowerCase())) continue;
- const images = p.images.slice(0, 8); // rehost-images cron copies these to our storage in the background
+ const images = p.images.slice(0, MAX_ITEM_IMAGES); // rehost-images cron copies these to our storage in the background
  await createItem({
  sellerId: seller.id,
  title: p.title,

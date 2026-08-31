@@ -194,7 +194,14 @@ const BAG_MODELS = [
  *  full listing title ("… Vertical Stitch … Bag Ruthenium Hardware") is too specific to match any
  *  sold listing, so eBay returns nothing and the pricer falls back to inflated asking prices. */
 export function compactQuery(query: string): string {
- let q = " " + query.toLowerCase() + " ";
+ // Strip negative phrases entirely: eBay's _nkw supports -word, NOT -"quoted
+ // phrase", and passing one makes the whole search return nothing. Measured: the
+ // same query went from 25 sold comps to 0 the moment an exclusion was appended.
+ // Google Shopping does honour them, which is why they stay on the raw query and
+ // are only removed here, on the path into eBay. Keeping the wrong TIER of a house
+ // out of the results is done after the fetch instead, by isFairComp.
+ const positive = query.replace(/-"[^"]+"/g, " ");
+ let q = " " + positive.toLowerCase() + " ";
  q = q
   .replace(/\b(ruthenium|gunmetal|palladium|brushed|antiqued?|aged|light\s+gold|gold|silver)\s+hardware\b/g, " ")
   .replace(/\bhardware\b/g, " ")

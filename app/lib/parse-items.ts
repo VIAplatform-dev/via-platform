@@ -1,3 +1,5 @@
+import { MAX_ITEM_IMAGES } from "./item-limits";
+
 // Flexible product/inventory CSV parser. Sellers export from Shopify, Square, a
 // spreadsheet, etc., so we sniff the delimiter and map columns by fuzzy header name
 // (title/name, price, brand, size, condition, era, material, category, description,
@@ -73,7 +75,7 @@ export function parseItems(text: string): ParsedItem[] {
  seen.add(key);
  // Images: a dedicated column may hold one or several URLs (comma/space separated).
  const imgCell = at(cells, idx.image);
- const images = imgCell ? (imgCell.match(URL_RE) || []).slice(0, 8) : [];
+ const images = imgCell ? (imgCell.match(URL_RE) || []).slice(0, MAX_ITEM_IMAGES) : [];
  items.push({
  title,
  priceCents,

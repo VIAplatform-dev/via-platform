@@ -86,6 +86,11 @@ export const items = pgTable(
  // Scheduled publish: a draft with publish_at in the future is "scheduled" — the cron flips it to
  // active at that time. NULL = not scheduled (a normal draft or an already-live item).
  publishAt: timestamp("publish_at", { withTimezone: true }),
+ // Which marketplaces this piece should cross-list to, chosen per listing in the
+ // intake form. Persisted so a SCHEDULED listing still fans out to the channels the
+ // seller picked, hours later, when the cron publishes it — NULL means they made no
+ // explicit choice and each channel's auto-list default applies.
+ crossListChannels: text("cross_list_channels").array(),
  soldAt: timestamp("sold_at", { withTimezone: true }),
  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

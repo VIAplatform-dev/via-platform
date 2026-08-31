@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
 type Listing = {
  id: number;
@@ -99,7 +100,7 @@ export default function ListingsManager() {
  const r = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Upload failed");
- setDraft((x) => (x ? { ...x, images: [...x.images, d.url].slice(0, 8) } : x));
+ setDraft((x) => (x ? { ...x, images: [...x.images, d.url].slice(0, MAX_ITEM_IMAGES) } : x));
  }
  } catch (e) {
  setErr(e instanceof Error ? e.message : "Upload failed");
@@ -194,7 +195,7 @@ export default function ListingsManager() {
  ))}
  <button
  onClick={() => fileRef.current?.click()}
- disabled={uploading || draft.images.length >= 8}
+ disabled={uploading || draft.images.length >= MAX_ITEM_IMAGES}
  className="flex h-24 w-20 flex-col items-center justify-center rounded-[3px] border border-dashed border-[#5D0F17]/30 text-[10px] uppercase tracking-wider text-[#5D0F17]/50 hover:border-[#5D0F17]/60 disabled:opacity-40"
  >
  {uploading ? "…" : "+ Photo"}
@@ -202,7 +203,7 @@ export default function ListingsManager() {
  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPickFiles(e.target.files)} />
  </div>
  <p className="mt-2.5 text-[11px] text-[#5D0F17]/40">
- {dragOver ? "Drop to upload" : "Drag & drop photos here, or click + Photo · up to 8"}
+ {dragOver ? "Drop to upload" : `Drag & drop photos here, or click + Photo · up to ${MAX_ITEM_IMAGES}`}
  </p>
  </div>
 

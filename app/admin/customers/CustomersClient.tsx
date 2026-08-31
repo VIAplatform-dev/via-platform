@@ -17,6 +17,8 @@ type Customer = {
  referralCode: string | null;
  referredBy: string | null;
  source: string | null;
+ sourceLabel: string;
+ sourceChannel: string;
  loginMethod: string;
  emailSubscribe: boolean;
  activityScore: number;
@@ -263,11 +265,14 @@ export default function CustomersClient() {
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);
  const [filter, setFilter] = useState<"all" | "approved" | "pending">("all");
+ // Acquisition-source filter. "all" plus one entry per source actually present in the
+ // data, so the chips never advertise a channel with nothing behind it.
+ const [sourceFilter, setSourceFilter] = useState<string>("all");
  const [search, setSearch] = useState(searchParams.get("search") ?? "");
  // Render in pages so a large customer list doesn't freeze the browser (each row is heavy).
  const PAGE = 100;
  const [visibleCount, setVisibleCount] = useState(PAGE);
- useEffect(() => { setVisibleCount(PAGE); }, [filter, search]);
+ useEffect(() => { setVisibleCount(PAGE); }, [filter, search, sourceFilter]);
  const [approving, setApproving] = useState<string | null>(null);
  const [approvingAll, setApprovingAll] = useState(false);
  const [emailProgress, setEmailProgress] = useState<string | null>(null);
@@ -366,15 +371,27 @@ export default function CustomersClient() {
  });
  }, []);
 
+ // Source counts drive the chips below — computed off the STATUS-filtered set so the
+ // numbers match what you'd actually see, but not off the source filter itself
+ // (otherwise selecting TikTok would zero out every other chip).
+ const sourceCounts = customers.reduce<Record<string, number>>((acc, c) => {
+ const label = c.sourceLabel || "Direct";
+ acc[label] = (acc[label] ?? 0) + 1;
+ return acc;
+ }, {});
+ const sourceOptions = Object.entries(sourceCounts)
+ .sort((a, b) => (a[0] === "Direct" ? 1 : b[0] === "Direct" ? -1 : b[1] - a[1]));
+
  const filtered = customers.filter((c) => {
  if (filter === "approved" && c.status !== "approved") return false;
  if (filter === "pending" && c.status === "approved") return false;
+ if (sourceFilter !== "all" && (c.sourceLabel || "Direct") !== sourceFilter) return false;
+ // Each condition must be able to REJECT independently. This used to `return` the
+ // search result directly, which meant typing in the box discarded the status filter.
  if (search) {
  const q = search.toLowerCase();
- return (
- c.email.toLowerCase().includes(q) ||
- (c.name?.toLowerCase().includes(q) ?? false)
- );
+ const hit = c.email.toLowerCase().includes(q) || (c.name?.toLowerCase().includes(q) ?? false);
+ if (!hit) return false;
  }
  return true;
  });
@@ -385,12 +402,14 @@ export default function CustomersClient() {
 
  const exportCSV = () => {
  if (filtered.length === 0) return;
- const headers = ["Email", "Name", "Phone", "Status", "Login Method", "Last Active", "Signed Up", "Approved", "Referral Code", "Referred By", "Email Subscribe"];
+ const headers = ["Email", "Name", "Phone", "Status", "Source", "Channel", "Login Method", "Last Active", "Signed Up", "Approved", "Referral Code", "Referred By", "Email Subscribe"];
  const rows = filtered.map((c) => [
  c.email,
  c.name ?? "",
  c.phone ?? "",
  c.status,
+ c.sourceLabel,
+ c.sourceChannel,
  c.loginMethod,
  fmt(c.lastActiveAt),
  fmt(c.signedUpAt),
@@ -510,6 +529,41 @@ export default function CustomersClient() {
  </button>
  ))}
  </div>
+
+ {/* Acquisition source. A select rather than chips: with a dozen sources the
+     chip row wrapped onto three lines and pushed the search box around. The
+     counts stay in the option labels so you still see the shape of the data
+     without opening it. */}
+ {sourceOptions.length > 0 && (
+ <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+ <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "#a1a1aa" }}>Source</span>
+ <select
+ value={sourceFilter}
+ onChange={(e) => setSourceFilter(e.target.value)}
+ style={{
+ border: "1px solid #e4e4e7",
+ borderRadius: 6,
+ padding: "7px 10px",
+ fontSize: 13,
+ color: "#09090b",
+ background: "#fff",
+ outline: "none",
+ cursor: "pointer",
+ minWidth: 168,
+ }}
+ onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px rgba(24,24,27,0.08)")}
+ onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
+ >
+ <option value="all">All sources ({customers.length})</option>
+ {sourceOptions.map(([label, count]) => (
+ <option key={label} value={label}>
+ {label} ({count})
+ </option>
+ ))}
+ </select>
+ </label>
+ )}
+
  <input
  type="text"
  placeholder="Search by email or name…"

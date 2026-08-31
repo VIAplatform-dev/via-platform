@@ -13,6 +13,10 @@ function db() {
 }
 
 let ensured = false;
+/** Exported so the analytics read-model views can guarantee this table exists. */
+export async function ensureAnalyticsEventsTable() {
+ return ensure();
+}
 async function ensure() {
  if (ensured) return;
  const sql = db();

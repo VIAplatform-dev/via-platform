@@ -45,6 +45,13 @@ export default function CollectionsAdminPage() {
  const [activeSlugs, setActiveSlugs] = useState<Set<string> | null>(null);
  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+ // Weekly New Arrivals subject line — stored server-side so it can change every week
+ // without a deploy.
+ const [subject, setSubject] = useState("");
+ const [subjectSaved, setSubjectSaved] = useState("");
+ const [subjectSaving, setSubjectSaving] = useState(false);
+ const [subjectError, setSubjectError] = useState<string | null>(null);
+
  // User likes import
  const [likesEmail, setLikesEmail] = useState("");
  const [likesProducts, setLikesProducts] = useState<Product[]>([]);
@@ -66,6 +73,39 @@ export default function CollectionsAdminPage() {
  .then((d) => setActiveSlugs(new Set(d.slugs ?? [])))
  .catch(() => setActiveSlugs(new Set()));
  }, []);
+
+ useEffect(() => {
+ fetch("/api/admin/email-subject")
+ .then((r) => (r.ok ? r.json() : null))
+ .then((d) => {
+ if (!d?.subject) return;
+ setSubject(d.subject);
+ setSubjectSaved(d.subject);
+ })
+ .catch(() => {});
+ }, []);
+
+ const saveSubject = useCallback(async () => {
+ const value = subject.trim();
+ if (!value || value === subjectSaved) return;
+ setSubjectSaving(true);
+ setSubjectError(null);
+ try {
+ const res = await fetch("/api/admin/email-subject", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ subject: value }),
+ });
+ const data = await res.json().catch(() => null);
+ if (!res.ok) throw new Error(data?.error || "Could not save");
+ setSubjectSaved(data.subject);
+ setSubject(data.subject);
+ } catch (e) {
+ setSubjectError(e instanceof Error ? e.message : "Could not save");
+ } finally {
+ setSubjectSaving(false);
+ }
+ }, [subject, subjectSaved]);
 
  const loadPicks = useCallback(async (collectionSlug: string) => {
  setLoadingPicks(true);
@@ -251,6 +291,41 @@ export default function CollectionsAdminPage() {
  {loadingPicks ? "…" : picks.length} selected
  </span>
  </div>
+
+ {activeCollection.slug === EMAIL_PICKS_COLLECTION.slug && (
+ <div style={{ marginBottom: 24, padding: 16, background: "#fafafa", border: "1px solid #e4e4e7", borderRadius: 8 }}>
+ <label htmlFor="na-subject" style={{ display: "block", fontSize: 12, textTransform: "uppercase", letterSpacing: "0.1em", color: "#71717a", marginBottom: 8 }}>
+ Subject line
+ </label>
+ <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+ <input
+ id="na-subject"
+ value={subject}
+ onChange={(e) => setSubject(e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") saveSubject(); }}
+ maxLength={120}
+ placeholder="Just in"
+ style={{ flex: "1 1 320px", padding: "9px 12px", fontSize: 14, border: "1px solid #d4d4d8", borderRadius: 6, color: "#09090b" }}
+ />
+ <button
+ onClick={saveSubject}
+ disabled={subjectSaving || !subject.trim() || subject.trim() === subjectSaved}
+ style={{
+ padding: "9px 18px", fontSize: 13, fontWeight: 600, borderRadius: 6, border: "none", color: "#fff",
+ background: subjectSaving || !subject.trim() || subject.trim() === subjectSaved ? "#a1a1aa" : "#09090b",
+ cursor: subjectSaving || !subject.trim() || subject.trim() === subjectSaved ? "default" : "pointer",
+ }}
+ >
+ {subjectSaving ? "Saving…" : subject.trim() === subjectSaved ? "Saved" : "Save"}
+ </button>
+ </div>
+ <p style={{ fontSize: 12, color: "#71717a", marginTop: 8 }}>
+ {subjectError
+ ? subjectError
+ : "Used by the next send. The email shows the first 8 picks, two across."}
+ </p>
+ </div>
+ )}
 
  {/* Collection tabs — show EVERY collection so empty ones can be curated. A dot marks the
    ones that already have items (from activeSlugs). */}

@@ -103,10 +103,30 @@ type Retention = {
  isReturning: boolean;
 };
 
+type Visit = {
+ source: string;
+ channel: string;
+ medium: string | null;
+ campaign: string | null;
+ landingPath: string | null;
+ timestamp: string;
+};
+
+type VisitSource = {
+ source: string;
+ channel: string;
+ visits: number;
+ firstAt: string;
+ lastAt: string;
+};
+
 type Data = {
  profile: Profile;
  stats: Stats;
  retention: Retention;
+ visits: Visit[];
+ visitSources: VisitSource[];
+ visitsTruncated: boolean;
  sessions: Session[];
  topStores: TopStore[];
  favorites: Favorite[];
@@ -161,6 +181,7 @@ export default function CustomerProfilePage() {
  const [data, setData] = useState<Data | null>(null);
  const [loading, setLoading] = useState(true);
  const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
+ const [showAllVisits, setShowAllVisits] = useState(false);
 
  useEffect(() => {
  fetch(`/api/admin/customers/${encodeURIComponent(email)}`)
@@ -290,6 +311,87 @@ export default function CustomerProfilePage() {
  </span>
  )}
  </div>
+ </div>
+ </>
+ )}
+
+ {/* ── Where they came from, every time ──────────────────────────────
+     The summary bar is the answer to "which channels keep bringing them
+     back" and is what you actually read. The visit-by-visit list is the
+     evidence behind it, collapsed by default — expanded it is 100+ rows
+     and drowns the rest of the page. ── */}
+ {data.visitSources.length > 0 && (
+ <>
+ <SectionLabel>Where They Came From</SectionLabel>
+ <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, marginBottom: 24, padding: "18px 20px" }}>
+
+ {/* One proportional bar per source. Width carries the comparison, so the
+     numbers don't have to be read against each other. */}
+ {(() => {
+ const total = data.visitSources.reduce((n, v) => n + v.visits, 0) || 1;
+ const TONE: Record<string, string> = {
+ Social: "#111827", Email: "#6366f1", Referral: "#d4af37", Search: "#0ea5e9", Direct: "#d4d4d8",
+ };
+ return (
+ <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+ {data.visitSources.map((vs) => (
+ <div key={vs.source} style={{ display: "grid", gridTemplateColumns: "104px 1fr 150px", gap: 12, alignItems: "center" }}>
+ <span style={{ fontSize: 13, fontWeight: 600, color: DARK }}>{vs.source}</span>
+ <div style={{ position: "relative", height: 8, background: "#f4f4f5", borderRadius: 99, overflow: "hidden" }}>
+ <div style={{ position: "absolute", inset: 0, width: `${Math.max(2, (vs.visits / total) * 100)}%`, background: TONE[vs.channel] ?? "#64748b", borderRadius: 99 }} />
+ </div>
+ <span style={{ fontSize: 11, color: MUTED, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+ {vs.visits} visit{vs.visits === 1 ? "" : "s"} &middot;{" "}
+ {vs.firstAt === vs.lastAt ? fmtDate(vs.firstAt) : `${fmtDate(vs.firstAt)}\u2013${fmtDate(vs.lastAt)}`}
+ </span>
+ </div>
+ ))}
+ </div>
+ );
+ })()}
+
+ <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${BORDER}`, flexWrap: "wrap" }}>
+ <span style={{ fontSize: 11, color: MUTED }}>
+ Signed-in visits only &mdash; logged-out visits aren&rsquo;t linked to an account yet.
+ </span>
+ <button
+ onClick={() => setShowAllVisits((v) => !v)}
+ style={{ fontSize: 12, color: DARK, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer" }}
+ >
+ {showAllVisits ? "Hide" : `Show all ${data.visits.length}${data.visitsTruncated ? "+" : ""} visits`}
+ </button>
+ </div>
+
+ {showAllVisits && (
+ <div style={{ maxHeight: 340, overflowY: "auto", marginTop: 14, borderTop: `1px solid ${BORDER}` }}>
+ {data.visits.map((v, i) => (
+ <div
+ key={`${v.timestamp}-${i}`}
+ style={{
+ display: "grid",
+ gridTemplateColumns: "140px 110px 1fr",
+ gap: 12,
+ alignItems: "baseline",
+ padding: "7px 0",
+ borderBottom: i === data.visits.length - 1 ? "none" : "1px solid #f4f4f5",
+ }}
+ >
+ <span style={{ fontSize: 11, color: MUTED, fontVariantNumeric: "tabular-nums" }}>{fmtDate(v.timestamp)}</span>
+ <span style={{ fontSize: 12, color: DARK, display: "inline-flex", alignItems: "center", gap: 5 }}>
+ {v.source}
+ {/* "earliest", not "first touch": the header badge shows the earliest
+     REAL channel, which is often not the oldest row (usually Direct). */}
+ {i === data.visits.length - 1 && (
+ <span style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.06em", color: MUTED }}>earliest</span>
+ )}
+ </span>
+ <span style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+ {[v.campaign, v.landingPath].filter(Boolean).join(" \u00b7 ") || "\u2014"}
+ </span>
+ </div>
+ ))}
+ </div>
+ )}
  </div>
  </>
  )}

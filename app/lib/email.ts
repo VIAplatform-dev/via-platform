@@ -234,7 +234,7 @@ function minifyHtml(html: string): string {
  return html.replace(/\s*\n\s*/g, " ").replace(/ {2,}/g, " ").trim();
 }
 
-function viaShell(subtitle: string, content: string, unsubscribeUrl?: string, heroImage?: string): string {
+function viaShell(subtitle: string, content: string, unsubscribeUrl?: string, heroImage?: string, logoWidth = 140): string {
  const year = new Date().getFullYear();
  const unsubUrl = unsubscribeUrl || `${BASE_URL}/account`;
  // Top navigation — spaced-caps links to the main VYA sections, like a site header.
@@ -298,8 +298,8 @@ u + .body .email-inner { background-color: #FFFDF8 !important; }
 
  <!-- Logo -->
  <div style="text-align:center;padding:34px 24px 30px;">
- <img src="https://vyaplatform.com/vya-logo.png" alt="VYA." width="140"
- style="display:block;margin:0 auto;width:140px;height:auto;" border="0" />
+ <img src="https://vyaplatform.com/vya-logo.png" alt="VYA." width="${logoWidth}"
+ style="display:block;margin:0 auto;width:${logoWidth}px;height:auto;" border="0" />
  </div>
 
  <!-- Editorial hero (optional, full-width) -->
@@ -1324,10 +1324,23 @@ function sortByBrand(products: DBProduct[]): { sorted: DBProduct[]; topBrands: s
  return { sorted, topBrands: brandOrder };
 }
 
+// Eight pieces, two across — four rows. Change these two together with the layout below.
+export const NEW_ARRIVALS_ITEM_COUNT = 8;
+// The weekly subject line, edited from /admin/collections so it can change every week without a
+// deploy. Unset falls back to DEFAULT_NEW_ARRIVALS_SUBJECT — an empty setting never ships blank.
+export const NEW_ARRIVALS_SUBJECT_KEY = "new_arrivals_subject";
+export const DEFAULT_NEW_ARRIVALS_SUBJECT = "Just in";
+const IMAGE_RADIUS = "6px";
+// One box for every tile, so eight photos of different shapes still line up.
+const IMAGE_HEIGHT = 300;
+
 export async function sendNewArrivalsEmail(
  emails: string[],
  products: DBProduct[],
- preserveOrder = false
+ preserveOrder = false,
+ // Set from /admin/collections so the line can change every week without a deploy. Falls back to
+ // the historic subject when nothing is stored, so an unset value can never send a blank subject.
+ subjectOverride?: string | null
 ): Promise<{ sent: number; failed: number }> {
  if (emails.length === 0 || products.length === 0) return { sent: 0, failed: 0 };
 
@@ -1336,9 +1349,10 @@ export async function sendNewArrivalsEmail(
  // Hand-curated picks keep the exact order they were chosen; the automatic
  // selection gets grouped by brand for a nicer flow.
  const sortedProducts = preserveOrder ? products : sortByBrand(products).sorted;
- const subject = "Just in";
- // Cap at 25 pieces.
- const display = sortedProducts.slice(0, 25);
+ const subject = (subjectOverride || "").trim() || DEFAULT_NEW_ARRIVALS_SUBJECT;
+ // Eight pieces, laid out two across — four rows. Deliberately short: the old 25-piece wall
+ // meant most of the email was never scrolled to.
+ const display = sortedProducts.slice(0, NEW_ARRIVALS_ITEM_COUNT);
 
  function productCell(p: DBProduct, recipient: string): string {
  const url = productViaUrl(p, "new_arrivals_email", recipient);
@@ -1346,18 +1360,12 @@ export async function sendNewArrivalsEmail(
  const safeImgSrc = p.image ? p.image.replace(/&/g, "&amp;") : null;
  // height:auto shows the FULL product image at its natural aspect ratio — bigger,
  // and nothing cropped off (the old fixed 220px + object-fit:cover cut pieces off).
+ // border-radius is honoured by every modern client; Outlook desktop ignores it and shows
+ // square corners, which is a clean fallback rather than a broken one.
  const imgBlock = safeImgSrc
- ? `<img src="${safeImgSrc}" alt="${p.title.replace(/"/g, "&quot;")}" width="240"
- style="display:block;width:100%;height:auto;" border="0" />`
- : `<div style="width:100%;height:300px;background:rgba(93,15,23,0.06);"></div>`;
-
- const priceStr = formatEmailPrice(p.price, p.currency);
- const compareStr = p.compare_at_price ? formatEmailPrice(p.compare_at_price, p.currency) : null;
- const priceBlock = compareStr
- ? `<span style="color:#5D0F17;font-size:13px;font-family:Georgia,'Times New Roman',serif;">${priceStr}</span>
- <span style="color:rgba(93,15,23,0.4);font-size:12px;text-decoration:line-through;margin-left:6px;
- font-family:Georgia,'Times New Roman',serif;">${compareStr}</span>`
- : `<span style="color:#5D0F17;font-size:13px;font-family:Georgia,'Times New Roman',serif;">${priceStr}</span>`;
+ ? `<img src="${safeImgSrc}" alt="${p.title.replace(/"/g, "&quot;")}" width="240" height="${IMAGE_HEIGHT}"
+ style="display:block;width:100%;height:${IMAGE_HEIGHT}px;object-fit:cover;border-radius:${IMAGE_RADIUS};" border="0" />`
+ : `<div style="width:100%;height:${IMAGE_HEIGHT}px;background:rgba(93,15,23,0.06);border-radius:${IMAGE_RADIUS};"></div>`;
 
  // Avoid <p> inside <a> — email clients break the outer <a> at block elements.
  const safeUrl = url.replace(/&/g, "&amp;");
@@ -1365,14 +1373,10 @@ export async function sendNewArrivalsEmail(
  <a href="${safeUrl}" style="display:block;text-decoration:none;color:inherit;">
  ${imgBlock}
  </a>
- <div style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(93,15,23,0.5);
- margin:10px 0 3px;font-family:Georgia,'Times New Roman',serif;">${p.store_name}</div>
- <div style="font-size:13px;color:#5D0F17;margin:0 0 5px;font-family:Georgia,'Times New Roman',serif;
- line-height:1.35;">${p.title}</div>
- <div style="margin:0 0 14px;">${priceBlock}</div>
- <a href="${safeUrl}" style="display:inline-block;border:1px solid #5D0F17;color:#5D0F17;padding:8px 18px;
- text-decoration:none;font-size:10px;letter-spacing:0.14em;text-transform:uppercase;
- font-family:Georgia,'Times New Roman',serif;">View Item</a>
+ <a href="${safeUrl}" style="display:block;text-decoration:none;">
+ <div style="font-size:13px;color:#5D0F17;margin:10px 0 0;font-family:Georgia,'Times New Roman',serif;
+ line-height:1.35;text-align:center;">${p.title}</div>
+ </a>
  `;
  }
 
@@ -1397,18 +1401,11 @@ export async function sendNewArrivalsEmail(
  `);
  }
  return `
- <p style="font-size:15px;color:#5D0F17;font-family:Georgia,'Times New Roman',serif;line-height:1.75;margin:0 0 6px;">
- These pieces won&rsquo;t be here for long.
- </p>
- <p style="font-size:15px;color:rgba(93,15,23,0.65);font-family:Georgia,'Times New Roman',serif;
- line-height:1.75;margin:0 0 24px;">
- Every piece on VYA is one-of-a-kind &mdash; once it&rsquo;s gone, it&rsquo;s gone forever. No restocks, no second chances.
- </p>
  <div style="text-align:center;margin-bottom:36px;">
  <a href="${naUrl}"
  style="display:inline-block;background:#5D0F17;color:#FFFDF8 !important;padding:13px 36px;
  text-decoration:none;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;
- font-family:Georgia,'Times New Roman',serif;">Shop New Arrivals</a>
+ border-radius:${IMAGE_RADIUS};font-family:Georgia,'Times New Roman',serif;">Shop New Arrivals</a>
  </div>
  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
  ${rows.join("")}
@@ -1417,7 +1414,7 @@ export async function sendNewArrivalsEmail(
  <a href="${naUrl}"
  style="display:inline-block;background:#5D0F17;color:#FFFDF8 !important;padding:13px 36px;
  text-decoration:none;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;
- font-family:Georgia,'Times New Roman',serif;">Shop New Arrivals</a>
+ border-radius:${IMAGE_RADIUS};font-family:Georgia,'Times New Roman',serif;">Shop New Arrivals</a>
  </div>
  `;
  }
@@ -1427,7 +1424,7 @@ export async function sendNewArrivalsEmail(
 
  for (const email of dedupeEmails(emails)) {
  const unsubUrl = `${BASE_URL}/unsubscribe?email=${encodeURIComponent(email)}`;
- const html = viaShell("New Arrivals", renderContent(email), unsubUrl);
+ const html = viaShell("New Arrivals", renderContent(email), unsubUrl, undefined, 96);
  try {
  await resend.emails.send({
  from: FROM_EMAIL,

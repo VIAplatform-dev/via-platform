@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { getTopViewed, getTopFavorited, storeViewFavoriteTotals, getTopSearches, type RankedItem } from "./store-favorites-db";
+import { SOLD_STATUSES } from "./analytics/core";
 
 // A store's OWN business analytics (its recommerce sales, inventory, customers, traffic)
 // — not its presence on the VYA marketplace. Everything is scoped to the seller behind
@@ -34,7 +35,10 @@ export type StoreAnalytics = {
  topSearches: { query: string; count: number }[];
 };
 
-const SOLD = ["paid", "shipped", "delivered"];
+// One definition of "sold" across every surface — see analytics/core.ts. (This
+// previously omitted "fulfilled", so a fulfilled order was missing from GMV here
+// while counting elsewhere.)
+const SOLD = SOLD_STATUSES;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export async function getStoreAnalytics(slug: string, days: number | null = 30): Promise<StoreAnalytics> {

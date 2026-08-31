@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+  <style>
+    body { margin:0; background:#FDF6F0; font-family:'Newsreader',Georgia,serif; color:#2B211D; }
+    a { color:#8A3F49; text-decoration:none; } a:hover { color:#5F262E; }
+    .disp { font-family:'Bricolage Grotesque','Helvetica Neue',sans-serif; letter-spacing:-0.025em; }
+    .ph { background-image:linear-gradient(155deg,#EBD9D0 0%,#D8BEB3 55%,#C2A296 100%); }
+    .ph2 { background-image:linear-gradient(155deg,#E3CFC7 0%,#CFB2A8 55%,#B8968B 100%); }
+    .ph3 { background-image:linear-gradient(155deg,#F2E4DC 0%,#E0CAC0 55%,#CBAEA3 100%); }
+    .ph4 { background-image:linear-gradient(155deg,#DCC5BC 0%,#C6A79C 55%,#AF8C80 100%); }
+  </style>
+</helmet>
+
+<div style="width:1200px; background:#FDF6F0;">
+
+  <!-- header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:24px 52px;">
+    <span class="disp" style="font-size:24px; font-weight:600;">your store</span>
+    <div style="display:flex; gap:26px; font-size:15px;"><span>shop</span><span>my story</span><span>sizing</span><span>say hi</span></div>
+    <div style="display:flex; gap:16px; align-items:center;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2B211D" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4.5-4.5"/></svg>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2B211D" stroke-width="1.6"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+    </div>
+  </div>
+
+  <!-- hero: image LEFT, text RIGHT -->
+  <div style="display:grid; grid-template-columns:1fr 1fr; align-items:stretch;">
+    <div class="ph2" style="min-height:520px;"></div>
+    <div style="padding:70px 52px 76px; display:flex; flex-direction:column; justify-content:center; gap:20px;">
+      <span style="font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:#8A3F49;">Hi, I'm [YOUR NAME]</span>
+      <h1 class="disp" style="margin:0; font-size:52px; font-weight:600; line-height:1.06;">Secondhand, found and chosen by me</h1>
+      <p style="margin:0; font-size:17.5px; line-height:1.65; max-width:44ch; color:#4A3B34;">Mostly one of each. Everything is washed, mended where it needs it, and measured before it goes up.</p>
+      <div style="display:flex; gap:12px; margin-top:6px;">
+        <span class="disp" style="background:#8A3F49; color:#FDF6F0; padding:14px 30px; border-radius:8px; font-size:14px; font-weight:600;">Shop everything</span>
+        <span class="disp" style="border:1px solid #2B211D; padding:14px 30px; border-radius:8px; font-size:14px; font-weight:600;">Read my story</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- THE LETTER — signature -->
+  <div style="padding:80px 52px; background:#F7E9E0;">
+    <div style="max-width:62ch; margin:0 auto; display:flex; flex-direction:column; gap:20px;">
+      <span class="disp" style="font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:#8A3F49;">A note</span>
+      <p style="margin:0; font-size:20px; line-height:1.72; font-style:italic;">I started this because I kept finding things worth keeping and running out of room for them.</p>
+      <p style="margin:0; font-size:17px; line-height:1.78;">I look for pieces that are well made and likely to last. That means I list fewer things than I could, and I would rather do that than fill the shop with items I do not believe in.</p>
+      <p style="margin:0; font-size:17px; line-height:1.78;">Everything is washed and repaired where it needs it. I measure each piece flat and photograph it on a person, so you can see how it actually sits rather than how it looks on a hanger.</p>
+      <p style="margin:0; font-size:17px; line-height:1.78;">If something does not fit, send it back. If you are looking for something specific, tell me and I will keep an eye out.</p>
+      <p class="disp" style="margin:8px 0 0; font-size:19px; font-weight:600;">— [YOUR NAME]</p>
+    </div>
+  </div>
+
+  <!-- featured 3-up -->
+  <div style="padding:76px 52px 40px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:28px;">
+      <h2 class="disp" style="margin:0; font-size:30px; font-weight:600;">new this week</h2>
+      <span style="font-size:15px; color:#8A3F49;">see everything →</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:34px;">
+      <div style="display:flex; flex-direction:column; gap:13px;"><div class="ph3" style="aspect-ratio:4/5; border-radius:10px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px;">Corduroy Jacket Size M</span><span style="font-size:16px; color:#8A3F49;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:13px;"><div class="ph" style="aspect-ratio:4/5; border-radius:10px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px;">Striped Cotton Shirt Size S</span><span style="font-size:16px; color:#8A3F49;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:13px;"><div class="ph4" style="aspect-ratio:4/5; border-radius:10px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px;">Bias Cut Slip Dress Size S</span><span style="font-size:16px; color:#8A3F49;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:13px;"><div class="ph2" style="aspect-ratio:4/5; border-radius:10px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px;">Hand Knit Cardigan Size L</span><span style="font-size:16px; color:#8A3F49;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:13px;"><div class="ph3" style="aspect-ratio:4/5; border-radius:10px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px;">Leather Loafers Size 39</span><span style="font-size:16px; color:#8A3F49;">$0.00</span></div></div>
+      <div style="display:flex; flex-direction:column; gap:13px;"><div class="ph" style="aspect-ratio:4/5; border-radius:10px;"></div><div style="display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px;">Floral Tea Dress Size M</span><span style="font-size:16px; color:#8A3F49;">$0.00</span></div></div>
+    </div>
+  </div>
+
+  <!-- split: the longer story -->
+  <div style="display:grid; grid-template-columns:0.9fr 1.1fr; margin-top:40px; background:#F7E9E0;">
+    <div class="ph4" style="min-height:400px;"></div>
+    <div style="padding:64px 56px; display:flex; flex-direction:column; gap:16px; justify-content:center;">
+      <span class="disp" style="font-size:13px; letter-spacing:0.1em; text-transform:uppercase; color:#8A3F49;">Before it goes up</span>
+      <h3 class="disp" style="margin:0; font-size:34px; font-weight:600; line-height:1.14;">How everything gets listed</h3>
+      <p style="margin:0; font-size:16.5px; line-height:1.75; max-width:48ch;">Everything is cleaned and repaired where it needs it before it goes up. Measurements are taken flat so you can check them against something you already own.</p>
+      <span class="disp" style="font-size:14px; font-weight:600; border-bottom:1.5px solid #8A3F49; color:#8A3F49; align-self:flex-start; padding-bottom:3px; margin-top:4px;">The longer version</span>
+    </div>
+  </div>
+
+  <!-- testimonials -->
+  <div style="padding:70px 52px;">
+    <h2 class="disp" style="margin:0 0 30px; font-size:26px; font-weight:600; text-align:center;">what people say</h2>
+    <div style="display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:30px;">
+      <div style="background:#F7E9E0; border-radius:12px; padding:28px; display:flex; flex-direction:column; gap:12px;"><p style="margin:0; font-size:16.5px; line-height:1.65; font-style:italic;">"The description was detailed and completely accurate."</p><span class="disp" style="font-size:13px; color:#7A6259;">[Customer name]</span></div>
+      <div style="background:#F7E9E0; border-radius:12px; padding:28px; display:flex; flex-direction:column; gap:12px;"><p style="margin:0; font-size:16.5px; line-height:1.65; font-style:italic;">"I asked for something specific and you found it."</p><span class="disp" style="font-size:13px; color:#7A6259;">[Customer name]</span></div>
+      <div style="background:#F7E9E0; border-radius:12px; padding:28px; display:flex; flex-direction:column; gap:12px;"><p style="margin:0; font-size:16.5px; line-height:1.65; font-style:italic;">"The measurements were exact, which made ordering easy."</p><span class="disp" style="font-size:13px; color:#7A6259;">[Customer name]</span></div>
+    </div>
+  </div>
+
+  <!-- gallery -->
+  <div style="padding:0 52px 70px;">
+    <p class="disp" style="margin:0 0 18px; font-size:15px; color:#7A6259; text-align:center;">worn and tagged — [@YOUR HANDLE]</p>
+    <div style="display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px;">
+      <div class="ph3" style="aspect-ratio:1; border-radius:8px;"></div><div class="ph" style="aspect-ratio:1; border-radius:8px;"></div><div class="ph2" style="aspect-ratio:1; border-radius:8px;"></div><div class="ph4" style="aspect-ratio:1; border-radius:8px;"></div><div class="ph3" style="aspect-ratio:1; border-radius:8px;"></div><div class="ph" style="aspect-ratio:1; border-radius:8px;"></div>
+    </div>
+  </div>
+
+  <!-- newsletter -->
+  <div style="background:#2B211D; color:#FDF6F0; padding:70px 52px; text-align:center;">
+    <h3 class="disp" style="margin:0 0 12px; font-size:32px; font-weight:600;">new pieces, by email</h3>
+    <p style="margin:0 auto 26px; font-size:17px; max-width:50ch; line-height:1.6; color:#D8C7BE;">An email when I add something new. Once or twice a month.</p>
+    <div style="display:flex; max-width:440px; margin:0 auto;">
+      <span style="flex:1; background:#3D302A; padding:15px 18px; border-radius:8px 0 0 8px; font-size:15px; color:#A08D84;">your email</span>
+      <span class="disp" style="background:#C99C93; color:#2B211D; padding:15px 28px; border-radius:0 8px 8px 0; font-size:14px; font-weight:600;">sign up</span>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <div style="padding:44px 52px; display:flex; justify-content:space-between; font-size:15px; color:#6E5A52;">
+    <div style="display:flex; gap:52px;">
+      <div style="display:flex; flex-direction:column; gap:8px;"><span class="disp" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#9A8279;">Shop</span><span>Everything</span><span>Just in</span><span>Sold</span></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><span class="disp" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#9A8279;">Know</span><span>My story</span><span>Sizing</span><span>Postage &amp; returns</span></div>
+      <div style="display:flex; flex-direction:column; gap:8px;"><span class="disp" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#9A8279;">Reach me</span><span>[YOUR EMAIL]</span><span>Instagram</span></div>
+    </div>
+    <span style="align-self:flex-end;">© 2026 [YOUR STORE]</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

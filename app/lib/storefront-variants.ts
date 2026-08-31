@@ -14,8 +14,8 @@
 // `variant` field, and must keep rendering exactly what it rendered before. So the first entry always
 // describes the layout that shipped, and `resolveVariant` falls back to it for absent/unknown ids.
 
-import type { BlockType, BlockField } from "./storefront-blocks";
-import type { ItemSchemaName } from "./storefront-items";
+import type { BlockType, BlockField } from "./storefront-blocks.ts";
+import type { ItemSchemaName } from "./storefront-items.ts";
 
 // Picker groupings — so ~75 layouts read as an organized library instead of a wall of cards.
 export type SectionCategory = "Hero" | "Products" | "Collections" | "Editorial" | "Social Proof" | "Content" | "Media" | "Marketing" | "Miscellaneous";
@@ -56,6 +56,11 @@ const HERO_BASE_FREE = ["heading", "subtext", "cta"] as const;
 
 // Shared by every OPEN product layout. Capped at MAX_FEATURED so pointing a section at a 200-piece
 // collection can never dump 200 products onto a homepage — the Shop page is where "everything" lives.
+// Every image layout carries the same edge-to-edge switch: the framing an image section applies by
+// default is a choice, and a merchant who wants the picture to be the section says so once, here,
+// rather than zeroing four spacing sliders.
+const IMAGE_FILL: BlockField = { key: "fill", label: "Photo width", kind: "choice", options: [{ value: "", label: "Inset — margin around the photo" }, { value: "1", label: "Fill — edge to edge" }] };
+
 const HOW_MANY: BlockField = { key: "limit", label: "How many to show", kind: "choice", options: [{ value: "4", label: "4" }, { value: "8", label: "8" }, { value: "12", label: "12" }, { value: "16", label: "16" }, { value: "20", label: "20 (max)" }] };
 
 export const VARIANTS: VariantGroup[] = [
@@ -170,9 +175,9 @@ export const VARIANTS: VariantGroup[] = [
  {
   type: "image", category: "Media",
   variants: [
-   { id: "full", label: "Full width", description: "A single full-width photo with an optional caption.", supports: { free: [] } },
-   { id: "inset", label: "Inset", description: "Held inside the page's measure with real margin — a plate in a book.", supports: { free: [] } },
-   { id: "captioned", label: "Captioned", description: "A portrait photo with its caption set beside it in the margin.", supports: { free: [] } },
+   { id: "full", label: "Full width", description: "A single full-width photo with an optional caption.", fields: [IMAGE_FILL], supports: { free: [] } },
+   { id: "inset", label: "Inset", description: "Held inside the page's measure with real margin — a plate in a book.", fields: [IMAGE_FILL], supports: { free: [] } },
+   { id: "captioned", label: "Captioned", description: "A portrait photo with its caption set beside it in the margin.", fields: [IMAGE_FILL], supports: { free: [] } },
   ],
  },
  {

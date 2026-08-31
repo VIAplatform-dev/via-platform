@@ -75,7 +75,16 @@ export default async function StorefrontView({ settings, view = "home", preview 
  // Only a family that actually groups SEVERAL buckets takes this path. "bags" is a family of one, and
  // routing it here would quietly retire the tag matching that imported stores' own menus depend on.
  const familyBuckets = familyMembers(catSlug).length > 1 ? familyMembers(catSlug) : [];
+ // A DECADE tile ("1990s", "90s") is a real way to shop an archive, and Provenance ships an era
+ // timeline as one of its two taxonomies. Era isn't a category field, so match it the way the era is
+ // actually written: the copy study found it is nearly always in the product title itself
+ // ("Versace SS 2005 Coral Reef Print Top"). Without this an era tile opens an empty aisle.
+ const dm = /^(?:(19|20)(\d0)|(\d0))s$/.exec(catSlug);
+ const decade = dm ? (dm[1] ? `${dm[1]}${dm[2]}` : Number(dm[3]) >= 30 ? `19${dm[3]}` : `20${dm[3]}`) : null;
+ // For "1990": any year 1990–1999, or the decade written long or short.
+ const decadeRe = decade ? new RegExp(`\\b(?:${decade.slice(0, 3)}\\d|${decade}s|${decade.slice(2)}s)\\b`, "i") : null;
  const matchesCat = (l: Listing) => {
+ if (decadeRe) return decadeRe.test(`${l.title} ${(l.tags || []).join(" ")} ${l.category || ""}`);
  if (familyBuckets.length) {
   const bucket = normalizeCategory(l.category || "");
   return !!bucket && familyBuckets.includes(bucket);
@@ -85,14 +94,21 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const t = f.map((x) => x.toLowerCase().replace(/s$/, ""));
  return catWords.some((w) => t.some((tag) => tag.includes(w) || w.includes(tag)));
  };
+ // Whether the category slug gave us anything to filter ON. A slug too short to word-match ("90s")
+ // still filters when it parsed as a decade, and must not silently fall through to "show everything".
+ const catFilters = !!category && (catWords.length > 0 || !!decadeRe || familyBuckets.length > 0);
  const q = (query || "").trim().toLowerCase();
  const shownListings = sortedListings
  .filter((l) => (collectionIds ? collectionIds.has(l.id) : true))
- .filter((l) => (category && catWords.length ? matchesCat(l) : true))
+ .filter((l) => (catFilters ? matchesCat(l) : true))
  .filter((l) => (q ? l.title.toLowerCase().includes(q) || catFields(l).some((t) => t.toLowerCase().includes(q)) : true));
+ const toTile = (l: Listing): Tile => ({ key: `l${l.id}`, title: l.title, price: formatPrice(l.price, l.currency), image: l.images[0] || "", size: l.size, href: null, itemId: l.status !== "sold" ? l.id : undefined, sold: l.status === "sold" });
  const items: Tile[] = listings.length
- ? shownListings.map((l) => ({ key: `l${l.id}`, title: l.title, price: formatPrice(l.price, l.currency), image: l.images[0] || "", size: l.size, href: null, itemId: l.status !== "sold" ? l.id : undefined, sold: l.status === "sold" }))
+ ? shownListings.map(toTile)
  : products.map((p) => ({ key: p.id, title: p.name, price: fmtPrice(p.price), image: p.image || p.images?.[0] || "", size: p.size ?? null, href: p.externalUrl || null }));
+ // The unfiltered catalogue, kept so a filter that matches nothing can fall back to it rather than
+ // dead-ending. A category tile is a promise; the worst it should do is over-promise, not strand.
+ const allTiles: Tile[] = listings.length ? sortedListings.map(toTile) : items;
 
  // ── Theme ──
  const theme = sf.theme || {};
@@ -203,8 +219,34 @@ export default async function StorefrontView({ settings, view = "home", preview 
  // receive the full list and slice it themselves.
  const HOME_HIGHLIGHT = 3;
  const productsSection = sections.find((s) => s.type === "products");
- const gridItems = isShop ? items : items.slice(0, HOME_HIGHLIGHT);
+ // A filter that matched nothing falls back to the whole catalogue with a line saying so. This is
+ // what makes any category tile safe to ship: an aisle that is empty today reads as "nothing here
+ // right now" rather than as a broken link.
+ const emptyFiltered = isShop && items.length === 0 && allTiles.length > 0;
+ const gridItems = isShop ? (emptyFiltered ? allTiles : items) : items.slice(0, HOME_HIGHLIGHT);
  const blockItems = items;
+
+ // ── Catalogue density ──
+ // The Shop grid belongs to the TEMPLATE, not to a section: Vitrine runs two enormous pieces per row
+ // and The Index runs five, and that difference is most of what makes them different stores. Classes
+ // are looked up from fixed maps rather than built from the value, because Tailwind only ships the
+ // classes it can see in the source.
+ const shopGrid = theme.shopGrid ?? {};
+ const SHOP_COLS: Record<number, string> = {
+  2: "sm:grid-cols-2",
+  3: "sm:grid-cols-2 lg:grid-cols-3",
+  4: "sm:grid-cols-3 lg:grid-cols-4",
+  5: "sm:grid-cols-3 lg:grid-cols-5",
+ };
+ const SHOP_RATIO: Record<string, string> = { "4/5": "aspect-[4/5]", "1/1": "aspect-square", "5/6": "aspect-[5/6]", "3/4": "aspect-[3/4]" };
+ const SHOP_GUTTER: Record<string, string> = {
+  tight: "gap-x-3 gap-y-8 sm:gap-x-4",
+  normal: "gap-x-5 gap-y-12 sm:gap-x-8",
+  wide: "gap-x-8 gap-y-20 sm:gap-x-14",
+ };
+ const gridColsCls = isShop ? SHOP_COLS[shopGrid.cols ?? 4] ?? SHOP_COLS[4] : "sm:grid-cols-3";
+ const gridGutterCls = SHOP_GUTTER[(isShop && shopGrid.gutter) || "normal"];
+ const cardRatioCls = SHOP_RATIO[(isShop && shopGrid.ratio) || "4/5"];
 
  // VYA-built section layout. When present it replaces the default cloned
  // hero/sections/grid — the seller (or VYA) composes the page from blocks. A
@@ -318,7 +360,13 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {headerNav.map((n, i) =>
  /^shop/i.test(n.label) && shopMenu.length ? (
  <div key={i} className="group relative">
- <a href={n.href} className="hover:opacity-100">{n.label} ⌄</a>
+ {/* A drawn chevron, not the "⌄" character. That glyph is a text arrowhead: it renders at whatever
+     weight and baseline the nav font happens to give it, sits low next to small caps, and looks
+     pasted on. This is stroked to match the type's weight and optically centred against it. */}
+ <a href={n.href} className="inline-flex items-center gap-1.5 hover:opacity-100">
+  {n.label}
+  <svg width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true" className="mt-px shrink-0 opacity-60"><path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" /></svg>
+ </a>
  <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-3 opacity-0 transition group-hover:visible group-hover:opacity-100">
  <div className="grid min-w-[210px] gap-0.5 border border-black/10 p-3 shadow-xl" style={{ background: bg }}>
  {/* "Shop all" first — the way back to the full catalogue once you've narrowed it. */}
@@ -504,14 +552,19 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {sf.about && <p className="mt-4 mx-auto max-w-2xl text-sm leading-relaxed opacity-60">{sf.about}</p>}
  </div>
 
+ {emptyFiltered && (
+ <p className="mb-10 text-center text-sm opacity-60">
+ Nothing in <span className="capitalize">{collectionTitle || categoryLabel || (query ? `“${query}”` : "that")}</span> right now — here’s everything else.
+ </p>
+ )}
  {gridItems.length === 0 ? (
  <p className="py-24 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">Coming soon</p>
  ) : (
- <div className={"grid gap-x-5 gap-y-12 grid-cols-2 sm:gap-x-8 " + (isShop ? "sm:grid-cols-3 lg:grid-cols-4" : "sm:grid-cols-3")}>
+ <div className={`grid grid-cols-2 ${gridGutterCls} ${gridColsCls}`}>
  {gridItems.map((it) => {
  const inner = (
  <>
- <div className={"relative aspect-[4/5] w-full overflow-hidden bg-black/5" + (it.sold ? " opacity-[0.55]" : "")}>
+ <div className={`relative ${cardRatioCls} w-full overflow-hidden bg-black/5` + (it.sold ? " opacity-[0.55]" : "")}>
  {it.image && (
  <img src={it.image} alt={it.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.045]" />
  )}

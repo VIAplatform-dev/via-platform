@@ -17,6 +17,7 @@ import { setEmailBrandOverrides, revertEmailBrand, resolveStoreSender } from "./
 import { getStoreAnalytics } from "./store-analytics-db";
 import { listSellerOrders, updateOrderStatus, markOrderShipped, getOrderDetail } from "./db/orders";
 import { getSellerBySlug } from "./db/sellers";
+import { addExpense, listExpenses, expenseTotals, categoryLabel, isExpenseCategory } from "./expenses-db";
 // ── The live commerce ("items") model — the real inventory the seller sees, scoped by sellerId. ──
 import { listSellerItems, createItem, updateItem, publishItem, publishItems, removeItem, removeItems, markSold, relistItem, getItem, ensurePublishAtColumn } from "./db/inventory";
 import { listCollections, getOrCreateCollection, setItemCollections, getItemCollectionIds } from "./db/collections";
@@ -148,6 +149,9 @@ const TOOLS = [
  // ══════════ SOURCING & MARKET INTELLIGENCE ══════════
  { name: "get_market_intelligence", description: "Pull VYA market intelligence for 'what should I source', 'what's in demand', 'what's trending', 'where's the whitespace'. action: 'whitespace' (gaps between market demand and the store's own supply), 'source_now' (current sourcing board of hot segments — Pro), 'colors' (trending colours), 'trends' (brand heat index), 'demand' (this store's demand intelligence — unmet searches + brand/category demand). Output is privacy-safe market aggregate — never another store's individual numbers. Optional window '7d'/'30d'.", input_schema: { type: "object", properties: { action: { type: "string", enum: ["whitespace", "source_now", "colors", "trends", "demand"] }, window: { type: "string", enum: ["7d", "30d"] } }, required: ["action"] } },
  { name: "get_account_status", description: "Read account status: subscription plan & tier, payout setup (Stripe connected, charges/payouts enabled), connected sales platform. Read-only — changing plan or connecting payouts is done by the seller in Billing/Payments; walk them there.", input_schema: { type: "object", properties: {} } },
+ // ══════════ OPERATING COSTS (the P&L's second half) ══════════
+ { name: "log_expense", description: "Record a business cost that ISN'T the purchase price of a piece — packaging, mailers, dust bags, flyers, studio rent, ads, market stall fees, dry cleaning, repairs. This is how a seller adds a cost just by saying it: \"spent 84 on poly mailers\" or \"paid 150 for the flea stall on Saturday\". Pick the closest category. Amount is in DOLLARS. Only pass occurredOn for a past date the seller names (YYYY-MM-DD); leave it off for today. Log it straight away — don't ask them to confirm an amount they just told you — then say what you recorded and the new total. NEVER use this for what a piece of inventory cost; that belongs on the listing itself.", input_schema: { type: "object", properties: { amountUsd: { type: "number", description: "Cost in dollars, e.g. 84 or 12.50" }, label: { type: "string", description: "What it was, in the seller's own words — \"poly mailers + tissue\"" }, category: { type: "string", enum: ["packaging", "shipping", "marketing", "studio", "fees", "repairs", "sourcing", "other"] }, occurredOn: { type: "string", description: "YYYY-MM-DD, only for a past date the seller names" } }, required: ["amountUsd", "label", "category"] } },
+ { name: "list_expenses", description: "Read the store's recorded operating costs for a period, with the total and a per-category breakdown. Use for 'what have I spent', 'how much on packaging this quarter', or to read a total back after logging something. days defaults to 90.", input_schema: { type: "object", properties: { days: { type: "number", description: "How many days back to look. Default 90." } } } },
 ];
 
 // The live commerce model is scoped by sellerId (a UUID), not the store slug — resolve it once.
@@ -164,6 +168,41 @@ async function loadTheme(slug: string): Promise<StorefrontTheme> {
 // Exported for read-only smoke tests / internal tooling. The route still resolves and scopes `slug`.
 export async function runTool(slug: string, name: string, input: any): Promise<any> {
  switch (name) {
+ case "log_expense": {
+ const dollars = Number(input.amountUsd);
+ if (!Number.isFinite(dollars) || dollars <= 0) return { ok: false, error: "I need an amount above zero to record that." };
+ const category = isExpenseCategory(input.category) ? input.category : "other";
+ const saved = await addExpense(slug, {
+  amountCents: Math.round(dollars * 100),
+  label: String(input.label ?? "").trim(),
+  category,
+  occurredOn: typeof input.occurredOn === "string" ? input.occurredOn : null,
+  source: "assistant",
+ });
+ // Hand back the running total so the reply can close the loop without a second call.
+ const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+ const totals = await expenseTotals(slug, since, new Date(Date.now() + 86_400_000).toISOString()).catch(() => null);
+ return {
+  ok: true,
+  logged: { ...saved, categoryLabel: categoryLabel(saved.category), amountUsd: saved.amountCents / 100 },
+  last90DaysTotalUsd: totals ? totals.totalCents / 100 : null,
+ };
+ }
+ case "list_expenses": {
+ const days = Math.min(730, Math.max(1, Number(input.days) || 90));
+ const start = new Date(Date.now() - days * 86_400_000).toISOString();
+ const end = new Date(Date.now() + 86_400_000).toISOString();
+ const [totals, recent] = await Promise.all([
+  expenseTotals(slug, start, end),
+  listExpenses(slug, start, end, 25),
+ ]);
+ return {
+  days,
+  totalUsd: totals.totalCents / 100,
+  byCategory: totals.byCategory.filter((c) => c.amountCents > 0).map((c) => ({ category: c.label, usd: c.amountCents / 100, entries: c.count })),
+  recent: recent.map((e) => ({ date: e.occurredOn, what: e.label, category: categoryLabel(e.category), usd: e.amountCents / 100 })),
+ };
+ }
  case "get_storefront": {
  const sf = await getStorefrontBySlug(slug);
  return { template: sf?.theme?.template ?? null, colors: sf?.theme?.colors ?? null, fonts: sf?.theme?.fonts ?? null, customCss: sf?.theme?.customCss ?? null, handle: sf?.handle ?? null, tagline: sf?.tagline ?? null, heroImage: sf?.heroImage ?? null, live: !!sf?.enabled, templatesAvailable: templateIds };
@@ -178,7 +217,22 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  case "update_storefront_design": {
  const sf = (await getStorefrontBySlug(slug)) ?? (await upsertStorefront(slug, { handle: slug, enabled: false, tagline: "", accentColor: "#5D0F17", heroImage: "", about: "" }));
  const theme: StorefrontTheme = { ...(sf.theme ?? {}) };
- if (input.template) { const t = getTemplate(String(input.template)); if (t) { theme.template = t.id; theme.colors = { ...t.colors }; theme.fonts = { ...t.fonts }; } }
+ // A template's LOOK — palette, type, corners, header, catalogue density. Sections are left alone
+ // here on purpose: this tool runs mid-conversation on a store the seller has already built, and
+ // "make it feel more like Vitrine" must not silently delete the page they were editing. Laying out
+ // a template's sections is the studio's template picker, which asks first.
+ if (input.template) {
+ const t = getTemplate(String(input.template));
+ if (t) {
+  theme.template = t.id;
+  theme.colors = { ...t.colors };
+  theme.fonts = { ...t.fonts };
+  theme.radius = t.radius;
+  theme.headerLayout = t.headerLayout;
+  theme.shopGrid = { ...t.grid };
+  theme.productLayout = t.productLayout;
+ }
+ }
  if (input.colors) { const c = input.colors; theme.colors = { bg: HEX.test(c.bg) ? c.bg : theme.colors?.bg || "#FFFDF8", text: HEX.test(c.text) ? c.text : theme.colors?.text || "#1a1a1a", accent: HEX.test(c.accent) ? c.accent : theme.colors?.accent || "#5D0F17" }; }
  if (input.fonts) { const f = input.fonts; theme.fonts = { heading: HEADING_FONTS.includes(f.heading) ? f.heading : theme.fonts?.heading || "Playfair Display", body: BODY_FONTS.includes(f.body) ? f.body : theme.fonts?.body || "Inter" }; }
  await setStorefrontTheme(slug, theme);

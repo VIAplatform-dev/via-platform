@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {
  const t = await testEbayConnection(slug);
- return NextResponse.json({ ok: true, readyToList: t.readyToList, tokenValid: t.tokenValid, policies: t.policies });
+ return NextResponse.json({ ok: true, readyToList: t.readyToList, tokenValid: t.tokenValid, sellerRegistered: t.sellerRegistered, hasLocation: t.hasLocation, policies: t.policies, reason: t.error ?? null });
  } catch {
  return NextResponse.json({ ok: false, readyToList: false, tokenValid: false, policies: { fulfillment: false, payment: false, return: false } });
  }

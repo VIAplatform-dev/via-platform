@@ -17,6 +17,9 @@ const PUBLIC_ROUTES = [
   "/admin/login",
   "/admin/set-password",
   "/api/admin/auth",
+  // Local-development sign-in. The route itself 404s unless NODE_ENV is development AND the Host is
+  // loopback — it must be reachable without a session to be able to CREATE one.
+  "/api/admin/dev-login",
   "/api/admin/set-password",
   "/terms",
   "/privacy",
@@ -178,8 +181,7 @@ function isSessionOnlyRoute(pathname: string): boolean {
   );
 }
 
-
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const fullPath = pathname + search;
 
@@ -481,7 +483,7 @@ export async function middleware(request: NextRequest) {
   // Serve the static marketing site (public/infra) at /infrastructure/* — the admin workspace is
   // handled above, so this only covers the public pages. URLs are extensionless
   // (/infrastructure/company → /infra/company.html); static assets are referenced absolutely at
-  // /infra/* and bypass middleware entirely (the matcher excludes dotted paths).
+  // /infra/* and bypass the proxy entirely (the matcher excludes dotted paths).
   if (pathname === "/infrastructure" || pathname.startsWith("/infrastructure/")) {
     const rest = pathname.slice("/infrastructure".length).replace(/\/$/, "");
     const url = request.nextUrl.clone();
