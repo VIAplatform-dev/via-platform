@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, type OrderStatus } from "@/app/lib/db/orders";
+import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, type OrderStatus, setOrderNote } from "@/app/lib/db/orders";
 import { relistItem } from "@/app/lib/db/inventory";
 import { reverseConsignedSale } from "@/app/lib/consignment-db";
 import { voidOrderLabel, generateReturnLabel, generateShipBackLabel } from "@/app/lib/order-label";
@@ -147,6 +147,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
  // Return label — buy a prepaid label (buyer → store) and email it to the buyer. Who ultimately
  // pays is the store's returns policy: buyer-pays → the cost is deducted from their eventual refund.
+ // The seller's own note on the order. Private — it never reaches the buyer,
+ // and nothing in the email templates reads it.
+ if (body?.action === "set_note") {
+ await setOrderNote(id, typeof body.note === "string" ? body.note : null);
+ return NextResponse.json({ ok: true, internalNote: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 2000) : null });
+ }
+
  if (body?.action === "return_label") {
  const res = await generateReturnLabel(id);
  if (!res.ok) return NextResponse.json({ error: `Couldn’t create a return label (${res.reason}).` }, { status: 400 });

@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { ShoppingBag } from "lucide-react";
 import { Card, PageHeader, Badge, Stat, EmptyState } from "../ui";
 import { useStoreBase } from "../nav-base";
+import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 
 type Order = {
  id: string;
  orderNo: number;
  itemTitle: string | null;
  amountCents: number;
+ taxCents: number | null;
  currency: string;
  buyerEmail: string | null;
  status: string;
@@ -86,11 +88,24 @@ export default function OrdersPage() {
  const revenue = orders.reduce((a, o) => a + (o.amountCents || 0), 0);
  const aov = orders.length ? revenue / orders.length : 0;
 
+ // Both sources in one file — a seller doing their books wants every sale of the
+ // year, not the ones that happened to come through the storefront.
+ function exportCsv() {
+  const rows = [
+   ...orders.map((o) => [o.orderNo, o.paidAt ? o.paidAt.slice(0, 10) : "", o.itemTitle ?? "", o.buyerEmail ?? "", (o.amountCents / 100).toFixed(2), o.taxCents != null ? (o.taxCents / 100).toFixed(2) : "", o.currency, o.status, "storefront"]),
+   ...imported.map((o) => [o.externalId ?? "", o.orderDate ? o.orderDate.slice(0, 10) : "", o.itemTitle ?? "", o.buyerEmail ?? "", (o.amountCents / 100).toFixed(2), "", o.currency, o.status ?? "", "imported"]),
+  ];
+  downloadCsv(datedFilename("orders"), toCsv(["order", "date", "item", "buyer", "amount", "tax", "currency", "status", "source"], rows));
+ }
+
  return (
  <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
  <div className="mb-6 flex items-start justify-between gap-4">
  <PageHeader title="Orders" subtitle="Sales from your storefront. Payouts settle to your bank automatically." />
- <button onClick={() => setImportOpen(true)} className="mt-1 shrink-0 rounded-full border border-stone-200 px-4 py-2 text-[13px] text-stone-700 transition hover:border-stone-400">Import history</button>
+ <div className="mt-1 flex shrink-0 gap-2">
+ <button onClick={exportCsv} disabled={orders.length === 0 && imported.length === 0} className="rounded-full border border-stone-200 px-4 py-2 text-[13px] text-stone-700 transition hover:border-stone-400 disabled:opacity-40">Export</button>
+ <button onClick={() => setImportOpen(true)} className="rounded-full border border-stone-200 px-4 py-2 text-[13px] text-stone-700 transition hover:border-stone-400">Import history</button>
+ </div>
  </div>
 
  {importOpen && <OrderImportModal onClose={() => { setImportOpen(false); load(); }} />}
