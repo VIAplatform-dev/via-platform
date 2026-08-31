@@ -21,6 +21,13 @@ const PUBLIC_ROUTES = [
   "/api/admin/set-password",
   "/terms",
   "/privacy",
+  // The consignor portal signs people in on its own terms: a magic link sets a
+  // consignor_session cookie, which is NOT an Auth.js session — so the catch-all
+  // gate below would bounce a legitimately signed-in consignor to /login, a
+  // store-owner sign-in they have no account for. The page renders its own
+  // request-a-link form when signed out, and /api/consignor/verify gates the data.
+  "/consignor",
+  "/api/consignor",
   "/api/giveaway",
   "/api/cron",
   "/api/test-emails",
@@ -227,6 +234,12 @@ export async function proxy(request: NextRequest) {
       pathname === "/order" || pathname.startsWith("/order/") ||
       // Offers are part of that same journey: the accepted-offer page links straight to /checkout.
       pathname === "/offer" || pathname.startsWith("/offer/") ||
+      // The consignor portal. A store's consignors sign in by magic link to see
+      // their pieces and payouts, and /api/consignor/verify redirects here on
+      // success — so without this they authenticate and land on the marketing
+      // rewrite, which has no consignor.html and 404s. Stripe's Connect return
+      // URL points here too.
+      pathname === "/consignor" || pathname.startsWith("/consignor/") ||
       pathname.startsWith("/infra/") ||
       pathname === "/infrastructure" ||
       pathname.startsWith("/infrastructure/") ||
@@ -234,9 +247,13 @@ export async function proxy(request: NextRequest) {
       pathname === "/admin/login" ||
       pathname === "/admin/set-password" ||
       pathname.startsWith("/admin/auth") ||
-      // store owners sign in via magic link here (callbackUrl=/admin → onboarding/workspace)
-      pathname === "/login" ||
-      pathname === "/register";
+      // Store owners sign in via magic link here (callbackUrl=/admin → onboarding/workspace).
+      // The SUB-paths matter as much as /login itself: Auth.js sends you to
+      // /login/check-email after you enter your email and /login/error on failure
+      // (app/lib/auth.ts), so matching only the exact path 404s the moment anyone
+      // actually tries to sign in.
+      pathname === "/login" || pathname.startsWith("/login/") ||
+      pathname === "/register" || pathname.startsWith("/register/");
     if (!passthrough) {
       if (pathname === "/admin" || pathname.startsWith("/admin/")) {
         // Owner Workspace. The path→route mapping (/admin/* → /infrastructure/admin/*) is a
