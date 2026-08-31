@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { stores, storeContactEmails } from "@/app/lib/stores";
 import { getSellerPayments, saveStripeAccount } from "@/app/lib/seller-payments-db";
+import { connectBlockedReason } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
+import { syncPayoutSchedule } from "@/app/lib/payout-schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,13 @@ export async function POST(request: NextRequest) {
  const sp = await getSellerPayments(slug);
  let accountId = sp?.stripeAccountId || null;
 
+ // Refuse rather than overwrite. The row holds ONE account id, so connecting a store that is
+ // already live-connected while the server runs test keys would replace its real account with a
+ // sandbox one and take its checkout down. This is the check that makes a mis-pointed sandbox
+ // annoying instead of destructive — see stripe-mode.ts.
+ const blocked = connectBlockedReason(sp);
+ if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
+
  try {
  // Create the Express account on first connect.
  if (!accountId) {
@@ -38,6 +47,15 @@ export async function POST(request: NextRequest) {
  accountId = acct.id as string;
  await saveStripeAccount(slug, accountId);
  }
+
+ // Payouts wait out this store's own return window, so a refund is always drawn from money still
+ // sitting in their Stripe balance rather than from their bank account (see payout-schedule.ts).
+ // Deliberately a SEPARATE call, and deliberately swallowed: whether a platform may set a
+ // connected account's payout schedule depends on how that account is configured, and a Stripe
+ // that refuses the schedule must not be able to stop a seller from onboarding at all. Runs on
+ // every connect, so an account created before this existed — or one whose policy has since moved
+ // — is reconciled the next time the seller opens payments.
+ await syncPayoutSchedule(slug).catch(() => null);
 
  // One-time Stripe-hosted onboarding link.
  const base = baseUrl(request);

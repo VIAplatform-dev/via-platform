@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { currentStripeMode, type StripeMode } from "./stripe-mode.ts";
 
 // ───────────────────────────────────────────────────────────────────────────
 // A store's payment-acceptance state. Each store gets a Stripe Connect *Express*
@@ -14,6 +15,9 @@ export type SellerPayments = {
  chargesEnabled: boolean; // can accept payments
  payoutsEnabled: boolean; // can receive payouts to bank
  detailsSubmitted: boolean; // finished Stripe onboarding
+ /** Which Stripe world this account lives in. Null on rows saved before the stamp existed — see
+  *  stripe-mode.ts, which treats those as live (production has only ever run one key). */
+ stripeMode: StripeMode | null;
 };
 
 const getDatabaseUrl = () => {
@@ -41,6 +45,9 @@ function ensureTable(): Promise<void> {
  // Shipping sub-account per store (EasyPost Forge Child-User key / Shippo managed-account id).
  // Self-healing add so existing rows get the column with no migration step.
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS ship_account_id TEXT`;
+ // 'test' or 'live' — a connected account id looks identical in both, so the only way to know
+ // which world it belongs to is to record it when we save it. See stripe-mode.ts.
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS stripe_mode TEXT`;
  })().catch((e) => {
  tableReady = null;
  throw e;
@@ -58,6 +65,7 @@ function rowTo(r: any): SellerPayments {
  chargesEnabled: Boolean(r.charges_enabled),
  payoutsEnabled: Boolean(r.payouts_enabled),
  detailsSubmitted: Boolean(r.details_submitted),
+ stripeMode: (r.stripe_mode as StripeMode | null) ?? null,
  };
 }
 
@@ -80,10 +88,12 @@ export async function getStoreSlugByStripeAccount(accountId: string): Promise<st
 export async function saveStripeAccount(storeSlug: string, accountId: string): Promise<void> {
  await ensureTable();
  const sql = neon(getDatabaseUrl());
+ // Stamped with the mode of the key that made it — the account id itself cannot tell us later.
+ const mode = currentStripeMode();
  await sql`
- INSERT INTO seller_payments (store_slug, stripe_account_id, updated_at)
- VALUES (${storeSlug}, ${accountId}, NOW())
- ON CONFLICT (store_slug) DO UPDATE SET stripe_account_id = EXCLUDED.stripe_account_id, updated_at = NOW()
+ INSERT INTO seller_payments (store_slug, stripe_account_id, stripe_mode, updated_at)
+ VALUES (${storeSlug}, ${accountId}, ${mode}, NOW())
+ ON CONFLICT (store_slug) DO UPDATE SET stripe_account_id = EXCLUDED.stripe_account_id, stripe_mode = EXCLUDED.stripe_mode, updated_at = NOW()
  `;
 }
 
