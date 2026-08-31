@@ -21,21 +21,35 @@ export default function OrderView({ v, mode }: { v: BuyerOrderView; mode: "confi
  const heading = ff(v.fonts.heading);
  const body = ff(v.fonts.body);
  const c = v.colors;
- const subtotal = Math.max(0, v.amountCents - v.shippingPaidCents);
+ // `amountCents` is the ITEM total, with shipping held separately — the refund path proves it:
+ // it charges back `amountCents + shippingPaidCents` as the full amount. Subtracting shipping OUT of
+ // it made the confirmation page under-report both lines: a buyer who paid $333 for a $325 bag plus
+ // $8 shipping was shown "Subtotal $317 · Shipping $8 · Total $325".
+ const subtotal = v.amountCents;
+ const total = v.amountCents + v.shippingPaidCents;
  const price = (cents: number) => formatPrice(cents / 100, v.currency);
 
  const cancelled = v.status === "cancelled" || v.status === "refunded";
  const shipped = ["shipped", "delivered", "fulfilled"].includes(v.status) || !!v.trackingNumber;
  const delivered = v.status === "delivered";
  const activeIdx = delivered ? 2 : shipped ? 1 : 0;
- const steps = [
+ // Collecting in store: nothing is posted, so "shipped / on its way / tracking" would be a lie.
+ const collecting = !!v.collect;
+ const steps = collecting
+ ? [
+ { label: "Confirmed", note: "We're setting your piece aside for you." },
+ { label: "Ready to collect", note: `Come by ${v.storeName} and ask for it.` },
+ { label: "Collected", note: "Enjoy your piece." },
+ ]
+ : [
  { label: "Confirmed", note: "We're preparing your order for shipping." },
  { label: "Shipped", note: v.trackingNumber ? `Tracking ${v.trackingNumber}` : "On its way to you." },
  { label: "Delivered", note: "Enjoy your piece." },
  ];
 
- // Soft ETA ~10 days from payment — labelled "estimated", not a promise.
- const eta = v.paidAt ? new Date(v.paidAt.getTime() + 10 * 86_400_000) : null;
+ // Soft ETA ~10 days from payment — labelled "estimated", not a promise. Meaningless for a
+ // collection: it's ready when the store says so, not ten days from now.
+ const eta = !collecting && v.paidAt ? new Date(v.paidAt.getTime() + 10 * 86_400_000) : null;
  const etaStr = eta ? eta.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : null;
 
  const shopHref = v.handle ? `${STOREFRONT_BASE}/s/${v.handle}` : "#";
@@ -106,13 +120,21 @@ export default function OrderView({ v, mode }: { v: BuyerOrderView; mode: "confi
  </div>
  <div className="mt-5 space-y-1.5 border-t pt-4 text-sm" style={{ borderColor: border }}>
  <div className="flex justify-between opacity-70"><span>Subtotal</span><span>{price(subtotal)}</span></div>
- <div className="flex justify-between opacity-70"><span>Shipping</span><span>{v.shippingPaidCents > 0 ? price(v.shippingPaidCents) : "Free"}</span></div>
- <div className="flex justify-between pt-1.5 text-base font-semibold"><span>Total</span><span>{price(v.amountCents)}</span></div>
+ <div className="flex justify-between opacity-70"><span>Shipping</span><span>{collecting ? "Collecting in store" : v.shippingPaidCents > 0 ? price(v.shippingPaidCents) : "Free"}</span></div>
+ <div className="flex justify-between pt-1.5 text-base font-semibold"><span>Total</span><span>{price(total)}</span></div>
  </div>
  </section>
 
- {/* Ship to */}
- {(v.ship.line1 || v.buyerName) && (
+ {/* Where it's going — or where to go and get it */}
+ {collecting ? (
+ <section className="mt-4 rounded-2xl border p-5 sm:p-6 text-sm" style={{ borderColor: border }}>
+ <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-45">Collect from</p>
+ <div className="mt-2 leading-relaxed opacity-80">
+ <p className="font-medium" style={{ opacity: 1 }}>{v.collect?.address || v.storeName}</p>
+ {v.collect?.instructions && <p className="mt-1.5">{v.collect.instructions}</p>}
+ </div>
+ </section>
+ ) : (v.ship.line1 || v.buyerName) && (
  <section className="mt-4 rounded-2xl border p-5 sm:p-6 text-sm" style={{ borderColor: border }}>
  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-45">Ship to</p>
  <div className="mt-2 leading-relaxed opacity-80">

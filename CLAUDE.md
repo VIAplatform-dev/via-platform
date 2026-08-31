@@ -33,6 +33,13 @@ log into.
 - **Sizing**: `deriveSize` (seller fit-note > tag > description > title > variant), `expandSizeKeys`
   (ranges → every size, "US 2-4" → {2,3,4}); `products.size_keys TEXT[]` powers SQL size filters.
 
+## Market Mode (in-person POS, in the Store OS)
+`app/infrastructure/admin/market/*` + `app/api/store/market/*` + `app/lib/market/*`. Sells one-of-one
+`items` in person on the seller's Stripe Connect account (QR Checkout Session / keyed / cash). Never
+add a parallel inventory or payment path: reserve via `reserveItemForMarket`, complete only through
+`finalizeMarketSale` (money first, then `markSold`), and let the `reconcile-market-checkouts` cron +
+Connect webhook converge. Design + edge-case audit: `docs/superpowers/specs/2026-08-28-market-mode-design.md`.
+
 ## Event data (the analytics foundation)
 Four capture tables (`app/lib/analytics-db.ts`, `favorites-db.ts`):
 `product_views`, `product_favorites`, `clicks`, `conversions`. Plus `products`, `searches`,
