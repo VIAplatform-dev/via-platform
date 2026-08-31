@@ -83,6 +83,9 @@ export default function OnboardingWizard() {
    });
    const data = await res.json().catch(() => ({}));
    if (!res.ok) { setError(data?.error || "Something went wrong — try again."); setBusy(false); return; }
+   // The workspace gate (whoami) reads store_users; the row was written a moment ago. Leave a
+   // breadcrumb so the gate retries instead of bouncing a brand-new seller back into this wizard.
+   try { sessionStorage.setItem("vya:just-onboarded", String(data?.slug || "1")); } catch { /* storage off */ }
    // Branch on the SELLER'S choice (local state) — not the API echo, which omits hasWebsite/websiteUrl
    // for an already-existing store (idempotent), silently misrouting an import into the build path.
    const isImport = hasWebsite === true && websiteUrl.trim().length > 3;
@@ -104,6 +107,8 @@ export default function OnboardingWizard() {
    // Build from scratch → AUTO-BUILD the storefront tailored to what they sell. NEVER overwrite an
    // existing store's storefront (idempotent onboarding returns existing:true) — just open the editor.
    setPhase("building");
+   // Auto-build the tailored storefront, then open the builder. A failure here is not fatal —
+   // the seller still lands in the builder with an empty store they can design.
    if (!data?.existing) {
     const kit = tailoredKit(cats, customs);
     const starter = defaultStarterTheme(finalName);
@@ -112,7 +117,7 @@ export default function OnboardingWizard() {
      body: JSON.stringify({ template: kit.template, colors: kit.colors, fonts: kit.fonts, blocks: kit.blocks, shopBlocks: [], extraPages: starter.extraPages || [] }),
     }).catch(() => {});
    }
-   router.replace(`/admin/storefront${data?.existing ? "" : "?welcome=build"}`);
+   router.replace(`/admin/storefront${data?.existing ? "" : "?welcome=build"}`); // → the Studio (block builder)
   } catch {
    setError("Network error — try again."); setBusy(false);
   }

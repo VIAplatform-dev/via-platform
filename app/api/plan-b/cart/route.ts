@@ -9,5 +9,5 @@ export async function GET(request: NextRequest) {
  const store = await resolveStore(request);
  if (!store) return errorResponse("Unknown store.", 404);
  const { token } = cartToken(request);
- return cartResponse(await currentCart(token));
+ return cartResponse(await currentCart(token, store.sellerId));
 }

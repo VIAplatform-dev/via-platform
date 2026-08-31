@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
  if (!isSellable(item)) return sqsError(`${item.title} has sold.`);
 
  const { token, isNew } = cartToken(request);
- await addToCart(token, item.id);
+ await addToCart(token, item.id, item.sellerId);
 
- const lines = await cartLines(token).catch(() => []);
+ const lines = await cartLines(token, store.sellerId).catch(() => []);
  const cart = buildSqsCart(lines, token, Date.now());
  const newlyAdded = cart.entries.find((e) => e.itemId === item.id)
   // The cart read is best-effort; the piece was added either way, so answer with it rather than

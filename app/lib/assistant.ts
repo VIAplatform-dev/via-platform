@@ -33,6 +33,7 @@ import { syncCustomersToKlaviyo } from "./klaviyo";
 import { getStoreIgConnection, setStoreIgAutoPost, disconnectStoreIg, publishItemStory, igAppConfigured } from "./instagram-publish";
 import { deliverCampaign, recordSentCampaign, createScheduledCampaign, listCampaigns, cancelScheduledCampaign } from "./store-campaigns-db";
 import { getRefundPolicy, setRefundPolicy } from "./store-policy-db";
+import { syncPayoutSchedule } from "./payout-schedule";
 import { getShippingSettings, setShippingSettings } from "./store-shipping-db";
 import { getStoreBrief, saveStoreBrief } from "./store-brief-db";
 import { getStoreProfile, updateStoreProfile } from "./store-profile-db";
@@ -840,7 +841,7 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  case "update_store_settings": {
  const done: string[] = [];
  if (input.profile && typeof input.profile === "object") { await updateStoreProfile(slug, { displayName: input.profile.name, legalName: input.profile.legalName, location: input.profile.location, bio: input.profile.bio }); done.push("profile"); }
- if (input.policy && typeof input.policy === "object") { await setRefundPolicy(slug, input.policy); done.push("policy"); }
+ if (input.policy && typeof input.policy === "object") { await setRefundPolicy(slug, input.policy); await syncPayoutSchedule(slug).catch(() => null); done.push("policy"); }
  if (input.shipping && typeof input.shipping === "object") {
  const s = input.shipping;
  const cur = await getShippingSettings(slug);

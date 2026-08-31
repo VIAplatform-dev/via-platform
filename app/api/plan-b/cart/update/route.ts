@@ -20,5 +20,5 @@ export async function POST(request: NextRequest) {
    if (Number(raw) <= 0) await removeFromCart(token, key);
   }
  }
- return withCartCookie(cartResponse(await currentCart(token)), token, isNew);
+ return withCartCookie(cartResponse(await currentCart(token, store.sellerId)), token, isNew);
 }

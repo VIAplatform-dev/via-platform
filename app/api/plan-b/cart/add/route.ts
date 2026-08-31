@@ -1,11 +1,9 @@
 import { NextRequest } from "next/server";
-import * as cheerio from "cheerio";
 import { addToCart, getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { findItemByVariantId, isSellable } from "@/app/lib/plan-b/lookup";
 import { variantIdFromAddBody, toCartLine } from "@/app/lib/plan-b/cart-json";
-import { buildKnownCartSections, buildFallbackSection } from "@/app/lib/plan-b/cart-sections";
-import { resolveStore, cartToken, cartResponse, errorResponse, readBody, withCartCookie } from "@/app/lib/plan-b/cart-session";
-import { getCapturePage } from "@/app/lib/site-capture-db";
+import { resolveStore, cartToken, cartResponse, errorResponse, readBody, withCartCookie, cartLines } from "@/app/lib/plan-b/cart-session";
+import { buildCartSectionsResponse, requestedSectionIds } from "@/app/lib/plan-b/cart-sections-response";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +28,7 @@ export async function POST(request: NextRequest) {
  if (!isSellable(item)) return errorResponse(`${item.title} has sold.`, 422);
 
  const { token, isNew } = cartToken(request);
- await addToCart(token, item.id);
+ await addToCart(token, item.id, item.sellerId);
  const itemCount = (await getCartItemIds(token).catch(() => [item.id])).length;
 
  const line = toCartLine({
@@ -44,31 +42,22 @@ export async function POST(request: NextRequest) {
  // and cart-drawer both do) — see cart-sections.ts for why answering it matters as much as the add
  // itself: skip it and the theme's own JS throws reading `sections[id]` off nothing, and the
  // shopper never sees ANY confirmation, popup or otherwise, even though the item really was added.
- const requestedSections = typeof body.sections === "string" ? body.sections.split(",").map((s) => s.trim()).filter(Boolean) : [];
- if (requestedSections.length) {
-  const sectionLine = { title: line.title, image: line.image, priceCents: line.price, currency: item.currency };
-  // `cart-icon-bubble`'s update REPLACES the header cart link's entire innerHTML, so rebuilding it
-  // needs the icon's OWN current markup (its <svg>) to rebuild AROUND, not just the count bubble —
-  // otherwise the icon itself vanishes the moment a count bubble is due to appear. The calling page
-  // is what the theme sends us as `sections_url`; also reused below as the fallback source for any
-  // section id we don't specifically know how to re-render.
-  const sectionsUrl = typeof body.sections_url === "string" ? body.sections_url : null;
-  const pageHtml = sectionsUrl ? await getCapturePage(store.slug, sectionsUrl).catch(() => null) : null;
-  const $ = pageHtml ? cheerio.load(pageHtml) : null;
-  const cartIconHtml = $ ? $("#cart-icon-bubble").first().html() || "" : "";
-
-  const sections = buildKnownCartSections(requestedSections, sectionLine, String(line.key), itemCount, cartIconHtml);
-  const unknown = requestedSections.filter((id) => !(id in sections));
-  // Best-effort fallback for a section id we don't specifically know how to re-render (a different
-  // cart type, some theme customisation): echo back what's already there rather than leaving it
-  // undefined, which would throw and kill the WHOLE notification — see buildFallbackSection().
-  if (unknown.length && $) {
-   for (const id of unknown) {
-    const $el = $(`#${id}`).first();
-    if ($el.length) sections[id] = buildFallbackSection($el.html() || "");
-   }
-  }
-  payload.sections = sections;
+ const requested = requestedSectionIds(body);
+ if (requested.length) {
+  const lines = await cartLines(token, store.sellerId).catch(() => []);
+  payload.sections = await buildCartSectionsResponse({
+   slug: store.slug,
+   requested,
+   sectionsUrl: typeof body.sections_url === "string" ? body.sections_url : null,
+   addedLine: { title: line.title, image: line.image, priceCents: line.price, currency: item.currency },
+   addedKey: String(line.key),
+   itemCount,
+   lines: lines.map((l) => ({
+    id: l.id, title: l.title, priceCents: l.priceCents, currency: l.currency,
+    image: l.image, href: `/products/${l.handle}`,
+   })),
+   checkoutHref: "/checkout?cart=1",
+  }).catch(() => ({}));
  }
 
  const res = cartResponse(payload as never);

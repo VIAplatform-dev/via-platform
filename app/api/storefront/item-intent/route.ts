@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItem, reserveItem, releaseReservation, currentReservationRef } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
+import { payableAccountId } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { recordCheckoutAttempt } from "@/app/lib/checkout-attempts-db";
@@ -56,7 +57,10 @@ export async function POST(request: NextRequest) {
  const seller = await getSellerById(item.sellerId);
  if (!seller) return NextResponse.json({ error: "Seller not found." }, { status: 404 });
  const pay = await getSellerPayments(seller.slug);
- if (!pay?.stripeAccountId || !pay.chargesEnabled) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
+ // payableAccountId, not acctId: an account from the OTHER Stripe mode is treated as
+ // no account at all, so a sandbox can never charge (or refund) a live seller. See stripe-mode.ts.
+ const acctId = payableAccountId(pay);
+ if (!acctId) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
 
  // Per-store discount (scoped by seller.slug). Skipped on binding offers (price already final).
  let salePriceCents = effPriceCents;
@@ -126,17 +130,17 @@ export async function POST(request: NextRequest) {
  // to card-only (which always works) rather than breaking checkout.
  let intent;
  try {
- intent = await stripePost("payment_intents", intentBody(methods), pay.stripeAccountId);
+ intent = await stripePost("payment_intents", intentBody(methods), acctId);
  } catch (e) {
  if (methods.length <= 1) throw e;
- intent = await stripePost("payment_intents", intentBody(["card"]), pay.stripeAccountId);
+ intent = await stripePost("payment_intents", intentBody(["card"]), acctId);
  }
 
  recordCheckoutAttempt({ storeSlug: seller.slug, email: buyerEmail, name: String(buyer.name || "") || null, itemId, itemTitle: item.title, itemImage: item.images?.[0] || null }).catch(() => {});
  return NextResponse.json({
  clientSecret: intent.client_secret,
  publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim(),
- stripeAccount: pay.stripeAccountId,
+ stripeAccount: acctId,
  amountCents: amount, currency,
  });
  } catch (e) {

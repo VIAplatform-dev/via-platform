@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
  if (!store) return NextResponse.json({ message: NO_CART_MESSAGE }, { status: 404 });
 
  const { token } = cartToken(request);
- const lines = await cartLines(token).catch(() => []);
+ const lines = await cartLines(token, store.sellerId).catch(() => []);
  // Squarespace answers a visitor with no cart with a 404 and this message, and its bundle treats
  // that as "empty" rather than as an error. Answering 200-with-an-empty-cart instead makes the
  // pill render a cart the shopper never started.

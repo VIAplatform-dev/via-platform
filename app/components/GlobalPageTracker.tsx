@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { randomId } from "@/app/lib/random-id";
 
 const SOURCE_ALIASES: Record<string, string> = {
  ig: "instagram",
@@ -78,13 +79,13 @@ export default function GlobalPageTracker() {
  try {
  sid = sessionStorage.getItem("via_session_id");
  if (!sid) {
- sid = crypto.randomUUID();
+ sid = randomId();
  sessionStorage.setItem("via_session_id", sid);
  }
  } catch {
  // sessionStorage blocked (e.g. TikTok in-app browser) — keep in memory only
  if (!sessionIdRef.current) {
- sid = crypto.randomUUID();
+ sid = randomId();
  }
  }
  if (sid) sessionIdRef.current = sid;

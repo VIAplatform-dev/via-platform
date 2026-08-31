@@ -3105,6 +3105,8 @@ export async function sendBuyerOrderConfirmation(p: {
  currency: string;
  storeName: string;
  ship?: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal?: string | null; country?: string | null } | null;
+ /** Set when the buyer chose to collect in store: where to go, and what the seller told them. */
+ collect?: { address: string | null; instructions: string | null } | null;
  replyTo?: string | null; // the store's email, so replies reach the seller
 }): Promise<void> {
  if (!p.buyerEmail) return;
@@ -3137,15 +3139,19 @@ export async function sendBuyerOrderConfirmation(p: {
  </tr></table>
  <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;border-top:1px solid ${t.panelBorder};padding-top:10px;">
  ${row("Subtotal", fmtMoney(p.subtotalCents, p.currency))}
- ${row("Shipping", p.shippingCents > 0 ? fmtMoney(p.shippingCents, p.currency) : "Free")}
+ ${row("Shipping", p.collect ? "Collecting in store" : p.shippingCents > 0 ? fmtMoney(p.shippingCents, p.currency) : "Free")}
  ${row("Total", fmtMoney(totalCents, p.currency), true)}
  </table>
  </div>
- ${addr ? `<div style="margin:0 0 22px;">
+ ${p.collect ? `<div style="margin:0 0 22px;">
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 6px;">Collect from</p>
+ <p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${escapeHtml(p.collect.address || storeName)}</p>
+ ${p.collect.instructions ? `<p style="font-size:13px;color:${t.muted};line-height:1.6;margin:6px 0 0;">${escapeHtml(p.collect.instructions)}</p>` : ""}
+ </div>` : addr ? `<div style="margin:0 0 22px;">
  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 6px;">Shipping to</p>
  <p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${addr}</p>
  </div>` : ""}
- <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 22px;">${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 22px;">${p.collect ? `Your piece is being held for you at ${escapeHtml(storeName)} — nothing to post, just come and collect it.` : `${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.`}</p>
  <div style="text-align:center;margin:4px 0;"><a href="${orderUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 34px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;">View your order →</a></div>
  `;
  const html = storeTransactionalShell(brand, storeName, "Order confirmed", content);
@@ -3171,6 +3177,8 @@ export async function sendSellerSaleNotification(p: {
  currency: string;
  buyerName?: string | null;
  ship: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal?: string | null; country?: string | null };
+ /** Set when the buyer is collecting in store — there is nothing to post and no label to buy. */
+ collect?: { address: string | null; instructions: string | null } | null;
  orderId: string;
 }): Promise<void> {
  if (!p.sellerEmail) return;
@@ -3188,14 +3196,14 @@ export async function sendSellerSaleNotification(p: {
  const content = `
  <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">You sold <b>${p.itemTitle}</b> for ${fmtMoney(p.amountCents, p.currency)}. 🎉</p>
  <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:20px 24px;margin:0 0 24px;">
- <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 8px;">Ship to</p>
- <p style="font-size:15px;color:${t.text};line-height:1.6;margin:0;">${addr || "(address on the order)"}</p>
+ <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 8px;">${p.collect ? "Collecting in store" : "Ship to"}</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.6;margin:0;">${p.collect ? `${escapeHtml(p.buyerName || "Your buyer")} is collecting this${p.collect.address ? ` from ${escapeHtml(p.collect.address)}` : ""}.` : addr || "(address on the order)"}</p>
  </div>
- <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 20px;">Shipping's already paid — just generate your prepaid label, print it, and mark it shipped from your dashboard.</p>
- <a href="${url}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Get your label →</a>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 20px;">${p.collect ? "Nothing to post — set it aside and mark it collected when they've picked it up." : "Shipping's already paid — just generate your prepaid label, print it, and mark it shipped from your dashboard."}</p>
+ <a href="${url}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">${p.collect ? "View the order →" : "Get your label →"}</a>
  `;
  const html = storeTransactionalShell(brand, p.storeName, "You made a sale", content);
- await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: `You sold ${p.itemTitle} — ship it`, html });
+ await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: p.collect ? `You sold ${p.itemTitle} — held for collection` : `You sold ${p.itemTitle} — ship it`, html });
 }
 
 /** Buyer's shipping/tracking email — sent when the order ships. Store-branded, from the store. */

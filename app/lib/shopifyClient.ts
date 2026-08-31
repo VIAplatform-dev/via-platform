@@ -7,6 +7,7 @@
  * - storefrontAccessToken: Public Storefront API access token
  */
 import { safeFetch } from "./safe-url.ts";
+import type { ReadOutcome } from "./feed-completeness";
 
 /** JSON.parse that tolerates the raw control characters real storefronts embed in product
  *  descriptions (every Shopify feed profiled had them; strict parsing rejects the whole payload).
@@ -49,6 +50,13 @@ export type ShopifyProduct = {
 export type ShopifyFetchResult = {
  products: ShopifyProduct[];
  skippedCount: number;
+ /**
+  * How the read finished. The import's sold-sweep is only allowed to run on a read that reached the
+  * END of the catalogue — see app/lib/feed-completeness.ts. Optional so the other reader in this
+  * file (and any caller that does not sweep) need not supply it; absent is treated as "unknown",
+  * which refuses the sweep.
+  */
+ outcome?: ReadOutcome;
 };
 
 type ShopifyImageNode = {
@@ -744,12 +752,20 @@ export async function fetchShopifyProductsPublic(
  storeName: string,
  maxProducts: number = 250,
  defaultCurrency: string = "USD",
- skipSoldOutFilter: boolean = false
+ skipSoldOutFilter: boolean = false,
+ /** The shop's HOME country (Shopify's `countryCode`). Sent as the `localization` cookie so Shopify
+  *  Markets serves the seller's own market. Without it the feed is priced in whatever market the
+  *  request's geography suggests — a UK store imported from a US-looking crawler came back in USD at
+  *  a converted rate, and every price on the hosted store disagreed with the seller's. Proven: the
+  *  same request with `localization=GB` returns £290.00 GBP; without it, $401.00 USD. */
+ homeCountry: string | null = null
 ): Promise<ShopifyFetchResult> {
  const normalizedDomain = normalizeStoreDomain(storeDomain);
  const products: ShopifyProduct[] = [];
  let skippedCount = 0;
  let page = 1;
+ // Recorded so the caller can tell "that is the whole catalogue" from "that is where I stopped".
+ const outcome: ReadOutcome = { pagesRead: 0, lastPageFull: false, hitCap: false, failed: false };
  // The currency the FEED is actually priced in. Shopify Markets serves a storefront in different
  // presentment currencies depending on how it reads the request, and products.json carries bare
  // price strings with no currency at all — so the same URL can return "245.00" (GBP) or "341.00"
@@ -770,7 +786,10 @@ export async function fetchShopifyProductsPublic(
  // has to go through the same SSRF guard (DNS resolution + private-IP rejection + per-hop
  // redirect revalidation) as every other outbound request. The timeout also means a hung store
  // can't pin the invocation open — the outer Promise.race can't cancel this work on its own.
- response = await safeFetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+ response = await safeFetch(url, {
+  headers: { Accept: "application/json", ...(homeCountry ? { Cookie: `localization=${homeCountry}` } : {}) },
+  signal: AbortSignal.timeout(15000),
+ });
  if (response.status !== 429) break;
  const retryAfter = parseInt(response.headers.get("Retry-After") ?? "5", 10);
  const waitMs = Math.min(retryAfter * 1000, 30_000);
@@ -779,6 +798,7 @@ export async function fetchShopifyProductsPublic(
  }
 
  if (!response!.ok) {
+ outcome.failed = true;
  if (response!.status === 401 || response!.status === 403) {
  throw new Error(
  "Store requires authentication. Please provide a Storefront Access Token."
@@ -802,7 +822,44 @@ export async function fetchShopifyProductsPublic(
  const data = parseLooseJson(await response!.text());
 
  if (!data.products || data.products.length === 0) {
+ // A `200 {"products":[]}` is what a throttled Shopify returns mid-catalogue — and ALSO what the
+ // real end of the catalogue looks like when its size is an exact multiple of the page size
+ // (shop-vintage-charm holds exactly 1,550 and we page by 50). The two are indistinguishable in
+ // one request, so ask twice: a throttle clears, an ending does not.
+ if (page > 1) {
+ // Ask again, with room for a throttle to clear. One quick retry is not enough: a shop that is
+ // busy enough to answer empty is often busy for more than two seconds, and a sustained throttle
+ // that survives the retry would be read as the end of the catalogue — the exact mistake this is
+ // here to prevent, just harder to spot.
+ let refilled: ReturnType<typeof parseLooseJson> | null = null;
+ let reachable = false;
+ // Backoff kept short on purpose: the whole read runs under a single outer timeout, and waiting
+ // 30s here spent the entire budget, turning a good read of shop-vintage-charm into an empty one.
+ for (const waitMs of [1500, 5000]) {
+ await new Promise((r) => setTimeout(r, waitMs));
+ const retry = await safeFetch(url, {
+  headers: { Accept: "application/json", ...(homeCountry ? { Cookie: `localization=${homeCountry}` } : {}) },
+  signal: AbortSignal.timeout(15000),
+ }).catch(() => null);
+ if (!retry?.ok) continue;
+ reachable = true;
+ const again = parseLooseJson(await retry.text());
+ if (again?.products?.length) { refilled = again; break; }
+ }
+ if (refilled?.products?.length) {
+  // It was a throttle. Take this page's products and carry on rather than stopping short.
+  console.log(`[Shopify] ${storeName}: page ${page} came back empty and refilled on retry (throttle)`);
+  data.products = refilled.products;
+ } else if (!reachable) {
+  outcome.failed = true; // never got an answer — cannot tell an ending from an outage
+  break;
+ } else {
+  outcome.lastPageFull = false; // answered, and empty every time: the catalogue really does end here
+  break;
+ }
+ } else {
  break;
+ }
  }
 
  for (const product of data.products) {
@@ -931,6 +988,9 @@ export async function fetchShopifyProductsPublic(
  });
  }
 
+ outcome.pagesRead = page;
+ outcome.lastPageFull = data.products.length >= limit;
+
  if (data.products.length < limit) {
  break;
  }
@@ -938,8 +998,10 @@ export async function fetchShopifyProductsPublic(
  page++;
  }
 
- console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)`);
- return { products, skippedCount };
+ // The while-condition itself: we stopped because our own ceiling was reached, not the shop's end.
+ if (products.length >= maxProducts) outcome.hitCap = true;
+ console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)${outcome.hitCap ? " — STOPPED AT OUR LIMIT, not the end of the catalogue" : ""}`);
+ return { products, skippedCount, outcome };
 }
 
 /**

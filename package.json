@@ -11,7 +11,13 @@
     "test": "node --test \"app/**/*.test.ts\"",
     "db:generate": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs generate",
     "db:push": "node --env-file=.env.local node_modules/drizzle-kit/bin.cjs push",
-    "eval:import": "node --experimental-strip-types scripts/eval-import.ts"
+    "eval:import": "node --experimental-strip-types scripts/eval-import.ts",
+    "verify:store": "node --experimental-strip-types --env-file=.env.local scripts/verify-store.mts",
+    "parity:store": "node --experimental-strip-types --env-file=.env.local scripts/parity-check.mts",
+    "repair:store": "node --env-file=.env.local --import tsx scripts/repair-store.mts",
+    "blackout:store": "node --experimental-strip-types --env-file=.env.local scripts/blackout-check.mts",
+    "census": "node --experimental-strip-types scripts/census.mts",
+  "fleet": "nohup scripts/fleet.sh > .verify/fleet.log 2>&1 &"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -51,6 +57,8 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "playwright": "^1.62.1",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4",
     "tsx": "^4.22.4",
     "typescript": "^5"
