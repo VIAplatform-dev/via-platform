@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
+import { storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
 import type { NextRequest } from "next/server";
 import { verifyRecipientTokenEdge } from "@/app/lib/recipientToken-edge";
 import { capturedSlugForDomain } from "@/app/lib/domain-routing-edge";
 
 // Routes accessible without any authentication or approval
 const PUBLIC_ROUTES = [
+  "/pay", // customer-facing "payment sent" pages after a Market Mode QR payment
   "/login",
   "/register",
   "/pilot-pending",
@@ -208,6 +209,17 @@ export async function middleware(request: NextRequest) {
       return new NextResponse("Not found", { status: 404 });
     }
 
+    // The theme's cart FORM. Method-aware, and checked before the table below because GET /cart is
+    // the cart PAGE (served from the capture) while POST /cart is the Update/Checkout submit — the
+    // same path meaning two different things. Left unrouted, that POST reached Next, which took it
+    // for a Server Action and answered "Server action not found." to a shopper pressing Checkout.
+    const cartSubmit = shopifyCartSubmitRoute(pathname, request.method);
+    if (cartSubmit) {
+      const url = request.nextUrl.clone();
+      url.pathname = cartSubmit;
+      return NextResponse.rewrite(url);
+    }
+
     // The theme's own route table, answered in Shopify's dialect. Every Shopify theme publishes
     // these as RELATIVE paths, so on this origin the theme's JavaScript sends its cart calls to us
     // (see app/lib/plan-b/cart-json.ts). One mapping covers every Shopify store.
@@ -310,6 +322,7 @@ export async function middleware(request: NextRequest) {
       pathname === "/checkout" || pathname.startsWith("/checkout/") ||
       pathname === "/cart" || pathname.startsWith("/cart/") ||
       pathname === "/order" || pathname.startsWith("/order/") ||
+      pathname === "/pay" || pathname.startsWith("/pay/") ||
       // Offers are part of that same journey: the accepted-offer page links straight to /checkout.
       pathname === "/offer" || pathname.startsWith("/offer/") ||
       pathname.startsWith("/infra/") ||

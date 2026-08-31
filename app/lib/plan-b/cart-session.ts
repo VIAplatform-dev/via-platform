@@ -60,16 +60,19 @@ export function withSqsCartFlag(res: NextResponse, hasCart: boolean): NextRespon
 
 /** Load the visitor's cart and render it in Shopify's shape. Sold/removed pieces drop out on their
  *  own — one-of-one inventory means availability is the status, not a count. */
-export async function currentCart(token: string): Promise<ShopifyCart> {
- return buildCart(await cartLines(token), token);
+export async function currentCart(token: string, sellerId?: string | null): Promise<ShopifyCart> {
+ return buildCart(await cartLines(token, sellerId), token);
 }
 
 /** The visitor's cart as plain VYA pieces, before any platform's dialect is applied — Shopify's
  *  above, Squarespace's in sqs-cart-json.ts. Both drop sold and removed pieces here, so every
  *  surface counts the same bag. */
-export async function cartLines(token: string): Promise<CartLineItem[]> {
+export async function cartLines(token: string, sellerId?: string | null): Promise<CartLineItem[]> {
  if (!token) return [];
- const ids = await getCartItemIds(token);
+ // Scoped to the store whose host served this request: a shopper has one bag per store, and this
+ // store's drawer must never show (or total) another store's piece. Omitted, it reads the whole
+ // bag, which is how every caller behaved before bags were per-store.
+ const ids = await getCartItemIds(token, sellerId);
  const lines: CartLineItem[] = [];
  for (const id of ids) {
   const it = await getItem(id);
@@ -95,9 +98,9 @@ export async function cartLines(token: string): Promise<CartLineItem[]> {
  * the /cart.js response drop sold and removed pieces, and a header badge that counted them anyway
  * would say "2" over a drawer showing one item. One rule, one number, everywhere.
  */
-export async function cartItemCount(token: string): Promise<number> {
+export async function cartItemCount(token: string, sellerId?: string | null): Promise<number> {
  if (!token) return 0;
- try { return (await currentCart(token)).item_count; } catch { return 0; }
+ try { return (await currentCart(token, sellerId)).item_count; } catch { return 0; }
 }
 
 /** Shopify's cart JSON, with the headers themes expect. */

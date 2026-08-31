@@ -59,6 +59,21 @@ const VENDOR_PATTERNS = [
  /tiktok\.com/i, /snap\.licdn\.com/i, /pinterest\.com/i, /bing\.com/i,
  /gorgias\.(com|chat)/i, /yotpo\.com/i, /judge\.me/i, /loox\.io/i, /okendo\.io/i,
  /attentivemobile\.com/i, /postscript\.io/i, /privy\.com/i, /omnisend\.com/i,
+ // POPUP/BANNER APPS. These inject a full-viewport dialog over the shop, and on a hosted store they
+ // fire on every visit because their "already shown" state is per-origin — measured on the sellers'
+ // OWN sites with a fresh browser, none of them showed a popup, while the hosted copies were covered
+ // by two stacked dialogs. They are Shopify apps, so they stop working the day the seller cancels
+ // anyway; serving them inert is the same outcome, minus the blocked storefront.
+ // Note omnisend ships from omnisnippet1.com / omnisendlink.com — the `omnisend.com` pattern above
+ // matches neither, which is why its welcome modal was still covering one store's hero and grid.
+ /omnisnippet\d*\.com/i, /omnisendlink\.com/i,
+ /hextom\.com/i, /pop-convert\.com/i, /tech-arms\.io/i,
+ // Shopify serves app EXTENSION bundles from its own CDN with the app's name in the PATH —
+ // `cdn.shopify.com/extensions/<uuid>/omnisend-55/assets/omnisend-in-shop.js`. A host-based pattern
+ // can never match those, and cdn.shopify.com is otherwise allowlisted as the theme's own CDN, so
+ // one store's welcome modal kept covering its hero and grid even with `omnisend.com` denied.
+ // Named apps only — a theme asset on the same CDN is untouched.
+ /\/extensions\/[^/]+\/(omnisend|hextom|privy|justuno|klaviyo|pop-?convert|smsbump|bss-|wisepops|optimonk)[^/]*\//i,
  /recharge(payments)?\.com/i, /bold(apps|commerce)\.io/i,
  /hcaptcha\.com/i, /recaptcha/i,
  // Shopify's OWN telemetry ships from cdn.shopify.com, which the theme allowlist otherwise keeps —
@@ -162,6 +177,34 @@ export function isDeniedScriptUrl(src: string): boolean {
  const s = (src || "").trim();
  if (!s) return false;
  return CHECKOUT_PATTERNS.some((p) => p.test(s)) || VENDOR_PATTERNS.some((p) => p.test(s));
+}
+
+/**
+ * Shopify app embeds that arrive as INLINE script, not as a `<script src>`.
+ *
+ * Denying hosts is not enough: an app embed ships a small inline config block that fetches the app's
+ * bundle itself at runtime, so there is no src attribute to match and the URL denylist never sees
+ * it. Two stores were covered by dialogs from exactly this shape — a Hextom market/region picker
+ * (`tmsSelectorData`), its free-shipping bar (`hextom_fsb_config`, the `div.fsb_message` that sat
+ * over Add to cart), a BSS window popup, and a pop-convert loader.
+ *
+ * Matched on the app's OWN identifiers rather than anything generic, so this can only ever remove a
+ * block that belongs to a named app. Verified against the sellers' live sites first: none of them
+ * shows these popups to a fresh browser, so this is not the seller's intended storefront behaviour —
+ * it is an app firing on an origin it was never configured for. They also stop working the day the
+ * seller cancels Shopify, so removing them changes nothing about the store's eventual behaviour.
+ */
+const DENIED_INLINE_MARKERS = [
+ /hextom_fsb_config|hextom_fsb_meta|tmsSelectorData|tmsAbsLinkData|cdn3\.hextom\.com/i,
+ /BSS_BP\.window_popup|bss-window-popup-config/i,
+ /pop-convert\.com/i,
+ /omnisnippet\d*\.com|omnisendlink\.com/i,
+];
+
+export function isDeniedInlineScript(code: string): boolean {
+ const s = (code || "").trim();
+ if (!s) return false;
+ return DENIED_INLINE_MARKERS.some((p) => p.test(s));
 }
 
 /**

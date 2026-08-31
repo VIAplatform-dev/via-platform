@@ -118,6 +118,15 @@ ready(function(){
  /* Progressive-enhancement flag some themes gate content on (e.g. Dwell). */
  var root=document.documentElement;
  if(root.classList.contains("no-js")){root.classList.remove("no-js");root.classList.add("js")}
+ /* …and the LOADING gate that goes with it. A theme's page-load overlay is hidden by whichever of
+    two rules fires: its own JS drops this flag, or a no-js fallback selector hides it. Palo Alto
+    ships exactly that pair:
+      .no-js.page-loading .loading-overlay, html:not(.page-loading) .loading-overlay {opacity:0}
+    Dropping "no-js" above (which we must, to un-gate content) kills the FIRST selector, and the
+    theme's JS that would satisfy the second is stripped on a VYA origin — so a fixed, full-viewport
+    z-index:99999 overlay stayed over every page and the whole site rendered as a solid colour.
+    Removing the flag here satisfies the second selector, which is what the theme's own JS does. */
+ root.classList.remove("page-loading");
 
  /* ── 1. Announcement bar: rotate one message at a time (honours data-speed, in seconds). ── */
  document.querySelectorAll(".announcement-bar").forEach(function(bar){

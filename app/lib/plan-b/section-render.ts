@@ -75,6 +75,14 @@ export function emptySection(sectionId: string): string {
  */
 export function predictiveSearchEmptySection(sectionId: string): string {
  return `<div id="${SECTION_ID_PREFIX}${escapeAttr(sectionId)}" class="shopify-section">` +
+  // Shopify's newer "Shapes" theme (and others built the same way) reads this section differently:
+  // its PredictiveSearch component does
+  //   new DOMParser().parseFromString(text, "text/html").querySelector("#predictive-search-count").textContent
+  // unconditionally, with no null check — a response missing this exact id throws inside the fetch
+  // handler's own .then(), which its .catch() turns into `this.rawQuery = ""`. Confirmed against the
+  // theme's real code, not guessed: every keystroke was being wiped the instant the debounced search
+  // fired, which read as "the search bar won't even let me type."
+  `<span id="predictive-search-count" class="visually-hidden">0 results</span>` +
   `<div class="predictive-search-empty-section">` +
   `<div id="predictive-search-results" class="predictive-search-dropdown" role="listbox" aria-expanded="true">` +
   `<div id="predictive-search-products" class="predictive-search-results__wrapper-products"></div>` +
@@ -110,6 +118,9 @@ export function predictiveSearchResultsSection(sectionId: string, cards: Suggest
   `</a>`
  )).join("");
  return `<div id="${SECTION_ID_PREFIX}${escapeAttr(sectionId)}" class="shopify-section">` +
+  // See predictiveSearchEmptySection() — required by the "Shapes"-family theme convention, not the
+  // Horizon one the rest of this section's markup targets. Both read from the same response fine.
+  `<span id="predictive-search-count" class="visually-hidden">${cards.length} result${cards.length === 1 ? "" : "s"}</span>` +
   `<div id="predictive-search-results" class="predictive-search-dropdown" role="listbox" aria-expanded="true"${single}>` +
   `<div id="predictive-search-products" class="predictive-search-results__wrapper-products">${items}</div>` +
   `</div></div>`;

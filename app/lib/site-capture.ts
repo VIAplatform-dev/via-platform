@@ -5,13 +5,21 @@
 // the VYA-hosted copy — so the whole site can be navigated on VYA, pixel-faithful.
 // (JS is stripped for v1: looks identical; interactivity + cart + AI editing next.)
 import * as cheerio from "cheerio";
+import { unavailableLabel } from "./unavailable-label.ts";
 // domhandler's Element, not the DOM one — these helpers operate on cheerio nodes.
 import type { Element as DomElement } from "domhandler";
 // Relative, not the "@/app" alias: Node's native TS test runner doesn't read tsconfig paths
 // (this file's own test — site-capture.test.ts — otherwise fails to load under `node --test`).
 import { assertPublicUrl, safeFetch } from "./safe-url.ts";
 import { CAPTURE_SHIM } from "./capture-shim.ts";
-import { classifyScript, rewriteInlineJsUrls, ownOrigins, detectMyshopifyDomain, stripShopifyCommerceUrls, isDeniedScriptUrl } from "./plan-b/scripts.ts";
+import { classifyScript, rewriteInlineJsUrls, ownOrigins, detectMyshopifyDomain, stripShopifyCommerceUrls, isDeniedScriptUrl, isDeniedInlineScript } from "./plan-b/scripts.ts";
+import { rehostPageAssets } from "./rehost-theme-assets.ts";
+import { deriveCartTemplate, type CartTemplate, type KnownItem } from "./plan-b/derive-cart-template.ts";
+import { renderCartRows } from "./plan-b/render-cart.ts";
+import { saveCartTemplate } from "./plan-b/cart-template-store.ts";
+
+/** What a cart-template capture yields: the /cart page to store, and the layout derived from it. */
+export type CartTemplateCapture = { capture: Capture | null; template: CartTemplate | null };
 // The DB helpers are imported lazily inside crawlAndStore (the only consumer) so that
 // the pure HTML functions here — applyEdits/prepareEditMode/captureSite — can be used
 // (and unit-tested) without pulling in the database layer.
@@ -255,7 +263,34 @@ export function stripVendorScripts(html: string): string {
  $("script[src]").each((_: number, el: any) => {
   if (isDeniedScriptUrl($(el).attr("src") || "")) $(el).remove();
  });
+ // …and the app embeds that carry no src at all — see isDeniedInlineScript.
+ $("script:not([src])").each((_: number, el: any) => {
+  if (isDeniedInlineScript($(el).html() || "")) $(el).remove();
+ });
+ removeAppPopupMarkup($);
  return $.html();
+}
+
+/**
+ * Popup MARKUP an app server-rendered into the page, as opposed to markup its script injects.
+ *
+ * Denying the script is not always enough. Omnisend's in-shop welcome modal is already in the
+ * captured HTML — 19 nodes of it — and it is visible without any script running, so on one store it
+ * covered the hero, the product grid and the Add-to-cart button on every page. Removing its script
+ * alone left the dialog on screen with nothing left to close it.
+ *
+ * Deliberately a short, named list. These are dialog ROOTS belonging to specific apps, never a
+ * theme's own section — and every one of these apps stops working when the seller cancels Shopify,
+ * so this only brings that outcome forward.
+ */
+function removeAppPopupMarkup($: cheerio.CheerioAPI): void {
+ $([
+  ".wl-welcome",                    // Omnisend in-shop welcome
+  ".ht-tms__recommendation-popup",  // Hextom market/region picker
+  ".ht-tms__recommendation-popup__backdrop",
+  "#bss-window-popup-container",    // BSS window popup
+  "email-signup-popup",
+ ].join(",")).remove();
 }
 
 export function cleanShopifyChrome(html: string): string {
@@ -267,6 +302,10 @@ export function cleanShopifyChrome(html: string): string {
  $("script[src]").each((_: number, el: any) => {
   if (isDeniedScriptUrl($(el).attr("src") || "")) $(el).remove();
  });
+ $("script:not([src])").each((_: number, el: any) => {
+  if (isDeniedInlineScript($(el).html() || "")) $(el).remove();
+ });
+ removeAppPopupMarkup($);
  return $.html();
 }
 
@@ -381,6 +420,11 @@ export type CaptureOpts = {
  /** Extra request headers for the page fetch. Used to capture the cart page as a session that
   *  actually HAS an item in it — an empty cart renders no row markup to reuse. */
  fetchHeaders?: Record<string, string>;
+ /** Copy this page's theme assets (JS, fonts, logo, hero media) onto our storage as it is captured,
+  *  and point the page at the copies. `cache` is shared across a crawl. The reason it happens HERE
+  *  and not afterwards: these files exist only while the seller's platform serves them, and the
+  *  capture is the moment we know it does. See rehostPageAssets(). */
+ rehost?: { slug: string; cache: Map<string, string> };
 };
 export type Capture = { html: string; origin: string; sourceUrl: string; bytes: number; inlinedSheets: number; links: string[] };
 
@@ -506,12 +550,17 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  // VYA's checkout.
  let html = $.html();
  if (opts.keepScripts) html = stripShopifyCommerceUrls(html);
+ // Last, on the final markup: everything above may add or rewrite an asset reference.
+ if (opts.rehost) html = await rehostPageAssets(html, origin, opts.rehost.slug, opts.rehost.cache);
  return { html, origin, sourceUrl, bytes: html.length, inlinedSheets, links: [...links] };
 }
 
 // ── Crawl an entire site and store every page on VYA ─────────────────────────
 // Sitemap-seeded + link-crawl, blacklist filter (skip products/cart/checkout/assets).
 // Internal links are rewritten to /site/{slug}/… so the whole site navigates on VYA.
+/** See the refusal in crawlAndStore. Bare hosts, no `www.`. */
+const DISCARDED_HOSTS = new Set(["unique-vintage.com"]);
+
 function includePath(p: string): boolean {
  // The cart PAGE is captured (unlike /cart/add etc.): the theme navigates to it after an add, and
  // without it the shopper lands on "Page not found" at the exact moment they're trying to buy.
@@ -533,6 +582,9 @@ export type CrawlState = { queue: string[]; done: string[]; paths: string[] };
 export type CrawlOpts = {
  /** Continue a previous crawl instead of starting over (skips the destructive reset). */
  resume?: CrawlState | null;
+ /** Own the theme's assets as pages are captured (see CaptureOpts.rehost). Defaults to on whenever
+  *  Blob storage is configured; a crawl-wide cache is created here so a shared asset uploads once. */
+ rehostAssets?: boolean;
  /** Called as pages land, so the caller can persist progress. Throttled — not once per page. */
  onProgress?: (state: CrawlState) => Promise<void> | void;
  /** Stop cleanly after this long and report `complete: false`, rather than being killed mid-page by
@@ -568,6 +620,12 @@ export async function crawlAndStore(slug: string, startUrl: string, maxPages = 8
  const host = new URL(start).host.toLowerCase().replace(/^www\./, "");
  if (host === "vyaplatform.com" || host.endsWith(".vyaplatform.com") || host === "getvya.ai" || host.endsWith(".getvya.ai")) {
  throw new Error("That's a VYA address — paste your store's own website (e.g. yourstore.com or your-store.myshopify.com).");
+ }
+ // Stores the owner has discarded outright. unique-vintage.com was 784 pages and 1 GB of stored
+ // HTML — a third of the entire capture footprint for one store — and was dropped on 2026-08-28.
+ // Refused here rather than merely removed from the corpus, so nobody re-imports it by accident.
+ if (DISCARDED_HOSTS.has(host)) {
+ throw new Error(host + " has been discarded as a store and can't be imported.");
  }
  // Where this capture's internal links should point. Plan A serves the store under a path prefix
  // (vyaplatform.com/site/{slug}); Plan B serves it at the ROOT of its own domain, so links must stay
@@ -657,6 +715,9 @@ async function runCrawl(
  warnings: string[] = [],
 ): Promise<CrawlResult> {
  const { slug, origin, maxPages, rewriteLink, saveCapturePage, opts } = ctx;
+ // One cache for the whole crawl. A resume in a later invocation starts fresh; rehostAsset's
+ // existence check keeps that from re-downloading what an earlier invocation already took.
+ const rehost = (opts.rehostAssets ?? Boolean(process.env.BLOB_READ_WRITE_TOKEN)) ? { slug, cache: new Map<string, string>() } : undefined;
  const queue = [...start.queue];
  const done = new Set(start.done);
  const paths = [...start.paths];
@@ -682,7 +743,7 @@ async function runCrawl(
   if (done.has(path)) continue;
   done.add(path);
   try {
-   const cap = await captureSite(origin + path, { rewriteLink, keepScripts: opts.keepScripts, myshopifyDomain: opts.myshopifyDomain });
+   const cap = await captureSite(origin + path, { rewriteLink, keepScripts: opts.keepScripts, myshopifyDomain: opts.myshopifyDomain, rehost });
    await saveCapturePage(slug, path, cap.html, origin + path);
    paths.push(path);
    for (const l of cap.links) { const p = new URL(l).pathname; if (includePath(p) && !done.has(p) && !queue.includes(p)) queue.push(p); }
@@ -706,9 +767,18 @@ async function runCrawl(
  // shopper with no indication anything had gone wrong. captureCartTemplate is self-contained (its
  // own products.json → add → cart-with-cookie sequence) and already degrades safely on its own
  // (try/catch, returns null) for a store that isn't Shopify at all — the gate bought nothing.
- const tpl = await captureCartTemplate(origin, { rewriteLink, keepScripts: opts.keepScripts, myshopifyDomain: opts.myshopifyDomain });
- if (tpl) await saveCapturePage(slug, "/cart", tpl.html, `${origin}/cart`);
+ // The cart page owns its assets like every other page; its own cache is fine (see rehostAsset's
+ // existence check — anything the crawl already took is found, not re-downloaded).
+ const rehostCart = (opts.rehostAssets ?? Boolean(process.env.BLOB_READ_WRITE_TOKEN)) ? { slug, cache: new Map<string, string>() } : undefined;
+ const tpl = await captureCartTemplate(origin, { rewriteLink, keepScripts: opts.keepScripts, myshopifyDomain: opts.myshopifyDomain, rehost: rehostCart });
+ if (tpl?.capture) await saveCapturePage(slug, "/cart", tpl.capture.html, `${origin}/cart`);
  else warnings.push("We couldn’t read your cart page layout, so your cart will use a simpler design.");
+ // The DERIVED layout — which element is a line, where the title, price and picture go — worked out
+ // by putting two known products in the store's own cart and reading where they landed. It is what
+ // lets one renderer serve every theme instead of a selector list per theme. A miss is not fatal:
+ // the cart falls back to VYA's own markup inside the store's chrome, which is a working page.
+ if (tpl?.template && tpl.template.confidence >= 0.6) await saveCartTemplate(slug, tpl.template);
+ else warnings.push("We couldn’t work out your cart's layout, so your cart will use a simpler design.");
  return { pages: paths.length, paths, complete: true, state: state(), failed, warnings };
 }
 
@@ -741,6 +811,8 @@ export type RewireOpts = {
   *  button drives VYA's cart. Replacing it with our own would throw away the fidelity Plan B exists
   *  for. Shopify's checkout is stripped either way: it takes the order off VYA. */
  keepThemeButtons?: boolean;
+ /** Why the piece is unbuyable, for the wording on the disabled control. */
+ unavailableReason?: string | null;
 };
 
 export function rewireCommerce(html: string, buyHref: string | null, opts: RewireOpts = {}): string {
@@ -755,16 +827,23 @@ export function rewireCommerce(html: string, buyHref: string | null, opts: Rewir
 
  const sold = !buyHref;
  const itemId = (buyHref || "").match(/item=([\w-]+)/)?.[1] || "";
+ const escAttr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
  const base = "display:block;width:100%;box-sizing:border-box;text-align:center;padding:15px;margin-top:10px;text-transform:uppercase;letter-spacing:.1em;font-size:13px;text-decoration:none;cursor:pointer;";
- const buttons = (cls: string) => sold
- ? `<a href="#" class="${cls}" style="${base}background:#111;color:#fff;border:1px solid #111;opacity:.4;pointer-events:none;">Sold out</a>`
- : `<a href="#" data-vya-add="${itemId}" class="${cls}" style="${base}background:#111;color:#fff;border:1px solid #111;">Add to cart</a><a href="${buyHref}" class="${cls}" style="${base}background:#fff;color:#111;border:1px solid #111;">Buy now</a>`;
+ // `data-vya-proto` carries the tag and classes of the button we are replacing. The colours a theme
+ // gives that button live in ITS stylesheet, which we cannot evaluate server-side — so the browser
+ // rebuilds a hidden copy of the original on load, reads what the theme actually paints it, and
+ // applies that to ours. See the styleFromTheme block in CART_UI. Without it every store got the
+ // same black button regardless of its palette.
+ const proto = (tag: string, cls: string) => `data-vya-proto="${escAttr(`${tag}|${cls}`)}"`;
+ const buttons = (cls: string, tag = "button") => sold
+ ? `<a href="#" class="${cls}" ${proto(tag, cls)} style="${base}background:#111;color:#fff;border:1px solid #111;opacity:.4;pointer-events:none;">${escHtml(unavailableLabel(opts.unavailableReason))}</a>`
+ : `<a href="#" data-vya-add="${itemId}" class="${cls}" ${proto(tag, cls)} style="${base}background:#111;color:#fff;border:1px solid #111;">Add to cart</a><a href="${buyHref}" class="${cls}" ${proto(tag, cls)} data-vya-secondary="1" style="${base}background:#fff;color:#111;border:1px solid #111;">Buy now</a>`;
 
  let done = false;
  $('form[action*="/cart"]').each((_: number, el: any) => {
  const $btn = $(el).find('[name="add"], button[type="submit"], .product-form__submit, .add-to-cart, .product__add-to-cart').first();
  const cls = $btn.attr("class") || "";
- if ($btn.length) $btn.replaceWith(buttons(cls)); else $(el).append(buttons(cls));
+ if ($btn.length) $btn.replaceWith(buttons(cls, ($btn.get(0) as { tagName?: string } | undefined)?.tagName || "button")); else $(el).append(buttons(cls));
  $(el).find(".shopify-payment-button").remove();
  $(el).removeAttr("action").attr("onsubmit", "return false");
  done = true;
@@ -787,7 +866,7 @@ export function rewireCommerce(html: string, buyHref: string | null, opts: Rewir
  * Everything is expressed through the theme's OWN elements (its quantity label, its error wrapper,
  * its button) so it looks native rather than like a notice we bolted on.
  */
-export function applyCartState(html: string, opts: { inCart: boolean; soldOut?: boolean }): string {
+export function applyCartState(html: string, opts: { inCart: boolean; soldOut?: boolean; unavailableReason?: string | null }): string {
  const $ = cheerio.load(html);
  const count = opts.inCart ? 1 : 0;
 
@@ -825,6 +904,21 @@ export function applyCartState(html: string, opts: { inCart: boolean; soldOut?: 
   }
   // A one-of-one piece already in the bag can't be added again.
   $("[name='add'], [class*='product-form__submit']").attr("disabled", "disabled").attr("aria-disabled", "true");
+ }
+ if (opts.soldOut) {
+  // …and neutralise VYA'S OWN buy controls, which the line above cannot touch. rewireCommerce
+  // replaces the theme's <button> with an <a>, and `disabled` means nothing on an anchor — so a
+  // sold piece kept a working "Add to cart" and a live /checkout link. This runs per request off
+  // the item's real status, which is what makes it right even for a capture stored while the piece
+  // was still available.
+  $("[data-vya-secondary]").remove(); // the "Buy now" half — one sold control, not two
+  $("[data-vya-add]")
+   .removeAttr("data-vya-add")
+   .removeAttr("href")
+   .attr("aria-disabled", "true")
+   .css({ opacity: ".4", "pointer-events": "none" })
+   // Same rule as the grid badge: only claim a sale the seller's platform actually reported.
+   .text(unavailableLabel(opts.unavailableReason));
  }
  return $.html();
 }
@@ -967,6 +1061,8 @@ export async function captureProductPage(
 ): Promise<string> {
  const cap = await captureSite(`${origin}/products/${handle}`, {
   rewriteLink: linkRewriteFor(slug, opts.planB),
+  // A product page captured on demand owns its assets the same way a crawled one does.
+  rehost: process.env.BLOB_READ_WRITE_TOKEN ? { slug, cache: new Map<string, string>() } : undefined,
   keepScripts: opts.planB,
  });
  return rewireCommerce(cap.html, buyHref, { keepThemeButtons: opts.planB });
@@ -986,30 +1082,64 @@ export async function captureProductPage(
  *
  * Best-effort: any failure returns null and the caller falls back to the empty cart page.
  */
-export async function captureCartTemplate(origin: string, opts: CaptureOpts = {}): Promise<Capture | null> {
+export async function captureCartTemplate(origin: string, opts: CaptureOpts = {}): Promise<CartTemplateCapture | null> {
+ const empty: CartTemplateCapture = { capture: null, template: null };
  try {
-  // A real variant id from the store's own feed — the cart won't accept anything else.
-  const feed = await safeFetch(`${origin}/products.json?limit=4`, { headers: UA, signal: AbortSignal.timeout(12000) });
-  if (!feed.ok) return null;
-  const parsed = JSON.parse(await feed.text()) as { products?: { variants?: { id?: number; available?: boolean }[] }[] };
-  const variant = (parsed.products || []).flatMap((p) => p.variants || []).find((v) => v?.id && v.available !== false)
-   || (parsed.products || []).flatMap((p) => p.variants || [])[0];
-  if (!variant?.id) return null;
+  // Two DISTINCT products, because the derivation works by finding what differs between them: if
+  // both rows said the same thing there would be nothing to tell a row apart from the table.
+  const feed = await safeFetch(`${origin}/products.json?limit=12`, { headers: UA, signal: AbortSignal.timeout(12000) });
+  if (!feed.ok) return empty;
+  const parsed = JSON.parse(await feed.text()) as {
+   products?: { title?: string; handle?: string; images?: { src?: string }[]; variants?: { id?: number; price?: string; available?: boolean }[] }[];
+  };
+  const picks: { id: number; known: KnownItem }[] = [];
+  for (const p of parsed.products || []) {
+   if (picks.length === 2) break;
+   const v = (p.variants || []).find((x) => x?.id && x.available !== false) || (p.variants || [])[0];
+   if (!v?.id || !p.title) continue;
+   // Distinct titles only — a duplicate title makes "the row holding A but not B" meaningless.
+   if (picks.some((q) => q.known.title === p.title)) continue;
+   picks.push({ id: v.id, known: { title: p.title, priceText: String(v.price ?? ""), imageUrl: p.images?.[0]?.src, href: p.handle ? `/products/${p.handle}` : undefined } });
+  }
+  if (!picks.length) return empty;
 
-  const add = await safeFetch(`${origin}/cart/add.js`, {
+  // The empty cart first, so its markup can be diffed against a full one to find the empty state.
+  const emptyCap = await captureSite(`${origin}/cart`, opts).catch(() => null);
+
+  const add = async (id: number, cookie?: string) => safeFetch(`${origin}/cart/add.js`, {
    method: "POST",
-   headers: { ...UA, "Content-Type": "application/json" },
-   body: JSON.stringify({ id: variant.id, quantity: 1 }),
+   headers: { ...UA, "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) },
+   body: JSON.stringify({ id, quantity: 1 }),
    signal: AbortSignal.timeout(12000),
   });
-  // The cart cookie IS the session; without it the cart page renders empty again.
-  const cookie = (add.headers.get("set-cookie") || "").split(/,(?=[^;]+=)/)
+  const cookieFrom = (r: Response) => (r.headers.get("set-cookie") || "").split(/,(?=[^;]+=)/)
    .map((c) => c.split(";")[0].trim()).filter((c) => /^cart(_sig)?=/.test(c)).join("; ");
-  if (!cookie) return null;
 
-  return await captureSite(`${origin}/cart`, { ...opts, fetchHeaders: { Cookie: cookie } });
+  const first = await add(picks[0].id);
+  // The cart cookie IS the session; without it the cart page renders empty again.
+  const cookie = cookieFrom(first);
+  if (!cookie) return empty;
+
+  // ONE item: the row template the existing serve path clones, and the /cart page we store.
+  const capture = await captureSite(`${origin}/cart`, { ...opts, fetchHeaders: { Cookie: cookie } });
+
+  // TWO items: what the derivation reads. Best-effort — a store with a single product still gets a
+  // usable /cart capture above, it just gets no derived template.
+  let template: CartTemplate | null = null;
+  if (picks.length === 2) {
+   await add(picks[1].id, cookie).catch(() => null);
+   const two = await captureSite(`${origin}/cart`, { ...opts, fetchHeaders: { Cookie: cookie } }).catch(() => null);
+   if (two) {
+    template = deriveCartTemplate({
+     twoItemHtml: two.html,
+     emptyHtml: emptyCap?.html,
+     items: [picks[0].known, picks[1].known],
+    });
+   }
+  }
+  return { capture, template };
  } catch {
-  return null; // never let a template miss fail the import — the empty cart page still works
+  return empty; // never let a template miss fail the import — the empty cart page still works
  }
 }
 
@@ -1028,8 +1158,102 @@ function cartMoney(cents: number, currency: string | null): string {
 
 export type CartPageLine = { id: string; title: string; priceCents: number; currency: string; image: string | null; href: string };
 
-export function injectCartPage(html: string, lines: CartPageLine[], checkoutHref: string): string {
+
+/** Anything a theme might call a cart line — broad on purpose, and never trusted without the
+ *  header check that goes with it. */
+const CART_ROW_CANDIDATES = "[class*='cart-item'], [class*='cart_item'], [class*='cart__item'], [class*='line-item'], [class*='line_item']";
+
+/** Totals, empty-state and the checkout button — shared by both the derived and the selector-based
+ *  cart-page paths so they can never disagree about what a full cart looks like. */
+function applyCartChrome($: cheerio.CheerioAPI, lines: CartPageLine[], checkoutHref: string): void {
+ const subtotal = lines.reduce((n, l) => n + l.priceCents, 0);
+ const cur = lines[0]?.currency || "USD";
+ $("[class*='totals__total-value'], [class*='totals__subtotal-value'], [class*='cart__subtotal']").each((_: number, el: DomElement) => {
+  const t = ($(el).text() || "");
+  $(el).text(t.includes("USD") || t.includes(cur) ? `${cartMoney(subtotal, cur)} ${cur}` : cartMoney(subtotal, cur));
+ });
+ $("[name='checkout'], [class*='cart__checkout-button']").each((_: number, el: DomElement) => {
+  $(el).removeAttr("disabled").attr("data-vya-checkout", checkoutHref);
+ });
+ if (lines.length) {
+  $(".is-empty").removeClass("is-empty");
+  $("[class*='cart__empty'], [class*='cart__login'], [class*='drawer__inner-empty']").remove();
+  $(".critical-hidden").removeClass("critical-hidden");
+ }
+ $("body").append(`<script>
+ document.addEventListener("click",function(e){
+  var c=e.target.closest&&e.target.closest("[data-vya-checkout]");
+  if(c){e.preventDefault();location.href=c.getAttribute("data-vya-checkout");return}
+  var r=e.target.closest&&e.target.closest("[data-vya-cart-remove]");
+  if(r){e.preventDefault();
+   fetch("/api/storefront/cart",{method:"DELETE",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({itemId:r.getAttribute("data-vya-cart-remove")})}).then(function(){location.reload()});}
+ });
+ </script>`);
+}
+
+export function injectCartPage(html: string, lines: CartPageLine[], checkoutHref: string, template?: CartTemplate | null): string {
  const $ = cheerio.load(html);
+
+ // An EMPTY bag. Whatever the capture happened to hold must go: a cart page captured mid-crawl can
+ // carry the CRAWLER's own cart, and leaving it there showed a shopper a stranger's product sitting
+ // beside the words "Your cart is empty". The blocks below only replace rows when there are lines to
+ // put in their place, so an empty cart needs its own pass.
+ if (!lines.length) {
+  for (const el of $(CART_ROW_CANDIDATES).toArray() as DomElement[]) {
+   const $el = $(el);
+   if ($el.find("th").length || $el.closest("thead").length) continue;
+   $el.remove();
+  }
+  $("table[class*='cart-item'], table.cart-items").each((_i: number, el: DomElement) => { if (!$(el).find("tr").length) $(el).remove(); });
+  // Say so where the lines used to be. Without this the cart region is simply blank — and a blank
+  // region beside a "Cart (0)" heading reads as a broken page rather than an empty bag.
+  const $where = $("#main-cart-items .js-contents, #main-cart-items, .cart__items, cart-items").first();
+  if ($where.length) $where.html(`<p style="opacity:.7;padding:32px 0">Your cart is empty.</p>`);
+  applyCartChrome($, lines, checkoutHref);
+  return $.html();
+ }
+
+ // A DERIVED layout, when this store has one: the rows come from renderCartRows, which needs no
+ // class names at all. The selector-based path below is Dawn's and mis-fires on other themes — a
+ // Horizon store rendered its table HEADER as a product line. See derive-cart-template.ts.
+ if (template && lines.length) {
+  // Locate the theme's row in THIS page by the derived row's own tag and classes, then replace its
+  // parent's children. The parent is the items container whatever the theme calls it.
+  const probe = cheerio.load(template.rowHtml, null, false).root().children().first();
+  const tag = probe.get(0)?.tagName;
+  const cls = (probe.attr("class") || "").trim().split(/\s+/).filter(Boolean);
+  const sel = tag ? `${tag}${cls.length ? "." + cls.map((c) => c.replace(/[^\w-]/g, "")).filter(Boolean).join(".") : ""}` : "";
+  // EVERY container that holds a row, not the first.
+  //
+  // A captured /cart page carries TWO carts: the drawer (which lives in the site header, so it is on
+  // every page) and the cart page itself. Replacing only the first match filled the DRAWER and left
+  // the actual cart page showing the template's product — a shopper saw their own item and a
+  // stranger's side by side. Both are the visitor's cart and both must be rendered.
+  const parents: DomElement[] = [];
+  if (sel) {
+   for (const el of $(sel).toArray() as DomElement[]) {
+    const $el = $(el);
+    // Header rows carry the same class as product rows on some themes; emptying <thead> would put
+    // every cart line inside the table header.
+    if ($el.find("th").length || $el.closest("thead").length) continue;
+    const parent = el.parent as DomElement | null;
+    if (parent && !parents.includes(parent)) parents.push(parent);
+   }
+  }
+  if (!parents.length) {
+   const $fallback = $("#main-cart-items .js-contents, #main-cart-items, .cart__items, cart-items").first();
+   const el = $fallback.get(0) as DomElement | undefined;
+   if (el) parents.push(el);
+  }
+  if (parents.length) {
+   const rows = renderCartRows(template, lines);
+   for (const parent of parents) $(parent).empty().append(rows);
+   applyCartChrome($, lines, checkoutHref);
+   return $.html();
+  }
+ }
+
 
  // The theme's own line-item row, captured from a cart that actually had something in it. Cloning it
  // is the same principle the product grids use: the store's markup already knows its own fonts,
@@ -1196,21 +1420,30 @@ export function injectSqsCartPage(html: string, lines: CartPageLine[], checkoutH
 // cart API, shows a slide-in bag, and checks out via the multi-item Stripe flow.
 const CART_UI = `
 <style>
-#vya-cart-btn{position:fixed;bottom:20px;right:20px;z-index:99997;background:#111;color:#fff;border:none;border-radius:30px;padding:13px 20px;font:600 12px/1 system-ui;letter-spacing:.08em;cursor:pointer;text-transform:uppercase}
+/* VYA's own buy buttons wear the THEME's classes so they look native — which also inherits any
+   decorative layer that class draws. One theme's .push-btn paints a fully-rounded pill via ::after,
+   offset 3px down and -3px left; behind our square button it poked out at every corner and read as
+   a rendering fault. The decoration is the theme's, sized for the theme's own button shape, so it
+   has no business framing ours. */
+[data-vya-add]::before,[data-vya-add]::after,a[href*="/checkout?item="]::before,a[href*="/checkout?item="]::after{content:none!important;display:none!important;background:none!important;box-shadow:none!important}
+/* Hidden when the theme has a cart control of its own — that one opens the drawer instead. Kept as
+   the fallback for a theme where nothing else can, or the bag becomes unreachable. */
+body[data-vya-has-cart-control] #vya-cart-btn{display:none}
+#vya-cart-btn{position:fixed;bottom:64px;right:20px;z-index:99997;background:var(--vya-btn-bg,#111);color:var(--vya-btn-fg,#fff);border:none;border-radius:var(--vya-radius,30px);padding:13px 20px;font:600 12px/1 var(--vya-font,system-ui);letter-spacing:.08em;cursor:pointer;text-transform:uppercase}
 #vya-cart-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99998;display:none}
-#vya-cart-drawer{position:fixed;top:0;right:-420px;width:380px;max-width:90vw;height:100%;background:#fff;color:#111;z-index:99999;transition:right .25s;display:flex;flex-direction:column;box-shadow:-4px 0 30px rgba(0,0,0,.18);font-family:system-ui}
+#vya-cart-drawer{position:fixed;top:0;right:-420px;width:380px;max-width:90vw;height:100%;background:var(--vya-surface,#fff);color:var(--vya-ink,#111);z-index:99999;transition:right .25s;display:flex;flex-direction:column;box-shadow:-4px 0 30px rgba(0,0,0,.18);font-family:var(--vya-font,system-ui)}
 #vya-cart-drawer.open{right:0}
-#vya-cart-drawer .vya-ch{padding:18px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center}
+#vya-cart-drawer .vya-ch{padding:18px;border-bottom:1px solid var(--vya-hair,#eee);display:flex;justify-content:space-between;align-items:center}
 #vya-cart-drawer .vya-items{flex:1;overflow:auto;padding:6px 18px}
-#vya-cart-drawer .vya-it{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid #f2f2f2;align-items:center}
+#vya-cart-drawer .vya-it{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--vya-hair,#f2f2f2);align-items:center}
 #vya-cart-drawer .vya-it img{width:54px;height:70px;object-fit:cover;background:#f4f4f4}
-#vya-cart-drawer .vya-cf{padding:18px;border-top:1px solid #eee}
-#vya-cart-drawer .vya-co{display:block;width:100%;text-align:center;padding:15px;background:#111;color:#fff;border:none;text-transform:uppercase;letter-spacing:.1em;font-size:13px;cursor:pointer}
-#vya-added{position:fixed;top:80px;right:20px;z-index:100000;width:360px;max-width:calc(100vw - 40px);background:#fff;color:#111;border-radius:14px;box-shadow:0 20px 60px -12px rgba(0,0,0,.35);padding:22px;font-family:system-ui;display:none}
+#vya-cart-drawer .vya-cf{padding:18px;border-top:1px solid var(--vya-hair,#eee)}
+#vya-cart-drawer .vya-co{display:block;width:100%;text-align:center;padding:15px;background:var(--vya-btn-bg,#111);color:var(--vya-btn-fg,#fff);border:none;text-transform:uppercase;letter-spacing:.1em;font-size:13px;cursor:pointer}
+#vya-added{position:fixed;top:80px;right:20px;z-index:100000;width:360px;max-width:calc(100vw - 40px);background:var(--vya-surface,#fff);color:var(--vya-ink,#111);border-radius:14px;box-shadow:0 20px 60px -12px rgba(0,0,0,.35);padding:22px;font-family:var(--vya-font,system-ui);display:none}
 #vya-added.open{display:block}
 #vya-added .vya-added-h{display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600;margin-bottom:16px}
 #vya-added .vya-added-h span{display:flex;align-items:center;gap:8px}
-#vya-added .vya-added-h button{background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:#111;padding:2px}
+#vya-added .vya-added-h button{background:none;border:none;font-size:20px;line-height:1;cursor:pointer;color:var(--vya-ink,#111);padding:2px}
 #vya-added .vya-added-row{display:flex;gap:14px;margin-bottom:18px}
 #vya-added .vya-added-row img{width:56px;height:74px;object-fit:cover;background:#f4f4f4;flex-shrink:0}
 #vya-added .vya-added-title{font-size:15px;line-height:1.35}
@@ -1219,6 +1452,48 @@ const CART_UI = `
 #vya-added button.vya-added-continue{display:block;width:100%;text-align:center;background:none;border:none;text-decoration:underline;font-size:13px;cursor:pointer;color:#111}
 </style>
 <button id="vya-cart-btn" onclick="VYACart.open()">Bag &middot; <span id="vya-cart-count">0</span></button>
+<script>/* The theme's OWN cart icon opens our drawer — see bindCartControls. Every hosted store used
+to show two ways to reach the bag (their icon, and our pill) and a shopper could not tell which was
+real. Delegated, so it survives a theme re-rendering its header. */
+document.addEventListener("click",function(e){var c=e.target.closest&&e.target.closest("[data-vya-cart-open]");
+if(!c)return;e.preventDefault();e.stopPropagation();if(window.VYACart)VYACart.open();},true);
+
+/* CAN SHE ACTUALLY REACH HER BAG?
+   The server finds a cart control, binds it, and stamps the body — which hides our floating pill,
+   because two ways to reach the bag confused everybody. On one store the theme then rebuilt its
+   header in JavaScript and the bound control ended up 0x0: no icon of hers a shopper could click,
+   and no pill of ours, because the stamp said she had one. A piece could go into the bag and never
+   come out.
+   So the stamp is re-decided in the browser, where the truth is. Same measurement the account panel
+   uses: size, position, and what is actually at those coordinates — never class names. */
+function vyaCartReachable(){
+ var els=document.querySelectorAll("[data-vya-cart-open]");
+ for(var i=0;i<els.length;i++){
+  var el=els[i],r=el.getBoundingClientRect();
+  if(r.width<4||r.height<4)continue;
+  if(r.bottom<0||r.right<0||r.top>innerHeight||r.left>innerWidth)continue;
+  var st=getComputedStyle(el);
+  if(st.visibility==="hidden"||st.display==="none"||Number(st.opacity)<=0.05)continue;
+  var x=Math.min(Math.max(r.left+r.width/2,1),innerWidth-1);
+  var y=Math.min(Math.max(r.top+r.height/2,1),innerHeight-1);
+  var hit=document.elementFromPoint(x,y);
+  if(hit&&(hit===el||el.contains(hit)||hit.contains(el)))return true;
+ }
+ return false;
+}
+function vyaCartStamp(){
+ if(vyaCartReachable())document.body.setAttribute("data-vya-has-cart-control","1");
+ else document.body.removeAttribute("data-vya-has-cart-control");
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",vyaCartStamp);else vyaCartStamp();
+addEventListener("load",vyaCartStamp);addEventListener("resize",vyaCartStamp);
+/* A header can arrive late — one theme swaps its whole header in on hydration. */
+setTimeout(vyaCartStamp,1500);setTimeout(vyaCartStamp,4000);
+if(window.MutationObserver){var vyaCartPending=0;
+ new MutationObserver(function(){if(vyaCartPending)return;
+  vyaCartPending=setTimeout(function(){vyaCartPending=0;vyaCartStamp()},400);
+ }).observe(document.documentElement,{childList:true,subtree:true});}
+</script>
 <div id="vya-cart-overlay" onclick="VYACart.close()"></div>
 <div id="vya-cart-drawer">
 <div class="vya-ch"><b style="text-transform:uppercase;letter-spacing:.1em;font-size:13px">Your bag</b><span onclick="VYACart.close()" style="cursor:pointer">&times;</span></div>
@@ -1235,9 +1510,14 @@ const CART_UI = `
 <script>
 window.VYACart={
  fmt:function(c,cur){return new Intl.NumberFormat("en-US",{style:"currency",currency:cur||"USD"}).format((c||0)/100)},
- add:function(id){if(!id)return;var s=this;fetch("/api/storefront/cart",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({itemId:id})}).then(function(r){return r.json()}).then(function(d){s.paint(d);s.showAdded(id,d)})},
- refresh:function(){var s=this;fetch("/api/storefront/cart").then(function(r){return r.json()}).then(function(d){s.paint(d)}).catch(function(){})},
- remove:function(id){var s=this;fetch("/api/storefront/cart",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({itemId:id})}).then(function(r){return r.json()}).then(function(d){s.paint(d)})},
+ /* WHICH STORE'S BAG. A shopper has one bag per store. On the seller's own domain the host says
+    which; on VYA's (/site/{slug}/…) there is no host to read, so the page names the store from its
+    own URL. Empty elsewhere, which reads the whole bag exactly as before. */
+ store:function(){var p=location.pathname.split("/");return p[1]==="site"&&p[2]?p[2]:""},
+ q:function(sep){var t=this.store();return t?sep+"store="+encodeURIComponent(t):""},
+ add:function(id){if(!id)return;var s=this;fetch("/api/storefront/cart"+s.q("?"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({itemId:id})}).then(function(r){return r.json()}).then(function(d){s.paint(d);s.showAdded(id,d)})},
+ refresh:function(){var s=this;fetch("/api/storefront/cart"+s.q("?")).then(function(r){return r.json()}).then(function(d){s.paint(d)}).catch(function(){})},
+ remove:function(id){var s=this;fetch("/api/storefront/cart"+s.q("?"),{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({itemId:id})}).then(function(r){return r.json()}).then(function(d){s.paint(d)})},
  paint:function(d){document.getElementById("vya-cart-count").textContent=d.count||0;var box=document.getElementById("vya-cart-items");var it=d.items||[];box.innerHTML=it.length?it.map(function(i){return '<div class="vya-it"><img src="'+(i.image||"")+'"><div style="flex:1"><div style="font-size:13px">'+i.title+'</div><div style="font-size:13px;opacity:.6">'+VYACart.fmt(i.priceCents,i.currency)+'</div></div><span data-vya-remove="'+i.id+'" style="cursor:pointer;opacity:.4">&times;</span></div>'}).join(""):'<p style="opacity:.5;padding:40px 0;text-align:center">Your bag is empty</p>';document.getElementById("vya-cart-sub").textContent=VYACart.fmt(d.subtotalCents,(it[0]&&it[0].currency)||"USD");var ids={};it.forEach(function(i){ids[i.id]=1});document.querySelectorAll("[data-vya-add]").forEach(function(b){if(ids[b.getAttribute("data-vya-add")]){b.textContent="In bag ✓";b.setAttribute("data-inbag","1")}else{b.textContent="Add to cart";b.removeAttribute("data-inbag")}})},
  // A confirmation popup, styled like the theme's own — this is Plan A (scripts stripped, so it's
  // VYA's own bag/checkout UI throughout), where a bare "count went up" is easy to miss and left the
@@ -1246,10 +1526,85 @@ window.VYACart={
  closeAdded:function(){document.getElementById("vya-added").classList.remove("open")},
  open:function(){document.getElementById("vya-cart-drawer").classList.add("open");document.getElementById("vya-cart-overlay").style.display="block";VYACart.closeAdded()},
  close:function(){document.getElementById("vya-cart-drawer").classList.remove("open");document.getElementById("vya-cart-overlay").style.display="none"},
- checkout:function(){location.href="/checkout?cart=1"}
+ checkout:function(){location.href="/checkout?cart=1"+this.q("&")}
 };
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-vya-add]");if(a){e.preventDefault();if(a.getAttribute("data-inbag")){VYACart.open()}else{VYACart.add(a.getAttribute("data-vya-add"))}}var r=e.target.closest&&e.target.closest("[data-vya-remove]");if(r){e.preventDefault();VYACart.remove(r.getAttribute("data-vya-remove"))}});
-window.addEventListener("load",function(){VYACart.refresh();document.querySelectorAll('a[href$="/cart"],a[href*="/cart?"]').forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();VYACart.open()})});document.querySelectorAll('form[action*="/cart"]').forEach(function(f){var card=f.closest('li,[class*="card"],[class*="product"],.grid__item');var link=card&&card.querySelector('a[href*="/products/"]');if(link){f.querySelectorAll('button,[name="add"]').forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();location.href=link.getAttribute("href")})})}})});
+window.addEventListener("load",function(){VYACart.refresh();
+/* THEME COLOURS FOR VYA'S BUY BUTTONS.
+   The theme paints its own Add-to-cart from its stylesheet, which we cannot evaluate on the server —
+   so rebuild a hidden copy of the button we replaced (tag + classes, in data-vya-proto), read what
+   the browser actually paints it, and wear that. Every store used to get the same black button no
+   matter its palette. Falls back silently to the inline default if the theme paints nothing. */
+(function(){
+ /* THE DRAWER WEARS THE STORE'S OWN SKIN.
+    The page itself is the reference: <body> carries the theme's surface colour, ink and typeface,
+    and a heading carries its display face. Read them and hand them to the drawer as CSS variables —
+    every value falls back to what the drawer used before, so a page we cannot read is unchanged. */
+ try{
+  var bs=getComputedStyle(document.body),root=document.documentElement.style,clear2="rgba(0, 0, 0, 0)";
+  var surface=bs.backgroundColor;
+  if(surface===clear2||!surface) surface=getComputedStyle(document.documentElement).backgroundColor;
+  if(surface&&surface!==clear2) root.setProperty("--vya-surface",surface);
+  if(bs.color) root.setProperty("--vya-ink",bs.color);
+  if(bs.fontFamily) root.setProperty("--vya-font",bs.fontFamily);
+  /* A hairline in the page's own ink rather than a fixed grey, so it reads on a dark storefront. */
+  root.setProperty("--vya-hair","color-mix(in srgb, "+(bs.color||"#111")+" 14%, transparent)");
+ }catch(e){}
+
+ var protos={};
+ document.querySelectorAll("[data-vya-proto]").forEach(function(el){
+  var spec=el.getAttribute("data-vya-proto")||"";
+  if(!protos[spec]){
+   var bits=spec.split("|"),ghost=document.createElement(bits[0]||"button");
+   ghost.className=bits.slice(1).join("|");
+   ghost.style.cssText="position:absolute;left:-9999px;top:0;visibility:hidden;pointer-events:none";
+   (el.parentNode||document.body).appendChild(ghost);
+   var c=getComputedStyle(ghost);
+   protos[spec]={bg:c.backgroundColor,fg:c.color,radius:c.borderRadius,border:c.border,font:c.fontFamily,weight:c.fontWeight,tt:c.textTransform,ls:c.letterSpacing};
+   ghost.remove();
+  }
+  var t=protos[spec],clear="rgba(0, 0, 0, 0)";
+  /* rgb(239, 239, 239) is Chrome's UA default for a bare <button>: it means the theme's classes did
+     not style our ghost at all (they often need a parent context to apply). Wearing it would give
+     five stores an unstyled grey button — worse than the black default we started from. */
+  var unstyled=t&&(t.bg===clear||t.bg==="rgb(239, 239, 239)"||t.bg==="buttonface");
+  if(!t||unstyled||!t.bg) return;                  /* theme paints nothing — keep our default */
+  if(el.hasAttribute("data-vya-secondary")){
+   /* Buy now: the same shape, inverted, so the pair reads as primary + secondary in their palette */
+   el.style.setProperty("background",t.fg,"important");
+   el.style.setProperty("color",t.bg,"important");
+   el.style.setProperty("border","1px solid "+t.fg,"important");
+  }else{
+   el.style.setProperty("background",t.bg,"important");
+   el.style.setProperty("color",t.fg,"important");
+   el.style.setProperty("border",t.border&&t.border!=="0px none "+t.fg?t.border:"1px solid "+t.bg,"important");
+  }
+  /* The drawer's Checkout button and floating bag use the same pair, so the whole cart reads as
+     part of the store rather than as a VYA panel dropped on top of it. */
+  if(!el.hasAttribute("data-vya-secondary")){
+   document.documentElement.style.setProperty("--vya-btn-bg",t.bg);
+   document.documentElement.style.setProperty("--vya-btn-fg",t.fg);
+   if(t.radius&&t.radius!=="0px") document.documentElement.style.setProperty("--vya-radius",t.radius);
+  }
+  if(t.radius&&t.radius!=="0px") el.style.setProperty("border-radius",t.radius,"important");
+  if(t.font) el.style.setProperty("font-family",t.font,"important");
+  if(t.weight) el.style.setProperty("font-weight",t.weight,"important");
+  if(t.tt&&t.tt!=="none") el.style.setProperty("text-transform",t.tt,"important");
+  if(t.ls&&t.ls!=="normal") el.style.setProperty("letter-spacing",t.ls,"important");
+ });
+})();
+/* Hide the theme's OWN buy controls wherever VYA has placed one. rewireCommerce replaces the button
+   it can find, but themes carry spares — a sticky bar, a second form, a payment button — and those
+   were left sitting behind ours, peeking out at the edges and looking broken. Scoped to the block
+   that actually contains a VYA button, so a page we did not rewire keeps its own controls. */
+document.querySelectorAll("[data-vya-add]").forEach(function(v){
+ var scope=v.closest("form,[class*='product-form'],[class*='product__info'],[class*='product-info']")||v.parentElement;
+ if(!scope)return;
+ scope.querySelectorAll('[name="add"],button[type="submit"],[class*="payment-button"],[class*="shopify-payment"],[class*="dynamic-checkout"],[class*="additional-checkout"]').forEach(function(b){
+  if(b.hasAttribute("data-vya-add")||b.closest("[data-vya-add]"))return;
+  b.style.setProperty("display","none","important");
+ });
+});document.querySelectorAll('a[href$="/cart"],a[href*="/cart?"]').forEach(function(a){a.addEventListener("click",function(e){e.preventDefault();VYACart.open()})});document.querySelectorAll('form[action*="/cart"]').forEach(function(f){var card=f.closest('li,[class*="card"],[class*="product"],.grid__item');var link=card&&card.querySelector('a[href*="/products/"]');if(link){f.querySelectorAll('button,[name="add"]').forEach(function(b){b.addEventListener("click",function(e){e.preventDefault();location.href=link.getAttribute("href")})})}})});
 </script>`;
 
 // ── Live VYA inventory on captured collection pages ──────────────────────────
@@ -1263,6 +1618,10 @@ export type CollectionCardItem = {
  /** False for a piece that has sold. A vintage store keeps its archive on the shelf with a badge —
   *  hiding sold pieces made a 52-product store look like a 15-product one. */
  available?: boolean;
+ /** Why it cannot be bought, which decides the wording. See app/lib/unavailable-label.ts. */
+ unavailableReason?: string | null;
+ /** What it was before the seller marked it down, when a markdown is running. */
+ compareAtCents?: number | null;
 };
 // Common Shopify/theme selectors for the collection product grid.
 const GRID_SELECTORS = "#product-grid,ul#product-grid,ul.product-grid,.product-grid,ul.grid--view-items,.grid--view-items,.collection ul.grid,ul.collection__products,.product-list,.collection-products,[class*='product-grid'],[id*='ProductGridContainer'] ul";
@@ -1281,6 +1640,23 @@ function looksLikeCard($: cheerio.CheerioAPI, el: DomElement): boolean {
  if ($el.find("img").length === 0) return false;
  if ($el.find("a[href]").length === 0) return false;
  return ($el.text() || "").trim().length > 0;
+}
+
+/**
+ * Does this element look like a PRODUCT card, specifically — not just any tile-shaped thing.
+ *
+ * A marketing slide ("Build a Niche Charms Bracelet", one big photo, a headline, a "Shop now"
+ * button linking to a real product) satisfies looksLikeCard() exactly as well as a real product
+ * does — image, link, non-empty text, all present. That's what let a homepage's promotional hero
+ * carousel get structurally mistaken for a product grid and have its curated slides overwritten
+ * with random live inventory. A product tile, unlike a marketing one, reliably shows its price
+ * somewhere; a hero banner never does. Used only for productGrids()'s own detection — fillGrid()
+ * and friends still use the looser looksLikeCard() to count slots WITHIN a grid already confirmed
+ * to be one, where requiring a visible price would be redundant at best.
+ */
+function looksLikeProductCard($: cheerio.CheerioAPI, el: DomElement): boolean {
+ if (!looksLikeCard($, el)) return false;
+ return MONEY_RE.test($(el).text() || "");
 }
 
 /**
@@ -1330,7 +1706,7 @@ function productGrids($: cheerio.CheerioAPI): DomElement[] {
   // container that literally calls itself a product grid is trusted with one, so a collection
   // holding a single piece — normal for one-of-one vintage — still renders in the theme's layout.
   if (kids.length < (named ? 1 : 2)) return;
-  const cards = kids.filter((k) => looksLikeCard($, k)).length;
+  const cards = kids.filter((k) => looksLikeProductCard($, k)).length;
   // Most of the container's children must be cards, so a page wrapper that happens to contain a
   // grid doesn't qualify on the strength of its one grid child. Three is the confident threshold;
   // two is accepted only when the container also NAMES itself a product grid, which keeps small
@@ -1378,14 +1754,8 @@ export function detectGridHandles(html: string): (string | null)[] {
  * reads those handles back out so the caller can ask for those items LIVE — correct AND current,
  * not the frozen capture.
  */
-export function capturedGridProductHandles(html: string): string[] {
- const $ = cheerio.load(html);
- const grids = productGrids($);
- // A dedicated /collections/{handle} page has exactly one real product grid; a homepage can have
- // several, and this reader isn't the right tool for that case (see detectGridHandles instead) —
- // pick the biggest so a small "you may also like" strip elsewhere on the page can't outrank it.
- const grid = grids.sort((a, b) => $(b).find('a[href*="/products/"]').length - $(a).find('a[href*="/products/"]').length)[0];
- if (!grid) return [];
+/** The `/products/{handle}` links inside ONE grid element, in document order, deduplicated. */
+function handlesInGrid($: cheerio.CheerioAPI, grid: DomElement): string[] {
  const seen = new Set<string>();
  const handles: string[] = [];
  $(grid).find('a[href*="/products/"]').each((_, a) => {
@@ -1395,6 +1765,35 @@ export function capturedGridProductHandles(html: string): string[] {
   if (handle && !seen.has(handle)) { seen.add(handle); handles.push(handle); }
  });
  return handles;
+}
+
+export function capturedGridProductHandles(html: string): string[] {
+ const $ = cheerio.load(html);
+ const grids = productGrids($);
+ // A dedicated /collections/{handle} page has exactly one real product grid; a homepage can have
+ // several, and this reader isn't the right tool for that case (see capturedGridProductHandlesPerGrid
+ // instead) — pick the biggest so a small "you may also like" strip elsewhere on the page can't
+ // outrank it.
+ const grid = grids.sort((a, b) => $(b).find('a[href*="/products/"]').length - $(a).find('a[href*="/products/"]').length)[0];
+ return grid ? handlesInGrid($, grid) : [];
+}
+
+/**
+ * The same reader as capturedGridProductHandles(), but for EVERY grid on the page, in the SAME
+ * document order productGrids() (and so detectGridHandles()) finds them in — so the two arrays can
+ * be zipped together index-for-index.
+ *
+ * Built for a homepage carousel whose collection detectGridHandles() can't name: a modern
+ * "collection focus carousel" section picks its products via Liquid (`collections['x'].products`),
+ * which compiles away to plain `/products/{handle}` links with no `/collections/{handle}` link left
+ * anywhere nearby for detectGridHandles() to find — "Shop Designer Bags" rendered nine real bags,
+ * and there was still nothing in the HTML naming which collection they came from. The captured grid
+ * still knows exactly which products it showed, same as a dedicated collection page does; this
+ * reads those back out per-grid so the caller can ask for THOSE, live, before falling back further.
+ */
+export function capturedGridProductHandlesPerGrid(html: string): string[][] {
+ const $ = cheerio.load(html);
+ return productGrids($).map((grid) => handlesInGrid($, grid));
 }
 
 /** Replace EVERY product grid on the page, each with its own list of live items (index-matched to
@@ -1414,6 +1813,85 @@ export function injectLiveGrids(html: string, perGrid: CollectionCardItem[][], h
   fillGrid($, el, slots > 0 ? items.slice(0, slots) : items, hrefFor, opts.keepQuickAdd);
  });
  return $.html();
+}
+
+/**
+ * Refill ONE captured product grid, keeping every scrap of markup around it.
+ *
+ * injectLiveGrids() above works on a whole captured PAGE; this works on a FRAGMENT the theme
+ * rendered for itself — a "You may also like" strip fetched from the source store's own
+ * `/recommendations/products` (see app/api/plan-b/recommendations). The fragment carries the
+ * section wrapper, its colour scheme, its heading and its grid, all in the theme's own classes, so
+ * cloning it and swapping in live pieces is the only way that strip can look like the rest of the
+ * store instead of like markup we invented.
+ *
+ * Parsed as a FRAGMENT (cheerio's third argument), so nothing is wrapped in an <html>/<body> that
+ * would then have to be unwrapped from the response the theme morphs into its page.
+ *
+ * Returns null when the fragment holds no grid we recognise — the caller then has to render its
+ * own cards, which is the situation this function exists to avoid but never a reason to serve a
+ * broken strip.
+ */
+export function fillCapturedGrid(fragmentHtml: string, items: CollectionCardItem[], hrefFor: HrefFor, opts: { keepQuickAdd?: boolean } = {}): string | null {
+ if (!items.length) return null;
+ const $ = cheerio.load(fragmentHtml, null, false);
+ const grid = productGrids($)[0];
+ if (!grid) return null;
+ fillGrid($, grid, items, hrefFor, opts.keepQuickAdd);
+ return $.html();
+}
+
+/** A card's add-to-cart control, whatever the theme calls it. */
+function quickAddButton($: cheerio.CheerioAPI, $card: cheerio.Cheerio<DomElement>): cheerio.Cheerio<DomElement> {
+ return $card.find("button[name='add'], [class*='quick-add__submit'], form button[type='submit']").first() as cheerio.Cheerio<DomElement>;
+}
+
+/** Where a button's visible wording lives — never its spinner, its screen-reader copy, or the
+ *  hidden "sold out" span themes keep beside the label to swap in later. */
+function buttonLabelEl($: cheerio.CheerioAPI, $btn: cheerio.Cheerio<DomElement>): cheerio.Cheerio<DomElement> {
+ const hiddenish = /hidden|sold-out-message|spinner|visually-hidden|sr-only|icon|svg/i;
+ const leaf = ($btn.find("span, div").toArray() as DomElement[]).find((el) => {
+  if (hiddenish.test($(el).attr("class") || "")) return false;
+  return $(el).children().length === 0 && ($(el).text() || "").trim().length > 0;
+ });
+ return (leaf ? $(leaf) : $btn.children().length === 0 ? $btn : $()) as cheerio.Cheerio<DomElement>;
+}
+
+/** Write a button's visible wording without disturbing the spinner, icon or screen-reader copy
+ *  the theme keeps beside it. */
+function setButtonLabel($: cheerio.CheerioAPI, $btn: cheerio.Cheerio<DomElement>, text: string): void {
+ const $label = buttonLabelEl($, $btn);
+ if ($label.length) $label.text(text);
+ else if ($btn.children().length === 0) $btn.text(text);
+}
+
+/**
+ * The two words THIS theme puts on a card's add button, read off the captured grid itself.
+ *
+ * Never invented. A clone can only carry the state of the ONE card it was made from, so on a store
+ * whose archive is mostly sold (106 of 109, on the store this was found on) every buyable piece
+ * offered a dead "Sold out" button. The grid prints both states itself — one card is disabled and
+ * one is not — and Dawn-family themes even ship the sold wording hidden inside every button, ready
+ * to swap in. Reading them keeps a French store's buttons in French.
+ */
+function quickAddLabels($: cheerio.CheerioAPI, cards: DomElement[]): { add?: string; sold?: string } {
+ const labels: { add?: string; sold?: string } = {};
+ for (const card of cards) {
+  const $btn = quickAddButton($, $(card) as cheerio.Cheerio<DomElement>);
+  if (!$btn.length) continue;
+  const text = (buttonLabelEl($, $btn).text() || "").replace(/\s+/g, " ").trim();
+  const disabled = $btn.attr("disabled") !== undefined || $btn.attr("aria-disabled") === "true";
+  if (text && !(disabled ? labels.sold : labels.add)) {
+   if (disabled) labels.sold = text; else labels.add = text;
+  }
+  // The wording a theme hides inside the button for its own JS to reveal — a second source for the
+  // sold state, and the only one on a grid where nothing happens to be sold.
+  if (!labels.sold) {
+   const hidden = ($btn.find("[class*='sold-out-message']").first().text() || "").replace(/\s+/g, " ").trim();
+   if (hidden) labels.sold = hidden;
+  }
+ }
+ return labels;
 }
 
 /**
@@ -1446,6 +1924,8 @@ function fillGrid($: cheerio.CheerioAPI, gridEl: DomElement, items: CollectionCa
   $grid.replaceWith(liveGridHtml(items, hrefFor));
   return themePageSize;
  }
+ // Both states of the theme's own add button, taken from the grid BEFORE it is refilled.
+ const labels = quickAddLabels($, cardChildren);
  // Mirror the theme's own price formatting (e.g. "$550.00 USD" vs "$550") rather than imposing ours.
  const samplePrice = findPriceText($, $template);
  const decimals = /[.,]\d{2}\b/.test(samplePrice) ? 2 : 0;
@@ -1469,8 +1949,8 @@ function fillGrid($: cheerio.CheerioAPI, gridEl: DomElement, items: CollectionCa
  const inPlace = slotsAreIndividuallyStyled($, cardChildren);
  items.forEach((it, i) => {
   const slot = inPlace ? cardChildren[i] : undefined;
-  if (slot) renderThemeCard($, $(slot), it, decimals, showCode, hrefFor, [], keepQuickAdd, true);
-  else $grid.append(renderThemeCard($, $cloneSource, it, decimals, showCode, hrefFor, identityIds, keepQuickAdd));
+  if (slot) renderThemeCard($, $(slot), it, decimals, showCode, hrefFor, [], keepQuickAdd, true, labels);
+  else $grid.append(renderThemeCard($, $cloneSource, it, decimals, showCode, hrefFor, identityIds, keepQuickAdd, false, labels));
  });
  // Captured cards nothing live was written into are frozen products — quite possibly sold ones.
  // They go, but their inlined stylesheets are hoisted out first: a capture inlines each stylesheet
@@ -1610,9 +2090,31 @@ function cardTitleEl($: cheerio.CheerioAPI, $card: cheerio.Cheerio<DomElement>):
  }).first();
  if ($ariaHidden.length) return $ariaHidden as cheerio.Cheerio<DomElement>;
  const links = $card.find("a[href]").toArray() as DomElement[];
- const best = links.map((a) => $(a)).filter(($a) => ($a.text() || "").trim().length > 1)
+ const candidates = links.map((a) => $(a)).filter(($a) => ($a.text() || "").trim().length > 1);
+ // A link that WRAPS THE CARD'S PHOTO is never the title element — even when it carries the exact
+ // same text. Palo Alto puts a visually-hidden copy of the product name inside the image link for
+ // screen readers, so both links measured the same length (66 chars), the sort tie broke toward
+ // document order, and the image link won. Writing the name into it with .text() then replaced
+ // `<deferred-loading><figure><img>` with a bare string — and the leftover-image sweep removed
+ // what was left, so every card on every collection page rendered as a text link with no photo.
+ // Text-only links are preferred; a media link is still allowed if the card offers nothing else.
+ const holdsMedia = ($a: cheerio.Cheerio<DomElement>) => $a.find("img, picture, svg, figure, video").length > 0;
+ const textOnly = candidates.filter(($a) => !holdsMedia($a));
+ const pool = textOnly.length ? textOnly : candidates;
+ const best = pool.sort((a, b) => (b.text() || "").trim().length - (a.text() || "").trim().length)[0];
+ if (!best) return $card.find("__none__") as cheerio.Cheerio<DomElement>;
+ // Prestige-family themes wrap the photo, the name AND the price in ONE link, so there is no
+ // text-only link to prefer. The name is a LEAF inside it — descend to that leaf instead of
+ // returning the link, or the caller writes the title over the whole thing and the photo goes with
+ // it. A class hint picks the name over the price; length only breaks a tie between unhinted leaves.
+ if (!holdsMedia(best)) return best;
+ const leaves = (best.find("*").toArray() as DomElement[]).map((e) => $(e)).filter(($e) =>
+  $e.children().length === 0 && !holdsMedia($e) && ($e.text() || "").trim().length > 1);
+ if (!leaves.length) return best;
+ const hinted = leaves.filter(($e) => /title|name|heading/i.test($e.attr("class") || ""));
+ const inner = (hinted.length ? hinted : leaves)
   .sort((a, b) => (b.text() || "").trim().length - (a.text() || "").trim().length)[0];
- return (best || $card.find("__none__")) as cheerio.Cheerio<DomElement>;
+ return (inner || best) as cheerio.Cheerio<DomElement>;
 }
 
 /** Replace every remaining text node equal to some stale value (the template's product name or
@@ -1626,8 +2128,15 @@ function replaceLeftoverText($: cheerio.CheerioAPI, $card: cheerio.Cheerio<DomEl
  if (!want) return;
  $card.find("*").addBack().contents().each((_: number, node: any) => {
   if (node.type !== "text" || !node.data) return;
-  if (node.data.replace(/\s+/g, " ").trim() !== want) return;
-  node.data = newText;
+  const text = node.data.replace(/\s+/g, " ").trim();
+  if (text === want) { node.data = newText; return; }
+  // The same value with nothing but punctuation around it — a theme's screen-reader suffix reads
+  // ", Versailles Tank Top" after its button label. Not an exact match, so the test above misses it,
+  // and every cloned card then ANNOUNCES the template's product no matter which piece it shows.
+  // Deliberately narrow: anything left over besides punctuation means this is prose, not a label.
+  if (text.includes(want) && !text.split(want).join("").replace(/[\s,.;:·|—–-]/g, "")) {
+   node.data = text.split(want).join(newText);
+  }
  });
  // Alt text on the theme's image is the same story.
  $card.find("img[alt]").each((_: number, el: any) => {
@@ -1636,6 +2145,46 @@ function replaceLeftoverText($: cheerio.CheerioAPI, $card: cheerio.Cheerio<DomEl
 }
 
 /** Clone one theme card and substitute a live item's content into it. */
+/**
+ * Recompute — or remove — any discount the theme's card template asserts.
+ *
+ * Only claims that are arithmetic about a piece: "50% off", "-30%", "Save $40". Anything else the
+ * card says is the seller's own wording and is none of our business.
+ */
+export function restateDiscountClaims(
+ $: cheerio.CheerioAPI,
+ $card: cheerio.Cheerio<DomElement>,
+ it: CollectionCardItem,
+): void {
+ // A piece with no price of its own can back no claim at all.
+ const price = it.priceCents ?? 0;
+ const was = it.compareAtCents ?? 0;
+ const off = price > 0 && was > price ? Math.round(((was - price) / was) * 100) : 0;
+ const PERCENT = /(?:-\s*)?\d{1,3}\s*%\s*(?:off|discount)?/i;
+ const SAVE = /save\s*[$£€]\s?\d[\d,]*(?:\.\d{2})?/i;
+
+ for (const el of $card.find("*").toArray() as DomElement[]) {
+  const $el = $(el);
+  if ($el.children().length) continue; // only the leaf that holds the words
+  const text = ($el.text() || "").trim();
+  if (!text) continue;
+  const isPercent = PERCENT.test(text) && /%/.test(text);
+  const isSave = SAVE.test(text);
+  if (!isPercent && !isSave) continue;
+  if (!off) {
+   // Nothing behind the claim. Remove the badge itself where the whole element is the claim, so a
+   // theme that styles it as a coloured pill does not leave an empty pill behind.
+   const $target = ($el.parent().children().length === 1 && ($el.parent().text() || "").trim() === text)
+    ? $el.parent() : $el;
+   $target.remove();
+   continue;
+  }
+  // Genuinely reduced: keep her design, restate the number. The surrounding words are hers.
+  $el.text(isSave ? text.replace(/[$£€]\s?\d[\d,]*(?:\.\d{2})?/, money(was - price, it.currency))
+   : text.replace(/\d{1,3}\s*%/, `${off}%`));
+ }
+}
+
 function renderThemeCard(
  $: cheerio.CheerioAPI,
  $template: cheerio.Cheerio<DomElement>,
@@ -1649,6 +2198,8 @@ function renderThemeCard(
   *  keeps its own id, wrapper class and inlined <style>, which is what any per-slot CSS is written
   *  against; nothing about it is duplicated, so none of the de-duplication below applies. */
  inPlace = false,
+ /** The theme's own wording for each state of the add button — see quickAddLabels(). */
+ labels: { add?: string; sold?: string } = {},
 ): cheerio.Cheerio<DomElement> {
  const $card = (inPlace ? $template : $template.clone()) as cheerio.Cheerio<DomElement>;
  // Never duplicate a stylesheet per card. The card's own <style> survives an in-place fill (it may
@@ -1656,6 +2207,17 @@ function renderThemeCard(
  // product's data, which the theme's own JS would happily render back over the live piece.
  if (inPlace) $card.find("script").remove();
  else $card.find("style, link, script").remove();
+ // THE THEME'S ARITHMETIC ABOUT A DIFFERENT PIECE.
+ //
+ // chill-boutique's homepage carried eight "50% OFF" badges on our copy. Her sale rail is a
+ // filtered view of genuinely half-price pieces; we fill the same template with OUR items and left
+ // her badge sitting on top of them. One card read "50% OFF · Derek Lam Navy Shirt · $100 · $495"
+ // — eighty percent off. We were inventing a price claim on somebody else's storefront.
+ //
+ // A badge that makes no numeric claim ("New in", "Last one", "Sale") is her language about the
+ // rail and is left exactly as it is. Only arithmetic is restated: recomputed from THIS piece when
+ // it is genuinely reduced, and removed when it is not.
+ restateDiscountClaims($, $card, it);
  // Give this clone its OWN copy of every identity id the template repeats (data-product-id etc. —
  // see identityIdsIn()), BEFORE anything else touches the card. Left as the template's own values,
  // every cloned card claims to BE the template's product to any theme whose JS keys behavior off
@@ -1689,8 +2251,36 @@ function renderThemeCard(
  // re-run per card; strip both. An in-place slot owns its id already — stripping it there is what
  // detached every per-slot CSS rule the capture came with.
  if (!inPlace) {
-  $card.find("[id]").removeAttr("id");
-  $card.removeAttr("id").removeAttr("data-cascade").removeAttr("style");
+  // Every id on the clone becomes a UNIQUE synthetic id, and every attribute that pointed at the old
+  // id is rewritten to the new one — never merely dropped. Dropping the reference was this
+  // morning's fix, and it was wrong for Palo Alto: that theme's reveal is not AOS's own observer
+  // but its own, keyed on `data-aos-anchor="#<card id>"` — it watches the card and reveals the
+  // children anchored to it. With the id gone and the anchor gone, the link is gone, and the media
+  // wrapper (`hover-slideshow`, the element that actually holds the photo) sat at opacity 0.001
+  // on every card of every theme-matched grid while the CARD measured visible. Found by a full-tree
+  // computed-style diff against the live source; the same rewrite keeps ARIA relationships intact.
+  const idMap = new Map<string, string>();
+  // Selector-safe: keep the theme's own prefix and append a per-item suffix. A purely numeric id
+  // (what the product-id substitute produces) is not a valid `#selector`, and the theme's observer
+  // resolves anchors with querySelector — so it would throw on the very id meant to reveal the card.
+  const suffix = String(it.id).replace(/[^a-z0-9]/gi, "").slice(0, 10) || "x";
+  const renameId = (el: any) => {
+   const v = $(el).attr("id"); if (!v) return;
+   const next = `${v}--vya-${suffix}`; idMap.set(v, next); $(el).attr("id", next);
+  };
+  renameId($card.get(0));
+  $card.find("[id]").each((_: number, el: any) => renameId(el));
+  $card.removeAttr("data-cascade").removeAttr("style");
+  for (const attr of ["data-aos-anchor", "aria-controls", "aria-labelledby", "aria-describedby", "for"]) {
+   $card.find(`[${attr}]`).addBack(`[${attr}]`).each((_: number, el: any) => {
+    const raw = $(el).attr(attr) || "";
+    const next = raw.split(/\s+/).filter(Boolean).map((tok) => {
+     const hash = tok.startsWith("#"); const key = hash ? tok.slice(1) : tok; const to = idMap.get(key);
+     return to ? (hash ? "#" + to : to) : tok;
+    }).join(" ");
+    if (next !== raw) $(el).attr(attr, next);
+   });
+  }
  }
 
  // Image: keep the theme's <img> (and its classes/sizing), just point it at the live photo.
@@ -1730,8 +2320,18 @@ function renderThemeCard(
  const $title = cardTitleEl($, $card);
  if ($title.length) {
   const $link = $title.find("a").first();
-  if ($link.length) $link.attr("href", href).text(it.title || "");
-  else $title.text(it.title || "");
+  const $target = ($link.length ? $link : $title) as cheerio.Cheerio<DomElement>;
+  if ($link.length) $link.attr("href", href);
+  // .text() REPLACES every child, so it must never be aimed at an element holding the card's
+  // media. cardTitleEl() now avoids picking one, but a theme can still nest an image inside the
+  // heading itself — so the write is guarded here too rather than trusting the selector. The
+  // element's stale name is still corrected: replaceLeftoverText() runs just below and swaps text
+  // nodes only, which is the non-destructive way to relabel markup we don't own.
+  if ($target.find("img, picture, svg, figure, video").length) {
+   replaceLeftoverText($, $target, templateTitle, it.title || "");
+  } else {
+   $target.text(it.title || "");
+  }
  }
  // Sweep up any OTHER copy of the template's title still sitting in the card (Dawn keeps a second,
  // visually-hidden heading; other themes duplicate it for a hover overlay). Without this every card
@@ -1766,8 +2366,19 @@ function renderThemeCard(
  // the title sweep above. Seen live: a hidden quick-view panel duplicating the card's price, left
  // showing the template product's price on every single card regardless of which real item it held.
  if (templatePriceText) replaceLeftoverText($, $card, templatePriceText, priceText);
- // Sale/compare-at markup has no live equivalent and would show a phantom discount.
+ // The captured card's own sale markup describes the TEMPLATE product, so it goes — a discount we
+ // cannot vouch for is a phantom one.
  $card.find("[class*='price__sale'], [class*='compare-at'], s, del").remove();
+ // …and the markdown THIS piece is actually running goes back in. The seller's grid shows "$645"
+ // struck from "$675"; ours showed a flat $645, so a shopper never saw the markdown at all. Taken
+ // from the same feed read as the price, so unlike a compare-at frozen at capture time it is a
+ // discount we can stand behind. bag-crush alone has 73 pieces on sale.
+ if (it.compareAtCents != null && it.priceCents != null && it.compareAtCents > it.priceCents) {
+  const was = moneyLike(it.compareAtCents, it.currency, decimals, showCode);
+  const $target = $price.length ? $price : $card.find(".vya-price").first();
+  const pill = `<s data-vya-compare-at="1" style="opacity:.55;margin-left:.5em;font:inherit">${escHtml(was)}</s>`;
+  if ($target.length) $target.after(pill); else $card.append(pill);
+ }
 
  // Quick-add forms POST directly to /cart/add — a real, classic Shopify form, server-rendered right
  // into the card (NOT fetched lazily on hover as an earlier version of this comment assumed — that
@@ -1776,8 +2387,21 @@ function renderThemeCard(
  // bridge exists (/api/plan-b/cart/add) and resolves an item by sourceId, then variants[].
  // sourceVariantId, then its own VYA uuid (see findItemByVariantId) — so the form's hidden variant
  // field just needs THIS item's own identity, not a real platform variant id we don't track.
- const showQuickAdd = keepQuickAdd && it.available !== false; // never offer to add a sold piece
- if (!showQuickAdd) {
+ const $submit = quickAddButton($, $card);
+ // A SOLD piece keeps the theme's own sold-out button — disabled, in the theme's own words — which
+ // is exactly what the source store shows. Deleting the form instead (what this used to do) left
+ // half the grid with a button and half without, ragged and unlike the shop it mirrors. Only when
+ // the theme never told us its sold wording does the control go rather than lie about the state.
+ const soldButton = keepQuickAdd && it.available === false && Boolean(labels.sold) && $submit.length > 0;
+ const showQuickAdd = keepQuickAdd && it.available !== false; // never offer to ADD a sold piece
+ if (soldButton) {
+  setButtonLabel($, $submit, labels.sold as string);
+  $submit.attr("disabled", "disabled").attr("aria-disabled", "true");
+  // Belt and braces: a disabled control cannot submit, and the bridge refuses a sold item anyway,
+  // but the form must not be one stray click from posting either.
+  $card.find("form").attr("onsubmit", "return false");
+  $card.find("input[name='id'], [ref='variantId']").attr("value", it.sourceId || it.id);
+ } else if (!showQuickAdd) {
   $card.find("form").remove();
   $card.find("[class*='quick-add'], quick-add-modal").remove();
  } else {
@@ -1798,6 +2422,11 @@ function renderThemeCard(
   // sold) belongs to THAT product — this one is confirmed available (showQuickAdd), so nothing here
   // should still say otherwise.
   $card.find("input[name='id'], button[type='submit']").removeAttr("disabled");
+  $submit.removeAttr("disabled").removeAttr("aria-disabled");
+  // …including what it SAYS. The template's product decided that wording, and on an archive store
+  // the card cloned is nearly always a sold one — which is how every buyable piece came to offer a
+  // "Sold out" button.
+  if (labels.add) setButtonLabel($, $submit, labels.add);
   // The button's default ("Add") state has a text span but no icon in the CAPTURED markup on either
   // the real site or ours — this theme sources it from somewhere neither a static fetch nor its own
   // CSS/JS bundles reveal (likely stamped in at their build step, not shipped as a runtime asset).
@@ -1825,6 +2454,11 @@ function renderThemeCard(
     .replace(/--quick-add-mobile-display:\s*[a-z]+/gi, "--quick-add-mobile-display: flex"));
   });
  }
+ // The price wrapper carries the TEMPLATE product's availability too (Dawn-family themes grey a
+ // sold price with `price--sold-out`). Only ever removed, never added: the class is the theme's to
+ // invent, and a card cloned from an available product never showed us what it is called.
+ if (it.available !== false) $card.find("[class*='price--sold-out']").removeClass("price--sold-out");
+
  // The template's own badge belongs to the TEMPLATE's product, so it goes — unless this item is
  // sold, in which case the badge is exactly what we want to reuse (handled just below).
  if (it.available !== false) $card.find("[class*='badge']").remove();
@@ -1833,6 +2467,9 @@ function renderThemeCard(
  // archive is part of how people browse. Reuse the theme's own badge if the card has one so it
  // looks native; otherwise add a plain one that inherits type and colour.
  if (it.available === false) {
+  // "Sold out" only when the seller's platform said so; a piece that merely vanished from their
+  // feed says "No longer available", because we cannot evidence a sale. See unavailableLabel.
+  const goneLabel = unavailableLabel(it.unavailableReason);
   // The theme nests a STYLED PILL inside a positioning wrapper:
   //   <div class="card__badge bottom left"><span class="badge badge--bottom-left …">Sold out</span></div>
   // Both match `[class*='badge']`, and writing text into the outer one destroys the inner span —
@@ -1840,14 +2477,14 @@ function renderThemeCard(
   const badges = $card.find("[class*='badge']").toArray() as DomElement[];
   const innermost = badges.find((b) => $(b).find("[class*='badge']").length === 0);
   const $badge = innermost ? $(innermost) : $();
-  if ($badge.length) $badge.text("Sold out").removeClass("hidden").css("display", "");
+  if ($badge.length) $badge.text(goneLabel).removeClass("hidden").css("display", "");
   else if (badges.length) {
    // A wrapper with no pill inside (the template's product wasn't sold). Borrow a real badge from
    // elsewhere on the page so it carries the theme's own styling rather than ours.
    const donor = $("[class*='badge']").toArray().find((b) => $(b).find("[class*='badge']").length === 0 && ($(b).text() || "").trim().length > 0);
    const $pill = donor
-    ? ($(donor).clone() as cheerio.Cheerio<DomElement>).text("Sold out").removeClass("hidden")
-    : $(`<span class="badge">Sold out</span>`);
+    ? ($(donor).clone() as cheerio.Cheerio<DomElement>).text(goneLabel).removeClass("hidden")
+    : $(`<span class="badge">${escHtml(goneLabel)}</span>`);
    $(badges[badges.length - 1]).empty().append($pill).removeClass("hidden").css("display", "");
   } else {
    // The PRIMARY image specifically, not "the first img in the card" — the alternate hover-swap
@@ -1858,7 +2495,7 @@ function renderThemeCard(
    // own responsive images (Editions marks them `data-rimg`) drop the photo entirely — every sold
    // card rendered as an empty tile with a badge floating above it. Position is CSS's job anyway.
    ($media.length ? $media : $card).append(
-    '<span data-vya-sold style="position:absolute;bottom:10px;left:10px;z-index:2;font:inherit;font-size:12px;letter-spacing:.06em;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;padding:6px 14px;line-height:1">Sold out</span>',
+    `<span data-vya-sold style="position:absolute;bottom:10px;left:10px;z-index:2;font:inherit;font-size:12px;letter-spacing:.06em;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;padding:6px 14px;line-height:1">${escHtml(goneLabel)}</span>`,
    );
    // Anchor the badge WITHOUT an inline `position:relative` on the host. An inline style beats the
    // theme's stylesheet, and Editions positions this very element `absolute` to fill a
@@ -1895,7 +2532,18 @@ export function liveGridHtml(items: CollectionCardItem[], hrefFor: HrefFor): str
   const media = img
    ? `<img src="${escHtml(img)}" alt="${escHtml(it.title || "")}" loading="lazy" style="display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:#f2f0eb">`
    : `<div style="aspect-ratio:3/4;background:#f2f0eb">&nbsp;</div>`;
-  return `<div style="font-family:inherit;color:inherit"><a href="${escHtml(hrefFor(it))}" style="text-decoration:none;color:inherit">${media}<div style="font-size:14px;margin-top:9px;line-height:1.3">${escHtml(it.title || "")}</div><div style="font-size:14px;opacity:.7;margin:2px 0 9px">${money(it.priceCents, it.currency)}</div></a></div>`;
+  // Sold pieces are badged HERE too, not just in the theme-card path. This grid renders whenever a
+  // theme's own card can't be matched — three stores in the corpus, and individual collections on
+  // stores that otherwise match — and it ignored `available` entirely, so those pages showed a sold
+  // archive as if every piece were still buyable. A vintage archive is part of browsing; the badge
+  // is what makes it honest.
+  const soldBadge = it.available === false
+   ? `<span data-vya-sold style="position:absolute;bottom:10px;left:10px;z-index:2;font:inherit;font-size:12px;letter-spacing:.06em;border-radius:999px;background:rgba(0,0,0,.75);color:#fff;padding:6px 14px;line-height:1">${escHtml(unavailableLabel(it.unavailableReason))}</span>`
+   : "";
+  const wasPrice = it.compareAtCents != null && it.priceCents != null && it.compareAtCents > it.priceCents
+   ? `<s data-vya-compare-at="1" style="opacity:.55;margin-left:.5em">${escHtml(money(it.compareAtCents, it.currency))}</s>`
+   : "";
+  return `<div style="font-family:inherit;color:inherit"><a href="${escHtml(hrefFor(it))}" style="text-decoration:none;color:inherit"><span style="display:block;position:relative">${media}${soldBadge}</span><div style="font-size:14px;margin-top:9px;line-height:1.3">${escHtml(it.title || "")}</div><div style="font-size:14px;opacity:.7;margin:2px 0 9px">${money(it.priceCents, it.currency)}${wasPrice}</div></a></div>`;
  }).join("");
  return `<div data-vya-collection="1" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:26px;padding:26px 0;font-family:inherit;color:inherit">${cards}</div>`;
 }
@@ -2032,7 +2680,7 @@ export function injectCollectionItems(
  html: string,
  items: CollectionCardItem[],
  hrefFor: HrefFor = (it) => `/products/${it.id}`,
- opts: { page?: number; path?: string; keepQuickAdd?: boolean; renderEmpty?: boolean } = {},
+ opts: { page?: number; path?: string; keepQuickAdd?: boolean; renderEmpty?: boolean; source?: CollectionSource } = {},
 ): string {
  // An empty list means one of two OPPOSITE things, and conflating them shows shoppers false stock.
  //   • no live data for this collection  → leave the captured grid alone (the default)
@@ -2043,8 +2691,11 @@ export function injectCollectionItems(
  if (!items.length) {
   if (!opts.renderEmpty) return html;
   const $empty = cheerio.load(html);
+  // Stamped before the early return below: "this collection is empty" is a decision we made, and it
+  // is just as true on a page that never had a grid to clear.
+  stampCollectionSize($empty, 0, "empty");
   const gridsE = productGrids($empty);
-  if (!gridsE.length) return html;
+  if (!gridsE.length) return $empty.html();
   const cardCountE = (el: DomElement) => ($empty(el).children().toArray() as DomElement[]).filter((k) => looksLikeCard($empty, k)).length;
   const mainE = gridsE.reduce((best, g) => (cardCountE(g) > cardCountE(best) ? g : best), gridsE[0]);
   // The CARDS go, not the container's contents wholesale: a grid can hold more than cards (a
@@ -2091,15 +2742,53 @@ export function injectCollectionItems(
    if (!/^\s*\d+\s+products?\s*$/i.test(node.data)) return;
    node.data = node.data.replace(/\d+/, String(items.length));
   });
+  stampCollectionSize($, items.length, opts.source ?? "unknown");
  } else {
   const fallback = liveGridHtml(items, hrefFor);
   // Fallback: remove any static product grids, drop the live grid after the page heading.
   $(GRID_SELECTORS).remove();
   const $host = $("main").first().length ? $("main").first() : $("body").first();
   const $h = $host.find("h1,h2").first();
-  if ($h.length) $h.after(fallback); else $host.prepend(fallback);
+  // AFTER THE HEADING'S BLOCK, not after the heading. hachi-archive's /collections/prada rendered
+  // one product per row and 36,000px tall: its theme puts the title in a narrow `col-span-section-
+  // title` column, our grid became that column's second child, and `auto-fill minmax(240px,1fr)`
+  // in a narrow column is one column. The heading tells us WHERE, not what to sit inside — so we
+  // climb out to the section it belongs to and place the grid after that, at the page's own width.
+  // Prefer the theme's own page-width wrapper: dropping the grid after the whole SECTION works but
+  // leaves it flush to the window edge, without the gutter every other row on the page has.
+  const $wrap = $h.length ? ($h.closest(".wrapper, .page-width, .container, .site-width") as cheerio.Cheerio<DomElement>) : $h;
+  const $block = $h.length ? ($h.closest("section, .shopify-section, [id^='shopify-section']") as cheerio.Cheerio<DomElement>) : $h;
+  if ($wrap.length) $wrap.append(fallback);
+  else if ($block.length) $block.after(fallback);
+  else if ($h.length) $h.after(fallback);
+  else $host.prepend(fallback);
+  stampCollectionSize($, items.length, opts.source ?? "unknown");
  }
  return $.html();
+}
+
+/**
+ * Where a collection page's contents came from. A page serving the seller's own filing must match
+ * that filing exactly; one serving what the captured page showed (because we could not read the
+ * collection from their store) legitimately differs from it, and must not be reported as a fault.
+ */
+export type CollectionSource = "filed" | "captured" | "empty" | "unknown";
+
+/**
+ * State, in the page itself, how many pieces this rail holds.
+ *
+ * The theme's own "N products" text cannot be a check's ground truth: we rewrite it, plenty of
+ * themes never print it (shop-vintage-charm prints nothing), and a label reading 401 on a 94-piece
+ * rail is honestly reporting a page that is wrong. Until this existed, every check compared our
+ * DATABASE with the seller's site and nothing compared the PAGE we actually serve — which is how a
+ * Dresses rail went out holding 401 pieces against the seller's 81 while the store graded clean.
+ * scripts/parity-check.mts reads this and fails the store when it disagrees with what we filed.
+ */
+function stampCollectionSize($: cheerio.CheerioAPI, size: number, source: CollectionSource = "unknown"): void {
+ $('meta[name="vya:collection-size"], meta[name="vya:collection-source"]').remove();
+ const tag = `<meta name="vya:collection-size" content="${size}"><meta name="vya:collection-source" content="${source}">`;
+ const $head = $("head").first();
+ if ($head.length) $head.append(tag); else $("body").first().prepend(tag);
 }
 
 /** Inject a store's site-wide custom CSS (seller edits applied over time) so it
@@ -2115,7 +2804,10 @@ export function injectCss(html: string, css: string): string {
  * Also strips the source CSP meta — it would block our inline cart script. */
 export function injectCart(html: string): string {
  html = html.replace(/<meta[^>]*http-equiv=["']?content-security-policy["']?[^>]*>/gi, "");
- if (html.indexOf("vya-cart-drawer") !== -1) return html;
+ // Look for the ELEMENT, not any mention of the name. A plain substring check matched the
+ // suppress-theme-cart stylesheet (which names #vya-cart-drawer in a :not() selector), so this
+ // returned early and the cart was never injected at all — on every page that had been suppressed.
+ if (html.indexOf('id="vya-cart-drawer"') !== -1) return html;
  return html.indexOf("</body>") !== -1 ? html.replace("</body>", CART_UI + "</body>") : html + CART_UI;
 }
 
@@ -2127,11 +2819,25 @@ export function injectShim(html: string): string {
  return html.indexOf("</body>") !== -1 ? html.replace("</body>", CAPTURE_SHIM + "</body>") : html + CAPTURE_SHIM;
 }
 
-/** A subtle "Powered by VYA" badge, fixed bottom-right, on the buyer-facing captured site. Links to
- * getvya.ai. Injected once (guarded), before </body>, so it rides above the seller's own layout. */
+/**
+ * A quiet "Powered by VYA" line at the bottom of the seller's own footer.
+ *
+ * It used to be a dark pill pinned bottom-right, riding over her layout and over everything else we
+ * float in that corner. A powered-by line belongs where every other one does — set in her own
+ * typeface, muted, above a hairline, at the end of the page.
+ *
+ * Idempotent, and never more than one. Where a theme carries several footers (some keep a hidden
+ * mobile copy) the LAST one in the document is the real one.
+ */
 export function injectPoweredBy(html: string): string {
- if (html.indexOf("vya-powered") !== -1) return html;
- const badge = `<a href="https://getvya.ai" target="_blank" rel="noopener" class="vya-powered" style="position:fixed;bottom:14px;right:14px;z-index:2147483000;display:inline-flex;align-items:center;gap:6px;background:rgba(17,17,17,.9);color:#fff;font:600 11px/1 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;letter-spacing:.02em;padding:7px 11px;border-radius:999px;text-decoration:none;box-shadow:0 4px 16px rgba(0,0,0,.22);backdrop-filter:saturate(140%) blur(2px)">Powered by <b style="font-weight:800">VYA</b></a>`;
+ // Guarded on a marker ATTRIBUTE, not on the class name. The account panel's own script mentions
+ // `.vya-powered` (it measures anything of ours pinned in the corner), and a substring guard on the
+ // class read that as "already injected" — so the badge silently disappeared from every store.
+ if (html.indexOf('data-vya-powered="1"') !== -1) return html;
+ const badge = `<div data-vya-powered="1" class="vya-powered-row" style="width:100%;padding:26px 20px 30px;text-align:center;border-top:1px solid rgba(128,128,128,.18);box-sizing:border-box"><a href="https://getvya.ai" target="_blank" rel="noopener" class="vya-powered" style="font-family:inherit;font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:inherit;opacity:.62;text-decoration:none">Powered by VYA</a></div>`;
+ const close = html.lastIndexOf("</footer>");
+ if (close !== -1) return html.slice(0, close) + badge + html.slice(close);
+ // No footer of her own — end of the page is still the right place for it, just not floating.
  return html.indexOf("</body>") !== -1 ? html.replace("</body>", badge + "</body>") : html + badge;
 }
 

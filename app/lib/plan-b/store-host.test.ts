@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { storeSlugForHost, isStoreHost, storeHostSuffix, normalizeHost, isRefusedOnStoreHost, isAllowedStoreApi, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "./store-host.ts";
+import { storeSlugForHost, isStoreHost, storeHostSuffix, normalizeHost, isRefusedOnStoreHost, isAllowedStoreApi, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath, shopifyCartSubmitRoute } from "./store-host.ts";
 
 const env = { STORE_HOST_SUFFIX: "vyasites.test" };
 
@@ -129,4 +129,54 @@ test("checkout is served by VYA on a store origin, not looked up as a captured p
  assert.equal(isVyaOwnedPath("/products/x"), false);
  // …and it must still not be a way to reach anything internal.
  assert.equal(isRefusedOnStoreHost("/checkout"), false);
+});
+
+// ── The cart FORM (POST /cart) ────────────────────────────────────────────────────────────────────
+// The theme's Checkout button is a submit of the /cart form, not a link. Unrouted, that POST fell
+// through to Next and answered "Server action not found" — the dead button a shopper meets at the
+// exact moment of buying.
+
+test("POST /cart is the theme's cart form", () => {
+ assert.equal(shopifyCartSubmitRoute("/cart", "POST"), "/api/plan-b/cart/submit");
+ assert.equal(shopifyCartSubmitRoute("/cart/", "POST"), "/api/plan-b/cart/submit");
+ assert.equal(shopifyCartSubmitRoute("/CART", "post"), "/api/plan-b/cart/submit");
+});
+
+// GET /cart is the cart PAGE, which the captured site serves. Swallowing it here would replace the
+// shopper's cart page with a form handler.
+test("GET /cart is left alone — that is the cart page", () => {
+ assert.equal(shopifyCartSubmitRoute("/cart", "GET"), null);
+ assert.equal(shopifyCartSubmitRoute("/cart", "HEAD"), null);
+ assert.equal(shopifyCartSubmitRoute("/cart", ""), null);
+});
+
+test("only /cart itself, never the routes beneath it", () => {
+ // These already belong to shopifyThemeRoute; claiming them here would shadow add/change/update.
+ assert.equal(shopifyCartSubmitRoute("/cart/add", "POST"), null);
+ assert.equal(shopifyCartSubmitRoute("/cart/change", "POST"), null);
+ assert.equal(shopifyCartSubmitRoute("/cart/update", "POST"), null);
+ assert.equal(shopifyCartSubmitRoute("/cart.js", "POST"), null);
+ assert.equal(shopifyCartSubmitRoute("/carts", "POST"), null);
+ assert.equal(shopifyCartSubmitRoute("/", "POST"), null);
+});
+
+test("the theme's recommendation fetch is allowed on a store origin", () => {
+ // "You may also like" is fetched by the seller's own theme from the shopper's browser, so it is a
+ // storefront surface — but it lives under /api/plan-b/, which the allowlist does not cover. Every
+ // request from a hosted store was refused before it reached the handler, and the strip rendered
+ // empty for ever. The route's own comment describes exactly this symptom, from the last time it
+ // happened for a different reason.
+ // `pathname` is what the caller passes, and a pathname never carries a query string — asserting
+ // on "…?section_id=x" was testing a shape this function is never handed.
+ assert.equal(isAllowedStoreApi("/api/plan-b/recommendations"), true);
+ assert.equal(isAllowedStoreApi("/API/Plan-B/Recommendations"), true, "case is normalised");
+});
+
+test("the rest of the internal surface stays refused on a store origin", () => {
+ // The allowlist exists so that adding an internal route cannot accidentally expose it on 45
+ // sellers' domains, where the seller's own JavaScript runs. Widening it by one route must not
+ // widen it by a prefix.
+ for (const p of ["/api/plan-b/cart-admin", "/api/store/analytics", "/api/admin/anything", "/api/cron/rehost-images"]) {
+  assert.equal(isAllowedStoreApi(p), false, p);
+ }
 });

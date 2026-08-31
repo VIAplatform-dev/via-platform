@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as cheerio from "cheerio";
-import { prepareEditMode, applyEdits, injectCollectionItems, injectLiveGrids, injectShim, deShopify, deLazy, rewireCommerce, injectCartPage, injectSqsCartPage, applyCartState, renderNativeProduct, stripScripts, capturedGridProductHandles, detectGridHandles } from "./site-capture.ts";
+import { restateDiscountClaims, injectCart, prepareEditMode, applyEdits, injectCollectionItems, injectLiveGrids, injectShim, deShopify, deLazy, rewireCommerce, injectCartPage, injectSqsCartPage, applyCartState, renderNativeProduct, stripScripts, capturedGridProductHandles, detectGridHandles, liveGridHtml } from "./site-capture.ts";
 
 const COLL_ITEMS = [
  { id: "a1", title: "1990s Silk Slip", priceCents: 18000, currency: "USD", images: ["https://x/img1.jpg"] },
@@ -28,7 +28,12 @@ test("injectCollectionItems reuses the theme's own card so the live grid matches
  assert.match($.html(), /1990s Silk Slip/);
  assert.equal($grid.find("a[href='/products/a1']").length > 0, true, "links to the live product");
  assert.equal($grid.find("form").length, 0, "quick-add form (would POST to the old platform) removed");
- assert.equal($grid.find("[id]").length, 0, "cloned ids stripped so they aren't duplicated");
+ // Clones keep their ids but each gets a UNIQUE one: the theme's own reveal (Palo Alto) links a
+ // card's children to the card by `data-aos-anchor="#<card id>"`, so stripping ids left every
+ // media wrapper at opacity 0.001. "No duplicates" is the invariant; "no ids" was never the point.
+ const ids = $grid.find("[id]").toArray().map((el) => $(el).attr("id"));
+ assert.equal(new Set(ids).size, ids.length, "cloned ids are unique — never duplicated across cards");
+ assert.ok(ids.every((id) => !/^\d/.test(id || "")), "every id is selector-safe (the theme resolves anchors with querySelector)");
  // Price mirrors the theme's own formatting, which showed 2 decimals and a currency code.
  assert.match($grid.find(".price-item").first().text(), /\$180\.00 USD/);
  assert.ok(!$.html().includes("STALE product"), "stale content gone");
@@ -75,6 +80,14 @@ test("live grids reuse the theme's own card across DIFFERENT theme families", ()
   assert.ok(out.includes("1990s Silk Slip"), `${name}: live title rendered`);
   assert.ok(!out.includes("Old One") && !out.includes(">Old<"), `${name}: stale content replaced`);
   assert.ok(out.includes("/p/a1"), `${name}: links to the live product`);
+  // The PHOTO has to survive the title substitution. Themes that wrap the image and the product
+  // name in the same link (Prestige) — or repeat the name inside the image link for screen readers
+  // (Palo Alto) — used to have cardTitleEl() return that link, and writing the title into it with
+  // .text() deleted the <img>. Every card on every collection page then rendered as a bare text
+  // link. Titles alone can't catch it: they were all correct while the grid had no pictures in it.
+  const withPhotos = COLL_ITEMS.filter((i) => i.images.length).length; // a2 deliberately has none
+  assert.equal($live.find("img").length, withPhotos, `${name}: one live photo per card that has one`);
+  assert.ok(!/(a|b|c)\.jpg/.test($live.html() || ""), `${name}: the template's own photo is gone`);
  }
 });
 
@@ -1485,7 +1498,7 @@ test("capturedGridProductHandles returns nothing for a page with no real product
 test("a grid built from custom elements is detected", () => {
  const card = (n: number) =>
   `<slideshow-slide class="resource-list__slide"><div class="resource-list__item">` +
-  `<product-card><a href="/products/piece-${n}"><img src="/i/${n}.jpg"><span>Piece ${n}</span></a></product-card>` +
+  `<product-card><a href="/products/piece-${n}"><img src="/i/${n}.jpg"><span>Piece ${n}</span><span class="price">$${n}0.00</span></a></product-card>` +
   `</div></slideshow-slide>`;
  const html = `<html><body><slideshow-container><slideshow-slides>${[1, 2, 3, 4].map(card).join("")}</slideshow-slides></slideshow-container></body></html>`;
  assert.equal(detectGridHandles(html).length, 1);
@@ -1528,4 +1541,370 @@ test("injectSqsCartPage shows a real empty-cart message, not a blank page, for a
  const out = injectSqsCartPage(html, [], "/checkout?cart=1");
  assert.match(out, /nothing in your shopping cart/i);
  assert.doesNotMatch(out, /href="\/checkout\?cart=1"/, "no checkout button with nothing to check out");
+});
+
+// ── The add button's two states ─────────────────────────────────────────────────────────────────
+// Every clone is made from ONE captured card, so that card's product decides what the button says
+// unless we rewrite it. On Love Again Vintage — 106 of 109 pieces sold — the card cloned was a sold
+// one, so every buyable bag on the mirrored homepage offered a dead "Sold out" button while the sold
+// ones lost their button altogether. The theme prints both words itself, in the same grid; these are
+// read off it rather than invented, so a store in another language keeps its own.
+const DAWN_QUICK_ADD_GRID = `<html><body><ul id="product-grid" class="grid product-grid">
+ <li class="grid__item"><a class="full-unstyled-link" href="/products/sold-one"><img src="sold.jpg"></a>
+  <h3 class="card__heading"><a class="full-unstyled-link" href="/products/sold-one">Chanel Boston Bag</a></h3>
+  <div class="price price--sold-out"><span class="price-item">$1,100.00 USD</span></div>
+  <div class="quick-add"><product-form><form method="post" action="/cart/add" onsubmit="return false">
+   <input type="hidden" name="id" value="111"><button type="submit" name="add" class="quick-add__submit" data-sold-out-message="true" disabled>
+    <span>Sold out </span><span class="sold-out-message hidden"> Sold out </span><div class="loading__spinner hidden"><svg></svg></div>
+   </button></form></product-form></div></li>
+ <li class="grid__item"><a class="full-unstyled-link" href="/products/live-one"><img src="live.jpg"></a>
+  <h3 class="card__heading"><a class="full-unstyled-link" href="/products/live-one">Gucci Loop Bag</a></h3>
+  <div class="price"><span class="price-item">$325.00 USD</span></div>
+  <div class="quick-add"><product-form><form method="post" action="/cart/add" onsubmit="return false">
+   <input type="hidden" name="id" value="222"><button type="submit" name="add" class="quick-add__submit" data-sold-out-message="true">
+    <span>Add to cart </span><span class="sold-out-message hidden"> Sold out </span><div class="loading__spinner hidden"><svg></svg></div>
+   </button></form></product-form></div></li>
+</ul></body></html>`;
+
+const TWO_STATES = [
+ { id: "b1", title: "Prada Nylon Bag", priceCents: 45000, currency: "USD", images: ["https://x/p.jpg"], sourceId: "prada-nylon-bag", available: false },
+ { id: "b2", title: "Dior Trotter Bag", priceCents: 64500, currency: "USD", images: ["https://x/d.jpg"], sourceId: "dior-trotter-bag", available: true },
+];
+
+const quickAddCards = (html: string) => {
+ const $ = cheerio.load(html);
+ return $("#product-grid > li").toArray().map((li) => {
+  const $btn = $(li).find("button[name='add']").first();
+  return {
+   title: $(li).find(".card__heading").text().trim(),
+   label: $btn.find("span").first().text().trim(),
+   disabled: $btn.attr("disabled") !== undefined,
+   variantId: $(li).find("input[name='id']").attr("value"),
+  };
+ });
+};
+
+test("a buyable piece gets the theme's own 'Add to cart', even when the card cloned was a sold one", () => {
+ const out = injectLiveGrids(DAWN_QUICK_ADD_GRID, [TWO_STATES], (it) => `/products/${it.sourceId}`, { keepQuickAdd: true });
+ const live = quickAddCards(out).find((c) => c.title === "Dior Trotter Bag");
+ assert.ok(live, "the available piece rendered");
+ assert.equal(live.label, "Add to cart", "not the template product's 'Sold out'");
+ assert.equal(live.disabled, false);
+ assert.equal(live.variantId, "dior-trotter-bag", "and the form points at this piece");
+});
+
+test("a sold piece keeps the theme's own disabled Sold-out button instead of losing it", () => {
+ const out = injectLiveGrids(DAWN_QUICK_ADD_GRID, [TWO_STATES], (it) => `/products/${it.sourceId}`, { keepQuickAdd: true });
+ const sold = quickAddCards(out).find((c) => c.title === "Prada Nylon Bag");
+ assert.ok(sold, "the sold piece rendered");
+ assert.equal(sold.label, "Sold out");
+ assert.equal(sold.disabled, true, "a sold one-of-one can never be added");
+});
+
+test("the price keeps the sold-out styling only for pieces that are actually sold", () => {
+ const $ = cheerio.load(injectLiveGrids(DAWN_QUICK_ADD_GRID, [TWO_STATES], (it) => `/products/${it.sourceId}`, { keepQuickAdd: true }));
+ const cardFor = (title: string) => $("#product-grid > li").toArray().find((li) => $(li).find(".card__heading").text().includes(title));
+ assert.equal($(cardFor("Dior Trotter Bag")!).find(".price--sold-out").length, 0, "a buyable piece is not priced as sold");
+ assert.equal($(cardFor("Prada Nylon Bag")!).find(".price--sold-out").length, 1);
+});
+
+test("with quick-add off (a VYA origin, no cart bridge) no card carries a form at all", () => {
+ const $ = cheerio.load(injectLiveGrids(DAWN_QUICK_ADD_GRID, [TWO_STATES], (it) => `/products/${it.sourceId}`));
+ assert.equal($("#product-grid form").length, 0);
+});
+
+// ── A sold piece must not be buyable ────────────────────────────────────────────────────────────
+// rewireCommerce swaps the theme's <button> for an <a>, so applyCartState's `disabled` (which only
+// ever matched a button) silently did nothing: sold pieces kept a live "Add to cart" and a working
+// /checkout link. Verified on a real store — 44 of 48 pieces in one collection were sold.
+
+test("applyCartState neutralises VYA's own buy controls on a sold piece", () => {
+ const live = rewireCommerce(
+  `<html><body><form action="/cart/add"><button name="add" class="product-form__submit">Add to cart</button></form></body></html>`,
+  "/checkout?item=abc123",
+ );
+ assert.match(live, /data-vya-add="abc123"/, "precondition: an anchor, not a button");
+ assert.match(live, /\/checkout\?item=abc123/, "precondition: a live checkout link");
+
+ const sold = applyCartState(live, { inCart: false, soldOut: true });
+ assert.doesNotMatch(sold, /data-vya-add/, "the add control is disarmed");
+ assert.doesNotMatch(sold, /href="\/checkout\?item=abc123"/, "the checkout link is gone");
+ assert.match(sold, /Sold out/, "and it says so");
+ assert.match(sold, /pointer-events:\s*none/, "and can't be clicked");
+});
+
+test("an available piece keeps both buy controls — the sold path must not leak", () => {
+ const live = rewireCommerce(
+  `<html><body><form action="/cart/add"><button name="add" class="product-form__submit">Add to cart</button></form></body></html>`,
+  "/checkout?item=abc123",
+ );
+ const out = applyCartState(live, { inCart: false, soldOut: false });
+ assert.match(out, /data-vya-add="abc123"/, "add to cart survives");
+ assert.match(out, /href="\/checkout\?item=abc123"/, "buy now survives");
+});
+
+test("rewireCommerce with no buy href renders the theme-shaped sold control", () => {
+ const out = rewireCommerce(
+  `<html><body><form action="/cart/add"><button name="add" class="product-form__submit">Add to cart</button></form></body></html>`,
+  null,
+ );
+ assert.match(out, /Sold out/);
+ assert.doesNotMatch(out, /data-vya-add/, "nothing to add");
+ assert.doesNotMatch(out, /\/checkout\?item=/, "and nowhere to check out");
+});
+
+test("the fallback grid badges sold pieces too — not just the theme-card path", () => {
+ // liveGridHtml renders wherever a theme's own card can't be matched. It ignored `available`, so
+ // those stores showed a sold-out archive as fully buyable.
+ const html = liveGridHtml(
+  [
+   { id: "s1", title: "Sold Piece", priceCents: 12000, currency: "USD", images: ["https://x/1.jpg"], available: false },
+   { id: "a1", title: "Available Piece", priceCents: 9000, currency: "USD", images: ["https://x/2.jpg"], available: true },
+  ],
+  (it) => `/p/${it.id}`,
+ );
+ assert.equal((html.match(/data-vya-sold/g) || []).length, 1, "exactly one badge, on the sold piece");
+ // Split into cards so the badge is checked against the RIGHT one, not just "somewhere on the page".
+ const cards = html.split('<div style="font-family:inherit').slice(1);
+ assert.equal(cards.length, 2, "two cards rendered");
+ const sold = cards.find((c) => c.includes("Sold Piece"))!;
+ const avail = cards.find((c) => c.includes("Available Piece"))!;
+ assert.match(sold, /data-vya-sold/, "the badge sits on the sold card");
+ assert.doesNotMatch(avail, /data-vya-sold/, "and not on the available one");
+});
+
+test("a cloned card never keeps a reference to an id it just dropped", () => {
+ // AOS gates visibility (`[data-aos]{opacity:.000001}` until its JS adds `.aos-animate`), and an
+ // element anchored to a MISSING id never animates. Cloned cards kept `data-aos-anchor="#…"`
+ // pointing at the template card's id, which the clone strips — so on a store origin, where the
+ // theme's own AOS runs, every product grid rendered permanently invisible. Correct markup,
+ // correct photos, opacity zero. Plan A masked it: its shim force-overrides that opacity.
+ const html = `<html><body><div class="product-grid">
+  <div class="product-grid-item" id="item-1">
+   <span data-aos="fade-left" data-aos-anchor="#item-1" aria-labelledby="cap-1">
+     <a href="/products/x"><img src="a.jpg"></a>
+   </span>
+   <span id="cap-1" class="product-title"><a href="/products/x">Old</a></span>
+   <span class="price">$10</span>
+  </div>
+ </div></body></html>`;
+ const out = injectCollectionItems(html, COLL_ITEMS, (it) => `/p/${it.id}`);
+ const $ = cheerio.load(out);
+ const ids = new Set($("[id]").toArray().map((el) => $(el).attr("id")!));
+ const anchors = $("[data-aos-anchor]").toArray().map((el) => ($(el).attr("data-aos-anchor") || "").replace(/^#/, ""));
+ assert.equal(anchors.filter((a) => !ids.has(a)).length, 0, "no dangling AOS anchor survives");
+ const labelled = $("[aria-labelledby]").toArray().map((el) => $(el).attr("aria-labelledby")!);
+ assert.equal(labelled.filter((a) => !ids.has(a)).length, 0, "no dangling aria-labelledby survives");
+ assert.ok(out.includes("1990s Silk Slip"), "and the card still rendered");
+});
+
+test("a collection page states how many pieces it is showing, so a check never has to guess", () => {
+ // The theme's own "N products" label is not reliable ground truth: we rewrite it, some themes
+ // (shop-vintage-charm) print no label at all, and one that reads 401 on a 94-piece rail is telling
+ // the truth about a page that is wrong. A machine-readable stamp is what a checker compares
+ // against the seller's own site — see scripts/parity-check.mts.
+ const html = `<html><head><title>t</title></head><body><main><h1>Dresses</h1><ul id="product-grid">
+  <li class="grid__item"><a href="/products/old"><img src="old.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$9.00</span></li>
+ </ul></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, COLL_ITEMS));
+ assert.equal($('meta[name="vya:collection-size"]').attr("content"), "2", "the stamp counts the whole rail, not one page of it");
+});
+
+test("the stamp reports the whole rail even when the page shows one page of it", () => {
+ // Paginated rails render a slice; the number a checker needs is the size of the rail.
+ const many = Array.from({ length: 30 }, (_, i) => ({ id: `p${i}`, title: `Piece ${i}`, priceCents: 100, currency: "USD", images: [] }));
+ const html = `<html><head></head><body><main><ul id="product-grid">
+  <li class="grid__item"><a href="/products/o1"><img src="a.jpg"></a><h3><a href="/products/o1">A</a></h3><span class="price-item">$9.00</span></li>
+  <li class="grid__item"><a href="/products/o2"><img src="b.jpg"></a><h3><a href="/products/o2">B</a></h3><span class="price-item">$9.00</span></li>
+ </ul><nav class="pagination"><a href="?page=2">2</a></nav></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, many, undefined, { path: "/collections/x" }));
+ assert.equal($('meta[name="vya:collection-size"]').attr("content"), "30");
+ assert.ok($("#product-grid").children("li").length < 30, "…while the page itself shows a single page");
+});
+
+test("a page we left alone carries no stamp", () => {
+ // With no live items and no renderEmpty, injectCollectionItems returns the capture untouched.
+ // Nothing was injected, so there is nothing to vouch for; a stamp here would be a lie.
+ const html = `<html><head></head><body><main><h1>Dresses</h1><ul id="product-grid"><li class="grid__item"><a href="/products/o"><img src="a.jpg"></a><h3><a href="/products/o">A</a></h3><span class="price-item">$9.00</span></li></ul></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, []));
+ assert.equal($('meta[name="vya:collection-size"]').length, 0);
+});
+
+test("a rail rendered in our own cards is stamped too, not just one built from the theme's", () => {
+ // fillGrid falls back to liveGridHtml when no theme card can be cloned. That page still shows a
+ // live rail, so it still has to say how big the rail is.
+ const html = `<html><head></head><body><main><h1>Dresses</h1></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, COLL_ITEMS));
+ assert.equal($('meta[name="vya:collection-size"]').attr("content"), "2");
+});
+
+test("deciding a collection is empty is stamped even when there was no grid to clear", () => {
+ // blummier's "Alaïa" page was captured with no product grid at all (it is empty on her site too),
+ // so there is nothing to empty — but we HAVE decided the page shows nothing, and a check must be
+ // able to read that decision. Silence here made the pages we had just fixed unverifiable.
+ const html = `<html><head></head><body><main><h1>Alaïa</h1><p>Nothing here yet.</p></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, [], undefined, { renderEmpty: true }));
+ assert.equal($('meta[name="vya:collection-size"]').attr("content"), "0");
+});
+
+test("an empty collection states that it is showing nothing", () => {
+ // The stamp is how a check knows what a page served (see stampCollectionSize). Without it on this
+ // branch, every collection we correctly emptied would report "we couldn't check" — blind on
+ // exactly the pages the empty-collection fix just changed.
+ const html = `<html><head></head><body><main><h1>Alaïa</h1><ul id="product-grid">
+  <li class="grid__item"><a href="/products/old"><img src="a.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$9.00</span></li>
+ </ul></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, [], undefined, { renderEmpty: true }));
+ assert.equal($('meta[name="vya:collection-size"]').attr("content"), "0");
+ assert.equal($("#product-grid").find("a[href^='/products/']").length, 0, "and the captured cards are gone");
+});
+
+test("a piece on sale shows its markdown in the grid, not just on its own page", () => {
+ // The seller's own grid shows "$645" struck from "$675". Ours showed a flat $645, so the shopper
+ // never saw the markdown — the selling tool it exists to be. bag-crush has 73 pieces on sale, and
+ // this was the biggest growing line in the census: prices reported as differing on 7 stores.
+ const html = `<html><body><main><ul id="product-grid">
+  <li class="grid__item"><a href="/products/old"><img src="a.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$999.00</span></li>
+ </ul></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, [
+  { id: "a1", title: "Dior Trotter Boston", priceCents: 64500, currency: "USD", images: ["https://x/1.jpg"], compareAtCents: 67500 },
+ ]));
+ assert.match($("#product-grid").text(), /\$645\.00/);
+ const was = $("#product-grid [data-vya-compare-at]");
+ assert.equal(was.length, 1, "the original price is shown alongside");
+ assert.match(was.text(), /\$675/);
+});
+
+test("a piece not on sale shows one price and no phantom discount", () => {
+ // The captured card may carry the template product's own sale markup, which is not ours to claim.
+ const html = `<html><body><main><ul id="product-grid">
+  <li class="grid__item"><a href="/products/old"><img src="a.jpg"></a><h3><a href="/products/old">STALE</a></h3>
+   <span class="price-item">$999.00</span><s class="price-item--compare">$1299.00</s></li>
+ </ul></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, [
+  { id: "a1", title: "Plain", priceCents: 20000, currency: "USD", images: ["https://x/1.jpg"] },
+ ]));
+ assert.equal($("#product-grid [data-vya-compare-at]").length, 0);
+ assert.equal($("#product-grid s").length, 0, "and the captured one is gone");
+});
+
+test("an original that is not higher than the price is not shown", () => {
+ const html = `<html><body><main><ul id="product-grid">
+  <li class="grid__item"><a href="/products/old"><img src="a.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$9.00</span></li>
+ </ul></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, [
+  { id: "a1", title: "Same", priceCents: 5000, currency: "USD", images: ["https://x/1.jpg"], compareAtCents: 5000 },
+ ]));
+ assert.equal($("[data-vya-compare-at]").length, 0);
+});
+
+test("the fallback grid escapes the heading's column instead of inheriting it", () => {
+ // hachi-archive's /collections/prada rendered ONE product per row, full width, 36,000px tall.
+ // Its captured page had no grid to reuse, so the fallback dropped our grid straight after the
+ // <h2> — and on that theme the heading sits in a narrow section-title column, so a grid asking
+ // for `auto-fill minmax(240px,1fr)` got exactly one column. The heading is a position, not a
+ // parent: the grid belongs after the block the heading sits in, at the page's own width.
+ const html = `<html><body><main>
+  <section class="shopify-section">
+   <div class="wrapper"><div class="grid lg:grid-cols-12">
+    <div class="lg:col-span-section-title"><h2>prada</h2></div>
+   </div></div>
+  </section>
+ </main></body></html>`;
+ const out = injectCollectionItems(html, [
+  { id: "1", title: "A", priceCents: 1000, currency: "usd", image: "a.jpg" },
+  { id: "2", title: "B", priceCents: 2000, currency: "usd", image: "b.jpg" },
+ ] as never);
+ const $ = cheerio.load(out);
+ const $grid = $("[data-vya-collection]");
+ assert.equal($grid.length, 1);
+ assert.equal($grid.closest(".lg\\:col-span-section-title").length, 0, "not inside the title column");
+ assert.equal($grid.closest("main").length, 1, "still on the page, under the heading's section");
+ assert.equal($grid.closest(".wrapper").length, 1, "and inside the theme's own page-width gutter");
+});
+
+test("a page whose heading has no section still gets its grid", () => {
+ const html = `<html><body><main><h1>prada</h1></main></body></html>`;
+ const $ = cheerio.load(injectCollectionItems(html, [
+  { id: "1", title: "A", priceCents: 1000, currency: "usd", image: "a.jpg" },
+ ] as never));
+ assert.equal($("[data-vya-collection]").length, 1);
+});
+
+test("every script VYA injects into a captured page actually PARSES", () => {
+ // A backslash written into the JS below survives TypeScript's template literal only if it is
+ // doubled. One that wasn't turned `/^\/site\/([^/?#]+)/` into `/^/site/([^/?#]+)/` — an invalid
+ // regex, which killed the whole VYACart object, which meant every "Add to cart" on every captured
+ // page silently did nothing. The HTML still contained the word VYACart, so nothing looked wrong.
+ const html = injectCart("<html><head></head><body><p>x</p></body></html>");
+ const $ = cheerio.load(html);
+ const scripts = $("script:not([src])").toArray().map((el) => $(el).html() || "").filter((s) => s.trim());
+ assert.ok(scripts.length > 0, "injectCart should inject at least one script");
+ for (const src of scripts) {
+  // Throws a SyntaxError on anything the browser could not have parsed either.
+  assert.doesNotThrow(() => new Function(src), `injected script does not parse:\n${src.slice(0, 300)}`);
+ }
+});
+
+// ── the theme's arithmetic about a different piece ────────────────────────────────────────────────
+const badgeCard = (text: string) => {
+ const $ = cheerio.load(`<li class="card"><span class="badge">${text}</span><span class="title">A</span></li>`);
+ return { $, $card: $("li") };
+};
+
+test("a discount the piece cannot back up is removed", () => {
+ // chill-boutique's homepage carried EIGHT "50% OFF" badges on our copy. Her sale rail is a
+ // filtered view of genuinely half-price pieces; we fill the same template with OUR items and left
+ // her badge sitting on top of them. One card read "50% OFF · Derek Lam Navy Shirt · $100 · $495"
+ // — eighty percent off. We were inventing a price claim on somebody else's storefront.
+ const { $, $card } = badgeCard("50% OFF");
+ restateDiscountClaims($, $card, { id: "1", title: "Derek", priceCents: 10000, currency: "usd", image: "b.jpg" } as never);
+ assert.doesNotMatch($.html(), /50%/);
+});
+
+test("a real markdown keeps her badge, with our number in it", () => {
+ const { $, $card } = badgeCard("50% OFF");
+ restateDiscountClaims($, $card, { id: "1", title: "B", priceCents: 10000, compareAtCents: 40000, currency: "usd", image: "b.jpg" } as never);
+ assert.match($.html(), /75%\s*OFF/i, "$100 down from $400 is 75% off, not 50%");
+});
+
+test("a badge that makes no numeric claim is left exactly as she wrote it", () => {
+ // "New in", "Last one", "Sale" are her language about the rail, not arithmetic about a piece.
+ // Stripping those would quietly redesign her page.
+ for (const word of ["New in", "Last one", "Sale", "Archive"]) {
+  const { $, $card } = badgeCard(word);
+  restateDiscountClaims($, $card, { id: "1", title: "B", priceCents: 10000, currency: "usd", image: "b.jpg" } as never);
+  assert.match($.html(), new RegExp(word), word);
+ }
+});
+
+test("'Save $40' is arithmetic too", () => {
+ const { $, $card } = badgeCard("Save $40");
+ restateDiscountClaims($, $card, { id: "1", title: "B", priceCents: 10000, currency: "usd", image: "b.jpg" } as never);
+ assert.doesNotMatch($.html(), /Save/i);
+});
+
+test("'Save $40' becomes the amount actually saved", () => {
+ const { $, $card } = badgeCard("Save $40");
+ restateDiscountClaims($, $card, { id: "1", title: "B", priceCents: 10000, compareAtCents: 40000, currency: "usd", image: "b.jpg" } as never);
+ assert.match($.html(), /Save\s*\$300/);
+});
+
+test("the bag pill comes back when her own cart icon cannot be reached", () => {
+ // ange-archive: the server found a cart control, bound it, and set the marker that hides our
+ // floating pill. Then the theme rebuilt its header in JavaScript and the bound control ended up
+ // 0×0. A shopper could put a piece in the bag and had NO way to open it — no reachable icon of
+ // hers, and no pill of ours, because the marker said she had one.
+ //
+ // Same shape as the account icon, one layer down: what the SERVER found is not what the SHOPPER
+ // can reach, and only the browser knows the difference.
+ const out = injectCart(`<html><body><a data-vya-cart-open="1">Cart</a></body></html>`);
+ assert.match(out, /function vyaCartReachable/, "the page measures whether her bag icon can be clicked");
+ assert.match(out, /data-vya-has-cart-control/, "and takes the marker off when it cannot");
+ assert.match(out, /elementFromPoint/, "measured by what is at the coordinates, not by class names");
+});
+
+test("the pill re-check keeps watching, because a header can arrive late", () => {
+ const out = injectCart(`<html><body><a data-vya-cart-open="1">Cart</a></body></html>`);
+ assert.match(out, /MutationObserver/);
 });

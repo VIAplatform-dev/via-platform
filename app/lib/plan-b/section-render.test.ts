@@ -85,3 +85,27 @@ test("isPredictiveSearchEmptyId matches the naming themes actually use", () => {
  assert.equal(isPredictiveSearchEmptyId("predictive_search_empty"), true);
  assert.equal(isPredictiveSearchEmptyId("template--1__main"), false);
 });
+
+test("predictiveSearchResultsSection carries #predictive-search-count — required by the \"Shapes\"-family theme convention", () => {
+ // Its PredictiveSearch component does `.querySelector(\"#predictive-search-count\").textContent`
+ // with NO null check; missing this id throws inside the fetch handler and its own .catch() resets
+ // the search box to empty on every keystroke. Confirmed against the theme's real code.
+ const out = predictiveSearchResultsSection("predictive-search", [
+  { title: "Chanel Flap", href: "/products/chanel-flap", image: null, price: "$5,000" },
+ ]);
+ assert.match(out, /id="predictive-search-count"/);
+ assert.match(out, />1 result</);
+});
+
+test("predictiveSearchResultsSection's count is plural for more than one result, singular for exactly one", () => {
+ const two = predictiveSearchResultsSection("s", [
+  { title: "A", href: "/products/a", image: null, price: "$1" },
+  { title: "B", href: "/products/b", image: null, price: "$2" },
+ ]);
+ assert.match(two, />2 results</);
+});
+
+test("predictiveSearchEmptySection also carries #predictive-search-count — same theme, same null-unsafe read", () => {
+ const out = predictiveSearchEmptySection("predictive-search-empty");
+ assert.match(out, /id="predictive-search-count"/);
+});

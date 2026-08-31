@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as cheerio from "cheerio";
 import { applyCartBadge, dawnBubbleHtml } from "./cart-badge.ts";
 
 // Real markup shapes, copied from captured pages in the corpus rather than invented.
@@ -64,9 +65,12 @@ test("a theme with no count element of its own gets VYA's badge", () => {
 });
 
 test("a position the theme set itself is never overwritten", () => {
+ // The control also gains `cursor:pointer`, because binding it to our drawer removes its href and
+ // an <a> without one loses the pointer. The theme's own position must survive that untouched.
  const fixed = IMPULSE.replace('class="Header__Icon Icon-Wrapper"', 'class="Header__Icon" style="position:absolute;top:0"');
  const out = applyCartBadge(fixed, 1);
- assert.match(out, /style="position:absolute;top:0"/);
+ assert.match(out, /style="position:absolute;top:0(;[^"]*)?"/);
+ assert.doesNotMatch(out, /position:relative[^"]*position:absolute/, "and is not overridden");
 });
 
 test("alpine themes are seeded with the true count", () => {
@@ -117,4 +121,54 @@ test("an alpine cart button is found by the count it binds, not by a label it do
  const out = applyCartBadge(html, 3);
  assert.match(out, /x-text="\$store\.cart_count\.count">3</);
  assert.doesNotMatch(out, /data-vya-cart-badge/);
+});
+
+// ── one cart control, not two ────────────────────────────────────────────────────────────────────
+// Every hosted store shows the theme's own cart icon AND a floating "Bag · N" pill we inject to open
+// our drawer. Two controls doing one job, and a shopper cannot tell which is real. The theme's icon
+// already carries our live count; it should open our drawer too, and the pill should go.
+import { bindCartControls, hasCartControl } from "./cart-badge.ts";
+
+test("the theme's own cart icon is marked to open our drawer", () => {
+ const html = `<header><a id="cart-icon-bubble" href="/cart"><span class="cart-count-bubble">0</span></a></header>`;
+ const out = bindCartControls(html);
+ const $ = cheerio.load(out);
+ assert.equal($("#cart-icon-bubble").attr("data-vya-cart-open"), "1");
+});
+
+test("its own link is neutralised so it cannot navigate away to the theme's cart page", () => {
+ const html = `<header><a id="cart-icon-bubble" href="/cart">Cart</a></header>`;
+ const $ = cheerio.load(bindCartControls(html));
+ assert.notEqual($("#cart-icon-bubble").attr("href"), "/cart");
+});
+
+test("a theme with no recognisable cart control is left able to reach the bag", () => {
+ // Removing the pill from a store where nothing else opens the drawer would strand the shopper.
+ const html = `<header><a href="/about">About</a></header>`;
+ const out = bindCartControls(html);
+ assert.equal(cheerio.load(out)("[data-vya-cart-open]").length, 0);
+ assert.equal(hasCartControl(html), false);
+});
+
+test("a store WITH a cart control does not need the fallback pill", () => {
+ assert.equal(hasCartControl(`<header><cart-icon></cart-icon></header>`), true);
+ assert.equal(hasCartControl(`<header><button aria-label="Open cart"></button></header>`), true);
+});
+
+test("every cart control on the page is bound, not just the first", () => {
+ // Themes commonly render one for desktop and one for mobile.
+ const html = `<header><a href="/cart" class="desk">Cart</a><a href="/cart" class="mob">Cart</a></header>`;
+ const $ = cheerio.load(bindCartControls(html));
+ assert.equal($("[data-vya-cart-open]").length, 2);
+});
+
+test("a store with its own cart control tells the page to hide the fallback pill", () => {
+ const out = applyCartBadge(`<html><body><header><a href="/cart">Cart</a></header></body></html>`, 2);
+ assert.match(out, /<body[^>]*data-vya-has-cart-control/);
+ assert.match(out, /data-vya-cart-open/);
+});
+
+test("a store with no cart control keeps the pill visible", () => {
+ const out = applyCartBadge(`<html><body><header><a href="/about">About</a></header></body></html>`, 2);
+ assert.doesNotMatch(out, /data-vya-has-cart-control/);
 });

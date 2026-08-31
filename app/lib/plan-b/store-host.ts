@@ -85,6 +85,12 @@ export function isAllowedStoreApi(pathname: string): boolean {
   p.startsWith("/api/search/") ||
   p.startsWith("/api/track") ||
   p.startsWith("/api/auth/") ||
+  // "You may also like". The seller's own theme fetches this from the shopper's browser, so it is
+  // a storefront surface — but it lives under /api/plan-b/, which this list does not cover, so
+  // every request from a hosted store was refused before reaching the handler and the strip
+  // rendered empty for ever. Exactly ONE route, not the /api/plan-b/ prefix: the rest of that
+  // namespace is internal and must stay refused on 45 sellers' domains.
+  p === "/api/plan-b/recommendations" ||
   // Squarespace's cart, in its own dialect. Unlike Shopify's /cart/* routes these live UNDER /api,
   // so without this the refusal above 404s the seller's own Add-to-cart before middleware ever gets
   // to rewrite it. Only the cart: the rest of Squarespace's /api surface stays refused.
@@ -110,6 +116,24 @@ export function shopifyThemeRoute(pathname: string): string | null {
  // the theme logs `Product recommendations error: Server returned 404` on every product view.
  if (p === "/recommendations/products") return "/api/plan-b/recommendations";
  return null;
+}
+
+/**
+ * The theme's cart FORM — a POST to /cart, which is a different thing from the GET that renders the
+ * cart page, so this is deliberately method-aware where shopifyThemeRoute is not.
+ *
+ * Shopify's cart page and cart drawer are one form with two submit buttons, `update` and `checkout`,
+ * both posting here. That makes this the route a shopper actually reaches checkout through: an audit
+ * of the stored captures found the form on 16 of 18 Shopify stores, and on 7 of them the drawer
+ * carrying it sits in the header of EVERY page. Unrouted, the POST fell through to Next, which
+ * answered "Server action not found" — a dead Checkout button at the moment of buying.
+ *
+ * Which button was pressed is decided in cart-submit.ts, not here.
+ */
+export function shopifyCartSubmitRoute(pathname: string, method: string): string | null {
+ if ((method || "").toUpperCase() !== "POST") return null;
+ const p = (pathname || "/").replace(/\/+$/, "").toLowerCase() || "/";
+ return p === "/cart" ? "/api/plan-b/cart/submit" : null;
 }
 
 /**

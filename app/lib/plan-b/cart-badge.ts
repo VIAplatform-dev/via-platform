@@ -174,6 +174,15 @@ export function applyCartBadge(html: string, count: number): string {
   if (label) $c.attr("aria-label", restateCountText(label, n));
  }
 
+ // 5. And the control opens OUR drawer. Every hosted store showed two ways to reach the bag — the
+ //    theme's icon and our floating pill — and a shopper could not tell which was real. The icon is
+ //    the one they reach for, so it gets the job, and the body marker hides the pill (see the
+ //    stylesheet in CART_UI). Where no control was found the pill stays: it is the only way in.
+ if (controls.length) {
+  bindIn($, controls);
+  $("body").attr("data-vya-has-cart-control", "1");
+ }
+
  // Screen-reader copy elsewhere in the header ("Total items in cart: 0") is part of the same lie.
  $('[class*="visually-hidden"], .sr-only, [class*="visuallyhidden"]').each((_: number, el: DomElement) => {
   const $el = $(el);
@@ -185,4 +194,44 @@ export function applyCartBadge(html: string, count: number): string {
  });
 
  return $.html();
+}
+
+/**
+ * Does this page have a cart control of its own?
+ *
+ * Every hosted store currently shows TWO ways to reach the bag: the theme's own cart icon, and a
+ * floating "Bag · N" pill we inject to open our drawer. A shopper cannot tell which is real, and the
+ * theme's icon is the one they instinctively reach for.
+ *
+ * The icon already carries our live count (see applyCartBadge). It should open our drawer too — and
+ * then the pill is redundant. The pill stays only where nothing else can open the bag, because
+ * removing it there would strand the shopper with a cart they cannot see.
+ */
+export function hasCartControl(html: string): boolean {
+ return cheerio.load(html)(CART_CONTROL_SELECTORS).length > 0;
+}
+
+/**
+ * Point the theme's own cart control at our drawer.
+ *
+ * Marks every cart control with `data-vya-cart-open` — the drawer script opens on a click anywhere
+ * inside one — and takes away its href so it cannot navigate to the theme's own cart page instead.
+ * Themes routinely render two (desktop and mobile), so every one is bound, not just the first.
+ */
+export function bindCartControls(html: string): string {
+ const $ = cheerio.load(html, undefined, false);
+ const controls = $(CART_CONTROL_SELECTORS);
+ if (!controls.length) return html;
+ bindIn($, controls.toArray() as DomElement[]);
+ return $.html();
+}
+
+/** The binding itself, so a caller already holding a parsed document does not parse it twice. */
+function bindIn($: cheerio.CheerioAPI, controls: DomElement[]): void {
+ for (const el of controls) {
+  // Idempotent: this runs on every request, and a re-run must not stack `cursor:pointer` up.
+  const style = ($(el).attr("style") || "").replace(/;?\s*$/, "");
+  const withCursor = /(^|;)\s*cursor\s*:/i.test(style) ? style : `${style ? style + ";" : ""}cursor:pointer`;
+  $(el).attr("data-vya-cart-open", "1").removeAttr("href").attr("style", withCursor);
+ }
 }
