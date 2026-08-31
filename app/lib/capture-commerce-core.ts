@@ -255,3 +255,79 @@ export function worthImporting(p: { title: string; cents: number | null | undefi
  // `undefined` means the feed did not say, and guessing "sold" would import every unpriced draft.
  return p.available === false;
 }
+
+/**
+ * The collections an item should end up in, after a membership read.
+ *
+ * `setItemCollections` REPLACES an item's collections, so this decides both what it joins and what
+ * it leaves. Two failures live here, and they pull in opposite directions:
+ *
+ *  • Writing only what the feed said, while a listing was throttled, DELETES the memberships that
+ *    listing would have confirmed. One throttled read turned "34 pieces in Best Dressed Guest"
+ *    into 13. So anything we hold in a collection we could not read is carried over untouched.
+ *
+ *  • Skipping an item the feed places NOWHERE leaves its old links standing for ever. That is how
+ *    shop-vintage-charm's "USA" kept 34 pieces after she emptied it, and kept them even once the
+ *    read was believed — the guard stopped calling it a failure, and nothing then removed anything.
+ *    An empty answer about an item IS an answer: it belongs in no collection we read.
+ */
+/**
+ * Which of a piece's TAGS may file it into one of her collections?
+ *
+ * Only ones we could not read. A tag is a guess about where a piece belongs; a collection listing
+ * we paged through to the end is the seller's own answer. When we have the answer, the guess does
+ * not get a vote — otherwise a piece she has taken OUT of a collection walks straight back in on
+ * the strength of a tag she never removed. ascensio's Boots collection is empty on her site; all
+ * three sold pairs are still tagged "Boots", and that is why our copy kept showing them.
+ *
+ * When the listing failed (Squarespace, a throttled read), the tag is the only signal there is,
+ * so it stands — that is the whole reason the tag path exists.
+ */
+export function taggedSlugs(o: { tags: string[]; known: Set<string>; unread: Set<string> }): string[] {
+ const out = new Set<string>();
+ for (const t of o.tags) {
+  const s = slugifyHandle(t);
+  if (o.known.has(s) && o.unread.has(s)) out.add(s);
+ }
+ return [...out];
+}
+
+
+/**
+ * What should we file a piece under when her store no longer lists it AT ALL?
+ *
+ * The membership loop walks the feed, so a piece she has deleted is never visited and its links
+ * stand for ever — blummier's Chantal Thomass corset sold, she took the listing down, and our copy
+ * of her Chantal Thomass collection went on showing it. It is not in her collection listings for
+ * the same reason it is not in her feed, so it comes out of every collection we READ, and keeps its
+ * place only in the ones we could not.
+ *
+ * `vanished` is not decided here. The item sweep already made that call under sweepRefusal — "the
+ * read did not reach the end of the catalogue" is never "they're all gone" — and wrote it on the
+ * row. This reads that decision rather than making a second, less careful one.
+ *
+ * Returns only the items whose filing actually changes: no write, no risk.
+ */
+export function unfileVanished(o: {
+ held: Map<string, string[]>;
+ vanished: Set<string>;
+ unread: string[];
+}): Map<string, string[]> {
+ const out = new Map<string, string[]>();
+ const unread = new Set(o.unread);
+ for (const id of o.vanished) {
+  const held = o.held.get(id);
+  if (!held?.length) continue;
+  const keep = held.filter((c) => unread.has(c));
+  if (keep.length === held.length) continue; // all of them unread — nothing we know changes
+  out.set(id, keep);
+ }
+ return out;
+}
+
+
+export function membershipToWrite(o: { fromFeed: string[]; held: string[]; unread: string[] }): string[] {
+ const unread = new Set(o.unread);
+ const preserved = o.held.filter((id) => unread.has(id));
+ return [...new Set([...o.fromFeed, ...preserved])];
+}

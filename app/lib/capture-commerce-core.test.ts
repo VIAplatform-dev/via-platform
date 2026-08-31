@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { worthImporting, unreadCollectionSlugs } from "./capture-commerce-core.ts";
+import { worthImporting, unreadCollectionSlugs, membershipToWrite, taggedSlugs, unfileVanished } from "./capture-commerce-core.ts";
 
 // ── a piece she has sold and zeroed the price on ─────────────────────────────────────────────────
 test("a SOLD piece with no price is still imported", () => {
@@ -83,4 +83,72 @@ test("collections the fetch layer already failed on are always unread", () => {
 
 test("a collection we hold nothing for is nobody's business", () => {
  assert.deepEqual(unreadCollectionSlugs({ readCount: new Map(), storedCount: new Map([["x", 0]]), completed: new Set(["x"]) }), []);
+});
+
+// ── an item the feed no longer files anywhere ────────────────────────────────────────────────────
+test("a piece the feed places in no collection is REMOVED from the ones we read", () => {
+ // The other half of the empty-collection bug. Believing an empty read was not enough: the item
+ // loop skipped any piece the feed placed nowhere, so its old links were never rewritten and it
+ // stayed in the category for ever. shop-vintage-charm's "USA" kept all 34 pieces even after the
+ // guard stopped calling the read a failure.
+ assert.deepEqual(membershipToWrite({ fromFeed: [], held: ["usa", "frames"], unread: [] }), []);
+});
+
+test("but it KEEPS its place in collections we could not read", () => {
+ // setItemCollections REPLACES an item's collections, so a set built while a listing was throttled
+ // would delete everything that listing would have confirmed. One throttled read once turned
+ // "34 pieces in Best Dressed Guest" into 13.
+ assert.deepEqual(membershipToWrite({ fromFeed: [], held: ["usa", "frames"], unread: ["frames"] }), ["frames"]);
+});
+
+test("the feed's answer wins where we have one", () => {
+ assert.deepEqual(membershipToWrite({ fromFeed: ["dresses"], held: ["usa"], unread: [] }), ["dresses"]);
+});
+
+test("feed and preserved are merged without duplicates", () => {
+ assert.deepEqual(
+  membershipToWrite({ fromFeed: ["dresses", "bags"], held: ["bags", "usa"], unread: ["bags"] }).sort(),
+  ["bags", "dresses"],
+ );
+});
+
+test("taggedSlugs: a tag cannot file a piece into a collection whose listing we read", () => {
+ // ascensio's three Prada/Mulberry boots are all still tagged "Boots", but she emptied her Boots
+ // collection when they sold. We read that collection to the end — so the tag is a stale guess and
+ // the read is the answer. Filing them back is how her empty collection kept showing 3 sold pairs.
+ const out = taggedSlugs({ tags: ["Boots", "Prada"], known: new Set(["boots"]), unread: new Set() });
+ assert.deepEqual(out, []);
+});
+
+test("taggedSlugs: a tag still files when we could NOT read that collection", () => {
+ // Squarespace and any throttled read land here: the tag is the only signal we have, so it stands.
+ const out = taggedSlugs({ tags: ["Boots"], known: new Set(["boots"]), unread: new Set(["boots"]) });
+ assert.deepEqual(out, ["boots"]);
+});
+
+test("taggedSlugs: tags naming no collection of ours are ignored either way", () => {
+ assert.deepEqual(taggedSlugs({ tags: ["SS2003", "archive"], known: new Set(["boots"]), unread: new Set(["boots"]) }), []);
+});
+
+test("unfileVanished: a piece her store no longer lists leaves the collections we read", () => {
+ // blummier's Chantal Thomass corset sold and she deleted it — it is in none of her 157 products.
+ // The membership loop only walks pieces the feed still returns, so its old links stood for ever.
+ const out = unfileVanished({ held: new Map([["i1", ["c1", "c2"]]]), vanished: new Set(["i1"]), unread: [] });
+ assert.deepEqual([...out], [["i1", []]]);
+});
+
+test("unfileVanished: it keeps its place in collections we could not read", () => {
+ const out = unfileVanished({ held: new Map([["i1", ["c1", "c2"]]]), vanished: new Set(["i1"]), unread: ["c2"] });
+ assert.deepEqual([...out], [["i1", ["c2"]]]);
+});
+
+test("unfileVanished: a piece still listed on her site is never touched here", () => {
+ // The main loop owns those. Touching them from two places is how curation gets clobbered.
+ const out = unfileVanished({ held: new Map([["i1", ["c1"]]]), vanished: new Set(), unread: [] });
+ assert.equal(out.size, 0);
+});
+
+test("unfileVanished: no write when there is nothing to unfile", () => {
+ const out = unfileVanished({ held: new Map(), vanished: new Set(["i1"]), unread: [] });
+ assert.equal(out.size, 0);
 });

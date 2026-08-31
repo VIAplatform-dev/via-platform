@@ -4,7 +4,7 @@
 // "Buy now" runs through VYA's existing Stripe flow.
 import { getSellerBySlug } from "./db/sellers";
 import { sweepRefusal } from "./feed-completeness.ts";
-import { reasonFromImport } from "./unavailable-label.ts";
+import { reasonFromImport, reasonForVanished } from "./unavailable-label.ts";
 import { needsCopyAfterImport, sameImagesAlreadyCopied } from "./rehost-images-core.ts";
 import { createItem, listAvailableItems, listStorefrontItems } from "./db/inventory";
 import { getImportedOrderTitleSet } from "./imported-orders-db";
@@ -16,7 +16,7 @@ import { MAX_ITEM_IMAGES } from "./item-limits";
 // Pure helpers (money, identity, hashing) live in capture-commerce-core.ts so they can be unit
 // tested without the database layer — same split as inventory-core.ts.
 export { productContentHash, centsOf, currencyOf, identityKey, slugifyHandle } from "./capture-commerce-core.ts";
-import { worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, slugifyHandle, unreadCollectionSlugs } from "./capture-commerce-core.ts";
+import { unfileVanished, taggedSlugs, membershipToWrite, worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, unreadCollectionSlugs } from "./capture-commerce-core.ts";
 
 /** Create/refresh db/items (checkout-able inventory) for a captured store's products.
  *
@@ -390,16 +390,18 @@ export async function syncCollectionMembership(
   if (item.origin === "user") continue;
 
   const handleSlugs = p.sourceId ? membership.get(p.sourceId) || [] : [];
-  const tagSlugs = (p.tags || []).map((t) => slugifyHandle(t)).filter((s) => colBySlug.has(s));
+  // Tags only get a vote on collections we could NOT read this pass — see taggedSlugs.
+  const tagSlugs = taggedSlugs({ tags: p.tags || [], known: new Set(colBySlug.keys()), unread: new Set(unreadSlugs) });
   const slugs = [...new Set([...handleSlugs, ...tagSlugs])].filter((s) => colBySlug.has(s));
-  if (!slugs.length) continue;
 
   const ids = slugs.map((s) => colBySlug.get(s)!).filter(Boolean);
-  // setItemCollections REPLACES an item's collections, so it may only ever be handed a set built
-  // from collections we actually read. Carry over this item's existing membership in the unread
-  // ones: without this, one throttled listing turned "34 pieces in Best Dressed Guest" into 13.
-  const preserved = (currentByItem.get(item.id) || []).filter((id) => unreadIds.has(id));
-  const finalIds = preserved.length ? [...new Set([...ids, ...preserved])] : ids;
+  const held = currentByItem.get(item.id) || [];
+  // NO `continue` when the feed places this piece nowhere. That empty answer IS an answer — she has
+  // taken it out of everything we read — and skipping it left the old links standing for ever:
+  // shop-vintage-charm's "USA" kept all 34 pieces even after the read was believed. What it keeps
+  // is its place in collections we could NOT read. See membershipToWrite.
+  if (!slugs.length && !held.length) continue; // nothing filed, nothing to say
+  const finalIds = membershipToWrite({ fromFeed: ids, held, unread: [...unreadIds] });
   try {
    await setItemCollections(item.id, finalIds);
    slugs.forEach((s) => used.add(s));
@@ -409,6 +411,18 @@ export async function syncCollectionMembership(
    failed.push(`“${item.title}” (${msgOf(e)})`);
   }
  }
+ // Pieces her store no longer lists at all. The loop above can't reach them — it walks the feed —
+ // so they are handled here, from the decision the item sweep already recorded on the row.
+ const vanished = new Set(items.filter((i) => i.origin !== "user" && i.unavailableReason === reasonForVanished()).map((i) => i.id));
+ for (const [id, keep] of unfileVanished({ held: currentByItem, vanished, unread: [...unreadIds] })) {
+  try {
+   await setItemCollections(id, keep);
+   links += keep.length;
+  } catch (e) {
+   failed.push(`a piece your store no longer lists (${msgOf(e)})`);
+  }
+ }
+
  const warnings = failed.length
   ? [`${failed.length} product${failed.length === 1 ? "" : "s"} couldn’t be filed into their collections: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? ` and ${failed.length - 3} more` : ""}.`]
   : [];
