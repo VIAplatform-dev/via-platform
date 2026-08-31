@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { worthImporting } from "./capture-commerce-core.ts";
+import { worthImporting, unreadCollectionSlugs } from "./capture-commerce-core.ts";
 
 // ── a piece she has sold and zeroed the price on ─────────────────────────────────────────────────
 test("a SOLD piece with no price is still imported", () => {
@@ -33,4 +33,54 @@ test("an ordinary priced piece is imported", () => {
 test("availability we could not read is treated as live, so a priceless piece is not imported", () => {
  // `undefined` means the feed did not say. Guessing "sold" would import every draft with no price.
  assert.equal(worthImporting({ title: "Unknown", cents: 0, available: undefined }), false);
+});
+
+// ── a collection the seller has emptied ──────────────────────────────────────────────────────────
+test("a collection that read cleanly and came back empty is believed", () => {
+ // shop-vintage-charm's "USA" shows 34 pieces on our copy and NOTHING on hers. Same for frames (21),
+ // plates-bowls (26), boots and flats on ascensio. 86 products in categories the sellers cleared out
+ // months ago — frozen because an empty answer was read as a failed read, every single run, while
+ // she was told "we couldn't read these, re-run the import" for a problem that does not exist.
+ // A realistic store: 267 collections, of which she has cleared one. The fixture matters — with a
+ // single collection, "one emptied" is the whole shop and the mass-emptying guard rightly fires.
+ assert.deepEqual(unreadCollectionSlugs({
+  readCount: new Map([["dresses", 40], ["bags", 12], ["jewelry", 9]]),
+  storedCount: new Map([["usa", 34], ["dresses", 40], ["bags", 12], ["jewelry", 9]]),
+  completed: new Set(["usa", "dresses", "bags", "jewelry"]),
+ }), []);
+});
+
+test("a collection that came back empty WITHOUT a clean read is still protected", () => {
+ // The original fear, and it stands: a read that failed must never empty a curated collection.
+ // Erring this way once cost a store 417 memberships in a single re-run.
+ assert.deepEqual(unreadCollectionSlugs({
+  readCount: new Map([["dresses", 40], ["bags", 12]]),
+  storedCount: new Map([["usa", 34], ["dresses", 40], ["bags", 12]]),
+  completed: new Set(["dresses", "bags"]),
+ }), ["usa"]);
+});
+
+test("a whole store going empty at once is refused, however clean each read looked", () => {
+ // One seller clearing one category is ordinary. Every category emptying in the same pass is a
+ // store-wide failure wearing an ordinary answer — the same shape the product sweep guard already
+ // refuses. We would rather serve a stale collection than empty a seller's shop.
+ const stored = new Map([["a", 10], ["b", 10], ["c", 10], ["d", 10]]);
+ const got = unreadCollectionSlugs({ readCount: new Map(), storedCount: stored, completed: new Set(["a", "b", "c", "d"]) });
+ assert.deepEqual(got.sort(), ["a", "b", "c", "d"]);
+});
+
+test("a minority emptying is believed, and the rest are untouched", () => {
+ const stored = new Map([["a", 10], ["b", 10], ["c", 10], ["d", 10], ["e", 10], ["f", 10]]);
+ const readCount = new Map([["b", 10], ["c", 10], ["d", 10], ["e", 10], ["f", 10]]);
+ assert.deepEqual(unreadCollectionSlugs({ readCount, storedCount: stored, completed: new Set(["a", "b", "c", "d", "e", "f"]) }), []);
+});
+
+test("collections the fetch layer already failed on are always unread", () => {
+ assert.deepEqual(unreadCollectionSlugs({
+  readCount: new Map(), storedCount: new Map(), unread: ["throttled"], completed: new Set(),
+ }), ["throttled"]);
+});
+
+test("a collection we hold nothing for is nobody's business", () => {
+ assert.deepEqual(unreadCollectionSlugs({ readCount: new Map(), storedCount: new Map([["x", 0]]), completed: new Set(["x"]) }), []);
 });

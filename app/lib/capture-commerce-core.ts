@@ -78,15 +78,32 @@ export function isTitleDuplicate(p: { sourceId?: string | null; name?: string },
  *  1. the listing genuinely failed (the fetch layer reports these as `unread`), and
  *  2. it came back EMPTY for a collection we already hold members for.
  *
- * (2) is the one that does the damage. A throttled — or missing — Shopify collection answers
- * `200 {"products":[]}`, byte for byte what a truly empty collection returns, so nothing at the
- * fetch layer can separate them. These collections exist only because we captured their page, and
- * that page had products on it; so when the source reports nobody and we already hold somebody,
- * the read is wrong, not the database.
+ * (2) USED TO mean "any empty answer for a collection we hold members for", on the grounds that
+ * nothing at the fetch layer could separate a throttled read from a genuinely empty collection.
+ * That was true when it was written and is not true now: a throttled store answers 429 and the
+ * fetch layer reports it (see CollectionPageResult's `Throttled`, and its `null` for "failed for
+ * some other reason — never empty"). That layer was hardened later and this guard never caught up.
  *
- * Erring this way costs a stale collection until the next import. Erring the other way cost this
- * store 417 curated memberships in a single re-run.
+ * The cost of not catching up: shop-vintage-charm's "USA" served 34 pieces where her own shop shows
+ * none, frames 21, plates-bowls 26, and the same on ascensio's boots and flats — 86 products in
+ * categories the sellers had cleared out, frozen at capture day through every repair, while she was
+ * told "we couldn't read these, re-run the import" for a problem that did not exist. Re-running
+ * produced the identical result, for ever.
+ *
+ * A collection that does not exist also answers `200 {"products":[]}` — that much is still true and
+ * still indistinguishable. It does not matter: missing and emptied both mean she is showing nothing
+ * there, so neither should we.
+ *
+ * What remains protected, and why:
+ *  • a read the fetch layer failed on is still unread, always;
+ *  • an empty answer with no CLEAN read behind it is still unread — that is the original fear, and
+ *    erring the other way once cost a store 417 curated memberships in a single re-run;
+ *  • and a whole store emptying at once is refused however clean each answer looked. One seller
+ *    clearing one category is ordinary; every category emptying in one pass is a store-wide failure
+ *    wearing an ordinary answer. Same shape as the product sweep guard in feed-completeness.ts.
  */
+/** Above this share of a store's collections emptying in one pass, we assume the store, not the seller. */
+const IMPLAUSIBLE_EMPTYING = 0.5;
 export function unreadCollectionSlugs(opts: {
  /** collection slug → how many members THIS read of the source found. */
  readCount: Map<string, number>;
@@ -94,11 +111,21 @@ export function unreadCollectionSlugs(opts: {
  storedCount: Map<string, number>;
  /** Collections the fetch layer already knows it failed to read. */
  unread?: string[];
+ /** Collections whose listing was read to the end without error. An empty answer is only an ANSWER
+  *  when it came from one of these; otherwise it is silence, and silence is not evidence. */
+ completed?: Set<string>;
 }): string[] {
  const out = [...new Set(opts.unread || [])];
+ const completed = opts.completed ?? new Set<string>();
+ const emptied: string[] = [];
  for (const [slug, stored] of opts.storedCount) {
-  if (stored > 0 && (opts.readCount.get(slug) ?? 0) === 0 && !out.includes(slug)) out.push(slug);
+  if (stored <= 0 || (opts.readCount.get(slug) ?? 0) !== 0 || out.includes(slug)) continue;
+  if (completed.has(slug)) emptied.push(slug);
+  else out.push(slug); // empty, with no clean read behind it — protect what we hold
  }
+ // A whole store emptying in one pass is the store failing, not the seller tidying up.
+ const held = [...opts.storedCount.values()].filter((n) => n > 0).length;
+ if (held > 0 && emptied.length / held > IMPLAUSIBLE_EMPTYING) out.push(...emptied.filter((s) => !out.includes(s)));
  return out;
 }
 

@@ -268,6 +268,8 @@ export async function syncCollectionMembership(
  // How much of each collection SHE lists as unavailable — the evidence for whether she keeps sold
  // pieces there. Empty for a scrape we could not do, which is correctly "we do not know".
  let stockBySlug = new Map<string, { unavailable: number; total: number }>();
+ // Collections read to the end without error. Only their EMPTY answers are believed.
+ let completedSlugs = new Set<string>();
  // collection slug → its products in the SELLER'S OWN ORDER, straight off the listings we just
  // paged through. Handed back so syncCollectionOrder can use today's order instead of the one the
  // collection page happened to have on crawl day. Only the scrape rung fills it: the CONNECTED
@@ -283,6 +285,7 @@ export async function syncCollectionMembership(
    membership = read.membership;
    liveOrder = read.order;
    stockBySlug = read.stock;
+   completedSlugs = read.completed;
    unreadSlugs = read.incomplete;
   } catch {
    // The listing pass failed outright, so we know NOTHING about membership. Falling through to
@@ -321,7 +324,7 @@ export async function syncCollectionMembership(
     if (s) storedCount.set(s, (storedCount.get(s) ?? 0) + 1);
    }
   }
-  unreadSlugs = unreadCollectionSlugs({ readCount, storedCount, unread: unreadSlugs });
+  unreadSlugs = unreadCollectionSlugs({ readCount, storedCount, unread: unreadSlugs, completed: completedSlugs });
  }
  const unreadIds = new Set(unreadSlugs.map((s) => colBySlug.get(s)).filter(Boolean) as string[]);
  // A collection we have judged unread must not hand over an order either. Belt and braces — an

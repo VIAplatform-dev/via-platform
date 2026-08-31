@@ -568,6 +568,8 @@ export type CollectionMembershipRead = {
   *  zero-of-zero would read as "she has no sold pieces", which is how a failed read would come to
   *  empty a seller's archive. See app/lib/collection-sold-policy.ts. */
  stock: Map<string, { unavailable: number; total: number }>;
+ /** Collections read to the end without error — the only ones whose EMPTY answer we believe. */
+ completed: Set<string>;
  /** Collections whose listing could NOT be read in full. Whatever they contributed to `membership`
   *  is partial, so the caller must never read it as "these are all the members". */
  incomplete: string[];
@@ -621,7 +623,7 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
  const out = new Map<string, string[]>();
  for (const [k, v] of read.membership) out.set(k, [...v]);
  // The order comes off the very same pages — no extra request. See syncCollectionOrder().
- return { membership: out, order: read.order, stock: read.stock, incomplete: read.incomplete };
+ return { membership: out, order: read.order, stock: read.stock, completed: read.completed, incomplete: read.incomplete };
 }
 
 /** Pull a store from a URL: Shopify public products.json, then Squarespace JSON. */

@@ -63,6 +63,14 @@ export type MembershipRead = {
   * which is how a network error would come to empty a seller's archive.
   */
  stock: Map<string, { unavailable: number; total: number }>;
+ /**
+  * Collections whose listing we read to the end without error.
+  *
+  * An empty answer is only an ANSWER when it came from one of these. Without this the guard could
+  * not tell "she cleared this category out" from "the read failed", and answered both by keeping
+  * months-old stock — 86 products across two stores, frozen through every repair.
+  */
+ completed: Set<string>;
  /** Collections we could not read. Their contents must be left alone, not overwritten. */
  incomplete: string[];
  /** Collections beyond the ceiling, never asked about. Recorded rather than silently dropped. */
@@ -112,6 +120,7 @@ export async function readCollectionMembership(
 
  const membership = new Map<string, Set<string>>();
  const stock = new Map<string, { unavailable: number; total: number }>();
+ const completed = new Set<string>();
  const order = new Map<string, string[]>();
  const incomplete: string[] = [];
  const truncated: string[] = [];
@@ -150,13 +159,16 @@ export async function readCollectionMembership(
    // As much of it as we will ever read in one pass. Usable, but ours is a floor not a total.
    if (page === maxPages) { complete = true; truncated.push(slug); }
   }
+  // Only a finished read may set an order, or have its EMPTY answer believed. A truncated read
+  // qualifies: what we hold is the feed's first N, a true prefix of the seller's order, and the
+  // tail simply keeps the positions it already had. A half-read one does not.
   if (!complete) incomplete.push(slug);
-  // Only a finished read may set an order. A truncated one qualifies: what we hold is the feed's
-  // first N, which is a true prefix of the seller's order, and the tail simply keeps the positions
-  // it already had. A half-read one does not — see the note on `order`.
-  else if (sequence.length) order.set(slug, sequence);
+  else {
+   completed.add(slug);
+   if (sequence.length) order.set(slug, sequence);
+  }
  }
- return { membership, order, stock, incomplete, notAttempted, truncated, throttleHits };
+ return { membership, order, stock, completed, incomplete, notAttempted, truncated, throttleHits };
 
  /** One page, with the store's own answer respected. Null means we could not read it. */
  async function readPage(slug: string, page: number): Promise<CollectionProduct[] | null> {
