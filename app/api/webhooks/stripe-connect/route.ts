@@ -5,7 +5,7 @@ import { getSellerById } from "@/app/lib/db/sellers";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
-import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus } from "@/app/lib/db/orders";
+import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderTax } from "@/app/lib/db/orders";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { logError } from "@/app/lib/error-log";
 import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
@@ -41,7 +41,7 @@ type ShipAddr = { line1?: string | null; line2?: string | null; city?: string | 
 // flow (Buy-now / hosted) and the Payment Element flow (embedded card + wallets).
 // Idempotent on the PaymentIntent, so a session payment that also fires
 // payment_intent.succeeded never records twice.
-async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null }) {
+async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null; taxCents?: number | null; taxJurisdiction?: string | null }) {
  if (!o.pi || !(await orderExistsForPaymentIntent(o.pi))) {
  // Resolve the store slug once (all items share the seller) for the clean event stream.
  const sellerSlug = (await getSellerById(o.sellerId).catch(() => null))?.slug || null;
@@ -61,6 +61,9 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  currency: (sold.currency || o.currency || "usd").toUpperCase(),
  stripePaymentIntent: o.pi,
  });
+ // Tax sits on the SESSION, not the line item, so it lands whole on the first
+ // order of a multi-item checkout — the same rule shipping already follows.
+ if (o.taxCents != null && idx === 0) await setOrderTax(order.id, o.taxCents, o.taxJurisdiction ?? null).catch(() => {});
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
  // Clean event stream: the purchase, canonical items.id, at the price actually charged.
  if (sellerSlug) recordEvent({ type: "purchase", storeSlug: sellerSlug, itemId, priceCents: salePriceCents, surface: "storefront" }).catch(() => {});
@@ -166,7 +169,11 @@ export async function POST(request: NextRequest) {
  }
  const buyerEmail = cust?.email ?? null;
  const shippingPaidCents = md.shipping_paid_cents ? parseInt(md.shipping_paid_cents, 10) || 0 : 0;
- await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null });
+ await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null,
+  // Stripe Tax's own total for this session, when the store has it switched on.
+  taxCents: typeof s.total_details?.amount_tax === "number" ? s.total_details.amount_tax : null,
+  taxJurisdiction: md.tax_jurisdiction || null,
+ });
  // Per-store discount redemption (idempotent per store+code+order via the unique index).
  if (md.discount_code && md.discount_store) {
  recordDiscountRedemption({

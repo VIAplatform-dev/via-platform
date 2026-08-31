@@ -35,7 +35,10 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  {
  label: "Store",
  items: [
- { href: `${B}/storefront`, label: "Storefront", icon: Store },
+ {
+ href: `${B}/storefront`, label: "Storefront", icon: Store,
+ children: [{ href: `${B}/storefront/domain`, label: "Your domain" }],
+ },
  { href: `${B}/import`, label: "Bring your site", icon: Plug },
  {
  href: `${B}/customers`, label: "Customers", icon: Users,
@@ -61,7 +64,10 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { href: `${B}/payments`, label: "Payments", icon: CreditCard },
  { href: `${B}/billing`, label: "Plan & billing", icon: Sparkles },
  { href: `${B}/dashboard`, label: "Analytics", icon: BarChart3 },
- { href: `${B}/settings`, label: "Settings", icon: Settings },
+ {
+ href: `${B}/settings`, label: "Settings", icon: Settings,
+ children: [{ href: `${B}/settings/tax`, label: "Sales tax" }],
+ },
  ],
  },
  { label: "Platform", items: [

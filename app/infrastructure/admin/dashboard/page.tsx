@@ -582,6 +582,16 @@ function Analytics() {
         </TechCard>
        )}
 
+       {sales.taxCollectedCents > 0 && (
+        <TechCard className="p-4">
+         <p className="text-[12px] text-stone-600">
+          <StatusPill tone="info">Held for tax</StatusPill>{" "}
+          {money(sales.taxCollectedCents)} of sales tax was collected from buyers this period. It isn&apos;t revenue —
+          it&apos;s held on their behalf until you file, so it&apos;s excluded from the totals above.
+         </p>
+        </TechCard>
+       )}
+
        {sales.returns.orders > 0 && (
         <TechCard className="p-4">
          <p className="text-[12px] text-stone-600">
