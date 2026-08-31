@@ -6,7 +6,8 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, AddressElement, useStripe, useElements } from "@stripe/react-stripe-js";
 
 type LineItem = { id: string; title: string; priceCents: number; currency: string; image: string | null };
-type Info = { items: LineItem[]; storeName: string; freeShipping: boolean; subtotalCents: number; publishableKey?: string };
+type Pickup = { available: boolean; address: string | null; instructions: string | null };
+type Info = { items: LineItem[]; storeName: string; freeShipping: boolean; subtotalCents: number; publishableKey?: string; pickup?: Pickup };
 type Addr = { name: string; line1: string; line2: string; city: string; state: string; zip: string; country: string; phone: string };
 
 const input = "w-full bg-white border border-black/30 px-3 py-2.5 text-sm text-black placeholder-black/40 outline-none focus:border-black transition rounded";
@@ -49,12 +50,21 @@ function CheckoutInner() {
  const itemId = sp.get("item") || "";
  const offerToken = sp.get("offer") || ""; // accepted binding offer → checkout at the agreed price
  const isCart = sp.get("cart") === "1";
+ // WHICH store's bag is being checked out. On a hosted storefront this page is served from the
+ // seller's own domain and the host answers it; on VYA's domain every store shares one address, so
+ // the page that sent the shopper here names the store (see storefront-cart-scope).
+ const storeSlug = sp.get("store") || "";
+ const storeQ = storeSlug ? `?store=${encodeURIComponent(storeSlug)}` : "";
  const [info, setInfo] = useState<Info | null>(null);
  const [loadErr, setLoadErr] = useState<string | null>(null);
  const [email, setEmail] = useState("");
  const [a, setA] = useState({ name: "", line1: "", line2: "", city: "", state: "", zip: "", country: "US", phone: "" });
  const [err, setErr] = useState<string | null>(null);
  const [shipCents, setShipCents] = useState<number | null>(null); // flat shipping once the address is known
+ // Delivery or collection. This is only what she PICKED — the server re-decides it (and the price)
+ // on every quote and again when the card is charged. See app/lib/checkout-delivery.ts.
+ const [delivery, setDelivery] = useState<"ship" | "pickup">("ship");
+ const [collect, setCollect] = useState<{ address: string | null; instructions: string | null } | null>(null);
  const [clientSecret, setClientSecret] = useState<string | null>(null);
  const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
  const [payTotal, setPayTotal] = useState(0);
@@ -72,7 +82,7 @@ function CheckoutInner() {
  let cancelled = false;
  (async () => {
  try {
- const r = await fetch(isCart ? `/api/storefront/cart-checkout-info` : `/api/storefront/checkout-info?item=${itemId}${offerToken ? `&offer=${offerToken}` : ""}`);
+ const r = await fetch(isCart ? `/api/storefront/cart-checkout-info${storeQ}` : `/api/storefront/checkout-info?item=${itemId}${offerToken ? `&offer=${offerToken}` : ""}`);
  const d = await r.json();
  if (cancelled) return;
  if (!r.ok) { setLoadErr(d.error || "Couldn’t load this checkout."); return; }
@@ -82,18 +92,23 @@ function CheckoutInner() {
  }
  })();
  return () => { cancelled = true; };
- }, [itemId, isCart, offerToken]);
+ }, [itemId, isCart, offerToken, storeQ]);
 
  const cur = info?.items[0]?.currency || "USD";
  const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format((c || 0) / 100);
  const resetPrep = () => { setShipCents(null); setClientSecret(null); setStripeP(null); preparedKey.current = ""; };
  // Load the Address Element's Stripe instance once the publishable key arrives with checkout info.
  useEffect(() => { if (info?.publishableKey && !addrStripe) setAddrStripe(loadStripe(info.publishableKey)); }, [info, addrStripe]);
- const addrValid = !!(a.line1 && a.city && a.state && a.zip && email.includes("@"));
+ // Collection is offered only when the store actually offers it (address and all) — the same
+ // question the server asks. Only the cart flow carries it; a single-item Buy-now is always posted.
+ const pickupAvailable = !!info?.pickup?.available;
+ const collecting = delivery === "pickup" && pickupAvailable;
+ // Collection needs an email and nothing else. Delivery needs somewhere to send it.
+ const readyToPay = email.includes("@") && (collecting || !!(a.line1 && a.city && a.state && a.zip));
  const addrKey = `${email}|${a.line1}|${a.line2}|${a.city}|${a.state}|${a.zip}|${a.country}`;
- // Re-prepare the PaymentIntent when the amount could change — address, or (single item) the
- // applied discount / offer — so the embedded card always charges the right total.
- const prepKey = `${addrKey}|${discount ? `${discount.code}:${discount.offCents}:${discount.freeShipping}` : ""}|${offerToken}`;
+ // Re-prepare the PaymentIntent when the amount could change — address, delivery method, or (single
+ // item) the applied discount / offer — so the embedded card always charges the right total.
+ const prepKey = `${collecting ? "pickup" : "ship"}|${addrKey}|${discount ? `${discount.code}:${discount.offCents}:${discount.freeShipping}` : ""}|${offerToken}`;
 
  // Compute flat shipping and, for a cart, create the PaymentIntent so the card mounts inline —
  // all on this one page, no "continue" steps. Reuses the same endpoints the old flow used.
@@ -102,29 +117,38 @@ function CheckoutInner() {
  setErr(null);
  try {
  let ship = 0;
- if (!info.freeShipping) {
+ // Quote even a free-shipping bag when she's collecting, so the page can show her where to go.
+ if (!info.freeShipping || collecting) {
  const toAddress = { name: a.name, street1: a.line1, street2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone };
- const r = await fetch(isCart ? "/api/storefront/cart-shipping" : "/api/storefront/shipping-rates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(isCart ? { toAddress } : { itemId, toAddress }) });
+ const r = await fetch(isCart ? `/api/storefront/cart-shipping${storeQ}` : "/api/storefront/shipping-rates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(isCart ? { toAddress, delivery: collecting ? "pickup" : "ship" } : { itemId, toAddress }) });
  const d = await r.json();
  if (!r.ok) { setErr(d.error || "Couldn’t calculate shipping."); preparedKey.current = ""; return; }
  ship = d.free ? 0 : (d.rates?.[0]?.costCents || 0);
+ // The SERVER says which it is. If it disagrees with her (the seller switched collection off
+ // while she was deciding), follow the server — and the postage comes back with it.
+ if (d.delivery === "pickup") setCollect({ address: d.collectFrom ?? null, instructions: d.instructions ?? null });
+ else { setCollect(null); if (collecting) { setDelivery("ship"); setErr("This store has stopped offering collection — you’ll need a delivery address."); preparedKey.current = ""; return; } }
  }
  setShipCents(ship);
  // Create the PaymentIntent for BOTH cart and single item, so the card mounts inline either way
  // (single item used to redirect to Stripe-hosted Checkout — now it's embedded like the cart).
  const buyer = { email, name: a.name, phone: a.phone };
  const shipAddr = { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country };
- const r2 = await fetch(isCart ? "/api/storefront/cart-intent" : "/api/storefront/item-intent", {
+ const r2 = await fetch(isCart ? `/api/storefront/cart-intent${storeQ}` : "/api/storefront/item-intent", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify(
  isCart
- ? { buyer, ship: shipAddr, shippingCostCents: ship }
+ ? { buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship" }
  : { itemId, offer: offerToken || undefined, discountCode: discount ? discountCode.trim() : undefined, buyer, ship: shipAddr, shippingCostCents: ship },
  ),
  });
  const d2 = await r2.json();
  if (!r2.ok || !d2.clientSecret) { setErr(d2.error || "Couldn’t start payment."); preparedKey.current = ""; return; }
+ // The intent is the last word on what's being charged: it re-derived both the method and the
+ // postage. Show what it decided, not what we asked for.
+ if (d2.delivery === "pickup") { setShipCents(0); setCollect({ address: d2.collectFrom ?? null, instructions: d2.collectInstructions ?? null }); }
+ else if (typeof d2.shippingCents === "number") { setShipCents(d2.shippingCents); setCollect(null); if (collecting) setDelivery("ship"); }
  setPayTotal(d2.amountCents);
  setStripeP(loadStripe(d2.publishableKey, { stripeAccount: d2.stripeAccount }));
  setClientSecret(d2.clientSecret);
@@ -133,12 +157,12 @@ function CheckoutInner() {
 
  // Auto-prepare once the address is complete (debounced) — the card appears on the same page.
  useEffect(() => {
- if (!info || !addrValid || preparedKey.current === prepKey) return;
+ if (!info || !readyToPay || preparedKey.current === prepKey) return;
  setClientSecret(null); setStripeP(null); // drop a stale card while re-preparing (address/discount changed)
  const t = setTimeout(() => { preparedKey.current = prepKey; prepare(); }, 600);
  return () => clearTimeout(t);
  // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [info, addrValid, prepKey]);
+ }, [info, readyToPay, prepKey]);
 
  // Validate a discount code for THIS store (server scopes it to the item's seller).
  async function applyDiscount() {
@@ -182,6 +206,35 @@ function CheckoutInner() {
  <input className={input} value={email} onChange={(e) => { setEmail(e.target.value); resetPrep(); }} placeholder="Email (for your receipt)" inputMode="email" />
  </section>
 
+ {/* Delivery or collection — only shown when this store actually offers collection. */}
+ {pickupAvailable && (
+ <section className="mb-8">
+ <span className={label}>How you’ll get it</span>
+ <div className="grid gap-2 sm:grid-cols-2">
+ {([
+ ["ship", "Deliver to me", info.freeShipping ? "Free shipping" : shipCents === null ? "Shipping calculated at your address" : money(shipCents)],
+ ["pickup", "Collect in store", "No shipping to pay"],
+ ] as const).map(([m, title, note]) => (
+ <button key={m} type="button" onClick={() => { if (delivery !== m) { setDelivery(m); resetPrep(); setErr(null); } }}
+ className={`text-left border px-4 py-3 transition ${delivery === m ? "border-[#111111] bg-[#111111]/[0.03]" : "border-[#111111]/20 hover:border-[#111111]/45"}`}>
+ <span className="block text-sm">{title}</span>
+ <span className="block text-[12px] text-[#111111]/50">{note}</span>
+ </button>
+ ))}
+ </div>
+ {collecting && (
+ <div className="mt-3 border border-[#111111]/12 bg-white px-4 py-3 text-[13px]">
+ <p className="text-[#111111]/60">Collect from</p>
+ <p className="mt-0.5">{collect?.address || info.pickup?.address}</p>
+ {(collect?.instructions || info.pickup?.instructions) && <p className="mt-1.5 text-[12px] text-[#111111]/60">{collect?.instructions || info.pickup?.instructions}</p>}
+ <p className="mt-1.5 text-[12px] text-[#111111]/50">{info.storeName} will email you when it’s ready to collect.</p>
+ </div>
+ )}
+ </section>
+ )}
+
+ {/* Nothing is being posted on a collection, so there's no address to ask for. */}
+ {!collecting && (
  <section className="mb-8">
  <span className={label}>Shipping address</span>
  {addrStripe ? (
@@ -192,11 +245,12 @@ function CheckoutInner() {
  <div className="border border-[#111111]/12 bg-white px-4 py-6 text-center text-[13px] text-[#111111]/40">Loading address…</div>
  )}
  </section>
+ )}
 
  <section>
  <span className={label}>Payment</span>
- {!addrValid ? (
- <div className="border border-dashed border-[#111111]/20 bg-white/40 px-4 py-6 text-center text-[13px] text-[#111111]/50">Enter your shipping address above to continue to payment.</div>
+ {!readyToPay ? (
+ <div className="border border-dashed border-[#111111]/20 bg-white/40 px-4 py-6 text-center text-[13px] text-[#111111]/50">{collecting ? "Enter your email above to continue to payment." : "Enter your shipping address above to continue to payment."}</div>
  ) : clientSecret && stripeP ? (
  <Elements stripe={stripeP} options={{ clientSecret, appearance }}>
  <PayForm total={total} money={money} storeName={info.storeName} />
@@ -237,7 +291,9 @@ function CheckoutInner() {
  {!isCart && discount && (discountOff > 0 || discount.freeShipping) && (
  <div className="flex justify-between text-green-700"><span>Discount ({discount.code})</span><span>{discount.freeShipping && discountOff === 0 ? "Free shipping" : `−${money(discountOff)}`}</span></div>
  )}
- <div className="flex justify-between"><span className="text-[#111111]/60">Shipping</span><span>{info.freeShipping || codeFreeShip ? "Free" : shownShip === null ? <span className="text-[#111111]/40">Calculated at address</span> : money(shownShip)}</span></div>
+ {collecting
+ ? <div className="flex justify-between"><span className="text-[#111111]/60">Shipping</span><span>Collecting in store</span></div>
+ : <div className="flex justify-between"><span className="text-[#111111]/60">Shipping</span><span>{info.freeShipping || codeFreeShip ? "Free" : shownShip === null ? <span className="text-[#111111]/40">Calculated at address</span> : money(shownShip)}</span></div>}
  <div className="flex justify-between border-t border-[#111111]/10 pt-2 mt-1 text-base font-semibold"><span>Total</span><span>{money(total)}</span></div>
  </div>
  </div>

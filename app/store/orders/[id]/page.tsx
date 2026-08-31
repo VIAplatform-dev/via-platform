@@ -26,6 +26,11 @@ type Order = {
  labelUrl: string | null;
  trackingNumber: string | null;
  trackingUrl: string | null;
+ // Delivered or collected in store. Absent on every order placed before collection existed — those
+ // are deliveries, so anything but "pickup" reads as one.
+ deliveryMethod?: "ship" | "pickup";
+ collectFrom?: string | null;
+ instructions?: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = { paid: "Paid", shipped: "Shipped", delivered: "Delivered", refunded: "Refunded" };
@@ -160,6 +165,7 @@ export default function OrderDetailPage() {
  const payout = order.amountCents - stripeFee - fee;
  const img = order.itemImages?.[0] || null;
  const addrLines = [order.buyerName, order.shipLine1, order.shipLine2, [order.shipCity, order.shipState, order.shipPostal].filter(Boolean).join(", "), order.shipCountry].filter(Boolean) as string[];
+ const isPickup = order.deliveryMethod === "pickup";
 
  return (
  <div className="mx-auto max-w-4xl px-6 py-10 sm:px-8">
@@ -167,6 +173,7 @@ export default function OrderDetailPage() {
  <div className="mb-7 mt-3 flex items-center gap-3">
  <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-stone-900">Order <span className="font-mono text-[18px] tabular-nums text-stone-400">{fmtOrderNo(order.orderNo)}</span></h1>
  <Badge tone={STATUS_TONE[order.status] || "neutral"} dot>{STATUS_LABEL[order.status] || order.status}</Badge>
+ {isPickup && <Badge tone="info">Collection</Badge>}
  {order.paidAt && <span className="text-[13px] text-stone-400">{new Date(order.paidAt).toLocaleString()}</span>}
  </div>
 
@@ -190,9 +197,16 @@ export default function OrderDetailPage() {
 
  {/* Fulfillment */}
  <Card>
- <CardHeader title="Fulfillment" />
+ <CardHeader title={isPickup ? "Collection" : "Fulfillment"} />
  <div className="px-5 py-4">
- {order.labelUrl ? (
+ {isPickup ? (
+ // Collected in store: no label, no tracking, nothing to post. Just hand it over.
+ <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
+ <p className="text-[13px] font-medium text-stone-900">Collect in store — no label to print.</p>
+ <p className="mt-1 text-[13px] text-stone-600">{order.buyerName || order.buyerEmail || "The buyer"} is picking this up{order.collectFrom ? <> at <b className="text-stone-900">{order.collectFrom}</b></> : null}. Mark it delivered when they’ve taken it.</p>
+ {order.instructions && <p className="mt-1.5 text-xs text-stone-500">You told them: “{order.instructions}”</p>}
+ </div>
+ ) : order.labelUrl ? (
  <div className="mb-4">
  {order.status !== "shipped" && order.status !== "delivered" && <p className="mb-2 text-[13px] text-stone-600">✓ Prepaid label ready — print it, drop off, then <b>Mark shipped</b>.</p>}
  <a href={order.labelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-md bg-[#5D0F17] px-4 text-[13px] font-medium text-white transition hover:bg-[#4a0c12]">Print label ↗</a>
@@ -212,9 +226,10 @@ export default function OrderDetailPage() {
  )}
  {labelMsg && <p className="mb-3 text-xs text-red-600">{labelMsg}</p>}
  <div className="flex flex-wrap gap-2">
- {order.status === "paid" && <Button size="sm" variant="secondary" onClick={markShipped} disabled={busy}>Mark shipped</Button>}
+ {order.status === "paid" && !isPickup && <Button size="sm" variant="secondary" onClick={markShipped} disabled={busy}>Mark shipped</Button>}
+ {order.status === "paid" && isPickup && <Button size="sm" variant="secondary" onClick={() => setStatus("delivered")} disabled={busy}>Mark collected</Button>}
  {order.status === "shipped" && <Button size="sm" variant="secondary" onClick={() => setStatus("delivered")} disabled={busy}>Mark delivered</Button>}
- {(order.status === "shipped" || order.status === "delivered") && <Button size="sm" variant="secondary" onClick={sendReturnLabel} disabled={retBusy}>{retBusy ? "Creating…" : "Send return label"}</Button>}
+ {!isPickup && (order.status === "shipped" || order.status === "delivered") && <Button size="sm" variant="secondary" onClick={sendReturnLabel} disabled={retBusy}>{retBusy ? "Creating…" : "Send return label"}</Button>}
  {(order.status === "shipped" || order.status === "delivered") && !rejecting && <Button size="sm" variant="ghost" onClick={() => { setRejecting(true); setRejMsg(null); }}>Reject return</Button>}
  {order.status !== "refunded" && <Button size="sm" variant="danger" onClick={() => setStatus("refunded")} disabled={busy}>Refund order</Button>}
  </div>
@@ -262,7 +277,10 @@ export default function OrderDetailPage() {
  <Card>
  <CardHeader title="Customer" />
  <div className="px-5 py-4">
- <p className="text-[13px] leading-relaxed text-stone-700">{addrLines.length ? addrLines.map((l, i) => <span key={i}>{l}<br /></span>) : "—"}</p>
+ {/* A collection has no delivery address — say so, rather than showing a bare dash. */}
+ {isPickup
+ ? <p className="text-[13px] leading-relaxed text-stone-700">{order.buyerName || "—"}<br /><span className="text-stone-500">Collecting in store — no delivery address.</span></p>
+ : <p className="text-[13px] leading-relaxed text-stone-700">{addrLines.length ? addrLines.map((l, i) => <span key={i}>{l}<br /></span>) : "—"}</p>}
  <div className="mt-3 space-y-1 text-[13px] text-stone-500">
  {order.buyerEmail && <p className="truncate">{order.buyerEmail}</p>}
  {order.buyerPhone && <p>{order.buyerPhone}</p>}

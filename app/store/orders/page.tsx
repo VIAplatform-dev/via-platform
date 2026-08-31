@@ -15,6 +15,8 @@ type Order = {
  buyerEmail: string | null;
  status: string;
  paidAt: string | null;
+ /** "pickup" = collected in store: no label to print. Absent on orders placed before collection existed. */
+ deliveryMethod?: "ship" | "pickup";
 };
 
 type ImportedOrder = {
@@ -126,7 +128,11 @@ export default function OrdersPage() {
  <td className="max-w-[260px] truncate px-5 py-3 font-medium text-stone-900">{o.itemTitle || "Item"}</td>
  <td className="px-5 py-3 text-stone-600">{o.buyerEmail || "—"}</td>
  <td className="px-5 py-3 tabular-nums text-stone-500">{o.paidAt ? new Date(o.paidAt).toLocaleDateString() : "—"}</td>
- <td className="px-5 py-3"><Badge tone={tone(o.status)} dot>{statusLabel(o.status)}</Badge></td>
+ {/* "needs shipping" is a lie for a collection — nothing is being posted. */}
+ <td className="px-5 py-3">
+ <Badge tone={tone(o.status)} dot>{o.deliveryMethod === "pickup" && o.status === "paid" ? "awaiting collection" : statusLabel(o.status)}</Badge>
+ {o.deliveryMethod === "pickup" && <span className="ml-1.5 align-middle text-[11px] text-stone-400">collection</span>}
+ </td>
  <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-900">${(o.amountCents / 100).toFixed(2)}</td>
  </tr>
  ))}

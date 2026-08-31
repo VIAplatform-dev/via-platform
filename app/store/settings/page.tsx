@@ -58,6 +58,11 @@ export default function SettingsPage() {
  const [mode, setMode] = useState<ShipMode>("buyer_pays");
  const [threshold, setThreshold] = useState("");
  const [from, setFrom] = useState<ShipFrom>({ country: "US" });
+ // Collect in store. `pickupOn` is only the toggle — an address is what makes it a real offer, so
+ // the save below refuses the pair (see pickupOffered in app/lib/pickup-core.ts).
+ const [pickupOn, setPickupOn] = useState(false);
+ const [pickupAddr, setPickupAddr] = useState<ShipFrom>({ country: "US" });
+ const [pickupNote, setPickupNote] = useState("");
  const [sBusy, setSBusy] = useState(false);
  const [sSaved, setSSaved] = useState(false);
  const [sErr, setSErr] = useState<string | null>(null);
@@ -100,6 +105,9 @@ export default function SettingsPage() {
   setMode(d.mode || "buyer_pays");
   setThreshold(d.freeThresholdUsd != null ? String(d.freeThresholdUsd) : "");
   setFrom(d.shipFrom || { country: "US" });
+  setPickupOn(!!d.pickup?.enabled);
+  setPickupAddr(d.pickup?.address || { country: "US" });
+  setPickupNote(d.pickup?.instructions || "");
  }).catch(() => {});
  fetch("/api/store/email-domain").then((r) => (r.ok ? r.json() : null)).then((d) => d && applySender(d)).catch(() => {});
  }, []);
@@ -167,8 +175,15 @@ export default function SettingsPage() {
  setSBusy(true); setSSaved(false); setSErr(null);
  const need = ["street1", "city", "state", "zip"] as const;
  if (need.some((k) => !(from[k] || "").trim())) { setSErr("Add a full ship-from address (street, city, state, zip)."); setSBusy(false); return; }
- const r = await fetch("/api/store/shipping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, freeThresholdUsd: threshold === "" ? null : Number(threshold), shipFrom: from }) }).catch(() => null);
- if (r && r.ok) setSSaved(true); else setSErr("Couldn’t save.");
+ // A collection toggle with nowhere to collect from is not an offer — don't let her publish one and
+ // believe it's live. The server refuses it too; this just says so before the round trip.
+ if (pickupOn && (!(pickupAddr.street1 || "").trim() || !(pickupAddr.city || "").trim())) {
+  setSErr("Add the street and city buyers will collect from, or turn collection off."); setSBusy(false); return;
+ }
+ const pickup = pickupOn ? { enabled: true, ...pickupAddr, instructions: pickupNote.trim() || null } : { enabled: false };
+ const r = await fetch("/api/store/shipping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode, freeThresholdUsd: threshold === "" ? null : Number(threshold), shipFrom: from, pickup }) }).catch(() => null);
+ if (r && r.ok) setSSaved(true);
+ else { const d = r ? await r.json().catch(() => null) : null; setSErr(d?.error || "Couldn’t save."); }
  setSBusy(false);
  }
 
@@ -180,6 +195,9 @@ export default function SettingsPage() {
  }
 
  const setF = (k: keyof ShipFrom, v: string) => { setFrom((f) => ({ ...f, [k]: v })); setSSaved(false); };
+ const setPk = (k: keyof ShipFrom, v: string) => { setPickupAddr((f) => ({ ...f, [k]: v })); setSSaved(false); setSErr(null); };
+ // Mirrors pickupOffered on the server: street + city, or it isn't an offer.
+ const pickupReady = !!(pickupAddr.street1 || "").trim() && !!(pickupAddr.city || "").trim();
 
  return (
  <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
@@ -346,6 +364,37 @@ export default function SettingsPage() {
     <span className="text-[13px] text-stone-500">Free shipping at $</span>
     <div className="w-24"><Input value={threshold} onChange={(e) => { setThreshold(e.target.value.replace(/[^0-9.]/g, "")); setSSaved(false); }} inputMode="decimal" placeholder="150" /></div>
     <span className="text-[13px] text-stone-500">and up</span>
+    </div>
+   )}
+   </div>
+
+   {/* Collect in store — the option a marketplace can't give a seller with a shop. */}
+   <div className="rounded-lg border border-stone-200 p-4">
+   <label className="flex cursor-pointer items-start gap-3">
+    <input type="checkbox" checked={pickupOn} onChange={(e) => { setPickupOn(e.target.checked); setSSaved(false); setSErr(null); }} className="mt-0.5" style={{ accentColor: ACCENT }} />
+    <span>
+    <span className="text-[13px] font-medium text-stone-900">Let buyers collect in store</span><br />
+    <span className="text-xs text-stone-500">They pick “Collect in store” at checkout, pay no shipping, and you print no label.</span>
+    </span>
+   </label>
+
+   {pickupOn && (
+    <div className="mt-4 space-y-3 border-t border-stone-100 pt-4">
+    <Field label="Where they collect from">
+     <div className="grid grid-cols-2 gap-2">
+     <Input className="col-span-2" value={pickupAddr.street1 || ""} onChange={(e) => setPk("street1", e.target.value)} placeholder="Street address" />
+     <Input className="col-span-2" value={pickupAddr.street2 || ""} onChange={(e) => setPk("street2", e.target.value)} placeholder="Unit, floor (optional)" />
+     <Input value={pickupAddr.city || ""} onChange={(e) => setPk("city", e.target.value)} placeholder="City" />
+     <Input value={pickupAddr.state || ""} onChange={(e) => setPk("state", e.target.value)} placeholder="State" />
+     <Input value={pickupAddr.zip || ""} onChange={(e) => setPk("zip", e.target.value)} placeholder="ZIP" />
+     <Input value={pickupAddr.country || "US"} onChange={(e) => setPk("country", e.target.value)} placeholder="Country (US)" />
+     </div>
+    </Field>
+    <Field label="Collection hours & instructions (optional)">
+     <textarea value={pickupNote} onChange={(e) => { setPickupNote(e.target.value.slice(0, 400)); setSSaved(false); }} rows={2}
+     placeholder="Wed–Sun, 11am–6pm. Ask for Scottie at the counter." className={ta} />
+    </Field>
+    {!pickupReady && <p className="text-xs text-amber-700">Buyers can’t collect from nowhere — add at least a street and city, or collection stays off.</p>}
     </div>
    )}
    </div>
