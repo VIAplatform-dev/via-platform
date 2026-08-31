@@ -328,3 +328,30 @@ test("an object that is not under a theme stem is ignored", () => {
  assert.equal(idx.size, 1, "still indexed by its own stem, not dropped");
  assert.equal(idx.get("products/x/photo")?.url, "https://blob/p.jpg");
 });
+
+test("a rimg size template is repointed at our copy, not left on the seller's CDN", () => {
+ // bag-crush's theme lazy-loads through `data-rimg-template`: its script reads that attribute,
+ // substitutes a width, blanks `src` to an SVG placeholder and loads from there. We were copying
+ // the image to Blob and setting `src` correctly, then the theme overwrote `src` from a template
+ // still pointing at mybagcrush.com — 1,391 references across her 44 pages, every one of which
+ // would die the day she cancels Shopify. `src` looked right in the markup, so nothing caught it.
+ const map = new Map([["https://shop.example.com/cdn/shop/files/bag_1024x.jpg?v=9", "https://blob.test/theme/x/aa.jpg"]]);
+ const html = `<img src="https://blob.test/theme/x/aa.jpg" data-rimg="lazy" data-rimg-template="//shop.example.com/cdn/shop/files/bag_{size}.jpg?v=9">`;
+ const out = rewritePageUrls(html, map, "https://shop.example.com");
+ assert.match(out, /data-rimg-template="https:\/\/blob\.test\/theme\/x\/aa\.jpg"/);
+ assert.doesNotMatch(out, /\{size\}/); // no placeholder left for the theme to substitute
+ assert.doesNotMatch(out, /shop\.example\.com/);
+});
+
+test("a rimg template we have no copy of is left exactly as it was", () => {
+ // Better a working image on her CDN than a broken one on ours.
+ const map = new Map([["https://shop.example.com/cdn/other.jpg", "https://blob.test/theme/x/bb.jpg"]]);
+ const html = `<img data-rimg-template="//shop.example.com/cdn/shop/files/bag_{size}.jpg?v=9">`;
+ assert.equal(rewritePageUrls(html, map, "https://shop.example.com"), html);
+});
+
+test("a root-relative rimg template resolves against the origin", () => {
+ const map = new Map([["https://shop.example.com/cdn/shop/files/b_1024x.jpg", "https://blob.test/theme/x/cc.jpg"]]);
+ const html = `<img data-rimg-template="/cdn/shop/files/b_{size}.jpg">`;
+ assert.match(rewritePageUrls(html, map, "https://shop.example.com"), /data-rimg-template="https:\/\/blob\.test\/theme\/x\/cc\.jpg"/);
+});

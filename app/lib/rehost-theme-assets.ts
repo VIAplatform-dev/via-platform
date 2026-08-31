@@ -332,6 +332,23 @@ export function rewritePageUrls(html: string, map: Map<string, string>, origin: 
   if (m) { add(abs, "http:" + m[1] + m[2], to); add(abs, "https:" + m[1] + m[2], to); add(rel, m[1] + m[2], to); }
   if (originBare && from.startsWith(originBare)) { const r = from.slice(originBare.length); if (r.startsWith("/")) add(rel, r, to); }
  }
+ // SIZE TEMPLATES, BEFORE the token pass — because a template carries `{size}` where a width goes,
+ // so it never equals any URL we collected and the token pass walks straight past it. The theme's
+ // own script then reads this attribute, blanks `src` to a placeholder and re-loads the image from
+ // whatever it says. Leaving it on the seller's CDN quietly undoes the whole rehost: bag-crush had
+ // 1,391 of these, `src` correct on every one, every image still fetched from mybagcrush.com.
+ //
+ // Our copy exists at one size (see collectAssetUrls), so the replacement carries NO placeholder —
+ // the theme's substitution becomes a no-op and it loads the file we hold.
+ html = html.replace(/data-rimg-template="([^"]*\{size\}[^"]*)"/g, (whole, raw: string) => {
+  const v = raw.replace(/&amp;/g, "&");
+  const absUrl = v.startsWith("//") ? "https:" + v : v.startsWith("/") ? (originBare ? originBare + v : "") : v;
+  if (!absUrl) return whole;
+  const key = absUrl.replace(/\{size\}/g, "1024x");
+  const to = map.get(key) ?? map.get(key.split("&").join("&amp;"));
+  return to ? `data-rimg-template="${to}"` : whole;
+ });
+
  const TOKEN = /(?:https?:)?\/\/[^\s"'()<>,]+|\/[^\s"'()<>,]+/g;
  return html.replace(TOKEN, (tok: string, offset: number) => {
   if (tok.startsWith("http")) {
