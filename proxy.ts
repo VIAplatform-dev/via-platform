@@ -102,7 +102,22 @@ const PUBLIC_ROUTES = [
   // Gating it dead-ends the negotiation: the buyer cannot answer a counter, and cannot reach the
   // accepted-price checkout.
   "/offer",
+  // A store signing in or signing up has, by definition, no session and no pilot approval yet —
+  // gating these behind either is a closed door with the key on the inside. /store/continue is the
+  // hop every provider callback returns to, and it must answer for a seller whose session cookie
+  // is still a few milliseconds old.
   "/store/login",
+  "/store/signup",
+  "/store/continue",
+  // The identity endpoint the seller flow asks "who is this, and do they have a store yet?".
+  // It authenticates itself and answers 401 when nobody is signed in — that 401 IS the answer the
+  // sign-in page needs. Left to the catch-all below it was redirected to /login instead, and a
+  // seller with a fresh session but no pilot-approval cookie was bounced into the pilot check
+  // mid-signup, which is the worst possible moment to be asked to wait for approval.
+  "/api/infrastructure/whoami",
+  // The PostHog reverse proxy (see next.config). It carries analytics from the seller workspace,
+  // which is already behind a session — gating the transport as well would only mean losing events.
+  "/ingest",
 ];
 
 // Routes that require a user session but NOT pilot approval (via_access cookie)
@@ -353,7 +368,17 @@ export async function proxy(request: NextRequest) {
       // (app/lib/auth.ts), so matching only the exact path 404s the moment anyone
       // actually tries to sign in.
       pathname === "/login" || pathname.startsWith("/login/") ||
-      pathname === "/register" || pathname.startsWith("/register/");
+      pathname === "/register" || pathname.startsWith("/register/") ||
+      // A STORE signs in and signs up here. /login above is the marketplace shopper's sign-in and
+      // /admin/login is the owner's password panel — neither is a seller's front door, which is why
+      // a store owner following her own link kept landing somewhere that couldn't let her in.
+      // /store/continue is the hop every provider returns to; it asks whoami and forwards her to
+      // onboarding or her workspace. Named individually rather than passing all of /store/*: the
+      // rest of that tree is the legacy marketplace portal and belongs on vyaplatform.com only.
+      pathname === "/store/login" ||
+      pathname === "/store/signup" ||
+      pathname === "/store/continue" ||
+      pathname.startsWith("/ingest");
     if (!passthrough) {
       if (pathname === "/admin" || pathname.startsWith("/admin/")) {
         // Owner Workspace. The path→route mapping (/admin/* → /infrastructure/admin/*) is a
@@ -362,9 +387,19 @@ export async function proxy(request: NextRequest) {
         // session). Per-store data scoping happens server-side (resolveStoreSlugAny returns only
         // their store's data); owner-only destructive actions stay behind ADMIN_PASSWORD (isOwner).
         // A signed-in user with no store yet is routed to onboarding by the layout (via whoami).
-        if (!(await isAdminAuthenticated(request)) && !hasUserSession(request)) {
-          const loginUrl = new URL("/admin/login", request.url);
-          loginUrl.searchParams.set("redirect", fullPath);
+        // Signed out → the SELLER sign-in, carrying where she was headed so she lands back on it
+        // once she's in. This used to send her to /admin/login, the owner's password + TOTP panel,
+        // which no store owner has credentials for — and it fired HERE, in the proxy, before any
+        // page code could offer her something better. The owner's own panel is unchanged and still
+        // reachable directly at /admin/login (it's in the passthrough list above).
+        // `next dev` only: the workspace is the owner's without a cookie, matching the same
+        // shortcut in /api/infrastructure/whoami. The two used to disagree — whoami handed out an
+        // owner identity that this gate then refused — and the sign-in page bounced between them.
+        // NODE_ENV is "production" on Vercel prod AND previews, so this cannot reach the live site.
+        const devOwner = process.env.NODE_ENV === "development";
+        if (!devOwner && !(await isAdminAuthenticated(request)) && !hasUserSession(request)) {
+          const loginUrl = new URL("/store/login", request.url);
+          loginUrl.searchParams.set("next", fullPath);
           return NextResponse.redirect(loginUrl);
         }
         return NextResponse.next();

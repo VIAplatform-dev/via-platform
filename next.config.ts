@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ["*.vyasites.test", "*.vyasites.com"],
   // Don't advertise the framework/version.
   poweredByHeader: false,
+  // Required by the /ingest reverse proxy below: PostHog's API paths are trailing-slash sensitive,
+  // and Next's default redirect would turn each capture into a 308 the SDK doesn't follow.
+  skipTrailingSlashRedirect: true,
   // Baseline security headers on every response. Deliberately NOT a full content-security-policy
   // (that risks breaking inline scripts/embeds and needs its own rollout); frame-ancestors here
   // gives robust clickjacking protection without touching resource loading.
@@ -58,6 +61,9 @@ const nextConfig: NextConfig = {
       // Sellers' store portal lands on the classic dashboard (performance + sales), not the
       // newer infra-style home. Repointed per the store owner — keep sellers on /store/dashboard.
       { source: "/store/home", destination: "/store/dashboard", permanent: false },
+      // Sellers are told "getvya.ai/store/signup" out loud, and people type the hyphen.
+      { source: "/store/sign-up", destination: "/store/signup", permanent: false },
+      { source: "/store/register", destination: "/store/signup", permanent: false },
       { source: "/store/intake", destination: "/infrastructure/admin/add-listing", permanent: false },
       { source: "/store/items", destination: "/infrastructure/admin/inventory", permanent: false },
       { source: "/store/customers", destination: "/infrastructure/admin/customers", permanent: false },
@@ -83,17 +89,25 @@ const nextConfig: NextConfig = {
     // The LEGACY internal panel lives at app/admin/* (served on vyaplatform.com). These are its
     // top-level segments — in local dev we DON'T rewrite them, so the owner's internal tools stay
     // reachable at /admin/* on localhost alongside the workspace.
-    // NOTE: `customers` and `golden-review` exist in BOTH trees. In production the host
-    // decides which one you get, but local dev has a single host — so whichever tree is
-    // NOT listed here becomes unreachable at /admin/*. Listing them sends /admin/* to the
-    // legacy panel, and the workspace versions stay reachable at their real
-    // /infrastructure/admin/* paths, so nothing is lost either way. They were previously
-    // omitted, which made app/admin/customers (the marketplace buyer list) impossible to
-    // open on localhost at all.
-    const LEGACY_ADMIN = "login|set-password|analytics|category-sweep|collabs-links|collections|conversions|customers|data|editors-picks|emails|giveaway|golden-review|intake-accuracy|key-metrics|listing-quality|market-data|removed-items|returns|search-analytics|session-flows|sourcing|stores|summary|sync|users|waitlist|webhooks";
+    // NOTE: `customers` and `golden-review` exist in BOTH trees. Production has two hosts and the
+    // host decides; local dev has one, so one tree has to win at /admin/*. It is the WORKSPACE,
+    // deliberately: getvya.ai rewrites both to the workspace, so listing them here made the same
+    // nav link open the seller's Customers page on the live site and the old marketplace buyer
+    // list on localhost — local testing that lies about the product is worse than a page you have
+    // to reach another way. The legacy pages still serve on vyaplatform.com, where that panel
+    // lives; they have no second path, so on localhost they yield.
+    const LEGACY_ADMIN = "login|set-password|analytics|category-sweep|collabs-links|collections|conversions|data|editors-picks|emails|giveaway|intake-accuracy|key-metrics|listing-quality|market-data|removed-items|returns|search-analytics|session-flows|sourcing|stores|summary|sync|users|waitlist|webhooks";
     const isDev = process.env.NODE_ENV !== "production";
     return {
       beforeFiles: [
+        // ── PostHog reverse proxy ────────────────────────────────────────────────────────────
+        // Analytics served from our own origin. Sent straight to us.i.posthog.com it is blocked by
+        // ad-blockers and by Safari's tracker rules, which would silently take out exactly the
+        // sellers whose behaviour we're trying to learn from — a half-sampled funnel is worse than
+        // none, because it looks like data. The assets host is separate from the ingest host, so
+        // the /static rule has to come first.
+        { source: "/ingest/static/:path*", destination: "https://us-assets.i.posthog.com/static/:path*" },
+        { source: "/ingest/:path*", destination: "https://us.i.posthog.com/:path*" },
         ...osHosts.flatMap((h) => [
           { source: "/admin", has: [h], destination: "/infrastructure/admin" },
           // Exclude the auth pages: /admin/login and /admin/set-password must serve the LEGACY
