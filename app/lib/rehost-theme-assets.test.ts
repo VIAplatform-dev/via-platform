@@ -355,3 +355,19 @@ test("a root-relative rimg template resolves against the origin", () => {
  const html = `<img data-rimg-template="/cdn/shop/files/b_{size}.jpg">`;
  assert.match(rewritePageUrls(html, map, "https://shop.example.com"), /data-rimg-template="https:\/\/blob\.test\/theme\/x\/cc\.jpg"/);
 });
+
+test("a script carried by a CUSTOM ELEMENT's src is collected too", () => {
+ // thenicheshop's theme boots its quick-buy island from <data-island src="…island-quick-buy.bundle.js">.
+ // The collector asked for `script[src]` and `img[src]` — tag-scoped — so a custom element holding a
+ // src matched nothing, and the file was never copied. Under blackout that page dropped from 162
+ // loaded images to 90, because the script that builds the grid lives on the seller's platform.
+ const html = `<data-island class="contents" x-data="QuickBuy({})" src="//shop.example.com/cdn/shop/t/56/assets/island-quick-buy.bundle.js?v=123"></data-island>`;
+ const urls = collectAssetUrls(html, "https://shop.example.com");
+ assert.ok(urls.some((u) => u.includes("island-quick-buy.bundle.js")), `not collected: ${JSON.stringify(urls)}`);
+});
+
+test("a src that is not an asset is still ignored", () => {
+ // An iframe pointing at a page is not a theme asset; the extension test still governs.
+ const html = `<iframe src="https://shop.example.com/pages/about"></iframe>`;
+ assert.deepEqual(collectAssetUrls(html, "https://shop.example.com"), []);
+});

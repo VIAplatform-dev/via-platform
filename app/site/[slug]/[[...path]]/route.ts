@@ -249,14 +249,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    // all. Read below, only for the grids that actually need it (skip the work for grids that
    // resolved normally).
    const ownHandlesPerGrid = handles.some((h) => !h || !byHandle.get(h)?.length) ? capturedGridProductHandlesPerGrid(html) : [];
+   // Which grids ARE a collection, rather than a rail showing its own captured pieces. Only these
+   // may grow past the number of cards the crawl happened to photograph — see injectLiveGrids.
+   const uncapped: boolean[] = [];
    const perGrid = await Promise.all(handles.map(async (h, i) => {
     const fromCollection = h ? byHandle.get(h) : undefined;
-    if (fromCollection?.length) return fromCollection.map(card);
+    if (fromCollection?.length) { uncapped[i] = true; return fromCollection.map(card); }
+    uncapped[i] = false;
     const ownHandles = ownHandlesPerGrid[i] || [];
     const own = ownHandles.length ? await listStorefrontItemsBySourceIds(seller.id, ownHandles).catch(() => []) : [];
     return (own.length ? own : items).map(card);
    }));
-   if (perGrid.some((g) => g.length)) html = injectLiveGrids(html, perGrid, hrefFor, { keepQuickAdd: onStoreOrigin });
+   if (perGrid.some((g) => g.length)) html = injectLiveGrids(html, perGrid, hrefFor, { keepQuickAdd: onStoreOrigin, uncapped });
   } else if (items.length) {
    // The shopper's page number, and the path the theme's pagination should point back at.
    const pageNo = Number(req.nextUrl.searchParams.get("page") || "1") || 1;

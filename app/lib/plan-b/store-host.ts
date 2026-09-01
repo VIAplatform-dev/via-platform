@@ -91,6 +91,9 @@ export function isAllowedStoreApi(pathname: string): boolean {
   // rendered empty for ever. Exactly ONE route, not the /api/plan-b/ prefix: the rest of that
   // namespace is internal and must stay refused on 45 sellers' domains.
   p === "/api/plan-b/recommendations" ||
+  // The theme's own section renderer, for the same reason and with the same care: this ONE path,
+  // never the prefix.
+  p === "/api/plan-b/section" ||
   // Squarespace's cart, in its own dialect. Unlike Shopify's /cart/* routes these live UNDER /api,
   // so without this the refusal above 404s the seller's own Add-to-cart before middleware ever gets
   // to rewrite it. Only the cart: the rest of Squarespace's /api surface stays refused.
@@ -115,6 +118,13 @@ export function shopifyThemeRoute(pathname: string): string | null {
  // Every theme's product page asks for a "You may also like" strip here. Left unrouted it 404s, and
  // the theme logs `Product recommendations error: Server returned 404` on every product view.
  if (p === "/recommendations/products") return "/api/plan-b/recommendations";
+ // A theme rendering ONE SECTION for a variant — Shopify's `?section_id=` convention. bag-crush's
+ // theme asks for the in-store-pickup widget here on every product view. Answering 404 does not
+ // merely omit a widget: the theme parses our response, calls .querySelector() on the result, gets
+ // null and THROWS — and every line of its startup after that never runs, the image loader
+ // included. 29 of 32 images on her product pages sit at a blank placeholder because of this.
+ // Numeric ids only: /variants/<anything-else> is a page, not a route we own.
+ if (/^\/variants\/\d+$/.test(p)) return "/api/plan-b/section";
  return null;
 }
 

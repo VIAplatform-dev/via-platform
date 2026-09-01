@@ -139,3 +139,23 @@ test("inline scripts that mention the domain outside /cdn are left alone", () =>
  const page = `<html><body><script>var shop="https://angearchive.com/products/x";</script></body></html>`;
  assert.match(sameOriginAssets(page, ORIGIN), /https:\/\/angearchive\.com\/products\/x/);
 });
+
+test("a data: URI in a srcset survives untouched — its own commas are not separators", () => {
+ // A srcset is comma-separated, but a data: URI CONTAINS a comma. Splitting on commas cut
+ // `data:image/svg+xml;utf8,<svg…>` in half and rejoining with ", " put a space after the comma —
+ // which in a srcset separates a URL from its descriptor, so the candidate became nonsense. The
+ // browser prefers srcset over src, so our correctly re-hosted `src` was never used: 29 images on
+ // every bag-crush product page rendered blank and the thumbnail strip collapsed to a sliver.
+ const svg = "data:image/svg+xml;utf8,<svg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%201%201'/>";
+ const html = `<img src="https://cdn.shopify.com/s/files/1/a.jpg" srcset="${svg}" data-rimg="lazy">`;
+ const out = sameOriginAssets(html, "https://shop.example.com", null);
+ assert.ok(out.includes(`srcset="${svg}"`), `srcset was altered: ${out.slice(0, 200)}`);
+ assert.ok(!out.includes("utf8, <svg"), "a space was inserted after the data URI's comma");
+});
+
+test("a real multi-URL srcset is still rewritten", () => {
+ // The fix must not stop the thing this function exists to do.
+ const html = `<img srcset="https://cdn.shopify.com/a.jpg 400w, https://cdn.shopify.com/b.jpg 800w">`;
+ const out = sameOriginAssets(html, "https://shop.example.com", null);
+ assert.ok(out.includes("400w") && out.includes("800w"), "descriptors were lost");
+});

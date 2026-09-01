@@ -180,3 +180,25 @@ test("the rest of the internal surface stays refused on a store origin", () => {
   assert.equal(isAllowedStoreApi(p), false, p);
  }
 });
+
+test("a theme's section render for a variant is routed, not 404'd", () => {
+ // bag-crush's theme asks for the in-store-pickup section on every product view. Unrouted it 404s
+ // with plain text; the theme parses that, calls .querySelector() on nothing and THROWS — taking
+ // the rest of its own startup down with it, including the image loader. 29 of 32 images on her
+ // product pages never load because of this one missing route.
+ assert.equal(shopifyThemeRoute("/variants/55701352350001"), "/api/plan-b/section");
+ assert.equal(shopifyThemeRoute("/variants/55701352350001/"), "/api/plan-b/section");
+});
+
+test("only a numeric variant id is routed there", () => {
+ // /variants/ is not a namespace we own; a page at /variants/anything-else stays a page.
+ assert.equal(shopifyThemeRoute("/variants/not-a-number"), null);
+ assert.equal(shopifyThemeRoute("/variants"), null);
+});
+
+test("the section route is reachable on a store's own host", () => {
+ // The same trap the recommendations route fell into: allowed by NAME, never by the /api/plan-b/
+ // prefix — the rest of that namespace is internal and must stay refused on sellers' domains.
+ assert.equal(isAllowedStoreApi("/api/plan-b/section"), true);
+ assert.equal(isAllowedStoreApi("/api/plan-b/cart/add"), false);
+});

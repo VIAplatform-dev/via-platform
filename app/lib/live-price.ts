@@ -30,10 +30,18 @@ export type PricedItem = {
  compareAtCents?: number | null;
 };
 
-/** Elements a theme uses to mean "this is the price". Kept to self-description, never position. */
-const PRICE_HOST = "[class*='price'], [data-product-price], [data-price], [itemprop='price']";
-/** A sale/compare-at price from crawl day is a claim about a discount we cannot vouch for. */
-const NOT_OURS_TO_CLAIM = "[class*='price__sale'], [class*='compare-at'], [class*='price--compare'], [class*='price-item--compare'], [data-compare-price], s, del";
+/** Elements a theme uses to mean "this is the price". Kept to self-description, never position.
+ *
+ *  The TAG names matter as much as the classes. Shopify's newer themes mark a price up as
+ *  <price-list><sale-price>$200.00</sale-price></price-list>, where the element actually holding the
+ *  money carries `class="h4 text-on-sale"` — nothing that says "price" at all. Matching on class
+ *  alone missed it entirely, and feathers served a dress at its crawl-day $200 while the cart
+ *  charged $125. `price-list` matches by class but its direct children are elements, not text, so
+ *  the money was never reached. */
+const PRICE_HOST = "[class*='price'], [data-product-price], [data-price], [itemprop='price'], sale-price, price-list";
+/** A sale/compare-at price from crawl day is a claim about a discount we cannot vouch for.
+ *  `compare-at-price` is the same story: a tag, not a class. */
+const NOT_OURS_TO_CLAIM = "[class*='price__sale'], [class*='compare-at'], [class*='price--compare'], [class*='price-item--compare'], [data-compare-price], compare-at-price, s, del";
 /** The whole text node must be money: an optional symbol/code, digits, optional decimals, optional code. */
 const WHOLE_MONEY = /^\s*(?:[^\d\s]{1,3}\s?)?\d[\d,  ]*(?:[.,]\d{2})?(?:\s?[A-Z]{3})?\s*$/;
 

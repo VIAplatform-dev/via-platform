@@ -175,3 +175,26 @@ test("the markdown is stated in the page too, so a check can read it", () => {
  const $ = cheerio.load(applyLivePrice(`<head></head><span class="price-item">$50.00</span>`, { priceCents: 8260, currency: "USD", compareAtCents: 12000 }));
  assert.equal($('meta[name="vya:product-compare-at"]').attr("content"), "12000 USD");
 });
+
+test("a theme that names its price with custom ELEMENTS, not classes, is still rewritten", () => {
+ // Shopify's newer themes mark the price up as <price-list><sale-price>…</sale-price>. Our selectors
+ // looked only at class names, and `class="h4 text-on-sale"` says nothing about price — so the one
+ // element holding the money was never matched. feathers served a Karl Lagerfeld dress at $200 with
+ // a $498 markdown beside it, frozen at crawl day, while the cart charged $125 and her own site said
+ // $125. The page contradicted our own record and nothing on it was true.
+ const html = `<div class="product-info__block-item" data-block-type="price"><price-list class="price-list price-list--product">` +
+  `<sale-price class="h4 text-on-sale"> <span class="sr-only">Sale price</span>$200.00 USD</sale-price>` +
+  `<compare-at-price class="h5 text-subdued line-through"> <span class="sr-only">Regular price</span>$498.00 USD</compare-at-price>` +
+  `</price-list></div>`;
+ const out = applyLivePrice(html, { priceCents: 12500, currency: "USD", compareAtCents: null });
+ assert.match(out, /\$125\.00 USD/, "the price a shopper is charged must be the price shown");
+ assert.ok(!out.includes("$200.00"), "the crawl-day price is gone");
+ assert.ok(!out.includes("$498.00"), "a markdown we cannot vouch for is gone");
+});
+
+test("a live markdown on such a theme is kept, and restated from the feed", () => {
+ const html = `<price-list class="price-list"><sale-price class="text-on-sale"> <span class="sr-only">Sale price</span>$200.00</sale-price>` +
+  `<compare-at-price class="line-through"> <span class="sr-only">Regular price</span>$498.00</compare-at-price></price-list>`;
+ const out = applyLivePrice(html, { priceCents: 12500, currency: "USD", compareAtCents: 49800 });
+ assert.match(out, /\$125\.00/, "the live price is shown");
+});

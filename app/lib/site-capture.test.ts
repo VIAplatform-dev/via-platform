@@ -1908,3 +1908,23 @@ test("the pill re-check keeps watching, because a header can arrive late", () =>
  const out = injectCart(`<html><body><a data-vya-cart-open="1">Cart</a></body></html>`);
  assert.match(out, /MutationObserver/);
 });
+
+test("a collection's own grid grows past the number of cards captured on crawl day", () => {
+ // The grid was capped at however many cards the crawl happened to photograph. awoke-vintage's
+ // denim page was captured with 36 cards; she has since filed 41 pieces into it, and the five
+ // newest — all active, all $65, all photographed — were invisible on our copy for ever. A hosted
+ // store that cannot show a piece the seller added after crawl day is not tracking live inventory.
+ //
+ // The cap is still right for a RAIL: a "featured" strip designed for three products, handed the
+ // whole catalogue, once became 251 cards and a carousel that could not render at all. So the cap
+ // stays wherever the grid is showing its own captured pieces, and lifts only where the grid IS
+ // the collection.
+ const card = (h: string) => ({ handle: h, title: h, priceCents: 6500, currency: "USD", images: [], status: "active" as const });
+ const slot = (h: string) => `<div class="card"><a href="/products/${h}"><img src="/i/${h}.jpg" alt="${h}"></a><span class="price">$65</span></div>`;
+ const html = `<ul class="product-grid">${slot("a")}${slot("b")}${slot("c")}</ul>`;
+ const five = ["a", "b", "c", "d", "e"].map(card);
+ const capped = injectLiveGrids(html, [five], (h: string) => `/products/${h}`);
+ assert.equal((capped.match(/\/products\//g) || []).length, 3, "a rail still keeps the theme's slot count");
+ const grown = injectLiveGrids(html, [five], (h: string) => `/products/${h}`, { uncapped: [true] });
+ assert.equal((grown.match(/\/products\//g) || []).length, 5, "the collection's own grid shows everything filed in it");
+});

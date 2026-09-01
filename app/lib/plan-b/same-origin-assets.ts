@@ -107,6 +107,15 @@ export function sameOriginAssets(html: string, captureOrigin: string | null, mys
     const $el = $(el);
     const raw = $el.attr("srcset");
     if (!raw) continue;
+    // A data: URI CONTAINS commas, and a srcset is comma-separated — so splitting one on commas
+    // cuts `data:image/svg+xml;utf8,<svg…>` in half, and rejoining with ", " leaves a space where
+    // the URI's own comma was. In a srcset a space starts the size descriptor, so the candidate
+    // becomes nonsense; and because the browser prefers srcset to src, our correctly re-hosted src
+    // was never used. 29 images on every bag-crush product page rendered blank because of it.
+    //
+    // Nothing in a data: URI can be proxied anyway — it carries its own bytes — so there is no
+    // work here to lose by leaving these alone.
+    if (raw.includes("data:")) continue;
     const rewritten = raw.split(",").map((part) => {
      const [url, ...rest] = part.trim().split(/\s+/);
      const next = proxied(url, hosts);

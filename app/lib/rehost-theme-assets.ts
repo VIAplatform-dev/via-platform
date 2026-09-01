@@ -120,6 +120,13 @@ export function collectAssetUrls(html: string, origin: string | null, productFil
  // extra photos per store is cheaper than a hosted store that quietly loses two images per page;
  // the srcset collapse in pickVariant is what keeps the cost sane, not exclusion.
  for (const el of els("img[src]")) add($(el).attr("src"));
+ // ANY element with a src, not only the tags we thought of. thenicheshop boots its quick-buy island
+ // from <data-island src="…island-quick-buy.bundle.js">: a custom element, so `script[src]` and
+ // `img[src]` both missed it and the file was never copied. Under blackout that collection page
+ // dropped from 162 loaded images to 90, because the script that builds the grid was still being
+ // fetched from her platform. The extension test in add() is what keeps this honest — an <iframe>
+ // pointing at a page is not an asset and is still ignored.
+ for (const el of els("[src]")) add($(el).attr("src"));
  for (const el of els("video[src], video[poster], source[src], [data-video-src], [data-src]")) {
   for (const a of ["src", "poster", "data-video-src", "data-src"]) add($(el).attr(a));
  }

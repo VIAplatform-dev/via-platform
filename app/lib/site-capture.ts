@@ -1798,7 +1798,7 @@ export function capturedGridProductHandlesPerGrid(html: string): string[][] {
 
 /** Replace EVERY product grid on the page, each with its own list of live items (index-matched to
  *  detectGridHandles). Grids whose list is empty are left alone rather than emptied. */
-export function injectLiveGrids(html: string, perGrid: CollectionCardItem[][], hrefFor: HrefFor, opts: { keepQuickAdd?: boolean } = {}): string {
+export function injectLiveGrids(html: string, perGrid: CollectionCardItem[][], hrefFor: HrefFor, opts: { keepQuickAdd?: boolean; uncapped?: boolean[] } = {}): string {
  if (!perGrid.some((g) => g.length)) return html;
  const $ = cheerio.load(html);
  const grids = productGrids($);
@@ -1809,8 +1809,15 @@ export function injectLiveGrids(html: string, perGrid: CollectionCardItem[][], h
   // uses. A homepage "featured" rail is designed for a handful; handing it the whole catalogue
   // turned a 3-product strip into 251 cards, blew the page to 1.2 MB, and left a carousel with 251
   // slides unable to render at all — the page looked empty below the hero.
+  //
+  // …EXCEPT where the grid IS a collection, which the caller tells us. Then the crawl-day card
+  // count is not a design decision, it is an accident of when we photographed the page: awoke's
+  // denim page was captured holding 36 cards and she has since filed 41 pieces, so the five newest
+  // — active, priced, photographed — could never appear. A rail has a shape the theme chose; a
+  // collection has whatever the seller has put in it.
   const slots = ($(el).children().toArray() as DomElement[]).filter((k) => looksLikeCard($, k)).length;
-  fillGrid($, el, slots > 0 ? items.slice(0, slots) : items, hrefFor, opts.keepQuickAdd);
+  const cap = opts.uncapped?.[i] ? 0 : slots;
+  fillGrid($, el, cap > 0 ? items.slice(0, cap) : items, hrefFor, opts.keepQuickAdd);
  });
  return $.html();
 }
