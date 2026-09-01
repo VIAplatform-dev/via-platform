@@ -7,20 +7,27 @@ import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { runImportJob } from "@/app/lib/import-engine/wire";
 import { createJob, getActiveJob, getLatestJob, getJob, saveJob } from "@/app/lib/import-engine/jobs-db";
 import { describeError, isResumable, reportLine, type ImportJob } from "@/app/lib/import-engine/report";
+import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
+import { shouldReuseExistingCapture } from "@/app/lib/import-engine/reuse-capture";
 
-// The captured site is served by the MARKETPLACE app (vyaplatform.com/site/{slug}) or the
-// store's own connected domain — NOT the getvya.ai OS host the seller is viewing this from.
-// Returning a relative "/site/{slug}" made "View your site" 404 (it opened on getvya.ai, which
-// doesn't serve /site). Always return an absolute URL to where the site actually lives.
+// WHERE THE SELLER'S HOSTED SITE ACTUALLY LIVES — the one address she is given for it.
+//
+// Never a relative "/site/{slug}": she is viewing this from the getvya.ai OS host, which does not
+// serve /site, so a relative link made "View your site" 404.
+//
+// Order matters. Her own connected domain wins if she has one. Otherwise it is her store host on
+// the Plan B suffix ({slug}.vyasites.com) — the origin the proxy actually serves her store from,
+// and the only one where her theme's own JavaScript runs (see app/lib/plan-b/store-host.ts). The
+// marketplace path is the last resort, for a deployment with Plan B switched off.
 async function siteViewUrl(slug: string): Promise<string> {
  const sf = await getStorefrontBySlug(slug).catch(() => null); /* allow-swallow: cosmetic — the fallback URL below is always valid */
  const cd = (sf?.customDomain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "").trim().toLowerCase();
  // Use a connected domain ONLY if it's a real external domain. A VYA host (or a bare
  // "vyaplatform.com" left in custom_domain) would send the seller to the marketplace
- // home instead of their captured site — fall through to /site/{slug} in that case.
+ // home instead of her captured site — fall through to the store host in that case.
  const isVyaHost = cd === "vyaplatform.com" || cd.endsWith(".vyaplatform.com") || cd === "getvya.ai" || cd.endsWith(".getvya.ai");
  if (cd && cd.includes(".") && !isVyaHost) return `https://${cd}`;
- return `https://vyaplatform.com/site/${slug}`;
+ return storePublicOrigin(slug) ?? `https://vyaplatform.com/site/${slug}`;
 }
 
 
@@ -130,6 +137,23 @@ export async function POST(request: NextRequest) {
    }
    await saveJob(job.id, { status: "running" });
    return await execute(slug, job, replaceBlocks);
+  }
+
+  // ── A store that already has a site here is NEVER re-crawled ────────────────────────────────
+  // The rule, and why it exists, is in app/lib/import-engine/reuse-capture.ts. In short: a second
+  // import would wipe a hosted site and every edit on top of it, so a seller's import is idempotent
+  // and answers with the site she already has, shaped exactly like a finished import.
+  const existing = await listCapturePaths(slug).catch(() => []); /* allow-swallow: a read blip must not turn into a destructive re-crawl — treated as "nothing captured", and the active-job check below still guards a double-click */
+  if (shouldReuseExistingCapture({ captured: existing.length, isOwner: isOwner(request, slug), force: body?.force === true })) {
+   const prior = await getLatestJob(slug).catch(() => null); /* allow-swallow: additive — the counts below fall back to the captured pages */
+   const counts = prior?.counts ?? { pages: existing.length, products: 0, collections: 0 };
+   return NextResponse.json({
+    ok: true, status: "done", jobId: prior?.id ?? null,
+    pages: existing.length, items: counts.products, collections: counts.collections,
+    report: reportLine({ ...counts, pages: existing.length }, []),
+    warnings: [], steps: prior?.steps ?? [],
+    url: await siteViewUrl(slug),
+   });
   }
 
   const url = body?.url ? String(body.url).trim() : "";

@@ -17,7 +17,7 @@
 import { safeFetch } from "../safe-url.ts";
 import { parseLooseJson } from "../shopifyClient.ts";
 import type { ImportedProduct } from "../store-import.ts";
-import type { PlatformId } from "./detect.ts";
+import { looksLikeBotChallenge, type PlatformId } from "./detect.ts";
 
 // The same browser User-Agent the site capture uses. A bare "VYA-Importer/1.0" is blocked outright
 // (403) by common WordPress/Cloudflare bot rules — including on a store whose own public Store API
@@ -73,6 +73,11 @@ async function fetchTextCapped(url: string, opts?: { flagBlocks?: boolean }): Pr
   if (opts?.flagBlocks && (r.status === 403 || r.status === 429)) throw new BlockedByStoreError(r.status, url);
   if (!r.ok) return null;
   const text = await r.text();
+  // A bot-protection interstitial can arrive with a 200 (see looksLikeBotChallenge). Treating it as
+  // page content meant the ladder read no products and blamed the seller's platform instead of
+  // saying the store is refusing us — the difference between "we can't import this" and a fixable
+  // "your site is blocking automated requests".
+  if (looksLikeBotChallenge(text)) { if (opts?.flagBlocks) throw new BlockedByStoreError(r.status, url); return null; }
   return text.length > LIMITS.maxBytesPerPage ? text.slice(0, LIMITS.maxBytesPerPage) : text;
  } catch (e) {
   if (e instanceof BlockedByStoreError) throw e;

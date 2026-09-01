@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStore } from "@/app/lib/plan-b/cart-session";
+import { storeEmailLinkOrigin } from "@/app/lib/plan-b/store-host";
 import { signInLinkToken } from "@/app/lib/shopper-signin";
 import { Resend } from "resend";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
@@ -44,7 +45,13 @@ export async function POST(request: NextRequest) {
  if (!secret) return NextResponse.json({ error: "Sign-in is not configured." }, { status: 500 });
 
  const token = signInLinkToken({ email, storeSlug: store.slug }, secret);
- const origin = new URL(request.url).origin;
+ // HER STORE'S ADDRESS, not `new URL(request.url).origin`. Next resolves request.url from the
+ // server's own view of the request — measured as http://localhost:3000 even when the Host header
+ // is the store — so that origin put a link in every sign-in email pointing at a host with no store
+ // on it, and clicking it answered "Unknown store." See storeEmailLinkOrigin for why the Host
+ // header isn't trusted in production either.
+ const origin = storeEmailLinkOrigin(store.slug, request.headers.get("host"));
+ if (!origin) return NextResponse.json({ error: "Sign-in is not configured." }, { status: 500 });
  const link = `${origin}/api/storefront/account/verify?token=${encodeURIComponent(token)}`;
 
  const seller = await getSellerBySlug(store.slug).catch(() => null);

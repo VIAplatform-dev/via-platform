@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { storeSlugForHost, isStoreHost, storeHostSuffix, normalizeHost, isRefusedOnStoreHost, isAllowedStoreApi, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath, shopifyCartSubmitRoute } from "./store-host.ts";
+import { storeSlugForHost, storePublicOrigin, storeEmailLinkOrigin, isStoreHost, storeHostSuffix, normalizeHost, isRefusedOnStoreHost, isAllowedStoreApi, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath, shopifyCartSubmitRoute } from "./store-host.ts";
 
 const env = { STORE_HOST_SUFFIX: "vyasites.test" };
 
@@ -201,4 +201,41 @@ test("the section route is reachable on a store's own host", () => {
  // prefix — the rest of that namespace is internal and must stay refused on sellers' domains.
  assert.equal(isAllowedStoreApi("/api/plan-b/section"), true);
  assert.equal(isAllowedStoreApi("/api/plan-b/cart/add"), false);
+});
+
+test("a store's public address is the exact host the proxy will serve it on", () => {
+ assert.equal(storePublicOrigin("tesselizabethvintage", env), "https://tesselizabethvintage.vyasites.test");
+ assert.equal(storePublicOrigin("Blummier", env), "https://blummier.vyasites.test", "slugs are normalised");
+ assert.equal(storePublicOrigin("blummier", { STORE_HOST_SUFFIX: "vyasites.com" }), "https://blummier.vyasites.com");
+});
+
+test("no address is advertised for a store the proxy would refuse to serve", () => {
+ assert.equal(storePublicOrigin("blummier", {}), null, "Plan B off — caller falls back");
+ assert.equal(storePublicOrigin("", env), null);
+ assert.equal(storePublicOrigin("a.b", env), null, "a dotted slug would not be a direct child");
+ assert.equal(storePublicOrigin("-nope", env), null, "malformed slugs never become a URL");
+ for (const reserved of ["www", "admin", "api", "app", "store", "portal", "internal"]) {
+  assert.equal(storePublicOrigin(reserved, env), null, reserved);
+ }
+});
+
+test("an emailed sign-in link points at the store's own canonical address in production", () => {
+ const prod = { STORE_HOST_SUFFIX: "vyasites.com", NODE_ENV: "production" };
+ assert.equal(storeEmailLinkOrigin("tess", "tess.vyasites.com", prod), "https://tess.vyasites.com");
+ // The header is ignored in production — this is what stops a forged Host poisoning the email.
+ assert.equal(storeEmailLinkOrigin("tess", "evil.example.com", prod), "https://tess.vyasites.com");
+ assert.equal(storeEmailLinkOrigin("tess", "localhost:3000", prod), "https://tess.vyasites.com");
+ assert.equal(storeEmailLinkOrigin("tess", null, prod), "https://tess.vyasites.com");
+});
+
+test("in development the link keeps the host and port the store is actually reachable on", () => {
+ const dev = { STORE_HOST_SUFFIX: "vyasites.test", NODE_ENV: "development" };
+ assert.equal(storeEmailLinkOrigin("tess", "tess.vyasites.test:3000", dev), "http://tess.vyasites.test:3000");
+ // Still only this store's own host — anything else falls back to the canonical address.
+ assert.equal(storeEmailLinkOrigin("tess", "other.vyasites.test:3000", dev), "https://tess.vyasites.test");
+ assert.equal(storeEmailLinkOrigin("tess", "localhost:3000", dev), "https://tess.vyasites.test");
+});
+
+test("with Plan B switched off there is no store address to link to", () => {
+ assert.equal(storeEmailLinkOrigin("tess", "tess.vyasites.com", { NODE_ENV: "production" }), null);
 });

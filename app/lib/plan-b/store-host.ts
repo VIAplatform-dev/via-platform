@@ -56,6 +56,56 @@ export function isStoreHost(host: string | null | undefined, env: Record<string,
 }
 
 /**
+ * Where a store's hosted site actually lives, e.g. `https://tess.vyasites.com`.
+ *
+ * The INVERSE of storeSlugForHost: that answers "which store is this host?", this answers "which
+ * host is this store?". One function so the address a seller is shown is the same one the proxy
+ * will honour — they drifted before, and a seller was handed three different addresses for one
+ * store depending on which screen she was looking at.
+ *
+ * Returns null when Plan B is switched off (no suffix configured); the caller falls back to the
+ * marketplace path. Slugs are validated the same way storeSlugForHost validates a host label, so a
+ * malformed slug can never be turned into a URL we then hand to a seller.
+ */
+export function storePublicOrigin(slug: string | null | undefined, env: Record<string, string | undefined> = process.env): string | null {
+ const s = (slug || "").trim().toLowerCase();
+ const suffix = storeHostSuffix(env);
+ if (!s || !suffix) return null;
+ if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(s)) return null;
+ // Anything storeSlugForHost would refuse to serve must not be advertised either.
+ if (storeSlugForHost(`${s}${suffix}`, env) !== s) return null;
+ return `https://${s}${suffix}`;
+}
+
+/**
+ * The origin to put in a link we EMAIL to a shopper — her store's own address.
+ *
+ * Never `new URL(request.url).origin`. Next resolves that from the server's own view of the
+ * request, which is `http://localhost:3000` even when the Host header is the seller's domain
+ * (measured, not assumed) — so every sign-in email carried a link to a host the shopper could not
+ * reach, and clicking it answered "Unknown store." because no store lives on that host.
+ *
+ * And never the Host HEADER in production, however tempting: a header is attacker-controlled, and a
+ * link minted from one is the classic way a magic-link email gets pointed at somebody else's server
+ * with a live token on the end. Production always uses the canonical address for the slug we
+ * already resolved. Development is allowed to use the header — but only when it really is this
+ * store's own host — because the canonical origin (https, no port) isn't reachable on a laptop.
+ */
+export function storeEmailLinkOrigin(
+ slug: string,
+ hostHeader: string | null | undefined,
+ env: Record<string, string | undefined> = process.env,
+): string | null {
+ if (env.NODE_ENV !== "production") {
+  const h = normalizeHost(hostHeader);
+  const withPort = (hostHeader || "").trim().toLowerCase();
+  // Only this store's own host, so a stray Host header still can't redirect the link elsewhere.
+  if (h && storeSlugForHost(withPort, env) === slug) return `http://${withPort}`;
+ }
+ return storePublicOrigin(slug, env);
+}
+
+/**
  * Paths that must NEVER be reachable on a store origin.
  *
  * This is SECURITY, not tidiness. A store origin runs the seller's own JavaScript; if VYA's admin,

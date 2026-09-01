@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detectPlatform, shellScore, detectFramework, declineMessage, visibleTextLength } from "./detect.ts";
+import { detectPlatform, shellScore, detectFramework, declineMessage, visibleTextLength, looksLikeBotChallenge } from "./detect.ts";
 
 // Signatures below are the real markers taken from a corpus of 29 live storefronts (Shopify across
 // Dawn/Dwell/Prestige/Editions, Squarespace, BigCommerce, Wix, WooCommerce, WordPress, and
@@ -88,4 +88,25 @@ test("declines name the platform and offer a real alternative", () => {
  const msg = declineMessage(wix) || "";
  assert.match(msg, /Wix/);
  assert.match(msg, /CSV/i, "tells the seller what they CAN do");
+});
+
+test("a bot-protection interstitial is recognised, not mistaken for the storefront", () => {
+ // ec.2ndstreetusa.com sits behind Cloudflare's managed challenge. Under load it serves the
+ // challenge page with **HTTP 200** for the first stretch and only switches to 429 later — and
+ // captureSite's only gate is `res.ok`. So a crawl would have stored a 9KB "Verifying your
+ // connection..." page AS the seller's storefront, on every page, and reported success. Measured by
+ // hand: ~35 requests in 20s triggers it, and it holds for roughly 20 minutes.
+ const cf = `<!DOCTYPE html><html><head><title>Verifying your connection...</title></head><body>
+  <h1 data-i18n="content-title">Your connection needs to be verified before you can proceed</h1>
+  <script>(function(){window._cf_chl_opt = {cRay: 'a3416b073b6ac984', cType: 'managed'};
+  var a = document.createElement('script');a.src = '/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1';}());</script>
+  </body></html>`;
+ assert.equal(looksLikeBotChallenge(cf), true);
+ assert.equal(looksLikeBotChallenge(`<html><head><title>Just a moment...</title></head><body><div id="cf-challenge-running"></div></body></html>`), true);
+ // A real storefront is never flagged — not for mentioning Cloudflare, and not even if a marker
+ // string appears somewhere in its own scripts: a real page carries thousands of characters of the
+ // seller's own copy, and BOTH halves are required.
+ assert.equal(looksLikeBotChallenge(`<html><body><h1>Vintage</h1><p>Our site is protected by Cloudflare.</p><p>${"shop ".repeat(400)}</p></body></html>`), false, "no marker");
+ assert.equal(looksLikeBotChallenge(`<html><body><script>var x="cdn-cgi/challenge-platform"</script><p>${"one of one vintage ".repeat(200)}</p></body></html>`), false, "marker, but a real page's worth of copy");
+ assert.equal(looksLikeBotChallenge(""), false);
 });

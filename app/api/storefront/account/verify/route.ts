@@ -15,6 +15,16 @@ import { upsertShopper } from "@/app/lib/store-customers-db";
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * A RELATIVE Location, for the same reason the cart's submit route uses one: request.url is the
+ * server's view of the request, not the seller's domain (locally it comes back as localhost:3000),
+ * so redirecting through it walks the shopper off the store origin — and the shopper cookie set on
+ * this very response is scoped to that origin, so they would arrive signed out. The browser
+ * resolves a relative Location against the page it is already on, which cannot leave the origin.
+ */
+const home = (path: string) =>
+ new NextResponse(null, { status: 303, headers: { Location: path, "Cache-Control": "no-store" } });
+
 export async function GET(request: NextRequest) {
  const store = await resolveStore(request);
  if (!store) return NextResponse.json({ error: "Unknown store." }, { status: 404 });
@@ -26,14 +36,14 @@ export async function GET(request: NextRequest) {
  // Expired, forged, or issued for another shop. Say the same thing for all three: which one it was
  // is only useful to someone probing.
  if (!link) {
-  const res = NextResponse.redirect(new URL("/?signin=expired", request.url));
+  const res = home("/?signin=expired");
   res.cookies.delete(SHOPPER_COOKIE);
   return res;
  }
 
  await upsertShopper(store.slug, link.email, null).catch(() => {});
 
- const res = NextResponse.redirect(new URL("/?signin=ok", request.url));
+ const res = home("/?signin=ok");
  res.cookies.set(SHOPPER_COOKIE, signShopperToken({ email: link.email, storeSlug: store.slug }, secret as string), shopperCookieOptions());
  return res;
 }

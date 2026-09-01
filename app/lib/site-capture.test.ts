@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as cheerio from "cheerio";
-import { restateDiscountClaims, injectCart, prepareEditMode, applyEdits, injectCollectionItems, injectLiveGrids, injectShim, deShopify, deLazy, rewireCommerce, injectCartPage, injectSqsCartPage, applyCartState, renderNativeProduct, stripScripts, capturedGridProductHandles, detectGridHandles, liveGridHtml } from "./site-capture.ts";
+import { documentBase, spriteRef, restateDiscountClaims, injectCart, prepareEditMode, applyEdits, injectCollectionItems, injectLiveGrids, injectShim, deShopify, deLazy, rewireCommerce, injectCartPage, injectSqsCartPage, applyCartState, renderNativeProduct, stripScripts, capturedGridProductHandles, detectGridHandles, liveGridHtml } from "./site-capture.ts";
 
 const COLL_ITEMS = [
  { id: "a1", title: "1990s Silk Slip", priceCents: 18000, currency: "USD", images: ["https://x/img1.jpg"] },
@@ -1927,4 +1927,160 @@ test("a collection's own grid grows past the number of cards captured on crawl d
  assert.equal((capped.match(/\/products\//g) || []).length, 3, "a rail still keeps the theme's slot count");
  const grown = injectLiveGrids(html, [five], (h: string) => `/products/${h}`, { uncapped: [true] });
  assert.equal((grown.match(/\/products\//g) || []).length, 5, "the collection's own grid shows everything filed in it");
+});
+
+test("relative URLs resolve against <base href>, not the page's own path", () => {
+ // 2ndstreetusa.com (a custom CMS, not Shopify) sets <base href="https://2ndstreetusa.com/"> in the
+ // head of EVERY page and writes every stylesheet, sprite and nav link relative to it — `href="about"`,
+ // `href="assets/styles/main.css"`. Resolved against the PAGE's url instead, an article four levels
+ // deep asked for /article/26/07/07/assets/styles/main.css: a 404, so the page was stored with no
+ // stylesheet at all (inlinedSheets 0), no logo, and 41 nav links pointing at paths that don't exist —
+ // which then went into the crawl queue as real pages to visit. 138 of that store's 139 pages are
+ // below the root, so this is not an edge case there; it is every page but the homepage.
+ const page = `<html><head><base href="https://shop.com/">
+  <link rel="stylesheet" href="assets/styles/main.css"></head>
+  <body><a href="about">About</a></body></html>`;
+ assert.equal(
+  documentBase(cheerio.load(page), "https://shop.com/article/26/07/07/opening"),
+  "https://shop.com/",
+ );
+});
+
+test("documentBase falls back to the page URL, and tolerates a relative or broken <base>", () => {
+ const at = (head: string) => documentBase(cheerio.load(`<html><head>${head}</head></html>`), "https://shop.com/a/b/c");
+ assert.equal(at(""), "https://shop.com/a/b/c", "no <base> — the page's own URL is the base");
+ assert.equal(at("<base>"), "https://shop.com/a/b/c", "a <base> with no href sets nothing");
+ assert.equal(at('<base href="">'), "https://shop.com/a/b/c", "an empty href sets nothing");
+ // A relative <base href> is itself resolved against the page URL (HTML spec), which is how
+ // localised sites write it: <base href="/en/"> on every page under /en/.
+ assert.equal(at('<base href="/en/">'), "https://shop.com/en/");
+ assert.equal(at('<base href="http://[">'), "https://shop.com/a/b/c", "an unparseable href is ignored");
+ // Only the FIRST <base> counts, per the spec.
+ assert.equal(at('<base href="/en/"><base href="/fr/">'), "https://shop.com/en/");
+});
+
+test("a cache-busted sprite is still recognised as a sprite", () => {
+ // 2ndstreetusa.com draws its wordmark with
+ //   <use xlink:href="assets/images/sprite.svg?v=1785931200855#logo-type">
+ // The extension test was tail-anchored on the RAW reference, so the `?v=` cache-buster made it
+ // fail /\.svg$/ and the <use> was skipped entirely — left relative. Served from a VYA origin that
+ // resolves against OURS, 404s, and the store's logo renders as blank space: precisely the failure
+ // this inlining exists to prevent. The extension belongs to the path, not to the query string.
+ // Resolved against the base the document declares (see documentBase), which on that store is the
+ // site root even four levels deep.
+ const base = documentBase(cheerio.load('<html><head><base href="https://shop.com/"></head></html>'), "https://shop.com/article/26/07/07/opening");
+ assert.deepEqual(
+  spriteRef("assets/images/sprite.svg?v=1785931200855#logo-type", base),
+  { url: "https://shop.com/assets/images/sprite.svg?v=1785931200855", id: "logo-type" },
+ );
+ // The shapes that already worked keep working.
+ assert.deepEqual(
+  spriteRef("/universal/svg/social-accounts.svg#instagram-unauth-icon", "https://shop.com/about"),
+  { url: "https://shop.com/universal/svg/social-accounts.svg", id: "instagram-unauth-icon" },
+ );
+ assert.equal(spriteRef("#cross", "https://shop.com/"), null, "an already-local ref needs nothing");
+ assert.equal(spriteRef("sprite.svg", "https://shop.com/"), null, "no fragment — nothing to inline");
+ assert.equal(spriteRef("/img/photo.png#hero", "https://shop.com/"), null, "not a sprite");
+ assert.equal(spriteRef("/s.svg#a b", "https://shop.com/"), null, "an id that isn't a plain token");
+});
+
+test("deLazy promotes the lazy-src attribute whatever the theme's loader calls it", () => {
+ // 2ndstreetusa.com's loader (Locomotive) writes `data-load-src` and parks a 1x1 transparent GIF in
+ // `src`. We knew only `data-src`, so BOTH halves failed at once: under Plan A the src stayed the
+ // 1x1 and every photograph on the page was a blank pixel; under Plan B the theme's own loader ran,
+ // read a still-RELATIVE `data-load-src`, and — because capture strips <base> — resolved it against
+ // the page path, asking for /article/26/07/07/uploads/… (404, all five photographs). The asset
+ // re-hosting pass never saw the URLs either, so none of her pictures were copied to our storage.
+ //
+ // The general lesson: capture removes <base> on the grounds that it has absolutized everything, so
+ // any URL-bearing attribute it does NOT know about is silently re-based onto the wrong path.
+ const html = `<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" data-load-src="uploads/a/photo.jpg" alt="x">`;
+ const $ = cheerio.load(html);
+ deLazy($, "https://shop.com/");
+ assert.equal($("img").attr("src"), "https://shop.com/uploads/a/photo.jpg");
+ assert.equal($("img").attr("data-load-src"), undefined, "the lazy attribute is consumed, not left to re-resolve");
+
+ // The same shape under every loader that ships it. data-original is jQuery.lazyload, data-lazy-src
+ // is Slick/WP Rocket, data-echo is echo.js — all still widely deployed on older themes.
+ for (const attr of ["data-src", "data-lazy-src", "data-original", "data-echo", "data-load-src"]) {
+  const $$ = cheerio.load(`<img src="/img/blank.gif" ${attr}="pics/one.jpg">`);
+  deLazy($$, "https://shop.com/collections/all");
+  assert.equal($$("img").attr("src"), "https://shop.com/collections/pics/one.jpg", `${attr} was not promoted`);
+ }
+ // A real src is never overwritten by a lazy attribute.
+ const $keep = cheerio.load(`<img src="/img/real.jpg" data-load-src="/img/other.jpg">`);
+ deLazy($keep, "https://shop.com/");
+ assert.equal($keep("img").attr("src"), "https://shop.com/img/real.jpg");
+});
+
+test("a page hidden until its JavaScript reveals it does not render blank", () => {
+ // 2ndstreetusa.com ships <body style="opacity: 0;"> and raises it in JS on load. A script-free
+ // render never runs that, so all 127 captured pages were a blank white screen — while every metric
+ // read healthy: 4 stylesheets, 1,426 CSS rules, 3,685px of content. Only the screenshot showed it.
+ // A body at zero opacity is never a design; it is always a loading state.
+ const shown = stripScripts(`<html><body style="opacity: 0;"><h1>Hello</h1></body></html>`);
+ assert.ok(!/opacity:\s*0/i.test(shown), `body left hidden: ${shown}`);
+ assert.ok(/<h1>Hello<\/h1>/.test(shown), "the content itself is untouched");
+ // Other inline styles on the same element survive.
+ const mixed = stripScripts(`<html><body style="background:#fff;opacity:0;margin:0"><p>hi</p></body></html>`);
+ assert.match(mixed, /background:\s*#fff/);
+ assert.match(mixed, /margin:\s*0/);
+ assert.ok(!/opacity:\s*0/i.test(mixed));
+ // visibility:hidden and display:none on the page root are the same loading trick.
+ assert.ok(!/visibility:\s*hidden/i.test(stripScripts(`<html><body style="visibility:hidden"><p>hi</p></body></html>`)));
+ assert.ok(!/display:\s*none/i.test(stripScripts(`<html><body style="display:none"><p>hi</p></body></html>`)));
+ // Anything BELOW the page root keeps its own opacity — inactive carousel slides are legitimately 0.
+ assert.match(stripScripts(`<html><body><div class="slide" style="opacity:0">2</div></body></html>`), /opacity:\s*0/);
+});
+
+test("relative url()s are absolutized in style-bearing attributes, not just <style> blocks", () => {
+ // Capture absolutized <style> elements and stripped <base> — but never looked at CSS held in an
+ // ATTRIBUTE. 2ndstreetusa.com paints its article images from
+ //   data-load-style="background-image: url('uploads/articles/…jpg')"
+ // and the theme's loader copies that onto the element after load. Left relative, and with <base>
+ // gone, all five resolved against the page path (/article/26/07/07/uploads/…) and 404'd on every
+ // article page. The inline `style` attribute carries the same risk for the same reason.
+ const $ = cheerio.load(`
+  <div data-load-style="background-image: url('uploads/a/hero.jpg');"></div>
+  <div style="background:#eee url(img/tile.png) repeat"></div>
+  <div data-load-style="background-image: url(data:image/gif;base64,R0lGOD)"></div>`);
+ // captureSite hands deLazy the document's base (see documentBase) — the site root on that store.
+ deLazy($, "https://shop.com/");
+ assert.match($("[data-load-style]").first().attr("data-load-style")!, /url\('https:\/\/shop\.com\/uploads\/a\/hero\.jpg'\)/);
+ assert.match($("[style]").first().attr("style")!, /url\(https:\/\/shop\.com\/img\/tile\.png\)/);
+ assert.match($("[data-load-style]").last().attr("data-load-style")!, /url\(data:image\/gif/, "a data: URI is left alone");
+});
+
+// A THEME MAY PUT THE WORD "badge" ON SOMETHING THAT IS NOT A BADGE.
+//
+// Tess Elizabeth Vintage's theme marks a card's image gallery as badge-bearing —
+// `card-gallery--badge-top-right` — so the substring selector that strips the template's badge
+// matched the wrapper holding every photograph and deleted the lot. 15 of 37 pieces on her
+// Accessories page rendered as a title and a price over blank space, and only the pieces her own
+// theme badges were affected, which is what made it look like a pricing bug.
+test("stripping the template's badge never takes the card's photographs with it", () => {
+ const grid = `<ul class="product-grid">
+  <li class="product-grid__item">
+   <div class="card-gallery card-gallery--badge-top-right"><img class="product-media__image" src="/a.jpg"></div>
+   <div class="product-badges"><span class="product-badges__badge">Sold out</span></div>
+   <a href="/products/one">One</a><span class="price">$10.00</span>
+  </li>
+  <li class="product-grid__item">
+   <div class="card-gallery"><img class="product-media__image" src="/b.jpg"></div>
+   <a href="/products/two">Two</a><span class="price">$20.00</span>
+  </li>
+ </ul>`;
+ const items = [
+  { id: "1", title: "Live one", priceCents: 5000, currency: "USD", images: ["/live1.jpg"], available: true },
+  { id: "2", title: "Live two", priceCents: 6000, currency: "USD", images: ["/live2.jpg"], available: true },
+ ];
+ const $ = cheerio.load(injectLiveGrids(grid, [items], (it) => `/p/${it.id}`));
+ const cards = $("li.product-grid__item").toArray();
+ assert.equal(cards.length, 2);
+ for (const [i, card] of cards.entries()) {
+  assert.equal($(card).find("img").length, 1, `card ${i} kept its photograph`);
+ }
+ assert.equal($("img").first().attr("src"), "/live1.jpg", "and it points at the live piece");
+ // The badge itself — the thing with no picture in it — is still removed for an available piece.
+ assert.equal($(".product-badges__badge").length, 0, "the template's Sold out badge is gone");
 });

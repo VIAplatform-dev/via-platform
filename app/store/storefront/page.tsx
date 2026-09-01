@@ -528,8 +528,11 @@ export default function StorefrontEditor() {
  // iframe. Build a relative /site/{slug} path from the slug (falling back to the url's pathname).
  const sitePath = captured.slug ? `/site/${captured.slug}` : (() => { try { return new URL(captured.url || "").pathname; } catch { return ""; } })();
  const editSrc = `${sitePath}${selPath === "/" ? "" : selPath}?edit=1`;
- // Show the store's VYA address (matches the from-scratch studio), not the original captured host.
- const siteHost = `${handle || captured.slug || "your-store"}.getvya.ai`;
+ // The address her hosted store is ACTUALLY served on — the same one /api/store/capture hands
+ // back (her connected domain, else {slug}.vyasites.com). Deriving it from that one answer is how
+ // this stays true: it used to print a .getvya.ai host while the store was served somewhere else,
+ // so a seller was shown an address her own site does not answer on.
+ const siteHost = (() => { try { return new URL(captured.url || "").host; } catch { return handle || captured.slug || "your-store"; } })();
  const deviceMax = device === "phone" ? "390px" : device === "tablet" ? "834px" : "100%";
  const capDbtn = (d: "desktop" | "tablet" | "phone", Icon: typeof Monitor) => (
  <button type="button" onClick={() => setDevice(d)} aria-label={d} className={`grid h-7 w-9 place-items-center rounded-md transition ${device === d ? "bg-white text-stone-800 shadow-sm" : "text-stone-400 hover:text-stone-600"}`}><Icon size={15} strokeWidth={1.9} /></button>

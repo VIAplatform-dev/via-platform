@@ -72,6 +72,38 @@ export function shellScore(html: string): ShellScore {
  return { isShell, bytes, textLength, images, reason };
 }
 
+/**
+ * Is this response a bot-protection interstitial rather than the site?
+ *
+ * Cloudflare's managed challenge, Akamai's and PerimeterX's equivalents all answer a *successful*
+ * HTTP status with a tiny page that says "prove you're human". captureSite's only gate is `res.ok`,
+ * so a challenge served as **200** — which is what ec.2ndstreetusa.com does for the first stretch,
+ * switching to 429 only later — would be stored as the seller's storefront on every page, and the
+ * import would report success. That is worse than failing: a store goes live serving a Cloudflare
+ * notice under the seller's own name.
+ *
+ * Deliberately conservative, and requires BOTH halves: an unmistakable challenge marker AND a page
+ * with almost no content of its own. A real storefront that happens to mention Cloudflare, or ships
+ * a "security" page, has thousands of characters of its own copy and is never flagged.
+ */
+const CHALLENGE_MARKERS = [
+ /_cf_chl_opt/,                      // Cloudflare managed challenge / Turnstile bootstrap
+ /cdn-cgi\/challenge-platform/,      // …and the script it loads
+ /id=["']cf-challenge-running["']/,  // Cloudflare's legacy "Just a moment…" interstitial
+ /<title>\s*Just a moment\.\.\.?\s*<\/title>/i,
+ /<title>[^<]{0,60}Verifying your connection[^<]{0,20}<\/title>/i,
+ /_pxAppId|px-captcha/,              // PerimeterX
+ /\/_sec\/cp_challenge\//,           // Akamai
+];
+export function looksLikeBotChallenge(html: string): boolean {
+ if (!html) return false;
+ if (!CHALLENGE_MARKERS.some((re) => re.test(html))) return false;
+ // A challenge page carries the vendor's own boilerplate and nothing of the seller's. The smallest
+ // genuine storefront homepage in the corpus still had ~4.8k characters of visible text; the
+ // Cloudflare interstitial has a headline and a sentence.
+ return visibleTextLength(html) < 2000;
+}
+
 const FRAMEWORKS: [string, RegExp][] = [
  ["remix", /__remixContext/],
  ["next", /__NEXT_DATA__|_next\/static/],

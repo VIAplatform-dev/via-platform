@@ -107,7 +107,11 @@ async function waitForCart(page: Page, ok: (c: { count: number; titles: string[]
 async function visibleCartText(page: Page): Promise<string> {
  return page.evaluate((panelSel) => {
   const parts: string[] = [];
-  for (const root of document.querySelectorAll(`${panelSel}, #vya-cart-items, [id*="cart" i][class*="items" i], [class*="cart-items"], [id="main-cart-items"]`)) {
+  // `[data-vya-fallback-cart]` is VYA'S OWN cart page — the one served when the captured theme has
+  // no cart region we can fill. It was missing from this list, so on a store that gets it (awoke-
+  // vintage) the only regions matched were the drawer's EMPTY containers, and a cart page plainly
+  // reading "Awoke Tote · Remove · $18.00 · Subtotal $18.00" was reported as not showing the item.
+  for (const root of document.querySelectorAll(`${panelSel}, [data-vya-fallback-cart], #vya-cart-items, [id*="cart" i][class*="items" i], [class*="cart-items"], [id="main-cart-items"]`)) {
    const s = getComputedStyle(root as Element);
    const r = (root as HTMLElement).getBoundingClientRect();
    if (s.display === "none" || s.visibility === "hidden" || Number(s.opacity) < 0.1) continue;
@@ -129,6 +133,32 @@ async function visiblePanels(page: Page): Promise<number> {
   }
   return n;
  }, SEL.cartPanel);
+}
+
+/**
+ * Click the first copy of a control that a SHOPPER could actually click.
+ *
+ * `.first()` is not that. Themes ship the same control more than once, and the extra copy is
+ * routinely a STICKY add-to-cart bar that sits outside the viewport until the theme reveals it on
+ * scroll — and it comes FIRST in DOM order. Playwright scrolls, finds it still outside the viewport,
+ * retries until it times out, and the store is reported broken while its real button, three hundred
+ * pixels up the same page, works perfectly.
+ *
+ * That is what "timed out — the page never settled" was on tesselizabethvintage: six candidate
+ * products, each costing an 8s click timeout plus a 10s wait for a cart that could never fill,
+ * against a 90s per-store budget. Her cart was fine the whole time — clicking the in-page button
+ * puts the piece in the bag in 0.8s.
+ *
+ * So try every visible copy and keep the first that accepts a click. No per-theme knowledge, which
+ * is the rule this harness is written to.
+ */
+async function clickAnyClickable(page: Page, selector: string, timeout = 4000): Promise<boolean> {
+ const all = page.locator(`${selector} >> visible=true`);
+ const n = await all.count();
+ for (let i = 0; i < n; i++) {
+  try { await all.nth(i).click({ timeout }); return true; } catch { /* a copy that can't be reached — try the next */ }
+ }
+ return false;
 }
 
 async function runStore(browser: Browser, slug: string): Promise<Result> {
@@ -173,10 +203,9 @@ async function runStore(browser: Browser, slug: string): Promise<Result> {
    const pdp = await page.goto(new URL(candidate, origin).toString(), { waitUntil: "domcontentloaded", timeout: 15000 });
    if (!pdp || pdp.status() >= 400) continue;
    sawPdp = true;
-   const addBtn = page.locator(`${SEL.addToCart} >> visible=true`).first();
-   if (!(await addBtn.count())) continue;
+   if (!(await page.locator(`${SEL.addToCart} >> visible=true`).count())) continue;
    sawButton = true;
-   await addBtn.click({ timeout: 8000 }).catch(() => {});
+   await clickAnyClickable(page, SEL.addToCart);
    const cart = await waitForCart(page, (c) => c.count >= 1, 10000);
    if (cart.count >= 1) { link = candidate; afterAdd = cart; break; }
   }
@@ -190,9 +219,9 @@ async function runStore(browser: Browser, slug: string): Promise<Result> {
   // ── the drawer the Add opened, or the one the cart icon opens ──────────────────────────────────
   let shown = await visibleCartText(page);
   if (!shown.includes(wanted)) {
-   const icon = page.locator(`${SEL.cartIcon} >> visible=true`).first();
-   if (await icon.count()) {
-    await icon.click({ timeout: 8000 }).catch(() => {});
+   // Same hazard as the Add button above: a theme's header cart icon often has an off-screen twin.
+   if (await page.locator(`${SEL.cartIcon} >> visible=true`).count()) {
+    await clickAnyClickable(page, SEL.cartIcon);
     await page.waitForTimeout(1800);
     shown = await visibleCartText(page);
    }
@@ -214,10 +243,9 @@ async function runStore(browser: Browser, slug: string): Promise<Result> {
   else res.status.cart = "pass";
 
   // ── remove ─────────────────────────────────────────────────────────────────────────────────────
-  const rm = page.locator(`${SEL.removeControl} >> visible=true`).first();
-  if (!(await rm.count())) fail("remove", "no remove control on the cart page");
+  if (!(await page.locator(`${SEL.removeControl} >> visible=true`).count())) fail("remove", "no remove control on the cart page");
   else {
-   await rm.click({ timeout: 8000 }).catch(() => {});
+   await clickAnyClickable(page, SEL.removeControl);
    const after = await waitForCart(page, (c) => c.count === 0, 12000);
    if (after.count !== 0) fail("remove", `still ${after.count} item(s) in the bag after pressing remove`);
    else res.status.remove = "pass";
@@ -232,7 +260,11 @@ async function runStore(browser: Browser, slug: string): Promise<Result> {
   await page.waitForLoadState("load", { timeout: 10000 }).catch(() => {});
   const gotoPdp = async () => page.goto(new URL(link, origin).toString(), { waitUntil: "domcontentloaded", timeout: 15000 });
   await gotoPdp().catch(async () => { await page.waitForTimeout(1200); return gotoPdp().catch(() => null); });
-  await page.locator(`${SEL.addToCart} >> visible=true`).first().click({ timeout: 8000 }).catch(() => {});
+  // clickAnyClickable, not `.first()`, for the reason given on that helper: `.first()` is the
+  // theme's off-screen sticky bar, so this re-add silently did nothing, the bag stayed empty, and
+  // the cart page then correctly showed no checkout control — reported as "no checkout control on
+  // the cart page" on a store whose checkout was fine.
+  await clickAnyClickable(page, SEL.addToCart);
   await page.waitForTimeout(2000);
   await page.goto(`${origin}/cart`, { waitUntil: "domcontentloaded", timeout: 15000 });
   const co = page.locator(`${SEL.checkout} >> visible=true`).first();

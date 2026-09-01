@@ -12,6 +12,7 @@ import type { Element as DomElement } from "domhandler";
 // (this file's own test — site-capture.test.ts — otherwise fails to load under `node --test`).
 import { assertPublicUrl, safeFetch } from "./safe-url.ts";
 import { CAPTURE_SHIM } from "./capture-shim.ts";
+import { looksLikeBotChallenge } from "./import-engine/detect.ts";
 import { classifyScript, rewriteInlineJsUrls, ownOrigins, detectMyshopifyDomain, stripShopifyCommerceUrls, isDeniedScriptUrl, isDeniedInlineScript } from "./plan-b/scripts.ts";
 import { rehostPageAssets } from "./rehost-theme-assets.ts";
 import { deriveCartTemplate, type CartTemplate, type KnownItem } from "./plan-b/derive-cart-template.ts";
@@ -32,6 +33,27 @@ function abs(u: string | undefined, base: string): string {
  if (!t || t.startsWith("data:") || t.startsWith("#") || t.startsWith("mailto:") || t.startsWith("tel:") || t.startsWith("javascript:")) return u || "";
  try { return new URL(t, base).href; } catch { return u; }
 }
+/**
+ * The URL relative references in this document resolve against.
+ *
+ * Almost always the page's own URL — but a document may declare `<base href>`, and when it does the
+ * HTML spec says EVERY relative reference resolves against that instead. 2ndstreetusa.com's CMS puts
+ * `<base href="https://2ndstreetusa.com/">` in every page's head and then writes its links and assets
+ * purely relative to the site root (`href="about"`, `href="assets/styles/main.css"`). Resolved against
+ * the page URL, an article four levels deep asked for /article/26/07/07/assets/styles/main.css and got
+ * a 404 — the page was stored with no stylesheet, no logo, and a nav pointing at paths that never
+ * existed. Capture strips <base> at the end precisely because it claims to have absolutized everything
+ * already; that claim is only true if the base was honoured first.
+ *
+ * A relative `<base href>` is itself resolved against the page URL, only the first one counts, and a
+ * malformed one is ignored — all three per the spec.
+ */
+export function documentBase($: cheerio.CheerioAPI, sourceUrl: string): string {
+ const declared = $("base[href]").first().attr("href");
+ if (!declared || !declared.trim()) return sourceUrl;
+ try { return new URL(declared.trim(), sourceUrl).href; } catch { return sourceUrl; }
+}
+
 function absSrcset(v: string | undefined, base: string): string {
  if (!v) return "";
  const t = v.trim();
@@ -156,6 +178,28 @@ function collectSpriteSymbols(sprite: string, id: string, out: Map<string, strin
 }
 
 /**
+ * A `<use>` reference split into the sprite file to fetch and the symbol id to pull out of it —
+ * or null when there is nothing to inline (an already-local `#id`, no fragment, not an SVG, or an
+ * id that isn't a plain token we can safely put in a regex).
+ *
+ * The extension is tested against the resolved PATH, not the raw reference: 2ndstreetusa.com writes
+ * `assets/images/sprite.svg?v=1785931200855#logo-type`, and a tail-anchored /\.svg$/ on the raw
+ * string fails on the cache-buster. That skipped the <use> altogether and left it RELATIVE, so on a
+ * VYA origin it resolved against ours, 404'd, and the store's wordmark rendered as blank space.
+ */
+export function spriteRef(raw: string, sourceUrl: string): { url: string; id: string } | null {
+ const hash = raw.indexOf("#");
+ if (hash <= 0) return null;                          // already a local "#id", or no fragment at all
+ const id = raw.slice(hash + 1);
+ if (!/^[\w-]+$/.test(id)) return null;
+ const url = abs(raw.slice(0, hash), sourceUrl);
+ let path = raw.slice(0, hash);
+ try { path = new URL(url).pathname; } catch { /* not absolutizable — fall back to the raw ref */ }
+ if (!/\.svg$/i.test(path)) return null;
+ return { url, id };
+}
+
+/**
  * Inline the SVG sprite symbols a page's <use> elements point at, in place.
  *
  * Squarespace draws every social icon as
@@ -181,17 +225,14 @@ export async function inlineSocialIconSprites($: cheerio.CheerioAPI, sourceUrl: 
   const attrName = $u.attr("xlink:href") != null ? "xlink:href" : "href";
   const setRef = (v: string) => { $u.removeAttr("href"); $u.removeAttr("xlink:href"); $u.attr(attrName, v); };
   const raw = $u.attr("xlink:href") || $u.attr("href") || "";
-  const hash = raw.indexOf("#");
-  if (hash <= 0) continue;                           // already a local "#id", or no fragment at all
-  const file = raw.slice(0, hash);
-  const id = raw.slice(hash + 1);
-  if (!/\.svg$/i.test(file) || !/^[\w-]+$/.test(id)) continue;
+  const ref = spriteRef(raw, sourceUrl);
+  if (!ref) continue;
+  const { url: spriteUrl, id } = ref;
   // Very often the page ALREADY defines this symbol inline and writes an external ref anyway —
   // Squarespace ships a 20-symbol sprite in the body and still points its social icons at the CDN
   // copy. Then there is nothing to fetch: just aim the reference at the symbol already here.
   // (Re-inlining it would define the same id twice, and a duplicate id is the browser's problem.)
   if ($(`[id="${id}"]`).length) { setRef("#" + id); continue; }
-  const spriteUrl = abs(file, sourceUrl);
   if (!sprites.has(spriteUrl)) {
    let body: string | null = null;
    for (let attempt = 0; attempt < 2 && body === null; attempt++) {
@@ -224,6 +265,32 @@ export async function inlineSocialIconSprites($: cheerio.CheerioAPI, sourceUrl: 
  * So the capture stores the seller's code and the SERVE decides. This is the function that decides,
  * and it runs on every VYA-origin response.
  */
+/**
+ * Undo the "hide the page until my JavaScript says so" trick, on the page root only.
+ *
+ * 2ndstreetusa.com serves `<body style="opacity: 0;">` and raises it on load; a script-free render
+ * never runs that, so all 127 captured pages were a blank white screen while every metric read
+ * healthy — 4 stylesheets, 1,426 CSS rules, 3,685px of content. Only the screenshot showed it.
+ *
+ * Scoped deliberately to <html> and <body>: a page root at zero opacity is never a design, it is
+ * always a loading state. Anything below it may legitimately be hidden (an inactive carousel slide),
+ * so it is left alone.
+ */
+function revealPageRoot($: cheerio.CheerioAPI): void {
+ $("html, body").each((_: number, el: unknown) => {
+  const $el = $(el as never);
+  const style = $el.attr("style");
+  if (!style || !/opacity|visibility|display/i.test(style)) return;
+  const kept = style
+   .split(";")
+   .filter((d) => !/^\s*opacity\s*:\s*0*(\.0*[0-4]\d*)?\s*$/i.test(d))
+   .filter((d) => !/^\s*visibility\s*:\s*hidden\s*$/i.test(d))
+   .filter((d) => !/^\s*display\s*:\s*none\s*$/i.test(d))
+   .join(";");
+  if (kept.trim()) $el.attr("style", kept); else $el.removeAttr("style");
+ });
+}
+
 export function stripScripts(html: string): string {
  const $ = cheerio.load(html);
  // A real browser only skips <noscript> content when it SUPPORTS scripting — a capability of the
@@ -235,6 +302,8 @@ export function stripScripts(html: string): string {
  // noscript correctly left wrapped-and-inert) can still be viewed here as a Plan A fallback, and that
  // render is just as script-free as a legacy Plan A capture.
  surfaceNoscriptImages($);
+ // Same precondition, same reason: nothing here will run the theme's own reveal. See revealPageRoot().
+ revealPageRoot($);
  $("script").remove();
  $("*").each((_: number, el: any) => {
   const attribs = el.attribs || {};
@@ -337,6 +406,28 @@ function surfaceNoscriptImages($: cheerio.CheerioAPI): void {
 // hide the real image behind script: a <noscript> fallback for backgrounds, a {width}-templated
 // data-src for responsive images, and a `.lazyload{opacity:0}` reveal-on-load. This undoes all
 // three so heroes and product photos actually show. Exported for unit testing.
+/**
+ * Where a theme's lazy loader parks the real image URL while a placeholder sits in `src`.
+ *
+ * Every loader picks its own attribute name and there is no standard, so this is a list, not a
+ * rule. We knew only lazysizes' `data-src`; 2ndstreetusa.com uses Locomotive's `data-load-src` and
+ * every photograph on all 127 of its pages was lost twice over — the `src` stayed a 1x1 transparent
+ * GIF for a script-free render, and the untouched relative `data-load-src` was re-based onto the
+ * page's own path once capture stripped <base>, so the theme's own loader 404'd as well. Neither
+ * URL ever reached the asset re-hosting pass, so none of the pictures were copied to our storage.
+ *
+ * Ordered: the first attribute present wins. Whatever we promote is REMOVED, so nothing relative
+ * survives to be re-resolved against the wrong base later.
+ */
+const LAZY_SRC_ATTRS = [
+ "data-src",        // lazysizes, lozad — by far the most common
+ "data-lazy-src",   // Slick carousel, WP Rocket
+ "data-original",   // jQuery.lazyload
+ "data-load-src",   // Locomotive (2ndstreetusa.com)
+ "data-echo",       // echo.js
+];
+const LAZY_SRCSET_ATTRS = ["data-srcset", "data-lazy-srcset", "data-load-srcset"];
+
 export function deLazy($: cheerio.CheerioAPI, sourceUrl: string, keepScripts = false): void {
  // 1) See surfaceNoscriptImages() — only valid when THIS capture has no JS running (Plan A). Under
  //    Plan B (keepScripts) the theme's kept script resolves the lazy sibling itself; stripScripts()
@@ -355,11 +446,13 @@ export function deLazy($: cheerio.CheerioAPI, sourceUrl: string, keepScripts = f
  const w = under.length ? Math.max(...under) : widths.length ? Math.min(...widths) : 900;
  const fill = (u?: string) => (u || "").replace(/\{width\}/gi, String(w));
  const cur = $el.attr("src") || "";
- const ds = $el.attr("data-src") || ($el.attr("data-srcset") || "").split(",").pop()?.trim().split(/\s+/)[0];
+ const lazySrcset = LAZY_SRCSET_ATTRS.map((a) => $el.attr(a)).find(Boolean);
+ const ds = LAZY_SRC_ATTRS.map((a) => $el.attr(a)).find(Boolean) || (lazySrcset || "").split(",").pop()?.trim().split(/\s+/)[0];
  if ((!cur || /placeholder|blank|data:image|1x1|lazyload/i.test(cur)) && ds) $el.attr("src", ds);
  $el.attr("src", abs(fill($el.attr("src")), sourceUrl));
- const ss = $el.attr("srcset") || $el.attr("data-srcset"); if (ss) $el.attr("srcset", absSrcset(fill(ss), sourceUrl));
- $el.removeAttr("loading").removeAttr("data-src").removeAttr("data-srcset").removeAttr("data-widths").removeAttr("data-sizes");
+ const ss = $el.attr("srcset") || lazySrcset; if (ss) $el.attr("srcset", absSrcset(fill(ss), sourceUrl));
+ $el.removeAttr("loading").removeAttr("data-widths").removeAttr("data-sizes");
+ for (const a of [...LAZY_SRC_ATTRS, ...LAZY_SRCSET_ATTRS]) $el.removeAttr(a);
  // Fade-in themes leave a promoted image at opacity:0 (the JS that adds `lazyloaded` never runs).
  if (/lazyload/.test($el.attr("class") || "")) $el.removeClass("lazyload lazyloading").addClass("lazyloaded");
  });
@@ -388,6 +481,20 @@ export function deLazy($: cheerio.CheerioAPI, sourceUrl: string, keepScripts = f
  if (ds) $el.attr("src", abs(ds, sourceUrl)).removeAttr("data-src");
  });
  $("video source[src]").each((_: number, el: any) => { const v = $(el).attr("src"); if (v) $(el).attr("src", abs(v, sourceUrl)); });
+
+ // 2c) CSS held in an ATTRIBUTE. Capture absolutizes <style> elements but never looked at the
+ //     `style` attribute or the data-* attributes themes use to carry a deferred background —
+ //     2ndstreetusa.com paints its article images from
+ //       data-load-style="background-image: url('uploads/articles/…jpg')"
+ //     and its loader copies that onto the element after load. Left relative, and with <base>
+ //     stripped, every one resolved against the page path and 404'd. Matched by CONTENT (does the
+ //     value contain a url()?) rather than by attribute name, so the next theme's spelling is
+ //     covered too.
+ $("[style], [data-load-style]").each((_: number, el: any) => {
+ for (const [name, value] of Object.entries((el.attribs || {}) as Record<string, string>)) {
+ if ((name === "style" || name.startsWith("data-")) && /url\(/i.test(value || "")) $(el).attr(name, absCssUrls(value, sourceUrl));
+ }
+ });
 
  // 3) Lazy BACKGROUND images (bgset): a hero/promo <div data-bgset> painted by JS → apply the real
  //    image as an inline background. Skip when an unwrapped <noscript> img already covers the slot.
@@ -437,7 +544,15 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  const origin = safe.origin;
  const res = await safeFetch(sourceUrl, { headers: { ...UA, ...(opts.fetchHeaders || {}) }, signal: AbortSignal.timeout(20000) });
  if (!res.ok) throw new Error(`Couldn't load ${sourceUrl} (${res.status})`);
- const $ = cheerio.load(await res.text());
+ const body = await res.text();
+ // `res.ok` is not enough. A bot-protection interstitial is served with a 200 for the first stretch
+ // of a rate limit, so without this the crawl stores "Verifying your connection…" AS the seller's
+ // page — silently, on every page, and reports success. Failing loudly is the only honest outcome.
+ if (looksLikeBotChallenge(body)) throw new Error(`${new URL(sourceUrl).host} is challenging automated requests (bot protection), so we couldn't read ${sourceUrl}.`);
+ const $ = cheerio.load(body);
+ // What relative references in THIS document resolve against — the page URL unless it declares
+ // <base href>. Everything below absolutizes against `docBase`, not `sourceUrl`. See documentBase().
+ const docBase = documentBase($, sourceUrl);
 
  // Drop the source CSP — it blocks the cart/interactivity scripts VYA injects.
  $("meta[http-equiv]").each((_: number, el: any) => { if (/content-security-policy/i.test($(el).attr("http-equiv") || "")) $(el).remove(); });
@@ -460,7 +575,7 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
   const src = $el.attr("src") || "";
   if (src) {
    if (classifyScript(src, origin) !== "keep") { $el.remove(); return; }
-   $el.attr("src", abs(src, sourceUrl));
+   $el.attr("src", abs(src, docBase));
    return;
   }
   // Inline script: bring any hardcoded absolute self-URL home, or the theme's own routes would
@@ -489,7 +604,7 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  let inlinedSheets = 0;
  for (const el of $('link[rel="stylesheet"], link[as="style"]').toArray()) {
  const href = $(el).attr("href"); if (!href) continue;
- const cssUrl = abs(href, sourceUrl);
+ const cssUrl = abs(href, docBase);
  let css = "";
  for (let attempt = 0; attempt < 2 && !css; attempt++) {
  try { const r = await safeFetch(cssUrl, { headers: UA, signal: AbortSignal.timeout(12000) }); if (r.ok) css = await r.text(); } catch { /* retry / fall through */ }
@@ -498,23 +613,23 @@ export async function captureSite(url: string, opts: CaptureOpts = {}): Promise<
  else $(el).attr("href", cssUrl);
  }
  // Absolutize any inline <style> url()s too.
- $("style").each((_: number, el: any) => { const c = $(el).html(); if (c && /url\(/.test(c)) $(el).text(absCssUrls(c, sourceUrl)); });
+ $("style").each((_: number, el: any) => { const c = $(el).html(); if (c && /url\(/.test(c)) $(el).text(absCssUrls(c, docBase)); });
 
  // Inline the SVG sprite symbols the page's <use> elements point at — see inlineSocialIconSprites().
- await inlineSocialIconSprites($, sourceUrl);
+ await inlineSocialIconSprites($, docBase);
 
  // Images → eager, real source; undo lazy-load (noscript fallbacks, {width} templates, opacity:0).
  // The noscript-unwrap step is Plan-A only — see deLazy()'s own comment.
- deLazy($, sourceUrl, opts.keepScripts);
- $("source[srcset], source[data-srcset]").each((_: number, el: any) => { const ss = $(el).attr("srcset") || $(el).attr("data-srcset"); if (ss) $(el).attr("srcset", absSrcset(ss, sourceUrl)).removeAttr("data-srcset"); });
+ deLazy($, docBase, opts.keepScripts);
+ $("source[srcset], source[data-srcset]").each((_: number, el: any) => { const ss = $(el).attr("srcset") || $(el).attr("data-srcset"); if (ss) $(el).attr("srcset", absSrcset(ss, docBase)).removeAttr("data-srcset"); });
  // Other asset links (favicons, preloaded fonts/images).
- $('link[href]:not([rel="canonical"]):not([rel="alternate"])').each((_: number, el: any) => { const h = $(el).attr("href"); if (h) $(el).attr("href", abs(h, sourceUrl)); });
+ $('link[href]:not([rel="canonical"]):not([rel="alternate"])').each((_: number, el: any) => { const h = $(el).attr("href"); if (h) $(el).attr("href", abs(h, docBase)); });
 
  // Rewrite anchors: same-origin → the VYA-hosted copy; external → absolute (open out).
  const links = new Set<string>();
  $("a[href]").each((_: number, el: any) => {
  const raw = $(el).attr("href"); if (!raw) return;
- const full = abs(raw, sourceUrl);
+ const full = abs(raw, docBase);
  if (!/^https?:/i.test(full)) return;
  if (sameSite(full, origin)) {
  links.add(full);
@@ -2367,8 +2482,33 @@ function renderThemeCard(
  // reads as money. Class names differ per theme; a currency amount looks the same everywhere.
  const $price = findPriceEl($, $card);
  const priceText = moneyLike(it.priceCents, it.currency, decimals, showCode);
- if ($price.length) $price.text(priceText);
- else $card.append(`<div class="vya-price">${escHtml(priceText)}</div>`);
+ if ($price.length) {
+  $price.text(priceText);
+  // A THEME WITH TWO PRICE BLOCKS HIDES THE ONE THAT DOESN'T APPLY — to the CAPTURED product.
+  //
+  // Horizon-family themes ship both a regular and a sale block and hide whichever is wrong for the
+  // product being rendered: `<div class="price__regular price__hidden">`. When the card we cloned
+  // happened to be a marked-down piece, the regular block is the hidden one — so we wrote this
+  // item's real price into an element the theme's own CSS keeps invisible, and the shopper saw
+  // nothing but the struck-through was-price beside it. A piece with no visible price to pay.
+  //
+  // Every check passed it: the correct number IS in the DOM, so a text comparison finds it. Only
+  // looking at the page shows it isn't on screen.
+  //
+  // Unhide ONLY the element we just wrote into, and only its price-block ancestors, so a theme's
+  // screen-reader copy elsewhere in the card is left exactly as it is.
+  const unhide = (el: DomElement) => {
+   const cls = $(el).attr("class");
+   if (!cls) return;
+   const kept = cls.split(/\s+/).filter((c) => c && !/(?:^|[-_]{1,2})hidden$/i.test(c));
+   if (kept.length !== cls.split(/\s+/).filter(Boolean).length) $(el).attr("class", kept.join(" "));
+  };
+  unhide($price.get(0) as DomElement);
+  for (const anc of ($price.parents().toArray() as DomElement[])) {
+   if (!/price/i.test($(anc).attr("class") || "") && !/price/i.test(anc.tagName || "")) continue;
+   unhide(anc);
+  }
+ } else $card.append(`<div class="vya-price">${escHtml(priceText)}</div>`);
  // Sweep up any OTHER copy of the template's price still sitting in the card — same reasoning as
  // the title sweep above. Seen live: a hidden quick-view panel duplicating the card's price, left
  // showing the template product's price on every single card regardless of which real item it held.
@@ -2468,7 +2608,20 @@ function renderThemeCard(
 
  // The template's own badge belongs to the TEMPLATE's product, so it goes — unless this item is
  // sold, in which case the badge is exactly what we want to reuse (handled just below).
- if (it.available !== false) $card.find("[class*='badge']").remove();
+ //
+ // NEVER remove an element that holds a photograph. `[class*='badge']` is a SUBSTRING match, and a
+ // theme is free to put that substring on something that is not a badge: Tess Elizabeth Vintage's
+ // theme marks a card's IMAGE GALLERY as badge-bearing —
+ //   <div class="card-gallery … card-gallery--badge-top-right">  ← holds all three photos
+ // — so this selector matched the gallery and deleted every picture in the card. On her Accessories
+ // page that was 15 of 37 pieces showing a title and a price over blank space, and it hit exactly
+ // the pieces her own theme badges (Sold out, Sale), because only those carry the modifier.
+ //
+ // A badge is a small label. It never contains the product's own photograph, and that — not a list
+ // of per-theme class names — is what tells the two apart in any theme.
+ if (it.available !== false) {
+  $card.find("[class*='badge']").filter((_: number, el: DomElement) => $(el).find("img").length === 0).remove();
+ }
 
  // Sold pieces stay on the shelf, badged — that's what the source store does, and a vintage
  // archive is part of how people browse. Reuse the theme's own badge if the card has one so it
@@ -2481,7 +2634,9 @@ function renderThemeCard(
   //   <div class="card__badge bottom left"><span class="badge badge--bottom-left …">Sold out</span></div>
   // Both match `[class*='badge']`, and writing text into the outer one destroys the inner span —
   // which is where the rounded corners, padding and colour scheme live. Always target the innermost.
-  const badges = $card.find("[class*='badge']").toArray() as DomElement[];
+  // Same substring hazard as above: an element matching `[class*='badge']` that holds photographs
+  // is a gallery, not a badge, and writing "Sold out" into it would replace the pictures with text.
+  const badges = ($card.find("[class*='badge']").toArray() as DomElement[]).filter((b) => $(b).find("img").length === 0);
   const innermost = badges.find((b) => $(b).find("[class*='badge']").length === 0);
   const $badge = innermost ? $(innermost) : $();
   if ($badge.length) $badge.text(goneLabel).removeClass("hidden").css("display", "");
