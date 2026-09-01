@@ -32,6 +32,7 @@ function defaultsFor(slug: string): StorefrontSettings {
  about: store?.description ? store.description.slice(0, 280) : null,
  customDomain: null,
  theme: null,
+ serveMode: null,
  };
 }
 
