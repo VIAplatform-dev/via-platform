@@ -99,10 +99,22 @@ export type SuggestCard = {
 /**
  * Predictive-search RESULTS (`/search/suggest?q=…&section_id=predictive-search`).
  *
- * The class names are the theme's, not ours: `predictive-search-results__card` is what its CSS
- * styles and what its keyboard navigation (`#allResultsItems`) queries for, so results built with
- * generic markup would appear unstyled and arrow-key navigation would skip them. `role="option"`
- * matches the `role="listbox"` container the capture already ships.
+ * The class names and the NESTING are the theme's, not ours. That distinction cost us a bug: the
+ * card class alone was right, but the grid CSS lives on `predictive-search-results__list` (a <ul>),
+ * the cards are <li> carrying the `--product` modifier, and everything inside a card is a
+ * `resource-card` with its own media/content/title parts. Emitting a bare <a> with only the card
+ * class meant not one rule matched, so every result rendered at its natural size — two enormous
+ * photographs per row with the title and price run together, against four tidy cards on her own
+ * site. Every check passed it, because the right products, titles and prices were all present.
+ *
+ * Verified against a live Horizon-family response rather than guessed, and the whole family shares
+ * this markup. A theme that doesn't simply won't match the extra classes, which is what it already
+ * does today — so this can only widen what styles correctly, never narrow it.
+ *
+ * Two deliberate omissions from the real thing:
+ *  · `<product-card-link>`, the theme's custom element for view transitions. It keys off a Shopify
+ *    product id we don't have, and the `resource-card` inside it is what carries the styling.
+ *  · the srcset/secondary hover image, which needs the CDN's own resizing parameters.
  *
  * `data-single-result-url` on a lone result is what lets Enter jump straight to it — the theme reads
  * that attribute before falling back to the full search page.
@@ -110,20 +122,33 @@ export type SuggestCard = {
 export function predictiveSearchResultsSection(sectionId: string, cards: SuggestCard[]): string {
  if (!cards.length) return predictiveSearchEmptySection(sectionId);
  const single = cards.length === 1 ? ` data-single-result-url="${escapeAttr(cards[0].href)}"` : "";
- const items = cards.map((c) => (
-  `<a class="predictive-search-results__card" role="option" href="${escapeAttr(c.href)}">` +
-  (c.image ? `<img class="predictive-search-results__card-image" src="${escapeAttr(c.image)}" alt="${escapeAttr(c.title)}" loading="lazy" width="80" height="80">` : "") +
-  `<span class="predictive-search-results__card-title">${escapeHtml(c.title)}</span>` +
-  (c.price ? `<span class="predictive-search-results__card-price">${escapeHtml(c.price)}</span>` : "") +
-  `</a>`
- )).join("");
+ const items = cards.map((c) => {
+  const title = escapeHtml(c.title);
+  return `<li class="predictive-search-results__card predictive-search-results__card--product" role="option" ref="resultsItems[]">` +
+   `<div class="resource-card" data-resource-type="product">` +
+   // The link covers the card and carries the accessible name; the title below is presentational,
+   // which is how the theme itself splits it.
+   `<a class="resource-card__link" href="${escapeAttr(c.href)}"><span class="visually-hidden">${title}</span></a>` +
+   `<div class="resource-card__media" style="--resource-card-aspect-ratio: 4 / 5;">` +
+   (c.image ? `<img class="resource-card__image" src="${escapeAttr(c.image)}" alt="${escapeAttr(c.title)}" loading="lazy">` : "") +
+   `</div>` +
+   `<div class="resource-card__content">` +
+   `<p class="resource-card__title paragraph">${title}</p>` +
+   (c.price ? `<div class="price__regular"><span class="price">${escapeHtml(c.price)}</span></div>` : "") +
+   `</div></div></li>`;
+ }).join("");
+ const count = `${cards.length} search result${cards.length === 1 ? "" : "s"} found`;
  return `<div id="${SECTION_ID_PREFIX}${escapeAttr(sectionId)}" class="shopify-section">` +
   // See predictiveSearchEmptySection() — required by the "Shapes"-family theme convention, not the
   // Horizon one the rest of this section's markup targets. Both read from the same response fine.
   `<span id="predictive-search-count" class="visually-hidden">${cards.length} result${cards.length === 1 ? "" : "s"}</span>` +
-  `<div id="predictive-search-results" class="predictive-search-dropdown" role="listbox" aria-expanded="true"${single}>` +
-  `<div id="predictive-search-products" class="predictive-search-results__wrapper-products">${items}</div>` +
-  `</div></div>`;
+  `<div id="predictive-search-results" class="predictive-search-dropdown" role="listbox" aria-label="Search results"${single}>` +
+  `<div class="predictive-search-results__inner" data-search-results>` +
+  `<div class="visually-hidden" role="status">${count}</div>` +
+  `<div id="predictive-search-products" class="predictive-search-results__products">` +
+  `<h4 class="predictive-search-results__title">Products</h4>` +
+  `<ul class="predictive-search-results__list predictive-search-results__wrapper-products list-unstyled">${items}</ul>` +
+  `</div></div></div></div>`;
 }
 
 /** Is this the search drawer's empty-state section? Shopify names it by convention across themes. */

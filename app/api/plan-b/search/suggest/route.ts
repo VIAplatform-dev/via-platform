@@ -60,6 +60,8 @@ function html(body: string): Response {
 
 function money(cents: number | null, currency: string | null): string {
  if (cents == null) return "";
- try { return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format(cents / 100); }
- catch { return `$${Math.round(cents / 100)}`; }
+ // Two decimals, because the seller's own search drawer shows "$50.00" and this one sat beside it
+ // reading "$50" — a different price to anyone comparing, on the one screen where they might.
+ try { return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD" }).format(cents / 100); }
+ catch { return `$${(cents / 100).toFixed(2)}`; }
 }

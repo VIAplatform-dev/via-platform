@@ -55,10 +55,12 @@ test("results use the theme's own class names, not ours", () => {
   { title: "Chanel Flap", href: "/products/chanel-flap", image: "https://x/img.jpg", price: "$5,000" },
   { title: "Dior Saddle", href: "/products/dior", image: null, price: "$2,500" },
  ]);
- // what the theme's CSS styles and its keyboard navigation queries for
- // exact class, not a substring match — the child spans carry `__card-title` / `__card-price` too
- assert.equal((out.match(/class="predictive-search-results__card"/g) || []).length, 2);
- assert.match(out, /class="predictive-search-results__wrapper-products"/);
+ // What the theme's CSS styles and its keyboard navigation queries for. Matched as a CLASS TOKEN
+ // rather than the whole attribute: the real theme puts `--product` beside it on the card and three
+ // classes on the list, and pinning the exact attribute string here asserted our own simplified
+ // markup was correct — which is precisely how the drawer shipped rendering two giant cards a row.
+ assert.equal((out.match(/class="predictive-search-results__card[ "]/g) || []).length, 2);
+ assert.match(out, /class="[^"]*\bpredictive-search-results__wrapper-products\b[^"]*"/);
  assert.match(out, /role="option"/);
  assert.ok(!out.includes("data-single-result-url"), "only a LONE result gets the Enter-key shortcut");
 });
@@ -108,4 +110,81 @@ test("predictiveSearchResultsSection's count is plural for more than one result,
 test("predictiveSearchEmptySection also carries #predictive-search-count — same theme, same null-unsafe read", () => {
  const out = predictiveSearchEmptySection("predictive-search-empty");
  assert.match(out, /id="predictive-search-count"/);
+});
+
+// The search drawer rendered two enormous cards per row with the title and price run together,
+// where the seller's own site shows four tidy ones. Nothing was missing from the response — the
+// products, titles and prices were all there — so every content check passed it. What was missing
+// was the nesting the theme's CSS actually selects on. These lock that shape in.
+
+test("results hang the grid off the class the theme's CSS actually styles", () => {
+ const html = predictiveSearchResultsSection("predictive-search", [
+  { title: "1930s Enamel Dangle Brooch", href: "/products/brooch", image: "https://cdn/x.png", price: "$50.00" },
+  { title: "1930s Mini Locket Charm", href: "/products/locket", image: "https://cdn/y.png", price: "$75.00" },
+ ]);
+ // The grid lives on __list, on a <ul>. A bare wrapper div matches no rule and every card renders
+ // at its natural size — which is the bug this whole family of assertions exists to catch.
+ assert.match(html, /<ul class="[^"]*predictive-search-results__list[^"]*"/);
+ assert.match(html, /list-unstyled/);
+ assert.equal((html.match(/<li class="predictive-search-results__card /g) || []).length, 2);
+ assert.match(html, /predictive-search-results__card--product/);
+});
+
+test("each result is a resource-card, which is what sizes the photograph", () => {
+ const html = predictiveSearchResultsSection("predictive-search", [
+  { title: "1930s Mini Locket Charm", href: "/products/locket", image: "https://cdn/y.png", price: "$75.00" },
+ ]);
+ assert.match(html, /class="resource-card"/);
+ assert.match(html, /class="resource-card__media"/);
+ assert.match(html, /--resource-card-aspect-ratio: 4 \/ 5/);
+ assert.match(html, /class="resource-card__image"/);
+ assert.match(html, /class="resource-card__content"/);
+ assert.match(html, /class="resource-card__title paragraph">1930s Mini Locket Charm</);
+});
+
+test("the price is its own block, not a span welded to the title", () => {
+ const html = predictiveSearchResultsSection("predictive-search", [
+  { title: "Brooch", href: "/products/b", image: null, price: "$50.00" },
+ ]);
+ // "Brooch$50" on one line was the visible symptom: two inline spans with nothing between them.
+ assert.ok(!/Brooch<\/span><span[^>]*>\$50/.test(html), "title and price are still welded together");
+ assert.match(html, /<div class="price__regular"><span class="price">\$50\.00<\/span><\/div>/);
+});
+
+test("keeps the heading and the count the drawer expects", () => {
+ const html = predictiveSearchResultsSection("predictive-search", [
+  { title: "A", href: "/products/a", image: null, price: "$1.00" },
+  { title: "B", href: "/products/b", image: null, price: "$2.00" },
+ ]);
+ assert.match(html, /predictive-search-results__title">Products</);
+ assert.match(html, /id="predictive-search-products"/);
+ assert.match(html, /id="predictive-search-count"[^>]*>2 results</);
+ assert.match(html, /role="status">2 search results found</);
+});
+
+test("a lone result still carries the jump-straight-there attribute", () => {
+ const one = predictiveSearchResultsSection("predictive-search", [{ title: "Only", href: "/products/only", image: null, price: "$9.00" }]);
+ assert.match(one, /data-single-result-url="\/products\/only"/);
+ assert.match(one, /1 result</);
+ const two = predictiveSearchResultsSection("predictive-search", [
+  { title: "A", href: "/products/a", image: null, price: "" },
+  { title: "B", href: "/products/b", image: null, price: "" },
+ ]);
+ assert.ok(!two.includes("data-single-result-url"), "two results must not jump anywhere");
+});
+
+test("a piece with no photograph still renders a card rather than a hole", () => {
+ const html = predictiveSearchResultsSection("predictive-search", [{ title: "No photo", href: "/products/n", image: null, price: "$5.00" }]);
+ assert.match(html, /class="resource-card__media"/);
+ assert.ok(!html.includes("<img"), "no image element when there is no image");
+ assert.match(html, /No photo/);
+});
+
+test("a title with markup in it cannot break out into the drawer", () => {
+ const html = predictiveSearchResultsSection("predictive-search", [
+  { title: '<script>alert(1)</script> "Dress"', href: "/products/x?a=1&b=2", image: null, price: "$1.00" },
+ ]);
+ assert.ok(!html.includes("<script>"), "script tag survived into the drawer");
+ assert.match(html, /&lt;script&gt;/);
+ assert.match(html, /href="\/products\/x\?a=1&amp;b=2"/);
 });
