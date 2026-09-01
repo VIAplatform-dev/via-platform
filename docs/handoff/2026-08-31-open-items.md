@@ -1,5 +1,11 @@
 # Open items — end of 2026-08-31
 
+> **SUPERSEDED — see `2026-09-01-handoff.md`.** Several items below are wrong: the bag-crush
+> recommendations strip is not a bug (her own site has none either), "fourteen stores never
+> repaired" was three and all three are fake, in-store pickup is built, and capture history now
+> exists. Read §7 of the new document before acting on anything here.
+
+
 Ordered by what a shopper loses, not by what is interesting.
 
 ## 1. The "you may also like" strip is empty on bag-crush  ← DO THIS FIRST
