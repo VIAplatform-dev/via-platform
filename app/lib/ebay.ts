@@ -7,6 +7,8 @@ import { getEbayTokens, saveEbayTokens, updateEbayAccessToken } from "./ebay-tok
 // (keyed by SKU = our itemId) → create an offer → publish it into a live listing. To pull
 // a piece, withdraw the offer. All env-gated: with no eBay app configured, callers no-op.
 
+import { adaptForEbay, missingSizeMessage } from "./ebay-adapt";
+
 const OAUTH_BASE = "https://api.ebay.com/identity/v1/oauth2/token";
 const AUTHORIZE_BASE = "https://auth.ebay.com/oauth2/authorize";
 const API = "https://api.ebay.com";
@@ -400,13 +402,15 @@ function parseColor(item: EbayItem): string | null {
 // Resolve a publishable value for a REQUIRED category aspect eBay demands. Uses VYA data where we have
 // it (brand, material), recovers colour from text, and picks a safe default otherwise so publish
 // doesn't fail on a missing item specific. Selection-only aspects must match an allowed value exactly.
-function resolveAspect(a: AspectMeta, item: EbayItem): string | null {
+function resolveAspect(a: AspectMeta, item: EbayItem, material?: string | null): string | null {
  const n = a.name.toLowerCase();
  const inList = (v: string) => a.values.find((x) => x.toLowerCase() === v.toLowerCase()) || null;
  const val = (v: string) => (a.selectionOnly ? inList(v) : v);
  if (n === "brand") return val(item.brand || "Unbranded") || item.brand || "Unbranded";
  if (n.includes("color") || n.includes("colour")) return val(parseColor(item) || "Multicolor") || "Multicolor";
- if (n.includes("material")) return val(item.material || "Other") || (a.selectionOnly ? a.values[0] || null : item.material || "Other");
+ // The ADAPTED material — a fabric the seller put in the Size box lands here rather than being
+ // discarded along with the size that was rejected.
+ if (n.includes("material")) { const m0 = material ?? item.material; return val(m0 || "Other") || (a.selectionOnly ? a.values[0] || null : m0 || "Other"); }
  if (n === "department") return inList("Women") || inList("Unisex Adults") || a.values[0] || (a.selectionOnly ? null : "Women");
  if (n === "type" || n.includes("style")) {
  const t = (item.title || "").toLowerCase();
@@ -431,7 +435,7 @@ function standardizeSize(raw: string, allowed: string[]): string | null {
  return allowed.find((v) => v.toLowerCase() === norm.toLowerCase()) || allowed.find((v) => v.toLowerCase() === r.toLowerCase()) || null;
 }
 
-export type EbayItem = { itemId: string; title: string; description?: string | null; brand?: string | null; condition?: string | null; size?: string | null; material?: string | null; priceCents: number; currency?: string; images: string[] };
+export type EbayItem = { itemId: string; title: string; description?: string | null; brand?: string | null; condition?: string | null; size?: string | null; material?: string | null; category?: string | null; priceCents: number; currency?: string; images: string[] };
 
 export type EbayResult = { ok: boolean; listingUrl?: string; error?: string; raw?: string };
 
@@ -509,13 +513,24 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  }
  }
  let sizeAspect: string | null = null;
+ // The material eBay should see, which may have been rescued out of the Size field.
+ let adaptedMaterial: string | null = item.material ?? null;
  let metaAll: AspectMeta[] = [];
  if (categoryId) {
  const asp = await categoryAspects(categoryId);
  metaAll = asp.all;
- sizeAspect = standardizeSize(item.size || "", asp.sizeValues);
+ // Reshape the piece for eBay rather than asking her to reshape her listing — what she wrote, then
+ // a size she wrote elsewhere, then "one size" where that is a fact about the piece. A fabric sitting
+ // in the Size box becomes the MATERIAL instead of being rejected and discarded. See ebay-adapt.ts;
+ // deliberately does not invent a garment size, because a wrong one is a return and she never chose it.
+ const adapted = adaptForEbay(
+  { size: item.size, material: item.material, title: item.title, description: item.description, category: item.category },
+  { standardize: (raw) => standardizeSize(raw, asp.sizeValues), allowedSizes: asp.sizeValues, sizeRequired: asp.sizeRequired },
+ );
+ sizeAspect = adapted.size;
+ adaptedMaterial = adapted.material;
  if (asp.sizeRequired && !sizeAspect) {
- return { ok: false, error: `eBay now requires a standard size for this category — “${item.size || "no size"}” isn’t one eBay recognizes. Use a standard size (e.g. S/M/L or a numeric size).` };
+  return { ok: false, error: missingSizeMessage({ size: item.size }, adapted) };
  }
  }
 
@@ -541,7 +556,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  // valid best value (colour recovered from the title, a safe default otherwise).
  for (const a of metaAll) {
  if (!a.required || aspects[a.name]) continue;
- const v = resolveAspect(a, item);
+ const v = resolveAspect(a, item, adaptedMaterial);
  if (v) aspects[a.name] = [v];
  }
  const inv = await ebayFetch(token, `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`, {
