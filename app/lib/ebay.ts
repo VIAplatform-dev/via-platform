@@ -515,7 +515,17 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  metaAll = asp.all;
  sizeAspect = standardizeSize(item.size || "", asp.sizeValues);
  if (asp.sizeRequired && !sizeAspect) {
- return { ok: false, error: `eBay now requires a standard size for this category — “${item.size || "no size"}” isn’t one eBay recognizes. Use a standard size (e.g. S/M/L or a numeric size).` };
+  // Name the FIELD, not just the value. eBay rejects free-text sizes on Apparel and Footwear and
+  // its message says only that the value is wrong — so a seller who has typed a fabric into the
+  // Size box reads "Leather isn't a size eBay recognizes" and goes to check her Material field,
+  // which is perfectly fine. The two boxes sit beside each other on the form.
+  const looksLikeMaterial = /leather|suede|cotton|silk|wool|linen|denim|cashmere|velvet|satin|lace|nylon|polyester|rayon|viscose|shearling|tweed|corduroy|canvas|\bfur\b/i.test(item.size || "");
+  return {
+   ok: false,
+   error: looksLikeMaterial
+    ? `“${item.size}” is in this piece’s Size field, and it looks like a material. Move it to Material and put a size in Size — eBay needs a standard one here (S/M/L or a number).`
+    : `eBay needs a standard size for this category — “${item.size || "no size"}” isn’t one it recognizes. Use S/M/L or a numeric size.`,
+  };
  }
  }
 
