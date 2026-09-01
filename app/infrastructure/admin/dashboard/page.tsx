@@ -270,13 +270,198 @@ function ProfitAndLoss({ margin, period, onAdded }: {
     </tbody>
    </table>
 
+   <ImportCosts onImported={onAdded} />
+
    <p className="mt-4 text-[11px] leading-relaxed text-stone-400">
     You can also just tell VYA — &ldquo;spent 84 on poly mailers&rdquo; — and it files the cost for you.
     {cur.coveragePct < 100 && cur.totalSales > 0 && (
      <> Revenue and cost of goods cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.</>
     )}
+    {/* On a tax-inclusive store the listed price already contains VAT, which is never the seller's
+        money. Say what was taken out — and, where no tax was recorded, say that too rather than
+        letting a gross figure pass for revenue. */}
+    {cur.taxCents > 0 && <> Revenue excludes {moneyExact(cur.taxCents)} of tax collected.</>}
+    {cur.salesWithoutTax > 0 && (
+     <> {cur.salesWithoutTax} {cur.salesWithoutTax === 1 ? "sale has" : "sales have"} no tax recorded, so {cur.salesWithoutTax === 1 ? "it is" : "they are"} shown as charged &mdash; if your prices include VAT, that much is still in this figure.</>
+    )}
    </p>
   </TechCard>
+ );
+}
+
+type ImportPreview = {
+ headers: string[];
+ mapping: Partial<Record<"date" | "label" | "amount" | "category", number>>;
+ counts: { ready: number; problems: number; skipped: number };
+ totalCents: number;
+ preview: { row: number; occurredOn: string; label: string; amountCents: number; category: string }[];
+ problems: { row: number; reason: string; raw: string }[];
+};
+
+const FIELD_LABEL: Record<string, string> = { date: "Date", label: "Description", amount: "Amount", category: "Category" };
+
+/**
+ * Bring a costs spreadsheet in.
+ *
+ * Two steps on purpose: the parser is guessing at somebody else's columns, so it shows what it read
+ * and lets her correct the mapping BEFORE anything is written. Rows it couldn't read are listed with
+ * the reason and the row number rather than dropped, because a silently short import is worse than
+ * an obvious one — she'd never know which costs were missing from her P&L.
+ */
+function ImportCosts({ onImported }: { onImported: () => void }) {
+ const [open, setOpen] = useState(false);
+ const [text, setText] = useState<string | null>(null);
+ const [fileName, setFileName] = useState("");
+ const [preview, setPreview] = useState<ImportPreview | null>(null);
+ const [mapping, setMapping] = useState<Record<string, number>>({});
+ const [busy, setBusy] = useState(false);
+ const [err, setErr] = useState<string | null>(null);
+ const [done, setDone] = useState<string | null>(null);
+
+ function reset() {
+  setText(null); setFileName(""); setPreview(null); setMapping({}); setErr(null); setDone(null);
+ }
+
+ async function post(body: Record<string, unknown>) {
+  setBusy(true); setErr(null);
+  const r = await fetch("/api/store/expenses/import", {
+   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  }).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
+  setBusy(false);
+  if (!r || !r.ok) { setErr(r?.d?.error || "Couldn’t read that file."); return null; }
+  return r.d;
+ }
+
+ async function pick(file: File) {
+  reset();
+  setFileName(file.name);
+  const raw = await file.text().catch(() => "");
+  setText(raw);
+  const d = await post({ text: raw, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (d) { setPreview(d as ImportPreview); setMapping((d.mapping || {}) as Record<string, number>); }
+ }
+
+ async function remap(field: string, col: number) {
+  const next = { ...mapping, [field]: col };
+  setMapping(next);
+  if (!text) return;
+  const d = await post({ text, mapping: next, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (d) setPreview(d as ImportPreview);
+ }
+
+ async function commit() {
+  if (!text) return;
+  const d = await post({ text, mapping, commit: true, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  if (!d) return;
+  setDone(`Imported ${d.imported} cost${d.imported === 1 ? "" : "s"}${d.failedCount ? `, ${d.failedCount} couldn’t be saved` : ""}.`);
+  setPreview(null); setText(null);
+  onImported();
+ }
+
+ if (!open) {
+  return (
+   <button onClick={() => setOpen(true)} className="mt-4 text-[12px] font-medium text-stone-500 underline underline-offset-2 hover:text-stone-800">
+    Import costs from a spreadsheet
+   </button>
+  );
+ }
+
+ return (
+  <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50/60 p-4">
+   <div className="mb-3 flex items-center justify-between gap-3">
+    <p className="text-[13px] font-semibold text-stone-800">Import costs from a spreadsheet</p>
+    <button onClick={() => { setOpen(false); reset(); }} className="text-[12px] text-stone-400 hover:text-stone-700">Close</button>
+   </div>
+
+   {done ? (
+    <div className="flex flex-wrap items-center gap-3">
+     <p className="text-[13px] text-emerald-700">{done}</p>
+     <button onClick={reset} className="text-[12px] text-stone-500 underline underline-offset-2">Import another</button>
+    </div>
+   ) : (
+    <>
+     <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-[12px] font-medium text-stone-700 hover:border-stone-400">
+      <input
+       type="file"
+       accept=".csv,.tsv,.txt,text/csv,text/plain"
+       className="hidden"
+       onChange={(e) => { const f = e.target.files?.[0]; if (f) pick(f); e.target.value = ""; }}
+      />
+      {fileName || "Choose a file"}
+     </label>
+     <p className="mt-2 text-[11px] leading-relaxed text-stone-400">
+      A CSV with a date, a description and an amount. In Excel or Numbers: File &rarr; Save As &rarr; CSV.
+      Nothing is saved until you press Import.
+     </p>
+
+     {busy && <p className="mt-3 text-[12px] text-stone-400">Reading&hellip;</p>}
+     {err && <p className="mt-3 text-[12px] text-rose-700">{err}</p>}
+
+     {preview && (
+      <div className="mt-4">
+       <p className="text-[13px] text-stone-700">
+        <span className="font-semibold">{preview.counts.ready}</span> cost{preview.counts.ready === 1 ? "" : "s"} ready
+        &nbsp;&middot;&nbsp; {moneyExact(preview.totalCents)} total
+        {preview.counts.problems > 0 && <> &middot; <span className="text-rose-700">{preview.counts.problems} couldn&rsquo;t be read</span></>}
+        {preview.counts.skipped > 0 && <> &middot; {preview.counts.skipped} total row{preview.counts.skipped === 1 ? "" : "s"} skipped</>}
+       </p>
+
+       {/* Column mapping — only worth showing when there's more than one column to choose from. */}
+       {preview.headers.length > 1 && (
+        <div className="mt-3 flex flex-wrap gap-3">
+         {(["date", "label", "amount", "category"] as const).map((f) => (
+          <label key={f} className="text-[11px] text-stone-500">
+           <span className="mr-1.5">{FIELD_LABEL[f]}</span>
+           <select
+            value={mapping[f] ?? -1}
+            onChange={(e) => remap(f, Number(e.target.value))}
+            className="rounded border border-stone-300 bg-white px-1.5 py-1 text-[11px] text-stone-700"
+           >
+            <option value={-1}>&mdash;</option>
+            {preview.headers.map((h, i) => <option key={i} value={i}>{h || `Column ${i + 1}`}</option>)}
+           </select>
+          </label>
+         ))}
+        </div>
+       )}
+
+       {preview.preview.length > 0 && (
+        <div className="mt-3 max-h-56 overflow-auto rounded-lg border border-stone-200 bg-white">
+         <table className="w-full text-[12px] tabular-nums">
+          <tbody>
+           {preview.preview.map((e) => (
+            <tr key={e.row} className="border-b border-stone-100 last:border-0">
+             <td className="px-2.5 py-1.5 text-stone-400">{e.occurredOn}</td>
+             <td className="px-2.5 py-1.5 text-stone-700">{e.label}</td>
+             <td className="px-2.5 py-1.5 text-stone-400">{e.category}</td>
+             <td className="px-2.5 py-1.5 text-right font-medium">{moneyExact(e.amountCents)}</td>
+            </tr>
+           ))}
+          </tbody>
+         </table>
+        </div>
+       )}
+
+       {preview.problems.length > 0 && (
+        <div className="mt-3 max-h-32 overflow-auto rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2">
+         {preview.problems.map((p) => (
+          <p key={p.row} className="text-[11px] leading-relaxed text-rose-700">Row {p.row}: {p.reason}</p>
+         ))}
+        </div>
+       )}
+
+       <button
+        onClick={commit}
+        disabled={busy || preview.counts.ready === 0}
+        className="mt-3 rounded-md bg-stone-900 px-3.5 py-1.5 text-[12px] font-medium text-white disabled:opacity-40"
+       >
+        {busy ? "Importing…" : `Import ${preview.counts.ready} cost${preview.counts.ready === 1 ? "" : "s"}`}
+       </button>
+      </div>
+     )}
+    </>
+   )}
+  </div>
  );
 }
 
