@@ -652,10 +652,27 @@ function Analytics() {
 
    {loading && !data ? (
     <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>
-   ) : nothing ? (
-    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="No activity yet" body="Once you publish listings and make sales, your revenue, demand and traffic show up here." />
    ) : data ? (
     <>
+     {/* A store with no sales yet gets the WHOLE page at zero, not a blank card where the page
+         should be. `nothing` only ever becomes true when `data` has already arrived — it is a store
+         whose every figure is 0, not a store we failed to load — so the real layout renders
+         perfectly well. Replacing it with one empty state meant a seller's first look at Analytics
+         taught her nothing about what she was going to get, on the screen most likely to sell her
+         on staying. The tabs, the cards and the charts are all here; they are simply empty. */}
+     {nothing && (
+      <TechCard className="mb-4 flex items-start gap-3 p-4">
+       <BarChart3 size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-stone-400" />
+       <div>
+        <p className="text-[13px] font-semibold text-stone-900">Nothing to measure yet — here’s what will be</p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-stone-500">
+         Every figure below is zero until your first listing and your first sale. Nothing needs setting
+         up: revenue, profit, repeat customers, where your traffic comes from and which pieces move
+         fastest all fill in on their own as you sell. Have a look through the tabs to see what’s coming.
+        </p>
+       </div>
+      </TechCard>
+     )}
      <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] text-stone-400">
       <span>{new Date(data.period.startISO).toLocaleDateString()} – {new Date(data.period.endISO).toLocaleDateString()}</span>
       {data.period.comparisons.prior && <span>· compared with {data.period.comparisons.prior.label.toLowerCase()}</span>}

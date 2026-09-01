@@ -41,7 +41,10 @@ export default function WorkspaceHome() {
  const [offersList, setOffersList] = useState<Offer[]>([]);
  const [inboxMsgs, setInboxMsgs] = useState<InboxMsg[]>([]);
  const [demand, setDemand] = useState<{ name: string; trend: string; index: number }[]>([]);
- const [demandLocked, setDemandLocked] = useState(false); // market-insights is Pro-gated → show upsell, not a misleading empty state
+ // Trends is VYA's own tooling, hidden from sellers in the workspace nav. The link out to it, and
+ // the empty state that points at it, have to follow — a seller sent to a page she can't open
+ // learns only that something exists which isn't for her.
+ const [isOwner, setIsOwner] = useState(false);
  const [period, setPeriod] = useState("30d");
  const [nowMs] = useState(() => Date.now()); // stable "now" (set once) — keeps date math pure in render
 
@@ -66,9 +69,9 @@ export default function WorkspaceHome() {
  }).catch(() => {});
  fetch("/api/store/messages").then((r) => (r.ok ? r.json() : null)).then((d) => { const m = d?.messages || d?.threads || d; if (Array.isArray(m)) setInboxMsgs(m); }).catch(() => {});
  fetch("/api/store/market-insights").then((r) => (r.ok ? r.json() : null)).then((d) => {
- if (d?.locked) { setDemandLocked(true); return; }
- if (Array.isArray(d?.trending) && d.trending.length) setDemand(d.trending.slice(0, 6).map((t: { segmentValue: string; demandTrend: string; demandIndex: number }) => ({ name: t.segmentValue, trend: t.demandTrend, index: t.demandIndex })));
+  if (Array.isArray(d?.trending) && d.trending.length) setDemand(d.trending.slice(0, 6).map((t: { segmentValue: string; demandTrend: string; demandIndex: number }) => ({ name: t.segmentValue, trend: t.demandTrend, index: t.demandIndex })));
  }).catch(() => {});
+ fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).then((d) => setIsOwner(d?.admin === true)).catch(() => {});
  // Load any saved conversation so the chat (and its memory) continues where it left off.
  fetch("/api/store/assistant").then((r) => (r.ok ? r.json() : null)).then((d) => {
  if (d && Array.isArray(d.messages) && d.messages.length) { msgsRef.current = d.messages; setMsgs(d.messages); }
@@ -342,7 +345,7 @@ export default function WorkspaceHome() {
  <TechCard className="mt-4 p-5">
  <div className="mb-2 flex items-center justify-between">
  <p className="text-[13px] font-semibold text-stone-900">What to source</p>
- <Link href={`${B}/trends`} className="text-[12px] text-[var(--accent-ink)] hover:underline">Trends</Link>
+ {isOwner ? <Link href={`${B}/trends`} className="text-[12px] text-[var(--accent-ink)] hover:underline">Trends</Link> : null}
  </div>
  {demand.length ? (
  <div className="grid gap-x-10 sm:grid-cols-2">
@@ -356,13 +359,11 @@ export default function WorkspaceHome() {
  );
  })}
  </div>
- ) : demandLocked ? (
- <div className="py-6 text-center">
- <p className="text-[13px] text-stone-500">See what VYA buyers are demanding right now — the exact brands and categories to source before prices climb.</p>
- <Link href={`${B}/billing`} className="mt-3 inline-block rounded-lg bg-stone-900 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-stone-800">Upgrade to unlock</Link>
- </div>
  ) : (
- <p className="py-8 text-center text-[13px] text-stone-400">Demand insights build as marketplace data grows — see the Trends page for what’s heating up.</p>
+ <p className="py-8 text-center text-[13px] text-stone-400">
+  Demand builds as more of the marketplace sells — the brands and categories buyers are asking for will show up here.
+  {isOwner ? <> See <Link href={`${B}/trends`} className="underline">Trends</Link> for the full picture.</> : null}
+ </p>
  )}
  </TechCard>
 

@@ -5,7 +5,6 @@ import { PRIVACY, DEMAND_WEIGHTS } from "@/app/lib/data-layer/config";
 import { rawDemand } from "@/app/lib/data-layer/metrics";
 import { askingPriceLookup } from "@/app/lib/data-layer/asking-price";
 import { resolveStoreSlug } from "@/app/lib/storeAuth";
-import { isStorePro } from "@/app/lib/store-plans-db";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +21,11 @@ export async function GET(request: NextRequest) {
  const storeSlug = await resolveStoreSlug(request);
  if (!storeSlug) return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
 
- // Market Insights is a VYA Pro feature — free stores get a locked teaser, not the data.
- if (!(await isStorePro(storeSlug))) return NextResponse.json({ locked: true });
+ // No plan gate. What to source is the answer to the question a vintage seller actually asks —
+ // what should I buy next — and it is the one thing here she cannot work out from her own shop.
+ // Holding it behind a tier meant the sellers with the least data got the least help, and the
+ // home page led with a padlock. Every figure below is still aggregated to >=5 stores by
+ // gateSegments, so opening it up exposes nobody's numbers.
 
  const windowKey = request.nextUrl.searchParams.get("window") === "30d" ? "30d" : "7d";
  const windowDays = windowKey === "30d" ? 30 : 7;
