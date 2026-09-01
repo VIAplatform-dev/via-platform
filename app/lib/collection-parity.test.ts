@@ -324,3 +324,46 @@ test("a sellable piece missing from a collection is still a real gap", () => {
  });
  assert.deepEqual(r.collectionsOff, ["archive 2/3"]);
 });
+
+test("a rail that drops sold pieces is not 'inflated' for serving fewer than we filed", () => {
+ // Sellers differ, so we now mirror each collection's own behaviour: where she drops sold pieces
+ // from a rail, ours drops them too. The filing keeps them — it is the record of what belongs in
+ // the collection — so the page legitimately serves FEWER than we filed, by exactly the sold count.
+ //
+ // This check compared the served size against raw membership and called that gap a fault. It put
+ // feathers on the blocking list for three rails (all-bottoms 16/17, designer 45/48, festival-vibes
+ // 29/32) whose gaps were 1, 3 and 3 — precisely their sold pieces. The page was right and the
+ // check was wrong, and it told the seller her collections were "showing pieces you didn't put in
+ // them" while they were showing exactly what she puts in them.
+ const ours = new Map([["all-bottoms", ["a", "b", "c"]]]);
+ const r = compareCollections({
+  source: [], ours, liveSourceIds: new Set(["a", "b", "c"]),
+  ourActive: new Set(["a", "b"]),           // "c" has sold
+  served: new Map([["all-bottoms", 2]]),    // the page serves the two live pieces
+  servedSource: new Map([["all-bottoms", "filed"]]),
+ });
+ assert.deepEqual(r.collectionsInflated, []);
+});
+
+test("a rail keeping its sold pieces is still held to the whole filing", () => {
+ const ours = new Map([["resort", ["a", "b", "c"]]]);
+ const r = compareCollections({
+  source: [], ours, liveSourceIds: new Set(["a", "b", "c"]),
+  ourActive: new Set(["a", "b"]),
+  served: new Map([["resort", 3]]),         // keeps the sold piece — matches the filing
+  servedSource: new Map([["resort", "filed"]]),
+ });
+ assert.deepEqual(r.collectionsInflated, []);
+});
+
+test("a served count matching NEITHER the filing nor its live pieces is still reported", () => {
+ // The fault this check exists for: a 94-piece rail that went out serving 401.
+ const ours = new Map([["dresses", ["a", "b", "c"]]]);
+ const r = compareCollections({
+  source: [], ours, liveSourceIds: new Set(["a", "b", "c"]),
+  ourActive: new Set(["a", "b"]),
+  served: new Map([["dresses", 9]]),
+  servedSource: new Map([["dresses", "filed"]]),
+ });
+ assert.deepEqual(r.collectionsInflated, ["dresses 9/3"]);
+});

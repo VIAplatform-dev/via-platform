@@ -72,7 +72,19 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
   for (const [page, s] of Object.entries(parity.shopper ?? {})) {
    if (s.error) { add("blocking", "This page did not load.", page); continue; }
    const titles = shortfall(s.titlesPresent);
-   if (/^0\/0$/.test(s.titlesPresent ?? "")) { add("degrading", "We couldn’t compare the products on this page.", page); continue; }
+   // NOTHING TO COMPARE is not the same as COULD NOT COMPARE. "0/0" says her page listed no
+   // products — hachi-archive's homepage is a lookbook, and a product page's only product links are
+   // its recommendations strip. When every other signal on the page agrees, both sides showed the
+   // same thing: nothing. Saying "we couldn't compare the products" there reports a failure of ours
+   // that did not happen, on a page that matches exactly.
+   //
+   // A page that ALSO differs elsewhere is a different matter — an empty grid beside missing
+   // headings may well be a page we read badly — so that is still reported.
+   if (/^0\/0$/.test(s.titlesPresent ?? "")) {
+    const elsewhere = shortfall(s.headingsPresent) + shortfall(s.navPresent) + shortfall(s.pricesPresent);
+    if (elsewhere > 0) add("degrading", "We couldn’t compare the products on this page.", page);
+    continue;
+   }
    if (page.startsWith("/products/")) {
     // A product page lists one product; every other product link on it is the platform's
     // "you may also like" strip, which the hosted copy does not mirror. Not a missing product.
@@ -81,8 +93,20 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
    }
    // A price can only be "wrong" for a product that is shown here; prices absent because the
    // product is absent (a recommendations strip we do not mirror) are the titles finding below.
+   //
+   // DEGRADING, not blocking — this is a diff of every money-shaped string on two pages, and it
+   // cannot establish the thing "blocking" claims. Her pages are not the same twice, so a price can
+   // be present on one read and gone on the next: loved-again was graded 14 of 15 while a hand
+   // check found all fourteen of her prices on ours. On chill-boutique the "missing prices" were
+   // the prices of pieces her homepage curates and ours does not — one difference counted twice.
+   //
+   // "Your store shows the wrong price" is the most alarming thing this report can say to a seller
+   // and the most expensive to be wrong about. It belongs to priceStale below, which compares the
+   // rendered price against the record the cart will actually charge. Six of the fleet's seven
+   // blocking findings came from this line, and not one of them was a price a shopper would have
+   // been charged.
    const prices = Math.max(0, shortfall(s.pricesPresent) - titles);
-   if (prices) add("blocking", `${n(prices, "price")} differ${prices === 1 ? "s" : ""} from your site${s.missingPrices?.length ? ` (${s.missingPrices.slice(0, 4).join(", ")})` : ""}.`, page);
+   if (prices) add("degrading", `${n(prices, "price")} differ${prices === 1 ? "s" : ""} from your site${s.missingPrices?.length ? ` (${s.missingPrices.slice(0, 4).join(", ")})` : ""}.`, page);
    if (titles) add("degrading", `${n(titles, "product")} shown on your site ${titles === 1 ? "is" : "are"} not shown here.`, page);
    const headings = shortfall(s.headingsPresent);
    if (headings) add("degrading", `${n(headings, "section heading")} missing.`, page);

@@ -17,14 +17,17 @@ test("a store with nothing wrong passes with no findings", () => {
  assert.deepEqual(g.findings, []);
 });
 
-test("a missing product or a wrong price is blocking — the store cannot sell correctly", () => {
+test("a product missing from the catalogue is blocking; a price scraped off a page is not", () => {
+ // A piece we do not hold cannot be sold at all — blocking, and always was. The price line beside
+ // it is a diff of two page texts, which cannot tell a wrong price from her page differing between
+ // reads; it is reported, but it does not condemn the store. See the tier test further down.
  const parity = structuredClone(cleanParity);
  parity.catalog.missingHere = 2;
  parity.shopper["/collections/all"].pricesPresent = "9/12";
  const g = gradeStore({ parity, blackout: cleanBlackout });
- assert.equal(g.verdict, "fail");
+ assert.equal(g.verdict, "fail"); // the missing products alone still fail it
  const tiers = g.findings.map((f) => f.tier);
- assert.deepEqual(tiers, ["blocking", "blocking"]);
+ assert.deepEqual(tiers, ["blocking", "degrading"]);
  assert.match(g.findings[0].message, /2 products/);
  assert.match(g.findings[1].message, /3 prices/);
 });
@@ -37,11 +40,11 @@ test("prices missing only because those products are absent are not a price prob
  const g = gradeStore({ parity, blackout: cleanBlackout });
  assert.equal(g.verdict, "warn");
  assert.ok(!g.findings.some((f) => f.tier === "blocking"));
- // Still a price problem when more prices are missing than products are.
+ // Still REPORTED when more prices are missing than products are — just not as a blocking one.
  parity.shopper["/collections/x"].pricesPresent = "0/4";
  const g2 = gradeStore({ parity, blackout: cleanBlackout });
- assert.equal(g2.verdict, "fail");
- assert.match(g2.findings[0].message, /1 price/);
+ assert.equal(g2.verdict, "warn");
+ assert.ok(g2.findings.some((f) => /1 price/.test(f.message) && f.tier === "degrading"));
 });
 
 test("a page where no products were compared cannot have a price finding, and misses are quoted", () => {
@@ -52,7 +55,7 @@ test("a page where no products were compared cannot have a price finding, and mi
  assert.match(g.findings[0].message, /couldn’t compare/);
  parity.shopper["/collections/prada"] = { titlesPresent: "14/14", titlesInOrder: "14/14", pricesPresent: "12/14", navPresent: "2/2", headingsPresent: "1/1", missingPrices: ["£290", "£1150"] };
  const g2 = gradeStore({ parity, blackout: cleanBlackout });
- assert.match(g2.findings[0].message, /2 prices differ from your site \(£290, £1150\)/);
+ assert.ok(g2.findings.some((f) => /2 prices differ from your site \(£290, £1150\)/.test(f.message)));
 });
 
 test("losing images or a collection count under blackout is degrading, not blocking", () => {
@@ -237,4 +240,66 @@ test("sold and unlisted pieces are never counted as missing", () => {
  parity.catalog.soldOrUnlisted = 33;
  const f = gradeStore({ parity: parity as never, blackout: cleanBlackout }).findings;
  assert.equal(f.filter((x) => x.tier === "blocking").length, 0);
+});
+
+test("a price scraped off the page is degrading; a price we would not honour is blocking", () => {
+ // TWO different checks, and only one of them can say "a shopper would be charged something else".
+ //
+ //   pricesPresent  — every money-shaped string on her page, diffed against ours. It cannot tell a
+ //                    wrong price from her page simply differing between two loads. On loved-again
+ //                    it reported 14 of 15 while a hand check found all fourteen of her prices on
+ //                    ours; on chill-boutique its "missing prices" were the prices of products her
+ //                    homepage curates and ours does not.
+ //   priceStale     — the rendered price against the item record the cart will charge. Exact.
+ //
+ // Grading the scrape as blocking told six sellers their store showed the wrong price. That claim
+ // is the most alarming this check can make and the most expensive to be wrong about, so it belongs
+ // to the check that can actually establish it.
+ const parity = structuredClone(cleanParity);
+ parity.shopper["/collections/prada"] = { titlesPresent: "14/14", titlesInOrder: "14/14", pricesPresent: "12/14", navPresent: "2/2", headingsPresent: "1/1", missingPrices: ["£290", "£1150"] };
+ const scraped = gradeStore({ parity, blackout: cleanBlackout });
+ const priceFinding = scraped.findings.find((f) => /prices differ from your site/.test(f.message));
+ assert.ok(priceFinding, "the difference is still reported");
+ assert.equal(priceFinding!.tier, "degrading", "a page-text diff must not be blocking");
+
+ const parity2 = structuredClone(cleanParity);
+ parity2.catalog.priceStale = ["some-handle"];
+ const stale = gradeStore({ parity: parity2, blackout: cleanBlackout });
+ const staleFinding = stale.findings.find((f) => /isn’t what a shopper would be charged/.test(f.message));
+ assert.ok(staleFinding, "the exact check still reports");
+ assert.equal(staleFinding!.tier, "blocking", "a price we would not honour stays blocking");
+});
+
+test("a page with no products on EITHER side has nothing to compare, and says nothing", () => {
+ // hachi-archive's homepage is a lookbook: no product grid, on her site or ours. The comparison
+ // read 0 products from her page and 0 from ours — a match — and the grader called it "we couldn't
+ // compare the products on this page", which sounds like a failure of ours and is not one.
+ //
+ // Everything else on that page matched exactly: headings 2/2, nav 1/1, prices 1/1, images 8 vs 8.
+ // A page where every other signal agrees and neither side has a product grid is a page that
+ // matches, not a page we failed to read.
+ const parity = structuredClone(cleanParity);
+ parity.shopper["/"] = { titlesPresent: "0/0", titlesInOrder: "0/0", pricesPresent: "1/1", navPresent: "1/1", headingsPresent: "2/2" };
+ const g = gradeStore({ parity, blackout: cleanBlackout });
+ assert.ok(!g.findings.some((f) => /couldn’t compare the products/.test(f.message)), "no such finding");
+ assert.equal(g.verdict, "pass");
+});
+
+test("a page with no products but other differences is still reported", () => {
+ // Only silence when there is genuinely nothing to say. A page missing headings alongside its
+ // absent grid may well be a page we failed to read properly.
+ const parity = structuredClone(cleanParity);
+ parity.shopper["/"] = { titlesPresent: "0/0", titlesInOrder: "0/0", pricesPresent: "1/1", navPresent: "1/1", headingsPresent: "1/4" };
+ const g = gradeStore({ parity, blackout: cleanBlackout });
+ assert.ok(g.findings.some((f) => /couldn’t compare the products/.test(f.message)), "still reported");
+});
+
+test("a product page with no recommendation links is not 'couldn't compare'", () => {
+ // The 0/0 check ran BEFORE the product-page branch, so a product page whose only product links are
+ // its "you may also like" strip — and which therefore reads 0/0 when neither side shows one —
+ // reported as unreadable instead of matching.
+ const parity = structuredClone(cleanParity);
+ parity.shopper["/products/marc-jacobs-mary-janes"] = { titlesPresent: "0/0", titlesInOrder: "0/0", pricesPresent: "2/2", navPresent: "1/1", headingsPresent: "1/1" };
+ const g = gradeStore({ parity, blackout: cleanBlackout });
+ assert.ok(!g.findings.some((f) => /couldn’t compare the products/.test(f.message)));
 });

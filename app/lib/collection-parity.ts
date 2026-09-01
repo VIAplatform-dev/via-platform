@@ -129,15 +129,25 @@ export function compareCollections(opts: {
   compared.push({ handle: c.handle, ours: oursCount, source: theirCount });
  }
 
- // What we serve must equal what we filed — compared against RAW membership, because the page
- // serves sold and vanished pieces too. This is checked for every rail we filed anything in,
- // including ones we could not read from the seller's site: it needs no answer from them.
+ // What we serve must equal what we filed — but "what we filed" now has TWO legitimate answers,
+ // because each rail mirrors its seller's own behaviour with sold pieces. Where she keeps them, the
+ // page serves the whole filing. Where she drops them, the page serves only the live pieces while
+ // the filing still holds the rest: the filing records what belongs in the collection, not what is
+ // for sale this morning.
+ //
+ // Comparing against raw membership alone put feathers on the BLOCKING list for three rails whose
+ // gaps — 1, 3 and 3 — were exactly their sold pieces, and told the seller her collections were
+ // "showing pieces you didn't put in them" when they were showing precisely what she puts in them.
+ //
+ // Neither answer is a fault. Anything else still is: this exists because a 94-piece rail once went
+ // out serving 401.
  const inflated: string[] = [];
  for (const [handle, ids] of ours) {
   const n = served?.get(handle);
   if (n == null) continue;
   if (servedSource?.get(handle) === "captured") continue; // never claimed to follow our filing
-  if (n !== ids.length) inflated.push(`${handle} ${n}/${ids.length}`);
+  const live = ourActive ? ids.filter((id) => ourActive.has(id)).length : ids.length;
+  if (n !== ids.length && n !== live) inflated.push(`${handle} ${n}/${ids.length}`);
  }
 
  const off = compared.filter((c) => c.ours !== c.source);

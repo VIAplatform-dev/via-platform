@@ -13,8 +13,13 @@
  * Deliberately narrow: only regions that are chosen per visit or per shopper. A product's own
  * price, the grid's prices, and anything in the buy box stay in the comparison, because a price we
  * show that she would not honour is exactly what this check exists to catch.
+ *
+ * The last group is OURS, not hers: the bag we inject carries a running total, and an empty bag
+ * reads as "$0.00" — a price on our page with no counterpart on hers, every time, on every page.
+ * Comparing our own furniture against her shop is not a comparison of anything.
  */
 export const VOLATILE_SELECTOR =
  '[class*="recommend" i],[id*="recommend" i],[class*="related" i],[class*="also-like" i],' +
  '[class*="complete-the-look" i],[class*="recently-viewed" i],[class*="recently_viewed" i],' +
- '[class*="pair-with" i],[class*="shop-the-look" i]';
+ '[class*="pair-with" i],[class*="shop-the-look" i],' +
+ '#vya-cart-drawer,#vya-cart-btn,[id^="vya-cart"],[class^="vya-"],[data-vya-cart],[data-vya-cart-open]';
