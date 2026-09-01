@@ -570,6 +570,32 @@ export async function endOnEbay(storeSlug: string, itemId: string): Promise<bool
  return r.ok;
 }
 
+// eBay writes its errors for developers integrating the API, not for someone running a vintage
+// shop. "Input data for tag <BrandMPN> is invalid or missing. Please check API documentation."
+// means "this piece has no brand on it" — but a seller reading it has no way to know that, and
+// nothing in the sentence tells her what to go and change.
+//
+// So: translate the failures we actually hit into the one action that fixes each, and keep eBay's
+// own words for anything unrecognised (a message we can't translate is still better than silence).
+// Matched against eBay's text AND its `parameters`, because the offending field is usually only
+// named in the parameters.
+const EBAY_PLAIN: { match: RegExp; say: string }[] = [
+ { match: /brandmpn|\bbrand\b[^.]*\b(missing|invalid|required)/i,
+   say: "this piece has no brand. Add one, then retry." },
+ { match: /\bmpn\b[^.]*\b(missing|invalid|required)/i,
+   say: "this piece has no brand. Add one, then retry." },
+ { match: /condition[^.]*\b(missing|invalid|required)/i,
+   say: "this piece has no condition set. Add one, then retry." },
+ { match: /categor(y|ies)[^.]*\b(missing|invalid|required|not found)/i,
+   say: "eBay couldn’t work out the category. Set one on the piece, then retry." },
+ { match: /(item specific|aspect)[^.]*\b(missing|invalid|required)/i,
+   say: "eBay wants more detail for this category — add the piece’s brand, size and material." },
+ { match: /(picture|image)[^.]*\b(missing|invalid|required)/i,
+   say: "there’s no photo on this piece. Add one, then retry." },
+ { match: /\bprice\b[^.]*\b(missing|invalid|required)/i,
+   say: "eBay rejected the price. Check it, then retry." },
+];
+
 function ebayErr(j: any): string | null {
  const e = j?.errors?.[0];
  if (!e) return null;
@@ -577,5 +603,7 @@ function ebayErr(j: any): string | null {
  // offending field is in `parameters`. Surface longMessage + the parameters so errors are usable.
  const params = Array.isArray(e.parameters) ? e.parameters.map((p: any) => `${p.name}=${p.value}`).filter(Boolean).join(", ") : "";
  const msg = e.longMessage || e.message || "error";
+ const plain = EBAY_PLAIN.find((r) => r.match.test(`${msg} ${params}`));
+ if (plain) return plain.say;
  return `eBay: ${msg}${params ? ` [${params}]` : ""}`;
 }

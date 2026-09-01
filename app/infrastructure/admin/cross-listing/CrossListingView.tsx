@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download, ExternalLink } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD } from "../ui";
 
@@ -80,11 +80,36 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const d = e.data;
  if (!d || d.source !== "vya-ext" || d.type !== "queued") return;
  setQueueState((st) => ({ ...st, [d.itemId]: d.ok ? "ok" : "err" }));
- if (d.ok) load();
+ // A reconciled item was already pending server-side, so its status can't have changed — skip the
+ // reload, or staging a big backlog would refetch the board once per item.
+ if (d.ok && !reconciledRef.current.has(d.itemId)) load();
  };
  window.addEventListener("message", onMsg);
  return () => { obs.disconnect(); window.removeEventListener("message", onMsg); };
  }, []);
+
+ // An item can become "pending" for an extension marketplace WITHOUT this board ever being involved:
+ // publishing a piece queues it server-side (createCrossListingsForItem), and so does the scheduled-
+ // publish cron. But the extension only learns of an item when the board posts queue-{platform} at it,
+ // which only happened on a click here. So a piece queued at publish showed as "queued" on this board
+ // while the extension's own queue was empty — and "Open Depop to list" opened a create form with
+ // nothing to fill in.
+ //
+ // Reconcile: whatever the server calls pending, stage into the extension too. vya.js replaces by item
+ // id, so re-staging is idempotent; the ref only stops us re-posting on every board reload.
+ const reconciledRef = useRef<Set<string>>(new Set());
+ useEffect(() => {
+ if (!extInstalled) return;
+ for (const key of QUEUEABLE) {
+ for (const it of board) {
+ const seen = `${key}:${it.itemId}`;
+ if (it.listings[key] !== "pending" || reconciledRef.current.has(seen)) continue;
+ reconciledRef.current.add(seen);
+ reconciledRef.current.add(it.itemId);
+ try { window.postMessage({ source: "vya-crosslist", type: `queue-${key}`, itemId: it.itemId, title: it.title }, window.location.origin); } catch { /* ignore */ }
+ }
+ }
+ }, [board, extInstalled]);
 
  const acct = (k: string) => accounts.find((a) => a.platform === k);
 

@@ -138,7 +138,13 @@ export async function createCrossListingsForItem(storeSlug: string, itemId: stri
 // Actually POST to the platforms that have a real API (eBay + Depop). Best-effort +
 // background: on success we store the live listing URL, on failure the error message.
 export async function syncItemToApiPlatforms(storeSlug: string, itemId: string, only?: string[] | null): Promise<void> {
- const want = (k: string) => !only || !only.length || only.includes(k);
+ // The seller's explicit per-item picks win. WITHOUT them, fall back to each channel's auto-list
+ // default — the same rule createCrossListingsForItem applies two functions up. This used to fall
+ // back to "everything connected", so a seller who unchecked eBay still got a live eBay post: the
+ // queue row was correctly skipped, but the API push went out anyway. Connected is not wanted.
+ const accounts = await getPlatformAccounts(storeSlug).catch(() => [] as PlatformAccount[]);
+ const autoOn = new Set(accounts.filter((a) => a.autoList).map((a) => a.platform));
+ const want = (k: string) => (only && only.length ? only.includes(k) : autoOn.has(k));
  const [ebayOn, depopOn, etsyOn] = await Promise.all([
  want("ebay") ? ebayConnected(storeSlug).catch(() => false) : Promise.resolve(false),
  want("depop") ? depopConnected(storeSlug).catch(() => false) : Promise.resolve(false),
