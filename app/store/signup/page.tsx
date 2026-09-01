@@ -3,15 +3,15 @@ import type { Metadata } from "next";
 import StoreAuthClient from "@/app/store/StoreAuthClient";
 
 export const metadata: Metadata = {
- title: "Sign in to your store — VYA",
- description: "Sign in to your VYA store to manage listings, orders and your storefront.",
+ title: "Create your store — VYA",
+ description: "Set up your VYA store: list your inventory, take orders, and run your own storefront.",
  robots: { index: false, follow: false },
 };
 
-export default function StoreLoginPage() {
+export default function StoreSignupPage() {
  return (
   <Suspense fallback={null}>
-   <StoreAuthClient mode="login" />
+   <StoreAuthClient mode="signup" />
   </Suspense>
  );
 }

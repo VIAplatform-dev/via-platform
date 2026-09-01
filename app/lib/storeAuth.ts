@@ -45,12 +45,29 @@ export async function resolveStoreSlug(request: NextRequest): Promise<string | n
  if (preview && isAdminRequest(request)) return preview;
  const session = await auth();
  if (session?.user?.email) {
- // Curated marketplace stores resolve from the static map; self-onboarded stores
- // (getvya.ai signups) resolve from the store_users table — no code change to add one.
+ // store_users FIRST, the hardcoded map second.
+ //
+ // store-users-db.ts describes itself as "the DYNAMIC, self-serve replacement for the hardcoded
+ // storeContactEmails map", and a replacement that loses to the thing it replaces never applies to
+ // anyone already in that map. That is not hypothetical: a curated marketplace seller who then
+ // brings her own site over has two identities — her marketplace slug and her hosted store's slug —
+ // and the static map would keep sending her to the marketplace one, where her site isn't. She then
+ // meets an import screen that thinks she has no site and offers to crawl one.
+ //
+ // storeContactEmails is not a login table anyway: it is also the address book for store emails and
+ // the roster the sourcing/digest crons iterate. Editing it to fix a login edits all three, which is
+ // why the fix belongs here instead.
+ //
+ // Stores with no store_users row — every curated store today — fall through unchanged.
+ //
+ // The catch is deliberate, not laziness: this lookup now runs BEFORE the static map, so without it
+ // a database blip would take out curated sellers' logins too, where previously they resolved from
+ // memory and never touched the database. Falling through to the map is the old behaviour exactly.
+ /* allow-swallow: DB unreachable must degrade to the static map, not lock every seller out */
+ const dbSlug = await storeSlugForEmail(session.user.email).catch(() => null);
+ if (dbSlug) return dbSlug;
  const slug = storeSlugFromEmail(session.user.email);
  if (slug) return slug;
- const dbSlug = await storeSlugForEmail(session.user.email);
- if (dbSlug) return dbSlug;
  }
  // The infrastructure/admin area (owner's build workspace) drives the store portal
  // endpoints as the synthetic via-admin store. An admin with no explicit ?store and
