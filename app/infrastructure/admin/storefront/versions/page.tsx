@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Layers, Check, Pencil, Trash2, Upload, Plus } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, StatusPill, cn } from "../../ui";
 
 // Your storefronts: the one that's live, and every one you've kept.
 //
@@ -63,6 +63,7 @@ export default function StorefrontVersionsPage() {
     eyebrow="Storefront"
     title="Your storefronts"
     subtitle="One is live. The rest are drafts, kept exactly as they were until you publish them."
+    actions={<TechButtonLink href="/admin/storefront"><Pencil size={14} /> Edit your site</TechButtonLink>}
    />
 
    {error && (
@@ -90,6 +91,7 @@ export default function StorefrontVersionsPage() {
         onRenameCancel={() => setRenaming(null)}
         onRenameSave={async () => { if (await act(`rename:${live.id}`, json({ id: live.id, action: "rename", name: draftName }, "PATCH"))) setRenaming(null); }}
         onPublish={() => {}}
+        onEdit={() => { window.location.href = "/admin/storefront"; }}
         onDelete={() => {}}
         confirmDelete={false}
         onConfirmDelete={() => {}}
@@ -136,6 +138,10 @@ export default function StorefrontVersionsPage() {
           onRenameCancel={() => setRenaming(null)}
           onRenameSave={async () => { if (await act(`rename:${v.id}`, json({ id: v.id, action: "rename", name: draftName }, "PATCH"))) setRenaming(null); }}
           onPublish={() => act(`publish:${v.id}`, json({ id: v.id, action: "publish" }, "PATCH"))}
+          onEdit={() => {
+            if (v.kind === "imported") { setError("Imported sites are edited on the live site — publish this one first."); return; }
+            window.location.href = `/admin/storefront?version=${encodeURIComponent(v.id)}`;
+           }}
           onDelete={() => setConfirmDelete(v.id)}
           confirmDelete={confirmDelete === v.id}
           onConfirmDelete={async () => { if (await act(`delete:${v.id}`, { method: "DELETE" }, `/api/store/storefront/versions?id=${encodeURIComponent(v.id)}`)) setConfirmDelete(null); }}
@@ -153,11 +159,11 @@ export default function StorefrontVersionsPage() {
 
 function Row({
  v, busy, renaming, draftName, setDraftName, onRename, onRenameCancel, onRenameSave,
- onPublish, onDelete, confirmDelete, onConfirmDelete, onCancelDelete,
+ onPublish, onEdit, onDelete, confirmDelete, onConfirmDelete, onCancelDelete,
 }: {
  v: Version; busy: string | null; renaming: boolean; draftName: string; setDraftName: (s: string) => void;
  onRename: () => void; onRenameCancel: () => void; onRenameSave: () => void;
- onPublish: () => void; onDelete: () => void;
+ onPublish: () => void; onEdit: () => void; onDelete: () => void;
  confirmDelete: boolean; onConfirmDelete: () => void; onCancelDelete: () => void;
 }) {
  return (
@@ -201,10 +207,17 @@ function Row({
       </>
      ) : (
       <>
-       {!v.published && (
-        <TechButton onClick={onPublish} disabled={!!busy}>
-         {busy === `publish:${v.id}` ? "Publishing…" : "Publish"}
-        </TechButton>
+       {v.published ? (
+        <TechButton onClick={onEdit} disabled={!!busy}><Pencil size={13} /> Edit</TechButton>
+       ) : (
+        <>
+         {/* Opens the editor ON THIS DRAFT. Nothing goes live until she presses Publish, so a
+             design can be worked on for a fortnight without a customer ever seeing it. */}
+         <TechButton onClick={onEdit} disabled={!!busy}><Pencil size={13} /> Edit</TechButton>
+         <TechButton variant="secondary" onClick={onPublish} disabled={!!busy}>
+          {busy === `publish:${v.id}` ? "Publishing…" : "Publish"}
+         </TechButton>
+        </>
        )}
        <button onClick={onRename} className="flex items-center gap-1 text-[12px] text-stone-400 hover:text-stone-700"><Pencil size={12} /> Rename</button>
        {!v.published && (

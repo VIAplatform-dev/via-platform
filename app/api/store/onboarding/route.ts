@@ -14,9 +14,14 @@ const CATEGORIES = new Set(["vintage", "designer", "streetwear", "y2k", "denim",
 const CHANNELS = new Set(["shopify", "square", "depop", "instagram", "in-person", "none"]);
 
 export async function POST(request: NextRequest) {
+ // A seller's own session, and nothing else. The owner's admin cookie is not a store identity —
+ // a store needs an email to attach, and there is no sensible one to invent. Anyone reaching this
+ // without a seller session is sent to sign in BEFORE the wizard, not after they've filled it in.
  const session = await auth();
  const email = session?.user?.email?.trim().toLowerCase();
- if (!email) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+ if (!email) return NextResponse.json({ error: "Sign in to create your store.", needsSignIn: true }, { status: 401 });
+
+ const body = await request.json().catch(() => null);
 
  // Already attached to a store? Return it (idempotent) — never a second store for the same owner.
  const existingSlug = await storeSlugForEmail(email);
@@ -27,7 +32,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, slug: existingAccount.slug, existing: true });
  }
 
- const body = await request.json().catch(() => null);
  const name = String(body?.name || "").trim().slice(0, 80);
  if (name.length < 2) return NextResponse.json({ error: "Enter your store name." }, { status: 400 });
 

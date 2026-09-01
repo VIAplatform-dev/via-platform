@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, Hammer, ArrowRight, Loader2 } from "lucide-react";
 import { BuildWizardInner } from "./build/page";
@@ -44,6 +44,27 @@ export default function OnboardingWizard() {
  const [websiteUrl, setWebsiteUrl] = useState("");
  const [busy, setBusy] = useState(false);
  const [error, setError] = useState<string | null>(null);
+ // Check she's signed in BEFORE she does any work. The wizard used to let her choose a template,
+ // pick pages, colours and fonts — and only then fail on the final button, which is where
+ // "sign in first" came from on a page that never offered a sign-in. If there's no session she
+ // goes to /login now and comes straight back here afterwards.
+ const [checking, setChecking] = useState(true);
+ useEffect(() => {
+  let active = true;
+  (async () => {
+   const me = await fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+   if (!active) return;
+   // `admin` is the VYA owner cookie, which is not a store identity — she needs a seller session.
+   if (!me || me.admin === true || (!me.needsOnboarding && !me.slug)) {
+    window.location.href = "/store/login?next=%2Fadmin%2Fonboarding";
+    return;
+   }
+   // Already has a store: nothing to onboard, send her to the workspace.
+   if (me.slug) { window.location.href = "/admin/home"; return; }
+   setChecking(false);
+  })();
+  return () => { active = false; };
+ }, []);
  // Once they choose "build me one" the builder takes over the screen. State, not a route, so
  // there is no navigation between the question and seeing their store.
  const [building, setBuilding] = useState(false);
@@ -66,6 +87,29 @@ export default function OnboardingWizard() {
   * Create the store. Called by the builder through onBeforeFinish with the name typed on its
   * Look step, so the slug matches the name the seller actually chose.
   */
+
+ /**
+  * Wait until the workspace gate can actually SEE the new store before leaving this page.
+  *
+  * This is the bounce. Creating the store writes store_users, then the wizard navigated straight
+  * into /admin — where the layout asks whoami, doesn't find the row yet, and sends her back here.
+  * The import path papered over it with a sessionStorage breadcrumb and one 1.2s retry; the build
+  * path had nothing at all, so it bounced every time.
+  *
+  * Waiting HERE is the honest fix: this is the only place that knows a store was just created, so
+  * it's the only place that can wait for it rather than guess. ~8s is far longer than the write
+  * needs and still finite, so a genuine failure surfaces instead of hanging.
+  */
+ async function waitForStore(): Promise<boolean> {
+  for (let i = 0; i < 10; i++) {
+   const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+   if (me?.slug) return true;
+   await new Promise((r) => setTimeout(r, 300 + i * 120));
+  }
+  return false;
+ }
+
  async function createStore(name: string): Promise<boolean> {
   const res = await fetch("/api/store/onboarding", {
    method: "POST",
@@ -73,7 +117,19 @@ export default function OnboardingWizard() {
    body: JSON.stringify({ name, hasWebsite: false, websiteUrl: null }),
   }).catch(() => null);
   const data = res ? await res.json().catch(() => ({})) : {};
-  if (!res || !res.ok) { setError(data?.error || "We couldn’t create your store — try again."); return false; }
+  if (!res || !res.ok) {
+   // Failures that used to look identical and read as "you're not logged in" to someone who
+   // plainly was. Each now has a way forward instead of a dead end.
+   if (data?.needsSignIn) { window.location.href = "/store/login?next=%2Fadmin%2Fonboarding"; return false; }
+   setError(data?.error || "We couldn’t create your store — try again.");
+   return false;
+  }
+  // Breadcrumb for the layout's own retry, and then WAIT here until the gate sees the store.
+  try { sessionStorage.setItem("vya:just-onboarded", String(data?.slug || "1")); } catch { /* storage off */ }
+  if (!(await waitForStore())) {
+   setError("Your store was created, but it’s taking a moment to appear. Refresh in a few seconds.");
+   return false;
+  }
   return true;
  }
 
@@ -88,10 +144,19 @@ export default function OnboardingWizard() {
     body: JSON.stringify({ name: finalName, hasWebsite: true, websiteUrl: websiteUrl.trim() }),
    });
    const data = await res.json().catch(() => ({}));
-   if (!res.ok) { setError(data?.error || "Something went wrong — try again."); setBusy(false); return; }
+   if (!res.ok) {
+    // Same two failures as the build path — an owner with no seller session, or no session at all.
+    setBusy(false);
+    if (data?.needsSignIn) { window.location.href = "/store/login?next=%2Fadmin%2Fonboarding"; return; }
+    setError(data?.error || "Something went wrong — try again.");
+    return;
+   }
    // The workspace gate (whoami) reads store_users; the row was written a moment ago. Leave a
    // breadcrumb so the gate retries instead of bouncing a brand-new seller back into this wizard.
    try { sessionStorage.setItem("vya:just-onboarded", String(data?.slug || "1")); } catch { /* storage off */ }
+   // Same wait as the build path — the import screen lives inside the workspace, so the gate has
+   // to see the store before we go there or she lands back on this wizard.
+   await waitForStore();
    const importUrl = /^https?:\/\//i.test(websiteUrl.trim()) ? websiteUrl.trim() : `https://${websiteUrl.trim()}`;
    // If the import fails/blocks, route to the Bring-your-site page WITH the reason + URL, not an empty editor.
    const cap = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: importUrl, replaceBlocks: true }) }).catch(() => null);
@@ -109,6 +174,11 @@ export default function OnboardingWizard() {
 
  // The builder owns the screen from here — same component /admin/onboarding/build renders, so
  // there is one builder and one set of steps, not a second copy that drifts.
+
+ if (checking) {
+  return <div className="grid min-h-screen place-items-center bg-[#f7f6f3] text-[13px] text-stone-400">One moment…</div>;
+ }
+
  if (building) {
   return (
    <Suspense fallback={<div className="min-h-screen bg-[#f7f6f3]" />}>

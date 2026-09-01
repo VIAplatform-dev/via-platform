@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, normalizeHandle } from "@/app/lib/storefront-db";
+import { getVersionTheme, setVersionTheme } from "@/app/lib/storefront-versions-db";
 import { STOREFRONT_TEMPLATES, getTemplate, templateTheme, HEADING_FONTS, BODY_FONTS } from "@/app/lib/storefront-templates";
 import { BLOCK_TYPES, sanitizeBlocks, sanitizePages, safeSrc } from "@/app/lib/storefront-blocks";
 import { isSkin } from "@/app/lib/storefront-skins";
@@ -23,6 +24,18 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ // A ?version= means "edit this draft, not the live site". Without it the editor works on the live
+ // storefront exactly as before — which is why a two-week project used to have to go live first.
+ const versionId = new URL(request.url).searchParams.get("version");
+ if (versionId) {
+  const v = await getVersionTheme(slug, versionId);
+  if (!v) return NextResponse.json({ error: "That design isn’t yours." }, { status: 404 });
+  if (v.kind === "imported") {
+   return NextResponse.json({ error: "Imported sites are edited on the live site — publish this one first.", importedDraft: true }, { status: 409 });
+  }
+  return NextResponse.json({ theme: v.theme ?? {}, version: versionId });
+ }
+
  const sf = await getStorefrontBySlug(slug);
  let theme: StorefrontTheme = sf?.theme ?? {};
  // First time the builder opens with no sections yet, seed it. A store that IMPORTED from a URL
@@ -239,6 +252,15 @@ export async function POST(request: NextRequest) {
  }).filter(Boolean).slice(0, 12) as { label: string; href: string; place: "header" | "footer" | "both" }[];
  }
 
- await setStorefrontTheme(slug, theme);
+ // Writing to a draft leaves the live storefront completely alone — that is the whole point of
+ // being able to edit one without publishing it.
+ const targetVersion = typeof body?.version === "string" && body.version ? body.version : null;
+ if (targetVersion) {
+  if (!(await setVersionTheme(slug, targetVersion, theme))) {
+   return NextResponse.json({ error: "That design isn’t yours." }, { status: 404 });
+  }
+ } else {
+  await setStorefrontTheme(slug, theme);
+ }
  return NextResponse.json({ ok: true, template: theme.template ?? null, colors: theme.colors, fonts: theme.fonts, radius: theme.radius ?? "sharp", skin: theme.skin ?? "", preSkin: theme.preSkin ?? null, customCss: theme.customCss ?? "", blocks: theme.blocks ?? [], shopBlocks: theme.shopBlocks ?? [], extraPages: theme.extraPages ?? [] });
 }

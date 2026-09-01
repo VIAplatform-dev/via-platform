@@ -31,6 +31,18 @@ export default function LocationsPage() {
  const [busy, setBusy] = useState(false);
  const [msg, setMsg] = useState<string | null>(null);
  const [err, setErr] = useState<string | null>(null);
+ // Arrived here from "Connect eBay": eBay won't publish without somewhere to ship from, so the
+ // connect route sends her here first rather than failing after she's signed in.
+ const [why, setWhy] = useState<string | null>(null);
+ useEffect(() => {
+  let active = true;
+  (async () => {
+   const need = new URLSearchParams(window.location.search).get("need");
+   if (!active || need !== "ebay") return;
+   setWhy("eBay needs to know where your pieces ship from before it can list them. Add it here and you’ll go straight back to connecting.");
+  })();
+  return () => { active = false; };
+ }, []);
 
  useEffect(() => {
   let active = true;
@@ -67,6 +79,12 @@ export default function LocationsPage() {
  return (
   <>
    <AdminHeader eyebrow="Settings" title="Locations" subtitle="Where parcels leave from, and where buyers can collect." />
+   {why && (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+     {why}
+     <a href="/api/store/cross-listing/ebay/connect" className="ml-auto shrink-0 font-semibold underline underline-offset-2">Back to eBay</a>
+    </div>
+   )}
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
    {msg && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-700">{msg}</div>}
 

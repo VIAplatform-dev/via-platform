@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, Gem, Camera, Plus, Receipt, Boxes, ClipboardList, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
 import CommandBar from "./CommandBar";
+import { loginHref } from "@/app/store/auth-route";
+import StoreAnalytics from "@/app/components/StoreAnalytics";
+import { signOut } from "next-auth/react";
 
 type Sub = { href: string; label: string };
 type NavItem = { href: string; label: string; icon: LucideIcon; children?: Sub[]; match?: string[] };
@@ -36,8 +39,16 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  label: "Store",
  items: [
  {
- href: `${B}/storefront`, label: "Storefront", icon: Store,
- children: [{ href: `${B}/storefront/versions`, label: "Drafts" }, { href: `${B}/settings/domain`, label: "Your domain" }],
+ // Lands on the storefronts list, NOT the editor. The editor is full-screen and covers this
+ // sidebar, so making it the parent's destination meant one click buried the sub-items with no
+ // way back to Drafts or the domain without leaving the section entirely.
+ href: `${B}/storefront/versions`, label: "Storefront", icon: Store,
+ match: [`${B}/storefront`],
+ children: [
+  { href: `${B}/storefront`, label: "Edit site" },
+  { href: `${B}/storefront/versions`, label: "Drafts" },
+  { href: `${B}/settings/domain`, label: "Your domain" },
+ ],
  },
  { href: `${B}/import`, label: "Bring your site", icon: Plug },
  {
@@ -121,7 +132,9 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  // keep it for the owner/internal admin (who re-syncs any store). isOwner = the workspace owner
  // (ADMIN_PASSWORD, i.e. via-admin), NOT a signed-in store partner.
  const [isOwner, setIsOwner] = useState(false);
- const [storeSetUp, setStoreSetUp] = useState(false);
+ // Which store this workspace is acting as. Only used to attribute analytics to the business
+ // rather than to the browser — every data fetch resolves the store server-side, not from this.
+ const [storeSlug, setStoreSlug] = useState<string | null>(null);
  const [marketMode, setMarketMode] = useState<boolean | null>(null); // null = not loaded yet
  const [marketBusy, setMarketBusy] = useState(false);
 
@@ -145,29 +158,32 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  await new Promise((res) => setTimeout(res, 1200));
  const retry = await fetch("/api/infrastructure/whoami").then((x) => (x.ok ? x.json() : null)).catch(() => null);
  try { sessionStorage.removeItem("vya:just-onboarded"); } catch { /* */ }
- if (retry && !retry.needsOnboarding) { setIsOwner(retry.admin === true); setOk(true); return; }
+ if (retry && !retry.needsOnboarding) { setIsOwner(retry.admin === true); setStoreSlug(retry.slug || null); setOk(true); return; }
  }
  router.replace("/admin/onboarding"); return;
  }
  try { sessionStorage.removeItem("vya:just-onboarded"); } catch { /* */ }
  setIsOwner(data?.admin === true);
+ setStoreSlug(data?.slug || null);
  setOk(true);
  fetch(withPreview("/api/store/market/mode")).then((m) => (m.ok ? m.json() : null)).then((m) => setMarketMode(Boolean(m?.enabled))).catch(() => setMarketMode(false));
- // For a store partner, check whether they've already set up (storefront live or listings)
- // so we can retire the one-time "Bring your site" step from their nav.
- if (data?.admin !== true) {
- fetch("/api/store/onboarding-status")
- .then((s) => (s.ok ? s.json() : null))
- .then((st) => setStoreSetUp(Boolean(st?.onboarded)))
- .catch(() => {});
- }
  })
  .catch(() => setOk(false));
  }, [isOnboarding, router]);
 
- // Hide the one-time import step for a set-up store; the owner always keeps it.
- const hideImport = !isOwner && storeSetUp;
- const normalGroups = GROUPS.map((g) => ({ ...g, items: g.items.filter((n) => !(hideImport && n.href === `${B}/import`)) })).filter((g) => g.items.length > 0);
+ // "Bring your site" is a step INSIDE onboarding, not a place in the workspace. It used to linger
+ // in the sidebar until a status endpoint said the store was set up — which meant a seller who had
+ // just imported her site still saw an invitation to import it again. It's owner-only now.
+ // VYA's own tooling, not a store's. Trends, AI accuracy and the golden set are how WE measure the
+ // model; Apps & integrations is platform plumbing. A seller opening her workspace should see her
+ // shop, not the instruments pointed at it.
+ const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/apps`, `${B}/import`]);
+ const normalGroups = GROUPS
+  .map((g) => ({
+   ...g,
+   items: g.items.filter((n) => isOwner || !INTERNAL.has(n.href)),
+  }))
+  .filter((g) => g.items.length > 0);
  const visibleGroups = marketMode ? MARKET_GROUPS : normalGroups;
  const inMarketArea = pathname === M || pathname.startsWith(M + "/");
 
@@ -186,12 +202,27 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  }
 
 
+ // Signed out → the SELLER sign-in, carrying where she was headed so she lands back on it. This
+ // used to point at /admin/login, which is the owner's password + TOTP panel: a seller sent there
+ // had no account that would work and no way to tell that was the problem.
  useEffect(() => {
- if (ok === false) router.replace("/admin/login?redirect=/admin");
- }, [ok, router]);
+ if (ok === false) router.replace(loginHref(pathname));
+ }, [ok, pathname, router]);
 
- // Render the wizard bare (no nav shell) when on the onboarding route.
- if (isOnboarding) return <>{children}</>;
+ // Render the wizard bare (no nav shell) when on the onboarding route — but still instrumented.
+ // Onboarding is the single most interesting thing a new store does, and it happens before she has
+ // a slug: PostHog records it against her anonymous id, and the identify() call on the first
+ // workspace screen stitches that session to the store, so the funnel spans both halves.
+ if (isOnboarding) {
+  return (
+   <>
+    <Suspense fallback={null}>
+     <StoreAnalytics slug={null} isOwner={false} />
+    </Suspense>
+    {children}
+   </>
+  );
+ }
 
  if (ok !== true) {
  return <div className="flex min-h-screen items-center justify-center text-sm text-stone-400">{ok === false ? "Redirecting…" : "Loading…"}</div>;
@@ -201,6 +232,11 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
 
  return (
  <>
+ {/* Product analytics, scoped to the workspace — see app/components/StoreAnalytics.tsx for why it
+     is mounted here and not in the root layout. Suspense because it reads the query string. */}
+ <Suspense fallback={null}>
+  <StoreAnalytics slug={storeSlug} isOwner={isOwner} />
+ </Suspense>
  {/* Brand type — Hanken Grotesk for UI, Newsreader for editorial display numbers/headings. */}
  <link rel="preconnect" href="https://fonts.googleapis.com" />
  <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -304,9 +340,22 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  ))}
  </nav>
  <div className="mt-3 border-t border-stone-100 pt-3">
- <Link href="/admin" className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] text-stone-400 hover:bg-stone-100 hover:text-stone-600">
- <LogOut size={15} strokeWidth={1.75} /> Marketplace admin
- </Link>
+ {/* A real sign-out. What sat here was a Link to /admin wearing a logout icon — which rewrites
+     straight back to this workspace, so it looked like a sign-out and did nothing. That left a
+     seller no way out of her own shop, and left the owner unable to become the owner again: the
+     acting store is resolved from the SESSION first (app/lib/storeAuth.ts), so while any seller
+     session exists the admin cookie never gets a turn. Signing out is what hands it back. */}
+ <button
+  onClick={() => signOut({ callbackUrl: "/store/login" })}
+  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
+ >
+  <LogOut size={15} strokeWidth={1.75} /> Sign out
+ </button>
+ {isOwner && (
+  <Link href="/admin/sync" className="mt-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[12px] text-stone-400 hover:bg-stone-100 hover:text-stone-600">
+   <LayoutGrid size={15} strokeWidth={1.75} /> Marketplace admin
+  </Link>
+ )}
  </div>
  </aside>
  {/* min-w-0: a flex child's min-width defaults to its content's, which let a long unbreakable row push

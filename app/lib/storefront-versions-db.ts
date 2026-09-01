@@ -247,3 +247,31 @@ export async function snapshotAsDraft(storeSlug: string, name?: string): Promise
  const all = await listVersions(storeSlug);
  return all.find((v) => v.id === id) ?? null;
 }
+
+/**
+ * A specific version's built design, and a way to write back to it.
+ *
+ * This is what lets a seller work on a draft WITHOUT publishing it. The editor used to read and
+ * write the live theme only, so opening a draft meant making it live first — which is fine for a
+ * quick swap and useless for a two-week project you don't want customers seeing.
+ *
+ * Imported versions are not editable this way: their content is captured HTML per page, not a
+ * theme document, and the captured-site editor works on the live pages. Returns null for those so
+ * the caller can say so rather than silently open the wrong thing.
+ */
+export async function getVersionTheme(storeSlug: string, id: string): Promise<{ kind: VersionKind; theme: StorefrontTheme | null } | null> {
+ await ensureTables();
+ const rows = (await db()`SELECT kind, theme FROM storefront_versions WHERE id = ${id} AND store_slug = ${storeSlug} LIMIT 1`.catch(() => [])) as any[];
+ if (!rows.length) return null;
+ const kind: VersionKind = rows[0].kind === "imported" ? "imported" : "built";
+ return { kind, theme: (rows[0].theme as StorefrontTheme) ?? null };
+}
+
+/** Save the editor's work into a draft. Refuses a version that isn't this store's. */
+export async function setVersionTheme(storeSlug: string, id: string, theme: StorefrontTheme | null): Promise<boolean> {
+ await ensureTables();
+ const rows = (await db()`
+  UPDATE storefront_versions SET theme = ${JSON.stringify(theme ?? null)}::jsonb, kind = 'built', updated_at = now()
+  WHERE id = ${id} AND store_slug = ${storeSlug} RETURNING id`.catch(() => [])) as any[];
+ return rows.length > 0;
+}
