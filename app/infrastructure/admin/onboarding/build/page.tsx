@@ -253,9 +253,14 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
 
  async function finish() {
  setBusy(true);
+ // Anything below can throw (an upload, a fetch). Without this the rejection escapes, `busy` stays
+ // true, and the button sticks on "Building…" with no way forward.
+ try { await runFinish(); } finally { setBusy(false); }
+ }
+ async function runFinish() {
  // Create the store first when the caller needs it (onboarding). Everything below writes to a
  // store, so there is nothing useful to do if this fails.
- if (onBeforeFinish && !(await onBeforeFinish(name.trim()))) { setBusy(false); return; }
+ if (onBeforeFinish && !(await onBeforeFinish(name.trim()))) return;
  const logoUrl = await commitLogo();
  // Only the pages the seller kept ticked. Everything else — sections, palette, type, corners,
  // header, catalogue density — is the template as previewed, so the store they land in is the

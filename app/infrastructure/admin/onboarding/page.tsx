@@ -114,6 +114,18 @@ export default function OnboardingWizard() {
    <Suspense fallback={<div className="min-h-screen bg-[#f7f6f3]" />}>
     <div className="vya-panel-in fixed inset-0 z-[60]">
     <BuildWizardInner onBeforeFinish={createStore} />
+    {/* createStore sets `error` and returns false, which stops the builder finishing — but this
+        branch renders ONLY the builder, so that message had nowhere to appear. Pressing "Create my
+        store" simply did nothing, with no way for the seller to find out why. Sits above the
+        builder (z-[70]) because the builder is itself fixed and full-screen. */}
+    {error && (
+     <div className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-4 pb-4" role="alert" aria-live="assertive">
+      <div className="flex max-w-md items-start gap-3 rounded-xl border border-rose-200 bg-white px-4 py-3 shadow-lg">
+       <p className="text-[13px] leading-snug text-rose-700">{error}</p>
+       <button type="button" onClick={() => setError(null)} className="ml-auto shrink-0 text-[12px] font-medium text-stone-400 hover:text-stone-700">Dismiss</button>
+      </div>
+     </div>
+    )}
    </div>
    </Suspense>
   );
