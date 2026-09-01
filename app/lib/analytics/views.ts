@@ -67,6 +67,11 @@ async function createViews(): Promise<void> {
   ensureAnalyticsEventsTable().catch(() => {}),
  ]);
 
+ // The view below reads orders.tax_cents, but that column is added lazily the first time a tax is
+ // recorded (db/orders.ts). On a database where no taxed order has landed yet the column wouldn't
+ // exist and the view would fail to create, taking every analytics section down with it.
+ await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_cents integer`.catch(() => {});
+
  await sql`
   CREATE OR REPLACE VIEW vya_store_sales AS
   SELECT
@@ -76,7 +81,12 @@ async function createViews(): Promise<void> {
    o.amount_cents,
    o.paid_at AS sold_at,
    lower(NULLIF(o.buyer_email, '')) AS buyer_email,
-   'order'::text AS origin
+   'order'::text AS origin,
+   -- Tax collected on this sale, so a tax-inclusive store's P&L doesn't count the government's
+   -- share as its own revenue. NULL means UNKNOWN, not zero: an item-status sale never went
+   -- through checkout, so nobody recorded tax on it, and the margin module has to say so rather
+   -- than quietly present a gross figure as profit. See tax-inclusive.ts.
+   o.tax_cents
   FROM orders o
   WHERE o.status IN ('paid', 'shipped', 'delivered', 'fulfilled') AND o.paid_at IS NOT NULL
   UNION ALL
@@ -87,7 +97,8 @@ async function createViews(): Promise<void> {
    i.price_cents,
    i.sold_at,
    NULL::text,
-   'item'::text
+   'item'::text,
+   NULL::integer
   FROM items i
   WHERE i.status = 'sold'
    AND NOT EXISTS (
