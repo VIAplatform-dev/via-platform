@@ -4,8 +4,7 @@ import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { markSold } from "@/app/lib/db/inventory";
 import {
  PLATFORMS, getPlatformAccounts, upsertPlatformAccount, removePlatformAccount,
- getCrossListBoard, delistEverywhere, platformByKey, getMarketplaceRollup, recordCrossListingSale,
-} from "@/app/lib/cross-listing-db";
+ getCrossListBoard, delistEverywhere, platformByKey, getMarketplaceRollup, recordCrossListingSale, effectiveMode, EXTENSION_IN_REVIEW } from "@/app/lib/cross-listing-db";
 import { ebayConfigured } from "@/app/lib/ebay";
 import { getEbayTokens, clearEbayTokens } from "@/app/lib/ebay-tokens-db";
 import { depopConfigured } from "@/app/lib/depop";
@@ -22,7 +21,10 @@ export async function GET(request: NextRequest) {
  const [accounts, board, rollup, ebayTok, depopTok, etsy] = await Promise.all([getPlatformAccounts(slug), getCrossListBoard(slug), getMarketplaceRollup(slug).catch(() => []), getEbayTokens(slug).catch(() => null), getDepopTokens(slug).catch(() => null), etsyStatus(slug).catch(() => ({ configured: false, connected: false, shop: null }))]);
  return NextResponse.json({
  ok: true,
- platforms: PLATFORMS.filter((p) => p.live).map((p) => ({ key: p.key, name: p.name, hasApi: p.hasApi, mode: p.mode })),
+ // effectiveMode, not p.mode: while the extension is in review the channels that need it are
+ // offered as coming soon, so a seller cannot switch on something she has no way to install.
+ platforms: PLATFORMS.filter((p) => p.live).map((p) => ({ key: p.key, name: p.name, hasApi: p.hasApi, mode: effectiveMode(p) })),
+ extensionInReview: EXTENSION_IN_REVIEW,
  accounts,
  board,
  rollup,

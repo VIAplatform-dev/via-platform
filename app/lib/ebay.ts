@@ -192,7 +192,26 @@ async function policyIds(token: string): Promise<{ fulfillment?: string; payment
 // blocker behind "I'm a business account but it still won't list". We prefer an ENABLED location the
 // seller already has (established accounts do — correct address, no guessing); only if they have none
 // do we create a default one under their account. Idempotent + best-effort.
-async function ensureLocationKey(token: string): Promise<string | null> {
+/** The store's ship-from address, for the eBay location. Null when she hasn't set one yet. */
+async function shipFromFor(storeSlug: string) {
+ try {
+  const { getShippingSettings } = await import("./store-shipping-db");
+  const s = await getShippingSettings(storeSlug);
+  return s.shipFrom ?? null;
+ } catch {
+  return null;
+ }
+}
+
+/**
+ * The eBay location a listing ships from.
+ *
+ * Reuses whatever the seller already has. When she has none we create one — and it must be HER
+ * address: this hardcoded a US country with a New York postcode, so a London store with no existing
+ * eBay location got listings that claimed to ship from Manhattan. VYA now collects a real ship-from
+ * address (Settings → Locations), so use it and only fall back when there genuinely isn't one.
+ */
+async function ensureLocationKey(token: string, from?: { city?: string | null; state?: string | null; zip?: string | null; country?: string | null } | null): Promise<string | null> {
  const list = await ebayFetch(token, `/sell/inventory/v1/location?limit=100`);
  const locs: any[] = Array.isArray(list.json?.locations) ? list.json.locations : [];
  const enabled = locs.find((l) => String(l?.merchantLocationStatus || "").toUpperCase() === "ENABLED");
@@ -204,7 +223,15 @@ async function ensureLocationKey(token: string): Promise<string | null> {
  const res = await ebayFetch(token, `/sell/inventory/v1/location/${key}`, {
   method: "POST",
   body: JSON.stringify({
-   location: { address: { country: "US", postalCode: process.env.EBAY_DEFAULT_POSTAL || "10001" } },
+   location: {
+    address: {
+     country: (from?.country || "US").toUpperCase().slice(0, 2),
+     // eBay requires a postcode for US locations and accepts one everywhere else.
+     postalCode: from?.zip || process.env.EBAY_DEFAULT_POSTAL || "10001",
+     ...(from?.city ? { city: from.city } : {}),
+     ...(from?.state ? { stateOrProvince: from.state } : {}),
+    },
+   },
    name: "VYA Default Location", locationTypes: ["WAREHOUSE"], merchantLocationStatus: "ENABLED",
   }),
  });
@@ -278,7 +305,7 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  // 3) Ensure a ship-from inventory location exists — publish requires one, and the status check
  //    (testEbayConnection) reports "not ready" without it. Creating it here (not just on first list)
  //    is what makes "Set up automatically" actually stick on reload.
- const locationKey = await ensureLocationKey(token);
+ const locationKey = await ensureLocationKey(token, await shipFromFor(storeSlug));
  const hasLocation = !!locationKey;
  if (!hasLocation) problems.push("couldn’t create a ship-from inventory location");
 
@@ -406,7 +433,7 @@ function standardizeSize(raw: string, allowed: string[]): string | null {
 
 export type EbayItem = { itemId: string; title: string; description?: string | null; brand?: string | null; condition?: string | null; size?: string | null; material?: string | null; priceCents: number; currency?: string; images: string[] };
 
-export type EbayResult = { ok: boolean; listingUrl?: string; error?: string };
+export type EbayResult = { ok: boolean; listingUrl?: string; error?: string; raw?: string };
 
 // Create/replace inventory item → create offer → publish. Returns the live listing URL.
 // Pre-flight: is this store's eBay account actually ready to list? Confirms the token refreshes and
@@ -499,7 +526,11 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  cond = pickCondition(item.condition || "", cpol.ids);
  }
  const aspects: Record<string, string[]> = {};
- if (item.brand) aspects.Brand = [item.brand];
+ // eBay requires a Brand aspect on most fashion categories and refuses the listing without one —
+ // as "Input data for tag <BrandMPN> is invalid or missing", which reads like the brand we sent was
+ // wrong rather than absent. "Unbranded" is eBay's own value for a piece with no maker, which is
+ // most of vintage, so a no-brand piece now lists instead of failing.
+ aspects.Brand = [item.brand?.trim() || "Unbranded"];
  if (sizeAspect) aspects.Size = [sizeAspect];
  // eBay requires an MPN (Manufacturer Part Number) aspect on many fashion categories; vintage/
  // resale pieces don't have one, so send the value eBay mandates for that case, or publish fails
@@ -522,15 +553,25 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  title: item.title.slice(0, 80),
  description: (item.description || item.title).slice(0, 4000),
  imageUrls: images,
- ...(item.brand ? { brand: item.brand } : {}),
+ // PRODUCT IDENTIFIERS, not aspects. This is what "<BrandMPN> is invalid or missing" is actually
+ // about, and why a correctly spelled brand still failed: eBay validates the product's brand/mpn/
+ // GTIN fields, and we were only putting MPN in `aspects`, where that check never looks. So eBay
+ // saw a branded product with no part number and no barcode and refused it.
+ //
+ // Vintage has none of these by definition — a 1970s jacket has no MPN and no UPC — and "Does Not
+ // Apply" is the exact value eBay documents for that case. Sent on every listing, because a piece
+ // that genuinely has a barcode is the rare one here.
+ brand: item.brand?.trim() || "Unbranded",
+ mpn: "Does Not Apply",
+ upc: ["Does not apply"],
  ...(Object.keys(aspects).length ? { aspects } : {}),
  },
  }),
  });
- if (!inv.ok) return { ok: false, error: ebayErr(inv.json) || "Couldn’t create the inventory item." };
+ if (!inv.ok) return { ok: false, error: ebayErr(inv.json) || "Couldn’t create the inventory item.", raw: JSON.stringify(inv.json?.errors || inv.json).slice(0, 900) };
 
  // 3) offer (category resolved above) — needs a ship-from location, or publish 25002's.
- const locationKey = await ensureLocationKey(token);
+ const locationKey = await ensureLocationKey(token, await shipFromFor(storeSlug));
  if (!locationKey) return { ok: false, error: "eBay needs a ship-from inventory location and one couldn’t be set up — reconnect eBay and try again." };
  const price = (item.priceCents / 100).toFixed(2);
  const offerBody = {
@@ -553,9 +594,43 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
 
  // 4) publish
  const pub = await ebayFetch(token, `/sell/inventory/v1/offer/${offerId}/publish`, { method: "POST" });
- if (!pub.ok) return { ok: false, error: ebayErr(pub.json) || "Couldn’t publish the listing." };
+ if (!pub.ok) return { ok: false, error: ebayErr(pub.json) || "Couldn’t publish the listing.", raw: JSON.stringify(pub.json?.errors || pub.json).slice(0, 900) };
  const listingId = pub.json?.listingId;
  return { ok: true, listingUrl: listingId ? `https://www.ebay.com/itm/${listingId}` : undefined };
+}
+
+/**
+ * What eBay ACTUALLY has for this SKU, as opposed to what VYA recorded.
+ *
+ * cross_listings stores what our publish call returned at the time. That is not the same thing as
+ * the state of the listing now: a publish can answer 200 without a listingId, an offer can be
+ * created but left unpublished, and a listing can be ended on eBay's side without telling us. All
+ * three read as "Listed" on the board while the seller finds nothing on eBay — which is the worst
+ * failure this feature has, because she trusts it and stops checking.
+ *
+ * So this asks eBay. Read-only; it publishes and changes nothing.
+ */
+export async function ebayOfferStatus(storeSlug: string, sku: string): Promise<{
+ ok: boolean; found: boolean; status?: string; listingId?: string; listingStatus?: string; offerId?: string; error?: string;
+}> {
+ if (!ebayConfigured()) return { ok: false, found: false, error: "eBay app keys aren’t set on this server." };
+ const token = await accessToken(storeSlug);
+ if (!token) return { ok: false, found: false, error: "No valid eBay token for this store." };
+ const r = await ebayFetch(token, `/sell/inventory/v1/offer?sku=${encodeURIComponent(sku)}`);
+ if (!r.ok) return { ok: false, found: false, error: ebayErr(r.json) || `eBay answered HTTP ${r.status}.` };
+ const offer = r.json?.offers?.[0];
+ if (!offer) return { ok: true, found: false };
+ // eBay nests the listing under `listing`, not at the top level — offer.status says whether the
+ // OFFER is published, listing.listingStatus says whether the resulting listing is still ACTIVE.
+ // They differ: an offer stays PUBLISHED after its listing ends, so only the second answers
+ // "can a shopper buy this right now".
+ return {
+  ok: true, found: true,
+  status: offer.status,
+  listingId: offer.listing?.listingId,
+  listingStatus: offer.listing?.listingStatus,
+  offerId: offer.offerId,
+ };
 }
 
 // Withdraw the offer for a SKU (ends the live listing) — used when it sells elsewhere.
@@ -580,10 +655,14 @@ export async function endOnEbay(storeSlug: string, itemId: string): Promise<bool
 // Matched against eBay's text AND its `parameters`, because the offending field is usually only
 // named in the parameters.
 const EBAY_PLAIN: { match: RegExp; say: string }[] = [
+ // Deliberately NOT "this piece has no brand". eBay says <BrandMPN> whenever the brand/MPN pair
+ // doesn't satisfy the category — including when a brand IS set and eBay simply doesn't accept it
+ // for that category. Telling a seller to add a brand she can see on the screen sends her to check
+ // the one thing that is not wrong. This says what we know and what to try.
  { match: /brandmpn|\bbrand\b[^.]*\b(missing|invalid|required)/i,
-   say: "this piece has no brand. Add one, then retry." },
+   say: "eBay wouldn’t accept the brand for this category. Check the brand is spelled as eBay lists it, or leave it blank to list as Unbranded." },
  { match: /\bmpn\b[^.]*\b(missing|invalid|required)/i,
-   say: "this piece has no brand. Add one, then retry." },
+   say: "eBay wants a part number for this category, which vintage rarely has. Try a different category on the piece." },
  { match: /condition[^.]*\b(missing|invalid|required)/i,
    say: "this piece has no condition set. Add one, then retry." },
  { match: /categor(y|ies)[^.]*\b(missing|invalid|required|not found)/i,

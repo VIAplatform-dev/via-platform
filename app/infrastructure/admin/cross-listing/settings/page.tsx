@@ -22,6 +22,10 @@ export default function CrossListingSettingsPage() {
  const [platforms, setPlatforms] = useState<Platform[]>([]);
  const [accounts, setAccounts] = useState<Account[]>([]);
  const [ebay, setEbay] = useState<Ebay | null>(null);
+ // Chrome hasn't approved the extension yet, so there is nothing to install and the channels that
+ // need it are offered as coming soon. The server decides (EXTENSION_IN_REVIEW) — one flag, flipped
+ // the day it is approved, rather than copy in here that someone has to remember to change.
+ const [extInReview, setExtInReview] = useState(false);
  const [loading, setLoading] = useState(true);
  const [handles, setHandles] = useState<Record<string, string>>({});
  const [ebayReady, setEbayReady] = useState<EbayReady | null>(null);
@@ -32,14 +36,14 @@ export default function CrossListingSettingsPage() {
 
  async function load() {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
- if (r) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay); }
+ if (r) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay);  setExtInReview(!!r.extensionInReview); }
  setLoading(false);
  }
  useEffect(() => {
  let active = true;
  (async () => {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
- if (r && active) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay); }
+ if (r && active) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay);  setExtInReview(!!r.extensionInReview); }
  if (active) setLoading(false);
  })();
  return () => { active = false; };
@@ -106,15 +110,19 @@ export default function CrossListingSettingsPage() {
  <div className="flex items-start gap-3">
  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft,#eafaf3)] text-[var(--accent-ink,#0b7a5c)]"><Puzzle size={18} /></span>
  <div>
- <p className="text-[14px] font-semibold text-stone-900">Install the VYA Cross-Lister extension</p>
- <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">One-time, installs in seconds. It auto-fills your Depop &amp; Vestiaire listings right in your own browser — nothing leaves your session. Required for those channels.</p>
+ <p className="text-[14px] font-semibold text-stone-900">{extInReview ? "Extension with other marketplaces — coming soon" : "Install the VYA Cross-Lister extension"}</p>
+ <p className="mt-0.5 text-[13px] leading-relaxed text-stone-500">
+  {extInReview
+   ? "eBay is live now and lists through eBay's own API — nothing to install. Depop and Vestiaire arrive with our browser extension, which is with Google for review. We'll switch them on here the moment it's approved."
+   : <>One-time, installs in seconds. It auto-fills your Depop &amp; Vestiaire listings right in your own browser — nothing leaves your session. Required for those channels.</>}
+ </p>
  </div>
  </div>
- <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener" className="shrink-0"><Download size={14} /> Add to Chrome</TechButtonLink>
+ {!extInReview && <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener" className="shrink-0"><Download size={14} /> Add to Chrome</TechButtonLink>}
  </TechCard>
 
  {/* Onboarding: pull an existing Depop shop into VYA in one pass. Hidden once they've imported. */}
- {!importedAlready && (
+ {!importedAlready && !extInReview && (
  <TechCard className="mb-5 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
  <div>
  <p className="text-[14px] font-semibold text-stone-900">Coming from Depop? Import your shop</p>

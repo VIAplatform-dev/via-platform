@@ -18,6 +18,25 @@ import { listOnEtsy, endOnEtsy, etsyConnected, type EtsyResult } from "./etsy";
 export type PlatformMode = "api" | "extension" | "soon";
 export type Platform = { key: string; name: string; hasApi: boolean; live?: boolean; mode: PlatformMode; titleMax: number; profileUrl: (handle: string) => string };
 
+/**
+ * The Chrome extension is submitted and waiting on Google's review.
+ *
+ * Until it is approved there is nothing for a seller to install, so every channel that depends on
+ * it — Depop, Vestiaire — is presented as coming soon rather than as a switch that silently does
+ * nothing when flipped. eBay is a real API integration and is unaffected.
+ *
+ * FLIP THIS TO false THE DAY THE EXTENSION IS APPROVED. It is the only thing to change: the
+ * platform table below still describes Depop and Vestiaire as extension channels, which is what
+ * they are, and this only changes how they are offered while nobody can install the thing.
+ */
+export const EXTENSION_IN_REVIEW = true;
+
+/** How a platform should be OFFERED right now, as opposed to what it fundamentally is. */
+export function effectiveMode(p: Platform): PlatformMode {
+ return p.mode === "extension" && EXTENSION_IN_REVIEW ? "soon" : p.mode;
+}
+
+
 export const PLATFORMS: Platform[] = [
  { key: "ebay", name: "eBay", hasApi: true, live: true, mode: "api", titleMax: 80, profileUrl: (h) => `https://www.ebay.com/usr/${h}` },
  { key: "depop", name: "Depop", hasApi: false, live: true, mode: "extension", titleMax: 65, profileUrl: (h) => `https://www.depop.com/${h}` },
