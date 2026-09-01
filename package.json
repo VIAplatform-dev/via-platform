@@ -17,7 +17,9 @@
     "repair:store": "node --env-file=.env.local --import tsx scripts/repair-store.mts",
     "blackout:store": "node --experimental-strip-types --env-file=.env.local scripts/blackout-check.mts",
     "census": "node --experimental-strip-types scripts/census.mts",
-  "fleet": "nohup scripts/fleet.sh > .verify/fleet.log 2>&1 &"
+    "fleet": "nohup scripts/fleet.sh > .verify/fleet.log 2>&1 &",
+    "ebay:check": "node --env-file=.env.local --import tsx scripts/ebay-check.mts",
+    "ebay:audit": "node --env-file=.env.local --import tsx scripts/ebay-audit-board.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
@@ -39,6 +41,7 @@
     "next": "^16.1.6",
     "next-auth": "^5.0.0-beta.30",
     "otpauth": "^9.5.0",
+    "posthog-js": "^1.424.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
