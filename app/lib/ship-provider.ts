@@ -9,6 +9,7 @@
 import * as shippo from "./shippo";
 import * as easypost from "./easypost";
 import type { ShipAddress, Parcel, Rate, PurchasedLabel } from "./shippo";
+import type { CustomsDeclaration } from "./customs";
 import { getShipAccountId, saveShipAccount } from "./seller-payments-db";
 
 export type ShipProviderName = "shippo" | "easypost";
@@ -21,10 +22,10 @@ export function isShipConfigured(): boolean {
  return activeProvider() === "easypost" ? easypost.isEasyPostConfigured() : shippo.isShippoConfigured();
 }
 
-export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, accountId?: string | null): Promise<Rate[]> {
+export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, accountId?: string | null, customs?: CustomsDeclaration | null): Promise<Rate[]> {
  return activeProvider() === "easypost"
-  ? easypost.getRates(from, to, parcel, accountId ?? undefined)
-  : shippo.getRates(from, to, parcel); // Shippo managed-account header wires in when we move Shippo to Platform Accounts
+  ? easypost.getRates(from, to, parcel, accountId ?? undefined, customs)
+  : shippo.getRates(from, to, parcel, customs); // Shippo managed-account header wires in when we move Shippo to Platform Accounts
 }
 
 export async function buyLabel(rateId: string, accountId?: string | null): Promise<PurchasedLabel | null> {

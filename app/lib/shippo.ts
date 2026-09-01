@@ -8,6 +8,8 @@ export function isShippoConfigured(): boolean {
  return Boolean(process.env.SHIPPO_API_KEY);
 }
 
+import type { CustomsDeclaration } from "./customs";
+
 export type ShipAddress = {
  name?: string | null;
  street1: string;
@@ -43,13 +45,39 @@ async function shippo(path: string, method: "GET" | "POST", body?: any): Promise
 function toShippo(a: ShipAddress) {
  return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || "" };
 }
+/** Our declaration in Shippo's field names — its enums are upper-cased and its EEL code is slugged. */
+function toShippoCustoms(d: CustomsDeclaration) {
+ return {
+  contents_type: "MERCHANDISE",
+  non_delivery_option: "RETURN",
+  certify: true,
+  certify_signer: d.certifySigner,
+  incoterm: d.incoterm,
+  ...(d.eelPfc ? { eel_pfc: "NOEEI_30_37_a" } : {}),
+  items: d.lines.map((l) => ({
+   description: l.description,
+   quantity: l.quantity,
+   net_weight: String(l.weightOz),
+   mass_unit: "oz",
+   value_amount: (l.valueCents / 100).toFixed(2),
+   value_currency: "USD",
+   origin_country: l.originCountry,
+   tariff_number: l.hsCode.replace(/\D/g, ""),
+  })),
+ };
+}
+
 function parcelToShippo(p: Parcel) {
  return { length: String(Math.max(1, p.lengthIn)), width: String(Math.max(1, p.widthIn)), height: String(Math.max(1, p.heightIn)), distance_unit: "in", weight: String(Math.max(1, p.weightOz)), mass_unit: "oz" };
 }
 
 /** Live rates from->to for a parcel, cheapest first. [] if not configured / on error. */
-export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel): Promise<Rate[]> {
- const shipment = await shippo("/shipments/", "POST", { address_from: toShippo(from), address_to: toShippo(to), parcels: [parcelToShippo(parcel)], async: false });
+export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, customs?: CustomsDeclaration | null): Promise<Rate[]> {
+ const shipment = await shippo("/shipments/", "POST", {
+  address_from: toShippo(from), address_to: toShippo(to), parcels: [parcelToShippo(parcel)], async: false,
+  // Same rule as EasyPost: no declaration, no international rates.
+  ...(customs ? { customs_declaration: toShippoCustoms(customs) } : {}),
+ });
  const rates: any[] = shipment?.rates || [];
  return rates
  .map((r) => ({

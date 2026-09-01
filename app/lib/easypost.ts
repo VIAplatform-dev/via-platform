@@ -5,6 +5,7 @@
 // Forge is enabled on the account and the child-auth flow is verified live.
 
 import type { ShipAddress, Parcel, Rate, PurchasedLabel } from "./shippo";
+import type { CustomsDeclaration } from "./customs";
 
 const EASYPOST_API = "https://api.easypost.com/v2";
 
@@ -39,14 +40,56 @@ async function ep(path: string, method: "GET" | "POST", body?: any, apiKey?: str
 function toEpAddress(a: ShipAddress) {
  return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || "" };
 }
+/**
+ * Our declaration in EasyPost's field names.
+ *
+ * Two conversions worth naming: EasyPost takes value in DOLLARS where we hold cents, and wants the
+ * tariff number as bare digits, so the dotted six-digit heading has its dot stripped.
+ */
+function toEpCustoms(d: CustomsDeclaration) {
+ return {
+  contents_type: d.contentsType,
+  restriction_type: "none",
+  non_delivery_option: d.nonDeliveryOption,
+  customs_certify: true,
+  customs_signer: d.certifySigner,
+  // Null means the seller owes an AES filing we can't invent — send nothing rather than a false one.
+  ...(d.eelPfc ? { eel_pfc: d.eelPfc } : {}),
+  customs_items: d.lines.map((l) => ({
+   description: l.description,
+   quantity: l.quantity,
+   value: Number((l.valueCents / 100).toFixed(2)),
+   weight: l.weightOz,
+   hs_tariff_number: l.hsCode.replace(/\D/g, ""),
+   origin_country: l.originCountry,
+   currency: "USD",
+  })),
+ };
+}
+
 function toEpParcel(p: Parcel) {
  // EasyPost: dimensions in inches, weight in ounces (matches our Parcel type).
  return { length: Math.max(1, p.lengthIn), width: Math.max(1, p.widthIn), height: Math.max(1, p.heightIn), weight: Math.max(1, p.weightOz) };
 }
 
 /** Live rates from->to for a parcel, cheapest first. [] if not configured / on error. */
-export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, apiKey?: string): Promise<Rate[]> {
- const shipment = await ep("/shipments", "POST", { shipment: { to_address: toEpAddress(to), from_address: toEpAddress(from), parcel: toEpParcel(parcel) } }, apiKey);
+export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, apiKey?: string, customs?: CustomsDeclaration | null): Promise<Rate[]> {
+ const shipment = await ep("/shipments", "POST", { shipment: {
+  to_address: toEpAddress(to), from_address: toEpAddress(from), parcel: toEpParcel(parcel),
+  // A shipment crossing a border needs a declaration or EasyPost returns no international rates at
+  // all. It goes on at CREATION, not at purchase, because buying references this shipment by id.
+  // DDP needs BOTH: the incoterm goes on the customs paperwork, and duty_payment tells the carrier
+  // whose account to bill. DHL Express reads the incoterm alone, but FedEx and UPS bill the
+  // RECEIVER unless duty_payment says otherwise — which would hand the buyer a bill at the door on
+  // an order whose store promised duties were covered.
+  ...(customs ? {
+   customs_info: toEpCustoms(customs),
+   options: {
+    incoterm: customs.incoterm,
+    ...(customs.incoterm === "DDP" ? { duty_payment: { type: "SENDER" } } : {}),
+   },
+  } : {}),
+ } }, apiKey);
  const shipmentId = shipment?.id as string | undefined;
  const rates: any[] = shipment?.rates || [];
  if (!shipmentId) return [];
