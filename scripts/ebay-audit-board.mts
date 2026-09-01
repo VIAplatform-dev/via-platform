@@ -23,21 +23,9 @@ import { ebayOfferStatus } from "../app/lib/ebay.ts";
 
 const argv = process.argv.slice(2);
 const at = argv.indexOf("--store");
-const ae = argv.indexOf("--email");
+const SLUG = at >= 0 ? (argv[at + 1] || "").trim() : "via-admin";
 
 const sql = neon(process.env.DATABASE_URL!);
-
-// --email, because the person asking "did my listing go up" knows their email and has no reason to
-// know their store's slug.
-let SLUG = at >= 0 ? (argv[at + 1] || "").trim() : "";
-if (!SLUG && ae >= 0) {
- const email = (argv[ae + 1] || "").trim().toLowerCase();
- const found = (await sql`SELECT store_slug FROM store_users WHERE lower(email) = ${email} LIMIT 1`) as { store_slug: string }[];
- if (!found.length) { console.error(`\nNo store is attached to ${email}.\n`); process.exit(1); }
- SLUG = found[0].store_slug;
- console.log(`\n${email} → store "${SLUG}"`);
-}
-if (!SLUG) SLUG = "via-admin";
 
 // Joined to the item so a failure can be read against what was actually sent. "Why did this one
 // work and not that one" is either the piece or the clock, and without the brand and the timestamp
@@ -51,17 +39,6 @@ const rows = (await sql`
  ORDER BY c.updated_at DESC
 `) as { item_id: string; status: string; external_url: string | null; updated_at: string;
         title: string | null; brand: string | null; category: string | null }[];
-
-// WHICH eBay account answered. Every check here runs on this store's token, so "eBay says ACTIVE"
-// means active on THIS account — which is a different sentence from "active on the account you are
-// looking at". When a listing is confirmed live and the seller cannot find it, that gap is usually
-// the whole explanation.
-let ebayUser: string | null = null;
-try {
- const tok = (await sql`SELECT ebay_user FROM ebay_tokens WHERE store_slug = ${SLUG} LIMIT 1`) as { ebay_user: string | null }[];
- ebayUser = tok[0]?.ebay_user ?? null;
-} catch { /* the table may not exist on a store that has never connected eBay */ }
-console.log(`\neBay account connected to this store: ${ebayUser || "(none recorded)"}`);
 
 console.log(`\ncross_listings — store "${SLUG}", platform eBay: ${rows.length} row(s)\n`);
 if (!rows.length) {
