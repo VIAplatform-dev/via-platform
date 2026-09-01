@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
 import { stores } from "@/app/lib/stores";
+import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
 import { getStoreAccount } from "@/app/lib/store-accounts-db";
 import { isStorePro } from "@/app/lib/store-plans-db";
 import {
@@ -45,9 +46,16 @@ export async function GET(request: NextRequest) {
  const store = stores.find((s) => s.slug === slug);
  const settings = (await getStorefrontBySlug(slug)) ?? defaultsFor(slug);
 
+ // The address her storefront actually answers on, from the one helper that is the inverse of the
+ // proxy's own routing (storePublicOrigin). The builder hardcoded ".getvya.ai" and the imported
+ // editor fell back to a vyaplatform.com path — so one store was shown two different addresses on
+ // two screens, and neither of them serves it.
+ const publicOrigin = storePublicOrigin(settings.handle || slug);
+
  return NextResponse.json({
  ok: true,
  settings,
+ publicOrigin,
  store: { slug, name: store?.name ?? slug, logo: store?.logo ?? null },
  admin: isAdminRequest(request), // platform admin (your admin login) — gates the Delete action
  });

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { snapshotAsDraft } from "@/app/lib/storefront-versions-db";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
-import { listCapturePaths, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
+import { listCapturePaths, getCaptureOrigin, deleteCaptures, getCapturePage } from "@/app/lib/site-capture-db";
+import { partitionByReachability } from "@/app/lib/capture-links";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { deleteAllItems } from "@/app/lib/db/inventory";
 import { getStorefrontBySlug } from "@/app/lib/storefront-db";
@@ -57,16 +58,34 @@ function jobView(job: ImportJob) {
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const paths = await listCapturePaths(slug).catch(() => []); /* allow-swallow: status read — a DB blip shows "not captured yet", never a failed import */
+ const paths = await listCapturePaths(slug).catch(() => [] as string[]); /* allow-swallow: status read — a DB blip shows "not captured yet", never a failed import */
  const origin = paths.length ? await getCaptureOrigin(slug).catch(() => null) : null; /* allow-swallow: display-only */
  const job = await getLatestJob(slug).catch(() => null); /* allow-swallow: the job record is additive; its absence must not break the capture status */
  // isAdmin gates the owner-only "reset to simple design + wipe inventory" action.
  // `url` is the ABSOLUTE public view URL (for "View your site"); `slug` lets the editor build a
  // SAME-ORIGIN /site/{slug} preview so it works on localhost / getvya.ai, not just prod.
+ // Which of those pages the site itself leads to. A crawl finds every URL that ANSWERS, and a
+ // Shopify store answers on far more than it shows — so the strip listed retired collections
+ // looking exactly as live as the homepage. Read from the two pages that carry the site's own
+ // navigation rather than all of them: eighty megabytes of HTML to decorate a row of thumbnails
+ // would cost more than the label is worth.
+ const navSources = paths.length
+  ? (await Promise.all(
+     ["/", "/collections"].filter((p) => paths.includes(p)).map((p) =>
+      getCapturePage(slug, p).catch(() => null) /* allow-swallow: this page is read only to label the strip — a read that fails must leave the labels off, never fail the capture status the editor depends on */
+     ),
+    )).filter((h): h is string => typeof h === "string" && h.length > 0)
+  : [];
+ /* allow-swallow: the labels are decoration — a page we cannot read must leave the strip unlabelled, never mark a live shop dead */
+ const unlinked: string[] = navSources.length ? partitionByReachability(paths, navSources, origin).unlinked : [];
+
  return NextResponse.json({
   captured: paths.length,
   url: paths.length ? await siteViewUrl(slug) : null,
   slug, origin, pages: paths,
+  // Pages nothing on the site links to. Still reachable by URL — see app/lib/capture-links.ts for
+  // why the editor says "Not linked" rather than "Archived".
+  unlinked,
   isAdmin: isOwner(request, slug),
   job: job ? jobView(job) : null,
  });

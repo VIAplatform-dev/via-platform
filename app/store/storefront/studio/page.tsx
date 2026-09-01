@@ -35,6 +35,23 @@ type Radius = "sharp" | "soft" | "round";
 // w/h as % of the section). Position-only — the box is moved, never resized — matching the live
 // drag clamp. Overlays with no stored size (auto-sized text/buttons) only get their corner clamped.
 // Returns the SAME object when already in bounds, so callers can detect "nothing changed" by ref.
+// Which design this editor is working on. A ?version= in the URL means a DRAFT — every read and
+// every save carries it, so the live storefront is untouched until she publishes. No version means
+// the live one, which is the original behaviour.
+const editingVersion = (): string | null => {
+ if (typeof window === "undefined") return null;
+ const v = new URLSearchParams(window.location.search).get("version");
+ return v && /^[A-Za-z0-9_-]{4,64}$/.test(v) ? v : null;
+};
+const withVersion = (url: string): string => {
+ const v = editingVersion();
+ return v ? `${url}${url.includes("?") ? "&" : "?"}version=${encodeURIComponent(v)}` : url;
+};
+const versionBody = (o: Record<string, unknown>): Record<string, unknown> => {
+ const v = editingVersion();
+ return v ? { ...o, version: v } : o;
+};
+
 function clampOverlayToSection(o: Overlay): Overlay {
  const hiX = typeof o.w === "number" ? Math.max(0, 100 - Math.min(100, o.w)) : 100;
  const hiY = typeof o.h === "number" ? Math.max(0, 100 - Math.min(100, o.h)) : 100;
@@ -421,6 +438,9 @@ export default function StorefrontStudio() {
  const [embedErr, setEmbedErr] = useState(false);
  const [settings, setSettings] = useState<Settings | null>(null);
  const [storeName, setStoreName] = useState("Your store");
+ // Her storefront's real host, resolved server-side by the same helper the proxy routes with, so
+ // the address shown in the builder is the one that actually serves her shop.
+ const [publicHost, setPublicHost] = useState("");
  const [colors, setColors] = useState<Colors>({ bg: "#FFFDF8", text: "#1a1a1a", accent: "#5D0F17" });
  // The colours the current template/palette shipped with — the "reset to" baseline. Updated
  // only when a palette/template is applied or design is loaded; NOT when a swatch is fine-tuned,
@@ -623,7 +643,7 @@ export default function StorefrontStudio() {
  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
  const loadDesign = useCallback(async () => {
- const r = await fetch("/api/store/storefront/design").catch(() => null);
+ const r = await fetch(withVersion("/api/store/storefront/design")).catch(() => null);
  if (!r || !r.ok) return;
  const d = await r.json();
  if (d.storeName) { importedNameRef.current = d.storeName; setStoreName(d.storeName); }
@@ -654,7 +674,7 @@ export default function StorefrontStudio() {
  setExtraPages(nPages);
  // If anything was out of bounds, persist the corrected geometry once (mirrors the sections autosave).
  if (nBlocks !== baseBlocks || nShop !== baseShop || pagesChanged) {
- fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks: nBlocks, shopBlocks: nShop, extraPages: nPages }) }).catch(() => {});
+ fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks: nBlocks, shopBlocks: nShop, extraPages: nPages })) }).catch(() => {});
  }
  setCustomCss(d.customCss || "");
  setSocials(d.socials || {});
@@ -669,6 +689,9 @@ export default function StorefrontStudio() {
  loadDesign(),
  ]);
  if (sf?.settings) setSettings(sf.settings as Settings);
+ // The address her storefront really answers on, resolved server-side by the same helper the proxy
+ // routes with. Hardcoding ".getvya.ai" here showed sellers a host that serves nothing.
+ if (typeof sf?.publicOrigin === "string") setPublicHost(sf.publicOrigin.replace(/^https?:\/\//, ""));
  if (sf?.store?.name && !importedNameRef.current) setStoreName(sf.store.name as string);
  loadedRef.current = true;
  setLoading(false);
@@ -710,7 +733,7 @@ export default function StorefrontStudio() {
  if (saveTimer.current) clearTimeout(saveTimer.current);
  saveTimer.current = setTimeout(async () => {
  setSave("saving");
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks, shopBlocks, extraPages }) }).catch(() => {});
+ await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks, shopBlocks, extraPages })) }).catch(() => {});
  setSave("saved");
  }, 700);
  return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
@@ -894,7 +917,7 @@ export default function StorefrontStudio() {
   headers: { "Content-Type": "application/json" },
   // applyContent:false — the sections are already in local state and on their way up via autosave.
   // Letting the server lay them out too would race that write and could clobber it.
-  body: JSON.stringify({ template: t.id, applyContent: false, colors: t.colors, fonts: t.fonts, radius: t.radius, headerLayout: t.headerLayout, shopGrid: t.grid, productLayout: t.productLayout }),
+  body: JSON.stringify(versionBody({ template: t.id, applyContent: false, colors: t.colors, fonts: t.fonts, radius: t.radius, headerLayout: t.headerLayout, shopGrid: t.grid, productLayout: t.productLayout })),
  }).catch(() => {});
  }
 
@@ -907,7 +930,7 @@ export default function StorefrontStudio() {
  if (designTimer.current) clearTimeout(designTimer.current);
  setSave("saving");
  designTimer.current = setTimeout(async () => {
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }).catch(() => {});
+ await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody(patch)) }).catch(() => {});
  setSave("saved");
  }, 400);
  }, []);
@@ -1948,7 +1971,7 @@ export default function StorefrontStudio() {
   <div className="flex h-9 shrink-0 items-center gap-2 border-b border-black/[0.07] bg-[#f4f1ec] px-3">
    <div className="flex gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /></div>
    <span className="rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-stone-600">{pg.title}</span>
-   <span className="ml-auto text-[11px] text-stone-400"><span className="text-stone-500">{handle || "your-store"}</span>.getvya.ai{pg.slug !== "home" ? `/${pg.slug}` : ""}</span>
+   <span className="ml-auto text-[11px] text-stone-400"><span className="text-stone-500">{publicHost || `${handle || "your-store"}.vyasites.com`}</span>{pg.slug !== "home" ? `/${pg.slug}` : ""}</span>
   </div>
   {/* `overflow-hidden`, not a scrollbar: a preview you can't click into shouldn't offer to scroll. */}
   <div className="min-h-0 flex-1 overflow-hidden" style={{ background: colors.bg }}>
@@ -1987,7 +2010,7 @@ export default function StorefrontStudio() {
 
  return (
  // fixed inset-0 z-[60] covers the portal sidebar + floating chat — a focused full-screen builder.
- <div className="fixed inset-0 z-[60] flex flex-col overflow-hidden bg-[#e7e3db] text-stone-800">
+ <div className="fixed inset-x-0 bottom-0 z-[60] flex flex-col overflow-hidden bg-[#e7e3db] text-stone-800" style={{ top: "var(--vya-banner, 0px)" }}>
  {/* Upload error toast — says WHY an upload failed (too big, wrong type, offline). Click to dismiss. */}
  {uploadErr && (
  <div className="fixed left-1/2 top-4 z-[95] flex -translate-x-1/2 items-start gap-3 rounded-xl border border-red-200 bg-white px-4 py-3 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]" role="alert">
@@ -2942,7 +2965,7 @@ export default function StorefrontStudio() {
  </>
  )}
  </div>
- <div className="ml-auto flex h-5 items-center rounded-md bg-white px-2 text-[11px] text-stone-400"><span className="text-stone-600">{handle || "your-store"}</span>.getvya.ai{activeSlug !== "home" ? `/${activeSlug}` : ""}</div>
+ <div className="ml-auto flex h-5 items-center rounded-md bg-white px-2 text-[11px] text-stone-400"><span className="text-stone-600">{publicHost || `${handle || "your-store"}.vyasites.com`}</span>{activeSlug !== "home" ? `/${activeSlug}` : ""}</div>
  </div>
 
  {/* editable canvas */}
