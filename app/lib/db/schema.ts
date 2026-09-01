@@ -136,10 +136,20 @@ export const orders = pgTable(
  amountCents: integer("amount_cents").notNull(),
  feeCents: integer("fee_cents"), // VYA's application fee on this order
  shippingPaidCents: integer("shipping_paid_cents"), // shipping the buyer paid at checkout (buyer_pays); funds the label
+ // Sales tax the buyer paid, as calculated by Stripe Tax on the SELLER's connected
+ // account — they are merchant of record on a direct charge, so the registrations
+ // and the liability are theirs. Null means tax was never calculated for this
+ // order (the store hadn't enabled it), which is different from zero.
+ taxCents: integer("tax_cents"),
+ // Where it was owed, for the books: "US-NY-NEW YORK" style, from Stripe's breakdown.
+ taxJurisdiction: text("tax_jurisdiction"),
  currency: text("currency").notNull().default("USD"),
  stripePaymentIntent: text("stripe_payment_intent"),
  status: orderStatus("status").notNull().default("pending"),
  confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),
+ // The seller's own note on this order — "buyer asked to hold until the 12th",
+ // "sent a replacement dust bag". Private: never shown to the buyer.
+ internalNote: text("internal_note"),
  // Shipping label (bought via Shippo in the fulfillment view).
  labelUrl: text("label_url"),
  trackingNumber: text("tracking_number"),

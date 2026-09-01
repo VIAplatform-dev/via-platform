@@ -1,4 +1,4 @@
-import { sqlRows, safe, int, meanCents, ratePct, truncUnit, fillSeries } from "./core";
+import { sqlRows, SOLD_STATUSES, safe, int, meanCents, ratePct, truncUnit, fillSeries } from "./core";
 import { ensureAnalyticsViews } from "./views";
 import { deltaPct, type Granularity, type ResolvedPeriod, type Window } from "./period";
 
@@ -42,6 +42,12 @@ export type SalesMetrics = {
  undatedSales: { count: number; valueCents: number };
  /** Money that came back. Refunded orders never count toward GMV, so this stands apart from it. */
  returns: { orders: number; valueCents: number; ratePct: number };
+ /**
+  * Sales tax collected from buyers. NOT revenue — it's held on behalf of the
+  * state until the seller files, so it's reported separately and never added to
+  * GMV. Null-safe: orders from before tax was switched on simply contribute 0.
+  */
+ taxCollectedCents: number;
 };
 
 const ZERO: SalesTotals = { gmvCents: 0, orders: 0, aovCents: 0, unitsSold: 0 };
@@ -77,14 +83,14 @@ export async function getSalesMetrics(sellerId: string, period: ResolvedPeriod):
  const empty: SalesMetrics = {
   current: ZERO, prior: null, yoy: null, vsPrior: null, vsYoy: null,
   granularity, series: [], bestDay: null, bestWeek: null, recentSales: [],
-  undatedSales: { count: 0, valueCents: 0 }, returns: { orders: 0, valueCents: 0, ratePct: 0 },
+  undatedSales: { count: 0, valueCents: 0 }, returns: { orders: 0, valueCents: 0, ratePct: 0 }, taxCollectedCents: 0,
  };
 
  return safe(async () => {
   await ensureAnalyticsViews();
   const sql = sqlRows();
 
-  const [cur, pri, yy, seriesRows, dayRows, weekRows, recentRows, undatedRows, returnRows] = await Promise.all([
+  const [cur, pri, yy, seriesRows, dayRows, weekRows, recentRows, undatedRows, returnRows, taxRows] = await Promise.all([
    totals(sellerId, current),
    prior ? totals(sellerId, prior) : Promise.resolve(null),
    yoy ? totals(sellerId, yoy) : Promise.resolve(null),
@@ -124,6 +130,11 @@ export async function getSalesMetrics(sellerId: string, period: ResolvedPeriod):
     SELECT COUNT(*)::int AS n, COALESCE(SUM(amount_cents), 0)::bigint AS value_cents
     FROM vya_store_sales WHERE seller_id = ${sellerId}::uuid AND sold_at IS NULL
    `,
+   sql`
+    SELECT COALESCE(SUM(tax_cents), 0)::bigint AS cents FROM orders
+    WHERE seller_id = ${sellerId}::uuid AND status = ANY(${SOLD_STATUSES})
+     AND paid_at >= ${current.startISO} AND paid_at < ${current.endISO}
+   `.catch(() => []),
    // Refunds live on orders alone — a hand-marked sale has no concept of coming back.
    sql`
     SELECT COUNT(*)::int AS n, COALESCE(SUM(amount_cents), 0)::bigint AS value_cents
@@ -161,6 +172,7 @@ export async function getSalesMetrics(sellerId: string, period: ResolvedPeriod):
     origin: String(r.origin ?? "order"),
    })),
    undatedSales: { count: int(undatedRows[0]?.n), valueCents: int(undatedRows[0]?.value_cents) },
+   taxCollectedCents: int(taxRows[0]?.cents),
    returns: {
     orders: int(returnRows[0]?.n),
     valueCents: int(returnRows[0]?.value_cents),

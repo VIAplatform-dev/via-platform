@@ -30,10 +30,47 @@ export type Tier = {
 export const TIERS: Tier[] = [
  { id: "starter", name: "Starter", tagline: "Run one store, end to end.", order: 1 },
  { id: "studio", name: "Studio", tagline: "Sell everywhere, on your own domain.", order: 2 },
- { id: "atelier", name: "Atelier", tagline: "The full intelligence + consignment suite.", order: 3 },
+ { id: "atelier", name: "Pro", tagline: "The full intelligence + consignment suite.", order: 3 },
 ];
 
 export const TIER_ORDER: Record<TierId, number> = { starter: 1, studio: 2, atelier: 3 };
+
+/**
+ * How many people can be in a store's workspace, by tier.
+ *
+ * Counts the OWNER. "2 seats" means the owner plus one other person, which is how a seller reads it
+ * — a limit that excluded the owner would let a Starter store have three logins and feel like a bug.
+ *
+ * A store with no live tier (free, or a lapsed subscription) keeps one seat, so the owner is never
+ * locked out of her own store by a billing problem. Losing access to your inventory because a card
+ * expired is not a downgrade, it's an outage.
+ */
+export const SEATS_BY_TIER: Record<TierId, number> = {
+ starter: 2,
+ studio: 4,
+ atelier: 6,
+};
+
+export const FREE_SEATS = 1;
+
+export function seatsForTier(tierId: TierId | null | undefined): number {
+ return tierId ? SEATS_BY_TIER[tierId] ?? FREE_SEATS : FREE_SEATS;
+}
+
+/** Whether one more person can be added, and what to say when they can't. */
+export function canAddSeat(tierId: TierId | null | undefined, currentCount: number): { ok: true } | { ok: false; limit: number; reason: string } {
+ const limit = seatsForTier(tierId);
+ if (currentCount < limit) return { ok: true };
+ const nextId: TierId | null = tierId === "starter" ? "studio" : tierId === "studio" ? "atelier" : null;
+ const next = nextId ? TIERS.find((t) => t.id === nextId)?.name ?? null : null;
+ return {
+  ok: false,
+  limit,
+  reason: next
+   ? `Your plan includes ${limit} ${limit === 1 ? "seat" : "seats"}. Upgrade to ${next} for more.`
+   : `Your plan includes ${limit} seats. Get in touch if you need more.`,
+ };
+}
 
 export function getTier(id: string | null | undefined): Tier | null {
  return TIERS.find((t) => t.id === id) ?? null;
@@ -60,7 +97,7 @@ export const FEATURE_MIN_TIER = {
  automations: 2,
  instagram_autopost: 2,
  demand_intelligence: 2, // Source Now, demand search, market benchmarks
- // Tier 3 — Atelier: the deep intelligence + consignment operation.
+ // Tier 3 — Pro (id `atelier`): the deep intelligence + consignment operation.
  consignment: 3,
  culture_trends: 3,
  sourcing_alerts: 3,

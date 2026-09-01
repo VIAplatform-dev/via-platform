@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { stores } from "@/app/lib/stores";
 import { getStorefrontByHandle, getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { hasCaptures } from "@/app/lib/site-capture-db";
+import { servesCapture } from "@/app/lib/storefront-versions";
 import StorefrontView from "../StorefrontView";
 import StorefrontTracker from "../StorefrontTracker";
 
@@ -52,9 +53,14 @@ export default async function StorefrontPage({ params, searchParams }: Props) {
  : await getStorefrontByHandle(handle).catch(() => null);
  if (!sf) return notFound();
 
- // If the seller brought their own site over, THAT is their storefront — serve the
- // captured site instead of the block builder. (The builder is for no-site sellers.)
- if (!preview && (await hasCaptures(sf.storeSlug).catch(() => false))) redirect(`/site/${sf.storeSlug}`);
+ // Which storefront is live is the seller's choice now, not a consequence of what she happens to
+ // have. This used to be "any captured pages? then serve those", which meant a store that had ever
+ // imported its site could never publish a design built here — the captures always won. The
+ // published version decides; the capture check is only the fallback for stores that predate
+ // versions and so have no published row yet. See storefront-versions.ts.
+ if (!preview && servesCapture(sf.serveMode, await hasCaptures(sf.storeSlug).catch(() => false))) {
+  redirect(`/site/${sf.storeSlug}`);
+ }
 
  // Store structured data → search engines treat the storefront as a real shop entity.
  const name = storeDisplayName(sf, handle);

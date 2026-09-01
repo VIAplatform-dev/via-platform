@@ -10,10 +10,13 @@ import { applicationFeeCents } from "@/app/lib/payments-config";
 import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
-import { flatRateCents } from "@/app/lib/shipping-tiers";
+import { quoteShipping } from "@/app/lib/shipping-zones";
 import { validateDiscount, computeDiscount, distributeDiscount } from "@/app/lib/store-discounts-db";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import type { Item } from "@/app/lib/db/schema";
+import { getTaxSettings, stripeTaxReady } from "@/app/lib/store-tax-db";
+import { taxCodeForItem, TAX_CODE_SHIPPING } from "@/app/lib/tax-codes";
+import { taxBehaviorForSale } from "@/app/lib/tax-inclusive";
 
 export const dynamic = "force-dynamic";
 const COOKIE = "via_cart";
@@ -96,6 +99,34 @@ export async function POST(request: NextRequest) {
  const discounted = distributeDiscount(amounts, off); // per-item cents after discount
  const discountedSubtotal = discounted.reduce((s, a) => s + a, 0);
 
+ // Sales tax, when the store has turned it on. DIRECT charge on their connected
+ // account, so Stripe Tax calculates against THEIR registrations and THEY stay
+ // merchant of record — the "connected account is responsible" model from
+ // Stripe's Connect tax docs. VYA calculates nothing and is liable for nothing.
+ const taxPref = await getTaxSettings(seller.slug).catch(() => ({ enabled: false, productTaxCode: null as string | null }));
+ // Only ask for automatic_tax once the account has finished Stripe Tax setup.
+ // Where a seller has no registration Stripe simply calculates nothing, which is
+ // correct — but an account that never completed setup can fail the session, and
+ // losing a sale is worse than not charging tax on it.
+ const taxReady = taxPref.enabled ? await stripeTaxReady(acctId).catch(() => ({ active: false, registrations: 0, country: null as string | null })) : { active: false, registrations: 0, country: null as string | null };
+ const tax = { enabled: taxPref.enabled && taxReady.active, productTaxCode: taxPref.productTaxCode };
+ // Does the price this seller typed already include tax? It is not a preference — it follows from
+ // where the store is established (see tax-inclusive.ts). A UK seller's "200" means £200 all in,
+ // because UK consumer law requires the shopper to see the VAT-inclusive figure; a US seller's
+ // "200" means $200 before tax, because US sales tax depends on the buyer's address and no single
+ // all-in number exists. Sending the wrong one either breaks that law or silently adds tax on top
+ // of a price that already contained it.
+ // Both ends of the sale, not just the seller's: an export out of the VAT world is exclusive, so a
+ // UK seller can never silently absorb US sales tax. `ship.country` is the destination the buyer
+ // already gave us on VYA's own form.
+ const taxBehavior = taxBehaviorForSale(taxReady.country, ship.country);
+ // The tax CODE is per ITEM, not per store: New York exempts clothing and
+ // footwear under $110 and PA/NJ exempt most apparel, but none of that covers
+ // handbags, jewelry or sunglasses. One blanket code would under-collect on bags
+ // (the seller owes tax they never charged) or overcharge on dresses.
+ const taxCodeFor = (item: { category: string | null; title: string }) =>
+ tax.enabled ? (tax.productTaxCode || taxCodeForItem(item.category, item.title)) : null;
+
  const lineItems: Record<number, unknown> = {};
  reserved.forEach((item, i) => {
  lineItems[i] = {
@@ -103,7 +134,12 @@ export async function POST(request: NextRequest) {
  price_data: {
  currency: (item.currency || "usd").toLowerCase(),
  unit_amount: discounted[i],
- product_data: { name: item.title, ...(item.images?.[0] ? { images: { 0: item.images[0] } } : {}) },
+ product_data: {
+   name: item.title,
+   ...(item.images?.[0] ? { images: { 0: item.images[0] } } : {}),
+   ...((() => { const c = taxCodeFor(item); return c ? { tax_code: c } : {}; })()),
+  },
+  ...(tax.enabled ? { tax_behavior: taxBehavior } : {}),
  },
  };
  });
@@ -115,15 +151,31 @@ export async function POST(request: NextRequest) {
  // Flat-rate by size (Depop/Poshmark-style), PER SELLER — the buyer pays one clean, consistent tier
  // price for this store's parcel, same number every time. VYA buys the real discounted label at
  // fulfillment and keeps the spread; margin is baked into the tier + kept safe by round-up dims.
- const shipHere = shipFree ? 0 : flatRateCents({
+ const parcel = {
  weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
  lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),
  widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
  heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
+ };
+ // Priced by DESTINATION, not just by parcel size. One flat rate everywhere meant the same $14 for
+ // the next town and for Sydney, which is a loss on every export — see shipping-zones.ts. A zone the
+ // store hasn't opened is refused here rather than sold: taking money for a parcel she has no way to
+ // post is worse than losing the sale.
+ const shipQuote = quoteShipping({
+ fromCountry: shipSettings.shipFrom?.country || "US",
+ toCountry: ship.country || "US",
+ parcel,
+ zones: shipSettings.zones,
  });
+ if (!shipQuote.ok) {
+ return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+ }
+ const shipHere = shipFree || !shipQuote.ok ? 0 : shipQuote.amountCents;
  const effShip = freeShip ? 0 : shipHere; // a free-shipping code waives the buyer's shipping charge
  const cur = (reserved[0].currency || "usd").toLowerCase();
- if (effShip > 0) lineItems[reserved.length] = { quantity: 1, price_data: { currency: cur, unit_amount: effShip, product_data: { name: "Shipping" } } };
+ // Shipping is taxable in some states and not others; the shipping tax code lets
+ // Stripe decide rather than us guessing.
+ if (effShip > 0) lineItems[reserved.length] = { quantity: 1, price_data: { currency: cur, unit_amount: effShip, product_data: { name: "Shipping", ...(tax.enabled ? { tax_code: TAX_CODE_SHIPPING } : {}) }, ...(tax.enabled ? { tax_behavior: taxBehavior } : {}) } };
  // Consignment (Model A): route each consigned item's consignor cut into VYA's balance, on top
  // of the platform fee — so we hold it and pay the consignor out (Stripe won't let the store
  // transfer to them directly). Computed on the DISCOUNTED per-item price.
@@ -149,6 +201,14 @@ export async function POST(request: NextRequest) {
  meta.discount_store = seller.slug;
  }
 
+ const taxParams = tax.enabled
+ ? {
+   automatic_tax: { enabled: true },
+   customer_update: { shipping: "auto" },
+   shipping_address_collection: { allowed_countries: [String(ship.country || "US").toUpperCase()] },
+  }
+ : {};
+
  const session = await stripePost(
  "checkout/sessions",
  {
@@ -158,6 +218,7 @@ export async function POST(request: NextRequest) {
  cancel_url: `${base}/checkout/cancel`,
  line_items: lineItems,
  metadata: meta,
+ ...taxParams,
  payment_intent_data: {
  ...(feeAmount > 0 ? { application_fee_amount: feeAmount } : {}),
  metadata: meta,

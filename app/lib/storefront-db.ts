@@ -48,6 +48,9 @@ export type StorefrontSettings = {
  about: string | null;
  customDomain: string | null;
  theme: StorefrontTheme | null; // extracted design (fonts/colors/logo)
+ // Which storefront is live: the imported copy of their site, or the design they built. Null on
+ // stores that predate storefront versions — serving then falls back to the old capture check.
+ serveMode: "imported" | "built" | null;
  updatedAt?: string;
 };
 
@@ -78,6 +81,7 @@ function ensureTable(): Promise<void> {
  `;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme JSONB`;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme_prev JSONB`;
+ await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS serve_mode TEXT`;
  })().catch((e) => {
  tableReady = null; // allow retry on transient failure
  throw e;
@@ -98,6 +102,7 @@ function rowToSettings(r: any): StorefrontSettings {
  about: r.about ?? null,
  customDomain: r.custom_domain ?? null,
  theme: (r.theme as StorefrontTheme) ?? null,
+ serveMode: r.serve_mode === "imported" || r.serve_mode === "built" ? r.serve_mode : null,
  updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
  };
 }
@@ -122,6 +127,16 @@ export async function revertStorefrontTheme(storeSlug: string): Promise<boolean>
 
 /** Remove a store's storefront entirely — settings, theme, pages, handle, publish state. A clean
  *  slate: the public handle stops resolving and the editor reopens blank. Idempotent. */
+/**
+ * Record which storefront is live. Written by publishVersion; read by serving so a built design can
+ * go live on a store that still has captured pages sitting in a draft.
+ */
+export async function setServeMode(storeSlug: string, mode: "imported" | "built"): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`UPDATE storefront_settings SET serve_mode = ${mode}, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
+}
+
 export async function deleteStorefront(storeSlug: string): Promise<void> {
  await ensureTable();
  const sql = neon(getDatabaseUrl());

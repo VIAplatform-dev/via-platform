@@ -23,7 +23,11 @@ export type MarginTotals = {
  coveredSales: number;
  totalSales: number;
  coveragePct: number;
- revenueCents: number; // revenue of the covered slice only
+ revenueCents: number; // revenue of the covered slice only, NET of tax collected
+ /** Tax collected on those sales — the government's share, excluded from revenue above. */
+ taxCents: number;
+ /** Covered sales with no tax figure recorded, so the caller can caveat rather than imply precision. */
+ salesWithoutTax: number;
  costCents: number;
  grossProfitCents: number;
  grossMarginPct: number | null;
@@ -90,7 +94,7 @@ export type MarginMetrics = {
 };
 
 const ZERO: MarginTotals = {
- coveredSales: 0, totalSales: 0, coveragePct: 0, revenueCents: 0, costCents: 0,
+ coveredSales: 0, totalSales: 0, coveragePct: 0, revenueCents: 0, taxCents: 0, salesWithoutTax: 0, costCents: 0,
  grossProfitCents: 0, grossMarginPct: null, roiPct: null, avgProfitPerSaleCents: 0,
 };
 
@@ -114,7 +118,14 @@ async function totalsFor(sellerId: string, w: Window): Promise<MarginTotals> {
   SELECT
    COUNT(*)::int AS total_sales,
    COUNT(*) FILTER (WHERE i.cost_cents > 0)::int AS covered_sales,
-   COALESCE(SUM(s.amount_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS revenue_cents,
+   -- Revenue is the sale LESS the tax collected on it. On a tax-inclusive store (UK, EU, AU) the
+   -- amount already contains VAT, and that money is the government's, never the seller's: £200 at
+   -- 20% is £166.67 of revenue. Counting the gross overstates revenue, margin and ROI at once.
+   COALESCE(SUM(s.amount_cents - COALESCE(s.tax_cents, 0)) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS revenue_cents,
+   COALESCE(SUM(s.tax_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS tax_cents,
+   -- Sales whose tax we simply don't know (an item marked sold never went through checkout).
+   -- Reported so the P&L can say the figure may still contain tax, instead of implying precision.
+   COUNT(*) FILTER (WHERE i.cost_cents > 0 AND s.tax_cents IS NULL)::int AS sales_without_tax,
    COALESCE(SUM(i.cost_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS cost_cents
   FROM vya_store_sales s JOIN items i ON i.id = s.item_id
   WHERE s.seller_id = ${sellerId}::uuid
@@ -131,6 +142,8 @@ async function totalsFor(sellerId: string, w: Window): Promise<MarginTotals> {
   totalSales,
   coveragePct: ratePct(coveredSales, totalSales),
   revenueCents,
+  taxCents: int(r.tax_cents),
+  salesWithoutTax: int(r.sales_without_tax),
   costCents,
   grossProfitCents,
   grossMarginPct: revenueCents > 0 ? Math.round((grossProfitCents / revenueCents) * 1000) / 10 : null,

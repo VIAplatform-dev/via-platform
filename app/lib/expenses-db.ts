@@ -48,7 +48,9 @@ export function categoryLabel(key: string): string {
  return EXPENSE_CATEGORIES.find((c) => c.key === key)?.label ?? "Other";
 }
 
-export type ExpenseSource = "typed" | "assistant";
+// Where a cost came from — shown in the list so a seller can tell what she typed from what a
+// spreadsheet import brought in, and undo a bad import without touching her own entries.
+export type ExpenseSource = "typed" | "assistant" | "import";
 
 /**
  * How a cost repeats.
@@ -104,7 +106,7 @@ function mapRow(r: Record<string, unknown>): Expense {
   category: (isExpenseCategory(r.category) ? r.category : "other") as ExpenseCategory,
   label: String(r.label),
   amountCents: Number(r.amount_cents) || 0,
-  source: (r.source === "assistant" ? "assistant" : "typed") as ExpenseSource,
+  source: (r.source === "assistant" || r.source === "import" ? r.source : "typed") as ExpenseSource,
   recurs: r.recurs === "monthly" || r.recurs === "per_order" ? r.recurs : null,
   createdAt: r.created_at ? new Date(r.created_at as string).toISOString() : null,
  };

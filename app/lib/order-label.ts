@@ -5,6 +5,7 @@ import { getRates, buyLabel, voidLabel, isShipConfigured, getOrCreateShipAccount
 import { recordLabelTransaction, getLabelTransaction, markLabelVoided } from "./shippo-labels-db";
 import { MIN_MARGIN_CENTS } from "./shipping-tiers";
 import { sendOpsAlert } from "./email";
+import { customsForOrder } from "./order-customs";
 
 /**
  * Auto-generate a PREPAID shipping label for an order and store it (status stays 'paid' — the seller
@@ -33,7 +34,15 @@ export async function generateOrderLabel(orderId: string): Promise<{ ok: boolean
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
  const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
- const rates = await getRates(from, to, parcel, shipAcct);
+ // A parcel crossing a border needs a declaration or the carrier returns no international rates.
+ // Built BEFORE rating, not at purchase, so the price quoted is the price paid — a DDP rate costs
+ // more than a DDU one because the duty is inside it.
+ const { declaration: customs } = await customsForOrder({
+  storeSlug: seller.slug, sellerName: seller.name, itemId: order.itemId,
+  fromCountry: from.country, toCountry: to.country,
+  parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
+ }).catch(() => ({ declaration: null }));
+ const rates = await getRates(from, to, parcel, shipAcct, customs);
  if (!rates.length) return { ok: false, reason: "no-rates" };
  const label = await buyLabel(rates[0].rateId, shipAcct);
  if (!label) return { ok: false, reason: "label-failed" };
@@ -94,7 +103,15 @@ export async function generateReturnLabel(orderId: string): Promise<{ ok: boolea
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
  const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
- const rates = await getRates(from, to, parcel, shipAcct);
+ // A parcel crossing a border needs a declaration or the carrier returns no international rates.
+ // Built BEFORE rating, not at purchase, so the price quoted is the price paid — a DDP rate costs
+ // more than a DDU one because the duty is inside it.
+ const { declaration: customs } = await customsForOrder({
+  storeSlug: seller.slug, sellerName: seller.name, itemId: order.itemId,
+  fromCountry: from.country, toCountry: to.country,
+  parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
+ }).catch(() => ({ declaration: null }));
+ const rates = await getRates(from, to, parcel, shipAcct, customs);
  if (!rates.length) return { ok: false, reason: "no-rates" };
  const label = await buyLabel(rates[0].rateId, shipAcct);
  if (!label) return { ok: false, reason: "label-failed" };
@@ -122,7 +139,15 @@ export async function generateShipBackLabel(orderId: string): Promise<{ ok: bool
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
  const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
- const rates = await getRates(from, to, parcel, shipAcct);
+ // A parcel crossing a border needs a declaration or the carrier returns no international rates.
+ // Built BEFORE rating, not at purchase, so the price quoted is the price paid — a DDP rate costs
+ // more than a DDU one because the duty is inside it.
+ const { declaration: customs } = await customsForOrder({
+  storeSlug: seller.slug, sellerName: seller.name, itemId: order.itemId,
+  fromCountry: from.country, toCountry: to.country,
+  parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
+ }).catch(() => ({ declaration: null }));
+ const rates = await getRates(from, to, parcel, shipAcct, customs);
  if (!rates.length) return { ok: false, reason: "no-rates" };
  const label = await buyLabel(rates[0].rateId, shipAcct);
  if (!label) return { ok: false, reason: "label-failed" };

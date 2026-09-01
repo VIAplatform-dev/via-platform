@@ -88,7 +88,10 @@ export default function SettingsPage() {
 
  useEffect(() => {
  const t = new URLSearchParams(window.location.search).get("tab");
- if (t === "brief" || t === "pricing" || t === "shipping" || t === "sender" || t === "policy") { const id = setTimeout(() => setTab(t), 0); void id; }
+ // Shipping moved to Settings → Shipping & duties (rates, zones, duty) and Locations (addresses).
+ // Old ?tab=shipping links go there rather than to a tab that no longer has a button.
+ if (t === "shipping") { window.location.replace("/admin/settings/shipping"); return; }
+ if (t === "brief" || t === "pricing" || t === "sender" || t === "policy") { const id = setTimeout(() => setTab(t), 0); void id; }
  fetch("/api/store/pricing").then((r) => (r.ok ? r.json() : null)).then((d) => d && setPct(String(d.minMarkupPct))).catch(() => {});
  fetch("/api/store/policy").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.policy) { setRefundsEnabled(d.policy.refundsEnabled !== false); setReturnWindowDays(String(d.policy.returnWindowDays ?? 14)); setRestockingFeePct(String(d.policy.restockingFeePct ?? 0)); setReturnShippingPaidBy(d.policy.returnShippingPaidBy === "store" ? "store" : "buyer"); setPolicyText(d.policy.policyText || ""); } }).catch(() => {});
  fetch("/api/store/brief").then((r) => (r.ok ? r.json() : null)).then((d) => {
@@ -201,11 +204,11 @@ export default function SettingsPage() {
 
  return (
  <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
-  <PageHeader title="Settings" subtitle="How VYA prices and writes for you, plus your pricing floor and shipping." />
+  <PageHeader title="General" subtitle="How VYA prices and writes for you, your pricing floor, and returns." />
 
   {/* Tabs */}
   <div className="mb-6 flex gap-5 border-b border-stone-200">
-  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["shipping", "Shipping"], ["policy", "Returns"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
+  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["policy", "Returns"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
    <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 pb-2.5 text-[13px] font-medium transition ${tab === k ? "border-[#5D0F17] text-[#5D0F17]" : "border-transparent text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
   ))}
   </div>
@@ -412,7 +415,7 @@ export default function SettingsPage() {
   {tab === "policy" && (
   <Card className="mb-5">
   <CardHeader title="Returns & refunds" subtitle="What buyers see on your storefront before they buy. You can always issue a refund manually from an order, whatever this says." />
-  <div className="space-y-5">
+  <div className="space-y-5 px-5 py-4">
    <div className="flex items-center justify-between gap-4">
    <div>
     <p className="text-[13px] font-medium text-stone-800">Accept returns</p>

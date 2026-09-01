@@ -1,8 +1,9 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { Fragment, useEffect, useState } from "react";
-import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download, ExternalLink } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download, ExternalLink, Ban } from "lucide-react";
+import { vestiaireEligibility } from "@/app/lib/vestiaire";
 import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD } from "../ui";
 
 // VYA Cross-Lister on the Chrome Web Store (Unlisted) — live once Google's review passes.
@@ -15,14 +16,14 @@ const CREATE_URL: Record<string, string> = {
 };
 // Extension marketplaces that have a working queue endpoint today. Add a key here when its
 // queue endpoint + extension fill flow ships (e.g. "vestiaire").
-const QUEUEABLE = new Set(["depop"]);
+const QUEUEABLE = new Set(["depop", "vestiaire"]);
 
 type Platform = { key: string; name: string; hasApi: boolean; mode?: string };
 type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { connected: boolean };
 type Etsy = { connected: boolean };
 type PlatformStats = { likes: number; offers: number; views: number; watchers: number };
-type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; errors?: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand?: string | null; listings: Record<string, string>; errors?: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 type Rollup = { platform: string; listed: number; queued: number; error: number; offers: number; likes: number; views: number; watchers: number; sold: number; revenueCents: number };
 type Content = { title: string; body: string; tags: string[]; price: string };
 
@@ -52,6 +53,8 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const [retrying, setRetrying] = useState<string | null>(null);
  const [extInstalled, setExtInstalled] = useState(false);
  const [queueState, setQueueState] = useState<Record<string, "queuing" | "ok" | "err">>({});
+ const [errors, setErrors] = useState<Record<string, string>>({});
+ const [notice, setNotice] = useState<string | null>(null);
 
  function apply(r: { platforms: Platform[]; accounts: Account[]; board: BoardRow[]; rollup?: Rollup[]; ebay: Ebay; etsy: Etsy }) {
  setPlatforms(r.platforms); setAccounts(r.accounts); setBoard(r.board); setRollup(r.rollup || []); setEbay(r.ebay); setEtsy(r.etsy);
@@ -80,11 +83,39 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const d = e.data;
  if (!d || d.source !== "vya-ext" || d.type !== "queued") return;
  setQueueState((st) => ({ ...st, [d.itemId]: d.ok ? "ok" : "err" }));
- if (d.ok) load();
+   // A marketplace can refuse a piece outright (Vestiaire only takes designer brands). Its reason
+   // is more useful than "couldn't queue", so it goes straight to the seller.
+   if (!d.ok && d.error) setErrors((e) => ({ ...e, [d.itemId]: String(d.error) }));
+ // A reconciled item was already pending server-side, so its status can't have changed — skip the
+ // reload, or staging a big backlog would refetch the board once per item.
+ if (d.ok && !reconciledRef.current.has(d.itemId)) load();
  };
  window.addEventListener("message", onMsg);
  return () => { obs.disconnect(); window.removeEventListener("message", onMsg); };
  }, []);
+
+ // An item can become "pending" for an extension marketplace WITHOUT this board ever being involved:
+ // publishing a piece queues it server-side (createCrossListingsForItem), and so does the scheduled-
+ // publish cron. But the extension only learns of an item when the board posts queue-{platform} at it,
+ // which only happened on a click here. So a piece queued at publish showed as "queued" on this board
+ // while the extension's own queue was empty — and "Open Depop to list" opened a create form with
+ // nothing to fill in.
+ //
+ // Reconcile: whatever the server calls pending, stage into the extension too. vya.js replaces by item
+ // id, so re-staging is idempotent; the ref only stops us re-posting on every board reload.
+ const reconciledRef = useRef<Set<string>>(new Set());
+ useEffect(() => {
+ if (!extInstalled) return;
+ for (const key of QUEUEABLE) {
+ for (const it of board) {
+ const seen = `${key}:${it.itemId}`;
+ if (it.listings[key] !== "pending" || reconciledRef.current.has(seen)) continue;
+ reconciledRef.current.add(seen);
+ reconciledRef.current.add(it.itemId);
+ try { window.postMessage({ source: "vya-crosslist", type: `queue-${key}`, itemId: it.itemId, title: it.title }, window.location.origin); } catch { /* ignore */ }
+ }
+ }
+ }, [board, extInstalled]);
 
  const acct = (k: string) => accounts.find((a) => a.platform === k);
 
@@ -113,8 +144,13 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  }
  // Bulk: queue every selected item that isn't already listed/sold on this marketplace.
  async function bulkQueue(platformKey: string) {
- const targets = board.filter((it) => selected.has(it.itemId) && it.listings[platformKey] !== "listed" && it.listings[platformKey] !== "sold");
+ const eligible = (it: BoardRow) => platformKey !== "vestiaire" || vestiaireEligibility(it.brand).ok;
+ const chosen = board.filter((it) => selected.has(it.itemId) && it.listings[platformKey] !== "listed" && it.listings[platformKey] !== "sold");
+ // A marketplace that won't take the piece shouldn't be queued it in bulk either.
+ const targets = chosen.filter(eligible);
+ const skipped = chosen.length - targets.length;
  for (const it of targets) await queueOne(it.itemId, it.title, platformKey);
+ if (skipped > 0) setNotice(`${skipped} ${skipped === 1 ? "piece isn’t" : "pieces aren’t"} accepted on ${nameFor(platformKey)} — they need a designer brand.`);
  setSelected(new Set());
  load();
  }
@@ -267,6 +303,13 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  );
  })}
 
+ {notice && (
+ <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-900">
+  {notice}
+  <button onClick={() => setNotice(null)} className="ml-auto text-[12px] text-amber-700/70 hover:text-amber-900">Dismiss</button>
+ </div>
+ )}
+
  {/* Bulk action bar — queue many at once for one extension marketplace (eBay auto-lists, so it's not here). */}
  {selected.size > 0 && (
  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 shadow-sm">
@@ -335,9 +378,14 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  {connected.map((p) => {
  const st = it.listings[p.key];
  const isExt = p.mode === "extension" && QUEUEABLE.has(p.key);
+ // Vestiaire is curated — it only takes designer brands. Saying so in the cell beats letting her
+ // queue it and meet a refusal at the end of their form.
+ const blocked = p.key === "vestiaire" && !st ? vestiaireEligibility(it.brand) : ({ ok: true } as const);
  return (
  <td key={p.key} className="whitespace-nowrap px-3 py-3 text-center">
- {st === "listed" ? (
+ {!blocked.ok ? (
+ <span className="inline-flex items-center gap-1 text-[11px] text-stone-400" title={blocked.reason}><Ban size={12} />Not accepted</span>
+ ) : st === "listed" ? (
  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><Check size={13} strokeWidth={2.6} />Listed</span>
  ) : st === "pending" ? (
  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Queued</span>
@@ -356,10 +404,13 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  );
  })}
   </tr>
- {it.errors && Object.keys(it.errors).length > 0 && (
+ {(Object.keys(it.errors || {}).length > 0 || errors[it.itemId]) && (
  <tr><td colSpan={connected.length + 2} className="px-5 pb-3">
  <div className="rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2">
- {Object.entries(it.errors).map(([k, msg]) => (
+ {/* A marketplace can refuse a piece outright — Vestiaire only takes designer brands — and its
+     reason belongs on the row it's about, not in a separate banner. */}
+ {errors[it.itemId] && <p className="text-[11px] leading-snug text-rose-700">{errors[it.itemId]}</p>}
+ {Object.entries(it.errors || {}).map(([k, msg]) => (
  <p key={k} className="text-[11px] leading-snug text-rose-700"><span className="font-semibold">{nameFor(k)} couldn’t list:</span> {msg}</p>
  ))}
  </div>

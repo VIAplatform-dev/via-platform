@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Package, Search, List, LayoutGrid, Check, X } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, ConfirmDialog, cn } from "../ui";
+import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
@@ -185,6 +186,43 @@ export default function ItemsPage() {
  const selectedItems = items.filter((i) => selected.has(i.id));
  const draftsSelected = selectedItems.filter((i) => i.status === "draft").length;
 
+ // Reprice the selection in one go. The analytics tab points a seller at aging
+ // stock to reprice; without this they'd have to open each listing to act on it.
+ async function bulkReprice() {
+  const raw = prompt(`Reprice ${selected.size} selected ${selected.size === 1 ? "piece" : "pieces"}.\n\nEnter a new price (e.g. 45), or a percentage change (e.g. -20% to cut a fifth).`);
+  if (raw == null) return;
+  const input = raw.trim();
+  if (!input) return;
+  const pctMatch = input.match(/^([+-]?\d+(?:\.\d+)?)\s*%$/);
+  const flat = Number(input.replace(/^\$/, ""));
+  if (!pctMatch && (!Number.isFinite(flat) || flat < 0)) { alert("Enter a price like 45, or a change like -20%."); return; }
+
+  const ids = [...selected];
+  const updates = ids.map((id) => {
+   const item = items.find((x) => x.id === id);
+   if (!item) return null;
+   const cents = pctMatch
+    ? Math.max(0, Math.round(item.priceCents * (1 + Number(pctMatch[1]) / 100)))
+    : Math.round(flat * 100);
+   return { id, priceCents: cents };
+  }).filter(Boolean) as { id: string; priceCents: number }[];
+
+  const preview = pctMatch ? `${Number(pctMatch[1]) > 0 ? "+" : ""}${pctMatch[1]}%` : `$${flat.toFixed(2)} each`;
+  if (!confirm(`Set ${updates.length} ${updates.length === 1 ? "piece" : "pieces"} to ${preview}? This changes live prices.`)) return;
+
+  setBulkBusy(true);
+  // One request per item — the existing PATCH already validates ownership per id.
+  for (const u of updates) {
+   await fetch(`/api/store/items/${u.id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ price: u.priceCents / 100 }),
+   }).catch(() => {});
+  }
+  setSelected(new Set());
+  await load();
+  setBulkBusy(false);
+ }
+
  async function bulk(action: "publish" | "remove") {
  const ids = [...selected];
  if (!ids.length) return;
@@ -362,6 +400,20 @@ export default function ItemsPage() {
  .filter((i) => (quickOnly ? i.source === "market" : true));
  const allChecked = shown.length > 0 && shown.every((i) => selected.has(i.id));
 
+ // Exports everything currently filtered, not just the rendered page — an export
+ // that silently stops at the pagination boundary is worse than none.
+ function exportCsv() {
+  const rows = shown.map((i) => [
+   i.sku, i.title, i.brand ?? "", i.category ?? "", i.size ?? "", i.condition ?? "", i.era ?? "", i.material ?? "",
+   (i.priceCents / 100).toFixed(2), i.costCents != null ? (i.costCents / 100).toFixed(2) : "",
+   i.currency, i.status, (i.images || []).length, (i.collections || []).join(" | "),
+  ]);
+  downloadCsv(datedFilename("inventory"), toCsv(
+   ["sku", "title", "brand", "category", "size", "condition", "era", "material", "price", "cost", "currency", "status", "photos", "collections"],
+   rows,
+  ));
+ }
+
  // Paginate the RENDERED rows — a big inventory (hundreds of image rows) is slow to paint all at
  // once. Filtering, search, counts and select-all still run over the full set; only the DOM is capped.
  const PAGE_SIZE = 40;
@@ -417,6 +469,7 @@ export default function ItemsPage() {
  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search items…" aria-label="Search items"
  className="h-9 w-full rounded-full border border-stone-200 bg-white pl-8 pr-3 text-[13px] text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[var(--accent,#0e9f76)] sm:w-52" />
  </div>
+ <TechButton variant="secondary" onClick={exportCsv}>Export</TechButton>
  <TechButton variant="secondary" onClick={() => setImportOpen(true)}>Import</TechButton>
  <TechButtonLink href={withStore("/admin/add-listing")}>+ New listing</TechButtonLink>
  </>
@@ -457,6 +510,7 @@ export default function ItemsPage() {
  <span className="font-medium text-stone-700">{selected.size} selected</span>
  <div className="ml-auto flex items-center gap-2">
  <div className="relative">
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={bulkReprice}>Reprice</TechButton>
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => setBulkColOpen((o) => !o)}>Add to collection ▾</TechButton>
  {bulkColOpen && (
  <div className="absolute right-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-stone-200 bg-white p-2.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]">

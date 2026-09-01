@@ -138,7 +138,13 @@ export async function createCrossListingsForItem(storeSlug: string, itemId: stri
 // Actually POST to the platforms that have a real API (eBay + Depop). Best-effort +
 // background: on success we store the live listing URL, on failure the error message.
 export async function syncItemToApiPlatforms(storeSlug: string, itemId: string, only?: string[] | null): Promise<void> {
- const want = (k: string) => !only || !only.length || only.includes(k);
+ // The seller's explicit per-item picks win. WITHOUT them, fall back to each channel's auto-list
+ // default — the same rule createCrossListingsForItem applies two functions up. This used to fall
+ // back to "everything connected", so a seller who unchecked eBay still got a live eBay post: the
+ // queue row was correctly skipped, but the API push went out anyway. Connected is not wanted.
+ const accounts = await getPlatformAccounts(storeSlug).catch(() => [] as PlatformAccount[]);
+ const autoOn = new Set(accounts.filter((a) => a.autoList).map((a) => a.platform));
+ const want = (k: string) => (only && only.length ? only.includes(k) : autoOn.has(k));
  const [ebayOn, depopOn, etsyOn] = await Promise.all([
  want("ebay") ? ebayConnected(storeSlug).catch(() => false) : Promise.resolve(false),
  want("depop") ? depopConnected(storeSlug).catch(() => false) : Promise.resolve(false),
@@ -276,7 +282,7 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
  return toPull;
 }
 
-export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand: string | null; listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 
 /** Every active/pending item with its per-platform cross-listing status + engagement, for the tab. */
 export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> {
@@ -284,13 +290,13 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  const sql = db();
  const [rows, statRows, vyaOffers] = await Promise.all([
  sql`
-  SELECT i.id::text AS item_id, i.title, i.price_cents, i.images, i.status,
+  SELECT i.id::text AS item_id, i.title, i.price_cents, i.images, i.status, i.brand,
    COALESCE(json_object_agg(c.platform, c.status) FILTER (WHERE c.platform IS NOT NULL), '{}') AS listings,
    COALESCE(json_object_agg(c.platform, c.external_url) FILTER (WHERE c.status = 'error' AND c.external_url IS NOT NULL), '{}') AS errors
   FROM items i JOIN sellers s ON s.id = i.seller_id
   LEFT JOIN cross_listings c ON c.item_id = i.id::text AND c.store_slug = ${storeSlug}
   WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved')
-  GROUP BY i.id, i.title, i.price_cents, i.images, i.status
+  GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand
   ORDER BY i.created_at DESC LIMIT 200
  `.catch(() => []),
  sql`SELECT item_id, platform, likes, offers, views, watchers FROM cross_listing_stats WHERE store_slug = ${storeSlug}`.catch(() => []),
@@ -314,7 +320,7 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  const totals = Object.values(byPlatform).reduce<PlatformStats>((t, s) => ({ likes: t.likes + s.likes, offers: t.offers + s.offers, views: t.views + s.views, watchers: t.watchers + s.watchers }), ZERO_STATS());
  return {
  itemId: r.item_id, title: String(r.title || "Item"), priceCents: Number(r.price_cents || 0),
- image: Array.isArray(r.images) ? (r.images[0] ?? null) : null, status: String(r.status),
+ image: Array.isArray(r.images) ? (r.images[0] ?? null) : null, status: String(r.status), brand: r.brand ?? null,
  listings: (r.listings && typeof r.listings === "object") ? r.listings : {},
  errors: (r.errors && typeof r.errors === "object") ? r.errors : {},
  stats: { totals, byPlatform },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, getOrderDelivery, type OrderStatus } from "@/app/lib/db/orders";
+import { getOrderDetail, updateOrderStatus, markOrderRefunded, reversePayoutForOrder, setOrderLabel, markOrderShipped, markTrackingEmailSent, getOrderDelivery, setOrderNote, type OrderStatus } from "@/app/lib/db/orders";
 import { chargedTotalCents } from "@/app/lib/checkout-delivery.ts";
 import { getOrdersByPaymentIntent } from "@/app/lib/db/orders";
 import { relistItem } from "@/app/lib/db/inventory";
@@ -18,6 +18,7 @@ import { getRates, buyLabel, isShipConfigured, getOrCreateShipAccount } from "@/
 import { shippingMarginCents } from "@/app/lib/shipping-tiers";
 import { logError } from "@/app/lib/error-log";
 import { sendBuyerTrackingEmail } from "@/app/lib/email";
+import { customsForOrder } from "@/app/lib/order-customs";
 
 export const dynamic = "force-dynamic";
 
@@ -157,6 +158,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
  // Return label — buy a prepaid label (buyer → store) and email it to the buyer. Who ultimately
  // pays is the store's returns policy: buyer-pays → the cost is deducted from their eventual refund.
+ // The seller's own note on the order. Private — it never reaches the buyer,
+ // and nothing in the email templates reads it.
+ if (body?.action === "set_note") {
+ await setOrderNote(id, typeof body.note === "string" ? body.note : null);
+ return NextResponse.json({ ok: true, internalNote: typeof body.note === "string" && body.note.trim() ? body.note.trim().slice(0, 2000) : null });
+ }
+
  if (body?.action === "return_label") {
  const res = await generateReturnLabel(id);
  if (!res.ok) return NextResponse.json({ error: `Couldn’t create a return label (${res.reason}).` }, { status: 400 });
@@ -215,8 +223,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
 
  const shipAcct = await getOrCreateShipAccount(slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
- const rates = await getRates(from, to, parcel, shipAcct);
- if (!rates.length) return NextResponse.json({ error: "No shipping rates available for this address." }, { status: 502 });
+ // See order-customs.ts: an international parcel needs a declaration to get rates at all, and the
+ // quote has to come from the same shipment the purchase will use.
+ const { declaration: customs, warnings, needsAesFiling } = await customsForOrder({
+  storeSlug: slug, sellerName: seller.name, itemId: order.itemId,
+  fromCountry: from.country, toCountry: to.country,
+  parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
+ }).catch(() => ({ declaration: null, warnings: [] as { material: string; note: string }[], needsAesFiling: false }));
+ // A US export over $2,500 needs an AES filing only the seller can make. Refuse rather than post a
+ // declaration we know is incomplete and have the parcel held at the border.
+ if (needsAesFiling) {
+  return NextResponse.json({ error: "This order is over $2,500 and shipping abroad, so US customs needs an AES filing with an ITN before it can go. File it at aesdirect.census.gov, then ship with that number." }, { status: 400 });
+ }
+ const rates = await getRates(from, to, parcel, shipAcct, customs);
+ if (!rates.length) return NextResponse.json({ error: customs ? "No international rates for this address — check the ship-from country and the parcel weight." : "No shipping rates available for this address." }, { status: 502 });
  const cheapest = rates[0];
 
  // Cost recovery: if the buyer funded shipping at checkout, the label is covered;
@@ -227,7 +247,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // The buyer paid a flat tier at checkout; the real label costs less — the difference is VYA's margin.
  const buyerPaidCents = order.shippingPaidCents || 0;
  const marginCents = buyerPaidCents > 0 ? shippingMarginCents(buyerPaidCents, cheapest.amountCents) : 0;
- return NextResponse.json({ rate: { provider: cheapest.provider, service: cheapest.service, costCents: cheapest.amountCents, estDays: cheapest.estDays, rateId: cheapest.rateId }, sellerPays, buyerPaidCents, marginCents });
+ // Exotic skins and fur can be seized whatever the piece's age, so the seller sees this WITH the
+  // quote, before she commits — not in a support email afterwards. Advisory: "croc embossed
+  // calfskin" is a cow, and only a person can tell the difference.
+  return NextResponse.json({ rate: { provider: cheapest.provider, service: cheapest.service, costCents: cheapest.amountCents, estDays: cheapest.estDays, rateId: cheapest.rateId }, sellerPays, buyerPaidCents, marginCents, international: Boolean(customs), incoterm: customs?.incoterm ?? null, customsWarnings: warnings });
  }
 
  if (body?.action === "buy_label") {

@@ -26,6 +26,7 @@ type Order = {
  labelUrl: string | null;
  trackingNumber: string | null;
  trackingUrl: string | null;
+ internalNote: string | null;
  // Delivered or collected in store. Absent on every order placed before collection existed — those
  // are deliveries, so anything but "pickup" reads as one.
  deliveryMethod?: "ship" | "pickup";
@@ -57,6 +58,10 @@ export default function OrderDetailPage() {
  const [quote, setQuote] = useState<{ costCents: number; provider: string; service: string; rateId: string; estDays: number | null; sellerPays: boolean } | null>(null);
  const [labelMsg, setLabelMsg] = useState<string | null>(null);
  const [labelBusy, setLabelBusy] = useState(false);
+ // The seller's private note. Local state so typing stays responsive; it writes
+ // on blur, because an order note isn't worth a request per keystroke.
+ const [note, setNote] = useState("");
+ const [noteSaved, setNoteSaved] = useState(false);
  const [retBusy, setRetBusy] = useState(false);
  const [retMsg, setRetMsg] = useState<string | null>(null);
  const [rejecting, setRejecting] = useState(false);
@@ -76,13 +81,22 @@ export default function OrderDetailPage() {
  return;
  }
  const d = await r.json();
- if (!cancelled) { setOrder(d.order); setStripeFee(d.stripeFeeCents || 0); setLoading(false); }
+ if (!cancelled) { setOrder(d.order); setNote(d.order?.internalNote ?? ""); setStripeFee(d.stripeFeeCents || 0); setLoading(false); }
  } catch {
  if (!cancelled) { setErr("Couldn’t load the order."); setLoading(false); }
  }
  })();
  return () => { cancelled = true; };
  }, [id, reloadKey]);
+
+ async function saveNote() {
+  await fetch(`/api/store/orders/${id}`, {
+   method: "POST", headers: { "Content-Type": "application/json" },
+   body: JSON.stringify({ action: "set_note", note }),
+  }).catch(() => {});
+  setNoteSaved(true);
+  setTimeout(() => setNoteSaved(false), 1500);
+ }
 
  async function setStatus(status: string) {
  if (status === "refunded" && !window.confirm("Refund this order? The buyer is refunded, VYA's fee is reversed, and the item relists.")) return;
@@ -199,6 +213,22 @@ export default function OrderDetailPage() {
  <Card>
  <CardHeader title={isPickup ? "Collection" : "Fulfillment"} />
  <div className="px-5 py-4">
+ {/* Private working note — the buyer never sees this. Sits above fulfilment
+     because it applies whether the piece ships or is collected. */}
+ <div className="mb-5 rounded-xl border border-stone-200 bg-white p-4">
+  <div className="mb-2 flex items-baseline justify-between">
+   <span className="text-[12px] font-medium text-stone-700">Your note</span>
+   <span className="text-[11px] text-stone-400">{noteSaved ? "Saved" : "Only you can see this"}</span>
+  </div>
+  <textarea
+   value={note}
+   onChange={(e) => setNote(e.target.value)}
+   onBlur={saveNote}
+   rows={2}
+   placeholder="Buyer asked to hold until the 12th · sent a replacement dust bag…"
+   className="w-full resize-y rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none placeholder:text-stone-400 focus:border-stone-400"
+  />
+ </div>
  {isPickup ? (
  // Collected in store: no label, no tracking, nothing to post. Just hand it over.
  <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 p-4">

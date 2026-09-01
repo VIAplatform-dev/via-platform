@@ -5,7 +5,7 @@ import { getSellerById } from "@/app/lib/db/sellers";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
 import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
-import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderPickup } from "@/app/lib/db/orders";
+import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderPickup, setOrderTax } from "@/app/lib/db/orders";
 import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { logError } from "@/app/lib/error-log";
@@ -44,7 +44,7 @@ type ShipAddr = { line1?: string | null; line2?: string | null; city?: string | 
 // flow (Buy-now / hosted) and the Payment Element flow (embedded card + wallets).
 // Idempotent on the PaymentIntent, so a session payment that also fires
 // payment_intent.succeeded never records twice.
-async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null; delivery?: { method: "ship" | "pickup"; collectFrom: string | null; instructions: string | null } }) {
+async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | null; buyerEmail: string | null; buyerName: string | null; buyerPhone: string | null; ship: ShipAddr; shippingPaidCents: number; currency: string; salePriceCents?: number | null; offerToken?: string | null; delivery?: { method: "ship" | "pickup"; collectFrom: string | null; instructions: string | null }; taxCents?: number | null; taxJurisdiction?: string | null }) {
  // How this order leaves the shop. Read off OUR OWN metadata (written by cart-intent after
  // resolveDelivery checked the store's settings), so a shopper never stamps her own order.
  const delivery = o.delivery ?? { method: "ship" as const, collectFrom: null, instructions: null };
@@ -67,6 +67,9 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  currency: (sold.currency || o.currency || "usd").toUpperCase(),
  stripePaymentIntent: o.pi,
  });
+ // Tax sits on the SESSION, not the line item, so it lands whole on the first
+ // order of a multi-item checkout — the same rule shipping already follows.
+ if (o.taxCents != null && idx === 0) await setOrderTax(order.id, o.taxCents, o.taxJurisdiction ?? null).catch(() => {});
  // Collected in store: record it so the Orders view says "collection" and never offers a label.
  if (delivery.method === "pickup") await setOrderPickup(String(order.id), { collectFrom: delivery.collectFrom, instructions: delivery.instructions }).catch((e) => logError("order-pickup-stamp", e, { context: { orderId: order.id } }));
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
@@ -197,7 +200,11 @@ export async function POST(request: NextRequest) {
  }
  const buyerEmail = cust?.email ?? null;
  const shippingPaidCents = md.shipping_paid_cents ? parseInt(md.shipping_paid_cents, 10) || 0 : 0;
- await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null, delivery: deliveryFromMetadata(md) });
+ await fulfill({ itemIds, sellerId, pi, buyerEmail, buyerName, buyerPhone, ship, shippingPaidCents, currency: s.currency || "usd", salePriceCents: md.sale_price_cents ? parseInt(md.sale_price_cents, 10) || null : null, offerToken: md.offer_token || null, delivery: deliveryFromMetadata(md),
+  // Stripe Tax's own total for this session, when the store has it switched on.
+  taxCents: typeof s.total_details?.amount_tax === "number" ? s.total_details.amount_tax : null,
+  taxJurisdiction: md.tax_jurisdiction || null,
+ });
  // Per-store discount redemption (idempotent per store+code+order via the unique index).
  if (md.discount_code && md.discount_store) {
  recordDiscountRedemption({

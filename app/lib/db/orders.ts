@@ -478,3 +478,43 @@ export async function getOrdersByPaymentIntent(pi: string): Promise<{ id: string
  const rows = await db.select({ id: orders.id, itemId: orders.itemId, sellerId: orders.sellerId, status: orders.status }).from(orders).where(eq(orders.stripePaymentIntent, pi));
  return rows.map((r) => ({ id: String(r.id), itemId: String(r.itemId), sellerId: String(r.sellerId), status: String(r.status) }));
 }
+
+/**
+ * The seller's private note on an order. Self-heals the column so a deploy works
+ * before db:push runs, matching how items handles its newer fields.
+ */
+let noteColEnsured = false;
+export async function setOrderNote(orderId: string, note: string | null): Promise<void> {
+ const db = getDb();
+ if (!noteColEnsured) {
+  try {
+   await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS internal_note text`);
+   noteColEnsured = true;
+  } catch { /* db:push covers it */ }
+ }
+ const clean = note && note.trim() ? note.trim().slice(0, 2000) : null;
+ await db.update(orders).set({ internalNote: clean }).where(eq(orders.id, orderId));
+}
+
+/**
+ * Record the sales tax on an order after Stripe has settled it. Kept separate
+ * from createPaidOrder because the tax total lives on the Checkout Session, which
+ * the webhook reads, while the order is built per line item.
+ *
+ * Self-heals the columns so a deploy works before db:push, matching how the rest
+ * of this table handles newer fields.
+ */
+let taxColsEnsured = false;
+export async function setOrderTax(orderId: string, taxCents: number | null, jurisdiction: string | null): Promise<void> {
+ const db = getDb();
+ if (!taxColsEnsured) {
+  try {
+   await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_cents integer`);
+   await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_jurisdiction text`);
+   taxColsEnsured = true;
+  } catch { /* db:push covers it */ }
+ }
+ await db.update(orders)
+  .set({ taxCents: taxCents == null ? null : Math.round(taxCents), taxJurisdiction: jurisdiction })
+  .where(eq(orders.id, orderId));
+}

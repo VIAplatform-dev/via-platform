@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { snapshotAsDraft } from "@/app/lib/storefront-versions-db";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { listCapturePaths, getCaptureOrigin, deleteCaptures } from "@/app/lib/site-capture-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
@@ -171,6 +172,12 @@ export async function POST(request: NextRequest) {
     note: "An import is already running for this store.",
    });
   }
+
+  // Keep whatever storefront she has before this import replaces it. An import deletes the
+  // captured pages and can overwrite the built design, and until storefront versions existed that
+  // was final — re-importing a site, or importing over a design she'd built here, destroyed the
+  // old one with no way back. Best-effort: a snapshot that fails must not block the import.
+  await snapshotAsDraft(slug).catch(() => null); /* allow-swallow: keeping a copy is a courtesy — if it fails the seller still gets the import she asked for, and the failure is hers to see in the drafts list, not a reason to refuse the import */
 
   const job = await createJob(slug, url);
   return await execute(slug, job, replaceBlocks);
