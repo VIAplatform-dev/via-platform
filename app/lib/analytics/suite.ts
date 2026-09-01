@@ -89,6 +89,27 @@ export class StoreNotFoundError extends Error {
  }
 }
 
+/**
+ * A valid, all-zero suite for a store with no seller row yet.
+ *
+ * Every metric getter keys off seller.id, so a store that has signed up but never written anything
+ * — no import, no listing, no market session — has nothing to key off. That is not an error, it is
+ * the first five minutes of every store's life, and answering 404 turned the seller's first look at
+ * Analytics into "Analytics unavailable. Try refreshing." on a page where refreshing cannot help.
+ *
+ * The period still resolves (it needs a clock, not a seller), and every section is simply absent —
+ * which the dashboard already reads as zero, because it optional-chains all of them.
+ */
+export function emptyAnalyticsSuite(slug: string, input: PeriodInput & { sections?: Section[] } = {}): AnalyticsSuite {
+ const period = resolvePeriod(input);
+ return {
+  store: { slug, name: slug },
+  period: summarise(period),
+  sections: input.sections?.length ? input.sections : [...SECTIONS],
+  generatedAt: new Date().toISOString(),
+ };
+}
+
 export async function getAnalyticsSuite(slug: string, input: PeriodInput & { sections?: Section[] } = {}): Promise<AnalyticsSuite> {
  const seller = await resolveSeller(slug);
  if (!seller) throw new StoreNotFoundError(slug);

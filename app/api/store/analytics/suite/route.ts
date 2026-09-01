@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
-import { getAnalyticsSuite, parseSections, StoreNotFoundError } from "@/app/lib/analytics/suite";
+import { getAnalyticsSuite, emptyAnalyticsSuite, parseSections, StoreNotFoundError } from "@/app/lib/analytics/suite";
 
 export const dynamic = "force-dynamic";
 
@@ -30,9 +30,18 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ ok: true, ...suite });
  } catch (e) {
   if (e instanceof StoreNotFoundError) {
-   // The slug authenticated but has no seller row — the synthetic admin workspace,
-   // or a store mid-signup. An empty suite is the honest answer, not a 500.
-   return NextResponse.json({ error: "No store data yet", slug }, { status: 404 });
+   // The slug authenticated but has no seller row — a store that has signed up and not yet
+   // written anything. An empty suite is the honest answer, and it has to be an ACTUAL suite:
+   // answering 404 with an error object left the dashboard with nothing to render, so a brand-new
+   // seller's first look at Analytics said "Analytics unavailable. Try refreshing." on a page
+   // where refreshing could never help. She gets the real page, at zero, instead.
+   return NextResponse.json({
+    ok: true,
+    ...emptyAnalyticsSuite(slug, {
+     period: q.get("period"), from: q.get("from"), to: q.get("to"), tz: q.get("tz"),
+     sections: parseSections(q.get("sections")),
+    }),
+   });
   }
   return NextResponse.json({ error: e instanceof Error ? e.message : "Failed" }, { status: 500 });
  }

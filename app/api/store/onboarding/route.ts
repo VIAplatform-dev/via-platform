@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { createStoreAccount, generateUniqueSlug, getStoreAccountByOwner } from "@/app/lib/store-accounts-db";
 import { addStoreUser, storeSlugForEmail } from "@/app/lib/store-users-db";
+import { getOrCreateSeller } from "@/app/lib/db/sellers";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,15 @@ export async function POST(request: NextRequest) {
   onboarding: { hasWebsite, websiteUrl, sellsCategory, sellsCategories, sellsChannel },
  });
  await addStoreUser(slug, email, "owner");
+ // And a seller row, now rather than on her first write.
+ //
+ // Everything downstream keys off seller.id — inventory, orders, every analytics metric — and it
+ // was created lazily by whichever write happened first: an import, a market session, a publish.
+ // A store that had signed up and not yet listed anything therefore had no identity to key off, so
+ // her Analytics answered 404 and the page said "Analytics unavailable. Try refreshing." That is a
+ // seller's first look at the screen meant to convince her to stay, on the one day she has no data
+ // and most needs to see what she is going to get.
+ await getOrCreateSeller(slug, name, email).catch(() => null); /* allow-swallow: additive — the store is created either way, and the lazy path still creates this on first write */
 
  // The 30-day trial starts now (store_accounts.created_at); payouts/going-live stay held
  // until they pick a paid tier (store_plans / isEntitled). hasWebsite tells the client
