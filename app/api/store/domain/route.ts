@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
  * Subdomains are covered too, since {handle}.vyaplatform.com is how free store
  * addresses already work.
  */
-const RESERVED_DOMAINS = ["vyaplatform.com", "getvya.ai", "vyasites.test", "vercel.app", "localhost"];
+const RESERVED_DOMAINS = ["vyaplatform.com", "getvya.ai", "vyasites.com", "vyasites.test", "vercel.app", "localhost"];
 
 function isReservedDomain(domain: string): boolean {
  const d = domain.toLowerCase().replace(/^www\./, "");
