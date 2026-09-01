@@ -1,0 +1,34 @@
+# Weekly drift check for every hosted store: repair → rehost → blackout gate → parity → grade.
+# Not nightly on purpose — each run crawls every seller's live store, and two runs in a day on one
+# seller already throttled Shopify into empty collection reads. Needs these repository secrets:
+#   DATABASE_URL, BLOB_READ_WRITE_TOKEN, and whatever .env.local carries for the app to boot
+#   (copy them into a single FLEET_ENV_FILE secret; it is written to .env.local below).
+name: fleet
+on:
+  schedule: [{ cron: "0 9 * * 1" }]   # Mondays 09:00 UTC
+  workflow_dispatch:
+jobs:
+  fleet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: printf '%s\n' "$FLEET_ENV_FILE" > .env.local
+        env: { FLEET_ENV_FILE: "${{ secrets.FLEET_ENV_FILE }}" }
+      # Parity/blackout hit the hosted stores on <slug>.vyasites.test:3348 — the same host trick
+      # used locally, so /etc/hosts gets every slug and the app runs on that port.
+      - run: |
+          STORES=$(node --env-file=.env.local -e "const {neon}=require('@neondatabase/serverless');(async()=>{const sql=neon(process.env.DATABASE_URL||process.env.POSTGRES_URL);console.log((await sql\`SELECT DISTINCT store_slug s FROM site_captures\`).map(r=>r.s+'.vyasites.test').join(' '))})()")
+          echo "127.0.0.1 $STORES" | sudo tee -a /etc/hosts
+      - run: npm run build
+      - run: |
+          (npx next start -p 3348 > .next-start.log 2>&1 &)
+          curl --retry 30 --retry-delay 4 --retry-connrefused -fsS -o /dev/null http://localhost:3348/
+      - run: VERIFY_PORT=3348 scripts/fleet.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: fleet-report, path: ".verify/FLEET-REPORT.md\n.verify/**/health.json\n.verify/**/parity-*.png", retention-days: 30 }
