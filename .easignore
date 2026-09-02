@@ -1,31 +1,25 @@
-# What EAS Build must NOT upload.
+# What EAS Build uploads. This is a WHITELIST, and deliberately so.
 #
-# `mobile/` lives inside the website's repo, and there are no npm workspaces joining them — so when
-# EAS archives the project it walks up to the git root and takes the whole thing. The first attempt
-# uploaded 664 MB, almost none of which the app build can use.
+# `mobile/` sits inside the website's repo with no npm workspaces joining them, so EAS archives from
+# the git root and takes everything. .easignore REPLACES .gitignore rather than adding to it, which
+# means every gitignored directory has to be named here or it lands in the archive.
 #
-# .easignore replaces .gitignore entirely for the archive, so this file has to re-state the things
-# .gitignore already excludes (node_modules, .next) as well as the web-only content.
+# Enumerating what to exclude does not survive contact with a real repo: the first attempt at this
+# listed .next/ and missed .next-os/, and the archive went from 664 MB to 2.1 GB — over the limit —
+# because a 2.5 GB build cache was silently included. Any new cache directory would do it again.
+#
+# So: exclude everything at the root, then re-admit only the app.
 
-node_modules/
-.next/
-.git/
+/*
+!/mobile
 
-# The website's own code and assets. The app talks to it over HTTPS and needs none of it at build
-# time; public/ alone is 391 MB of store and product photography.
-public/
-app/
-components/
-drizzle/
-docs/
-scripts/
-data/
-extension/
-types/
-_to_delete/
-*.patch
+# ...and within the app, the things that are generated, installed, or secret.
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/ios/
+mobile/android/
 
-# Local env and build leftovers
-.env*
-.vercel/
-tsconfig.tsbuildinfo
+# Development-only credentials — see mobile/lib/devAuth.ts. Gitignored already, but .easignore
+# replaces .gitignore for the archive, so leaving this out would upload them to the build server.
+mobile/.env*.local
