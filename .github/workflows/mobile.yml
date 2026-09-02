@@ -1,0 +1,39 @@
+# The mobile app must build from a FRESH CLONE, which is the check that would have caught the bug
+# that started all this: app.json referenced five icons that were never committed, so the copy in
+# the repo could not build and nobody found out until someone tried to pull it.
+#
+# Deliberately not a test run — the app has no tests yet. `expo export` is the real check: it
+# resolves every import, every asset path, and every native module, and fails on anything missing.
+
+name: mobile
+
+on:
+  push:
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+  pull_request:
+    paths: ["mobile/**", ".github/workflows/mobile.yml"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      # `npm ci` so the lockfile is honoured — an install that silently resolves a different tree
+      # than the one committed would make this check meaningless.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Bundle for iOS
+        run: npx expo export --platform ios --output-dir /tmp/export

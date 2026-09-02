@@ -1,0 +1,38 @@
+# Typecheck for the web app. Kept separate from the mobile workflow so a change to one never waits
+# on the other, and so a red build names which half broke.
+#
+# THE UNIT TESTS ARE NOT GATED YET, on purpose. Five suites are currently failing — comps,
+# unbranded-benchmark, storefront-from-brand, and two assertions in storefront-variants — and they
+# were failing before any of this work. Gating on them would make this workflow red on its first
+# run, and a permanently-red CI is worse than none: people stop reading it, and then it cannot tell
+# you when something real breaks.
+#
+# Fix those five, then add:
+#     - name: Unit tests
+#       run: npm test
+# The pure-logic suites behind it (consignment splits, the payout state machine, eBay adaptation)
+# are the ones where being wrong costs somebody money, so they are worth gating on.
+
+name: web
+
+on:
+  push:
+    paths-ignore: ["mobile/**"]
+  pull_request:
+    paths-ignore: ["mobile/**"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
