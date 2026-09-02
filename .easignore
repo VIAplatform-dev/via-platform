@@ -1,0 +1,31 @@
+# What EAS Build must NOT upload.
+#
+# `mobile/` lives inside the website's repo, and there are no npm workspaces joining them — so when
+# EAS archives the project it walks up to the git root and takes the whole thing. The first attempt
+# uploaded 664 MB, almost none of which the app build can use.
+#
+# .easignore replaces .gitignore entirely for the archive, so this file has to re-state the things
+# .gitignore already excludes (node_modules, .next) as well as the web-only content.
+
+node_modules/
+.next/
+.git/
+
+# The website's own code and assets. The app talks to it over HTTPS and needs none of it at build
+# time; public/ alone is 391 MB of store and product photography.
+public/
+app/
+components/
+drizzle/
+docs/
+scripts/
+data/
+extension/
+types/
+_to_delete/
+*.patch
+
+# Local env and build leftovers
+.env*
+.vercel/
+tsconfig.tsbuildinfo

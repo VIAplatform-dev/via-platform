@@ -1,0 +1,12 @@
+# Excluded from the EAS Build archive. The root .easignore handles the website; this covers what is
+# local to the app.
+
+node_modules/
+.expo/
+dist/
+ios/
+android/
+
+# Development-only credentials — see lib/devAuth.ts. Gitignored already, but .easignore replaces
+# .gitignore for the archive, so it has to be named again or it would be uploaded.
+.env*.local
