@@ -19,6 +19,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "//": "VYA's App Store Connect app id. Without it, `eas submit` opens an interactive Apple login to find the app — which cannot complete in a non-interactive shell. EAS already holds the App Store Connect API key, so pinning this makes submission a single unattended command.",
+        "ascAppId": "6785535765"
+      }
+    }
   }
 }
