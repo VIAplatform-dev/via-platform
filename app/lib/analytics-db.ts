@@ -29,6 +29,9 @@ export async function initAnalyticsTables() {
  await sql`CREATE INDEX IF NOT EXISTS idx_product_views_timestamp ON product_views(timestamp)`;
  await sql`ALTER TABLE product_views ADD COLUMN IF NOT EXISTS user_id TEXT`;
  await sql`CREATE INDEX IF NOT EXISTS idx_product_views_user_id ON product_views(user_id) WHERE user_id IS NOT NULL`;
+ // How long the piece was actually on screen. A view is a weak signal on its own — a scroll past
+ // and a two-minute study of the measurements look identical without this.
+ await sql`ALTER TABLE product_views ADD COLUMN IF NOT EXISTS dwell_ms INT`;
 
  await sql`
  CREATE TABLE IF NOT EXISTS clicks (
@@ -414,7 +417,15 @@ export async function getConversionAnalytics(range: string) {
  * Record a product page view. Called fire-and-forget from the product page.
  */
 let productViewsReady = false;
-export async function saveProductView(productId: string, userId?: string | null): Promise<void> {
+/**
+ * Record that a piece was looked at, and for how long.
+ *
+ * `dwellMs` arrives on a SECOND call, when the screen is left — the first call records the view
+ * immediately so a view is never lost if the app is killed. Clamped at 10 minutes: a phone left
+ * unlocked on a product page is not ten minutes of interest, and one such row would otherwise
+ * outweigh a hundred real ones in the ranking.
+ */
+export async function saveProductView(productId: string, userId?: string | null, dwellMs?: number | null): Promise<void> {
  const sql = neon(getDatabaseUrl());
  // Ensure schema once per lambda instance — not 3 DDL statements on every single page view.
  if (!productViewsReady) {
@@ -427,9 +438,28 @@ export async function saveProductView(productId: string, userId?: string | null)
  `;
  await sql`CREATE INDEX IF NOT EXISTS idx_product_views_product_id ON product_views(product_id)`;
  await sql`ALTER TABLE product_views ADD COLUMN IF NOT EXISTS user_id TEXT`;
+ await sql`ALTER TABLE product_views ADD COLUMN IF NOT EXISTS dwell_ms INT`;
  productViewsReady = true;
  }
- await sql`INSERT INTO product_views (product_id, user_id) VALUES (${productId}, ${userId ?? null})`;
+ const dwell = Number.isFinite(dwellMs) && (dwellMs as number) > 0
+  ? Math.min(Math.round(dwellMs as number), 600_000)
+  : null;
+
+ // A dwell update attaches to the most recent view of this piece by this viewer rather than
+ // inserting a second row — otherwise every product page would count as two views.
+ if (dwell != null) {
+ const updated = (await sql`
+  UPDATE product_views SET dwell_ms = ${dwell}
+  WHERE id = (
+   SELECT id FROM product_views
+   WHERE product_id = ${productId}
+    AND (user_id IS NOT DISTINCT FROM ${userId ?? null})
+    AND timestamp >= NOW() - INTERVAL '30 minutes'
+   ORDER BY timestamp DESC LIMIT 1
+  ) RETURNING id`) as unknown[];
+ if (updated.length) return;
+ }
+ await sql`INSERT INTO product_views (product_id, user_id, dwell_ms) VALUES (${productId}, ${userId ?? null}, ${dwell})`;
 }
 
 /**
