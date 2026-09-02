@@ -33,7 +33,19 @@
       "expo-router"
     ],
     "extra": {
-      "apiBaseUrl": "https://vyaplatform.com"
-    }
+      "apiBaseUrl": "https://vyaplatform.com",
+      "router": {},
+      "eas": {
+        "projectId": "18c737a7-630a-43d4-90c8-b0f60b2277da"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 10000
+    },
+    "owner": "vyaplatform"
   }
 }

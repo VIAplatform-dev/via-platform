@@ -1,88 +1,92 @@
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ScrollView, useWindowDimensions, View } from "react-native";
+import { Redirect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
-import { colors } from "../../lib/theme";
-import { ProductCard } from "../../components/ProductCard";
-import type { SearchResponse } from "../../lib/types";
+import { useAuth } from "../../lib/auth";
+import { useFavorites } from "../../lib/useFavorites";
+import { loadSizes } from "../../lib/sizes";
+import AppHeader from "../../components/AppHeader";
+import CategoryStrip from "../../components/CategoryStrip";
+import SectionHeading from "../../components/SectionHeading";
+import CollectionRail, { type CollectionCard } from "../../components/CollectionRail";
+import ProductCard from "../../components/ProductCard";
+import type { Product } from "../../lib/types";
+import { colors, spacing } from "../../lib/theme";
+
+// Home is a magazine front page, not a feed: several named sections, each a different shape.
+// New Arrivals is a two-up row (not a full grid) so Collection and Curated For You are reachable
+// without endless scrolling — the sections are the navigation.
 
 export default function HomeScreen() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["home-feed"],
-    queryFn: () => apiGet<SearchResponse>("/api/search?q="),
+  const { user, loading } = useAuth();
+  const { width } = useWindowDimensions();
+  const { favorites, isFavorited, toggleFavorite } = useFavorites();
+  const [sizes, setSizes] = useState<string[]>([]);
+  useEffect(() => { loadSizes().then(setSizes); }, []);
+  const cardWidth = (width - 12 * 2 - 2) / 2;
+
+  const arrivals = useQuery({
+    queryKey: ["home-arrivals"],
+    queryFn: () => apiGet<{ products: Product[] }>("/api/public/new-arrivals?limit=4"),
+    enabled: Boolean(user),
+  });
+  const collections = useQuery({
+    queryKey: ["collections"],
+    queryFn: () => apiGet<{ collections: CollectionCard[] }>("/api/public/collections"),
+    enabled: Boolean(user),
+  });
+  // The endpoint ranks on clicks, favourites and views server-side, but also takes these as query
+  // signals so the feed is personal on the FIRST session — before any view history exists.
+  const favIds = favorites.map((f) => f.id).slice(0, 60).join(",");
+  const forYou = useQuery({
+    queryKey: ["for-you", favIds, sizes.join(",")],
+    queryFn: () => {
+      const p = new URLSearchParams({ limit: "40" });
+      if (favIds) p.set("favs", favIds);
+      if (sizes.length) p.set("sizes", sizes.join(","));
+      return apiGet<{ products: Product[]; personalized: boolean }>(`/api/public/for-you?${p.toString()}`);
+    },
+    enabled: Boolean(user),
   });
 
-  if (isLoading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.text} />
+  const row = useCallback(
+    (products: Product[]) => (
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2, paddingHorizontal: 12 }}>
+        {products.map((p) => (
+          <ProductCard key={p.id} product={p} width={cardWidth} favorited={isFavorited(p)} onToggleFavorite={toggleFavorite} />
+        ))}
       </View>
-    );
-  }
+    ),
+    [cardWidth, isFavorited, toggleFavorite],
+  );
 
-  if (error || !data) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.error}>Couldn&apos;t load products. Pull down to retry.</Text>
-      </View>
-    );
-  }
+  if (loading) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (!user) return <Redirect href="/auth/login" />;
 
   return (
-    <FlatList
-      data={data.products}
-      numColumns={2}
-      contentContainerStyle={styles.list}
-      columnWrapperStyle={styles.row}
-      keyExtractor={(item) => String(item.id)}
-      renderItem={({ item }) => <ProductCard product={item} />}
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.heroText}>
-            Access the world&apos;s best vintage.
-          </Text>
-          <Text style={styles.subText}>
-            Curated from independent stores around the world.
-          </Text>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <AppHeader wordmark />
+      <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+        <CategoryStrip />
+
+        <View style={{ marginTop: spacing.lg }}>
+          <SectionHeading eyebrow="Just in" title="New Arrivals" seeAllHref="/(tabs)/new-arrivals" />
+          {row(arrivals.data?.products ?? [])}
         </View>
-      }
-    />
+
+        {(collections.data?.collections ?? []).length ? (
+          <View style={{ marginTop: spacing.lg }}>
+            <SectionHeading eyebrow="Shop by" title="Collection" />
+            <CollectionRail collections={collections.data!.collections} />
+          </View>
+        ) : null}
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionHeading eyebrow="Curated for" title="You" />
+          {row(forYou.data?.products ?? [])}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.bg,
-  },
-  list: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 32,
-    backgroundColor: colors.bg,
-  },
-  row: {
-    justifyContent: "space-between",
-  },
-  header: {
-    paddingVertical: 20,
-    paddingHorizontal: 4,
-  },
-  heroText: {
-    fontFamily: "Georgia",
-    fontSize: 28,
-    lineHeight: 34,
-    color: colors.text,
-    marginBottom: 8,
-  },
-  subText: {
-    fontSize: 13,
-    color: colors.textMuted,
-    lineHeight: 18,
-  },
-  error: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-});

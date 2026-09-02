@@ -1,68 +1,49 @@
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { colors } from "../../lib/theme";
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  return (
-    <Text
-      style={{
-        fontSize: 10,
-        letterSpacing: 1.5,
-        color: focused ? colors.text : colors.textDim,
-        fontWeight: focused ? "600" : "400",
-        textTransform: "uppercase",
-      }}
-    >
-      {label}
-    </Text>
-  );
+// Five icons, no labels.
+//
+// The bag is NOT here — it lives in the header, which is what makes five possible. Two of these
+// tabs are really two screens each (Obsessions holds Sold Out and Searches; Community holds
+// Messages), split by the underlined row inside them rather than by more tabs.
+//
+// Outline icons throughout; the active one is the same glyph at full strength against the muted
+// rest. No labels, because with five familiar shapes they only add clutter — and because a label
+// long enough to say "Obsessions" truncates to "Obsessi…" at this width.
+
+function icon(name: React.ComponentProps<typeof Feather>["name"]) {
+  return ({ color }: { color: string }) => <Feather name={name} size={24} color={color} />;
 }
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: colors.bg },
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: colors.bg,
           borderTopColor: colors.border,
-          height: 84,
-          paddingTop: 8,
+          borderTopWidth: 1,
+          height: 88,
+          paddingTop: 10,
         },
-        tabBarShowLabel: false,
-        headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontFamily: "Georgia", fontWeight: "400", fontSize: 22 },
-        headerShadowVisible: false,
+        tabBarActiveTintColor: colors.text,
+        tabBarInactiveTintColor: colors.textDim,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "VYA",
-          tabBarIcon: ({ focused }) => <TabIcon label="Shop" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="browse"
-        options={{
-          title: "Browse",
-          tabBarIcon: ({ focused }) => <TabIcon label="Browse" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="favorites"
-        options={{
-          title: "Favorites",
-          tabBarIcon: ({ focused }) => <TabIcon label="Saved" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: "Account",
-          tabBarIcon: ({ focused }) => <TabIcon label="Account" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ tabBarIcon: icon("home") }} />
+      <Tabs.Screen name="shop" options={{ tabBarIcon: icon("grid") }} />
+      <Tabs.Screen name="obsessions" options={{ tabBarIcon: icon("heart") }} />
+      <Tabs.Screen name="community" options={{ tabBarIcon: icon("message-circle") }} />
+      <Tabs.Screen name="account" options={{ tabBarIcon: icon("user") }} />
+
+      {/* Reached from Home's "See all" and from Browse, not from the bar. */}
+      <Tabs.Screen name="new-arrivals" options={{ href: null }} />
+      <Tabs.Screen name="browse" options={{ href: null }} />
+      <Tabs.Screen name="cart" options={{ href: null }} />
     </Tabs>
   );
 }
