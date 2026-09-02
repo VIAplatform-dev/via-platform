@@ -7,6 +7,10 @@ import { setStorePlan } from "@/app/lib/store-plans-db";
 import { type TierId, type Interval, tierForPriceId } from "@/app/lib/plans";
 import { neon } from "@neondatabase/serverless";
 import { timingSafeEqualStr } from "@/app/lib/safe-compare";
+import { saveMandateFromSetupIntent } from "@/app/lib/store-debit";
+import { settlePayoutByIntent, getPayoutByIntent, getConsignor } from "@/app/lib/consignment-db";
+import { payoutStatusForIntent } from "@/app/lib/consignment-payout-core";
+import { stripePost } from "@/app/lib/stripe";
 
 function unixToIso(v: unknown): string | null {
  const n = typeof v === "number" ? v : typeof v === "string" ? parseInt(v, 10) : NaN;
@@ -77,6 +81,20 @@ export async function POST(request: NextRequest) {
  switch (event.type) {
  case "checkout.session.completed": {
  const session = event.data.object;
+
+ // A store finished the hosted bank-connect flow, authorising VYA to debit it for consignor
+ // payouts on sales that settled off VYA. Nothing was saved when we handed out the link — this
+ // is the only place the mandate becomes real. See app/lib/store-debit.ts.
+ if (session.mode === "setup" && (session.metadata as Record<string, string>)?.type === "store_bank_mandate") {
+ const slug = (session.metadata as Record<string, string>)?.store_slug;
+ const si = session.setup_intent as string | null;
+ if (slug && si) {
+ await saveMandateFromSetupIntent(slug, si).catch((err) =>
+ console.error("[stripe-webhook] store_bank_mandate save error:", err),
+ );
+ }
+ break;
+ }
 
  // Handle store VYA Pro (data layer) subscription
  if (session.mode === "subscription" && (session.metadata as Record<string, string>)?.type === "store_pro") {
@@ -232,6 +250,53 @@ export async function POST(request: NextRequest) {
  await setStorePlan(slug, { status: "canceled" }).catch((err) =>
  console.error("[stripe-webhook] store_subscription cancel error:", err),
  );
+ }
+ break;
+ }
+
+ // ── ACH debits that fund consignor payouts ────────────────────────────────────────────────
+ //
+ // The consignor is paid HERE, days after the store pressed Pay, and only because the money has
+ // actually arrived. The other half of this — a debit that bounces — must release the hold that
+ // recordPayout put on her balance, or she is owed money that no longer appears anywhere.
+ case "payment_intent.processing":
+ case "payment_intent.succeeded":
+ case "payment_intent.payment_failed":
+ case "payment_intent.canceled": {
+ const pi = event.data.object;
+ if ((pi.metadata as Record<string, string>)?.type !== "consignment_debit") break;
+ const intentId = pi.id as string;
+
+ // payment_failed arrives with the intent walked back to requires_payment_method; the others
+ // carry their own status. Anything that maps to null is a step on the way, not an outcome.
+ const next = payoutStatusForIntent(
+ event.type === "payment_intent.payment_failed" ? "requires_payment_method" : (pi.status as string),
+ );
+ if (!next) break;
+
+ if (next === "paid") {
+ // Send the money BEFORE recording it paid. A transfer that fails then leaves the row in
+ // awaiting_funds and Stripe's redelivery retries it; the idempotency key means the retry
+ // returns the same transfer rather than paying her twice.
+ const payout = await getPayoutByIntent(intentId);
+ if (!payout || payout.status !== "awaiting_funds") break;
+ const consignor = await getConsignor(payout.consignorId);
+ if (!consignor?.stripeAccountId) {
+ console.error("[stripe-webhook] cleared debit for consignor with no connected account:", payout.id);
+ break;
+ }
+ const transfer = await stripePost(
+ "transfers",
+ { amount: payout.amountCents, currency: "usd", destination: consignor.stripeAccountId },
+ undefined,
+ `consignor-ach-${payout.id}`,
+ );
+ await settlePayoutByIntent(intentId, "paid", { stripeTransferId: transfer.id as string });
+ console.log("[stripe-webhook] consignment ACH cleared, paid:", payout.id, transfer.id);
+ } else {
+ // awaiting_funds is usually a no-op (the row was created in that state). failed/canceled
+ // release the hold — settlePayoutByIntent writes the reversing ledger entry.
+ await settlePayoutByIntent(intentId, next);
  }
  break;
  }

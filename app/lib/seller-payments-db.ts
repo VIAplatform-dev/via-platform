@@ -48,6 +48,16 @@ function ensureTable(): Promise<void> {
  // 'test' or 'live' — a connected account id looks identical in both, so the only way to know
  // which world it belongs to is to record it when we save it. See stripe-mode.ts.
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS stripe_mode TEXT`;
+ // The store's authorisation for VYA to DEBIT its bank (ACH), used to fund consignor payouts for
+ // sales that settled off VYA. This is the opposite direction to everything else in this table:
+ // stripe_account_id is where money goes TO the store, these columns are where it comes FROM.
+ // The customer and payment method live on VYA's own platform account, not the store's connected
+ // account — VYA is the merchant of record for a debit it initiates. See store-debit.ts.
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_customer_id TEXT`;
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_payment_method_id TEXT`;
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_bank_last4 TEXT`;
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_bank_name TEXT`;
+ await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_mandate_at TIMESTAMPTZ`;
  })().catch((e) => {
  tableReady = null;
  throw e;
@@ -129,4 +139,85 @@ export async function updateSellerStatus(
  details_submitted = ${s.detailsSubmitted}, updated_at = NOW()
  WHERE store_slug = ${storeSlug}
  `;
+}
+
+// ── ACH debit mandate ─────────────────────────────────────────────────────────
+//
+// A consigned piece sells on eBay. eBay pays the STORE. To pay the consignor, VYA pulls the money
+// out of the store's bank and forwards it — which it may only do because the store signed a mandate
+// authorising exactly that, collected once through Stripe's hosted bank-connect flow.
+//
+// The mandate is a saved us_bank_account PaymentMethod on a Customer that belongs to VYA's PLATFORM
+// account. It is deliberately not on the store's connected account: the store is not charging
+// itself, VYA is charging the store.
+
+export type StoreDebitMandate = {
+ customerId: string | null;
+ paymentMethodId: string | null;
+ bankLast4: string | null;
+ bankName: string | null;
+ mandateAt: string | null;
+};
+
+/** True when the store has authorised debits AND we still hold a usable payment method. */
+export function debitReady(m: StoreDebitMandate | null | undefined): boolean {
+ return Boolean(m?.customerId && m?.paymentMethodId && m?.mandateAt);
+}
+
+export async function getStoreDebitMandate(storeSlug: string): Promise<StoreDebitMandate | null> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ const rows = await sql`
+ SELECT debit_customer_id, debit_payment_method_id, debit_bank_last4, debit_bank_name, debit_mandate_at
+ FROM seller_payments WHERE store_slug = ${storeSlug}`;
+ if (!rows.length) return null;
+ const r = rows[0] as any;
+ return {
+ customerId: r.debit_customer_id ?? null,
+ paymentMethodId: r.debit_payment_method_id ?? null,
+ bankLast4: r.debit_bank_last4 ?? null,
+ bankName: r.debit_bank_name ?? null,
+ mandateAt: r.debit_mandate_at ? String(r.debit_mandate_at) : null,
+ };
+}
+
+/** The platform Customer for a store, created once and reused for every later debit. */
+export async function saveDebitCustomer(storeSlug: string, customerId: string): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`
+ INSERT INTO seller_payments (store_slug, debit_customer_id, updated_at)
+ VALUES (${storeSlug}, ${customerId}, NOW())
+ ON CONFLICT (store_slug) DO UPDATE SET debit_customer_id = EXCLUDED.debit_customer_id, updated_at = NOW()
+ `;
+}
+
+/** Record the signed mandate. `mandateAt` is what makes debitReady true, so it is set here only. */
+export async function saveDebitMandate(
+ storeSlug: string,
+ m: { customerId: string; paymentMethodId: string; bankLast4?: string | null; bankName?: string | null },
+): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`
+ INSERT INTO seller_payments (store_slug, debit_customer_id, debit_payment_method_id, debit_bank_last4, debit_bank_name, debit_mandate_at, updated_at)
+ VALUES (${storeSlug}, ${m.customerId}, ${m.paymentMethodId}, ${m.bankLast4 ?? null}, ${m.bankName ?? null}, NOW(), NOW())
+ ON CONFLICT (store_slug) DO UPDATE SET
+ debit_customer_id = EXCLUDED.debit_customer_id,
+ debit_payment_method_id = EXCLUDED.debit_payment_method_id,
+ debit_bank_last4 = EXCLUDED.debit_bank_last4,
+ debit_bank_name = EXCLUDED.debit_bank_name,
+ debit_mandate_at = NOW(),
+ updated_at = NOW()
+ `;
+}
+
+/** Revoke the mandate. The Customer is kept so a reconnect doesn't orphan past debits. */
+export async function clearDebitMandate(storeSlug: string): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`
+ UPDATE seller_payments
+ SET debit_payment_method_id = NULL, debit_bank_last4 = NULL, debit_bank_name = NULL, debit_mandate_at = NULL, updated_at = NOW()
+ WHERE store_slug = ${storeSlug}`;
 }
