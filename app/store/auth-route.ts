@@ -7,11 +7,12 @@
 // back through onboarding, and why "sign in" still reaches the wizard for someone who created an
 // account but never finished setting up.
 
+export const STORE_ONBOARDING = "/admin/onboarding";
+
 export type StoreWhoAmI = { admin?: boolean; slug?: string; needsOnboarding?: boolean; dev?: boolean };
 
 export const STORE_LOGIN = "/store/login";
 export const STORE_SIGNUP = "/store/signup";
-export const STORE_ONBOARDING = "/admin/onboarding";
 export const STORE_WORKSPACE = "/admin/home";
 
 /**
@@ -24,6 +25,11 @@ export const STORE_WORKSPACE = "/admin/home";
 export function safeNext(next: string | null | undefined): string | null {
  const v = (next || "").trim();
  if (!v.startsWith("/") || v.startsWith("//")) return null;
+ // Onboarding is a ROUTER, not a destination: it asks whoami and sends you wherever you belong.
+ // Honouring it as a `next` can only fight that decision — and did, as an infinite loop in
+ // production. Onboarding bounced the owner here, this returned her there, and round it went.
+ // Anyone who genuinely needs onboarding is sent there by destinationAfterAuth anyway.
+ if (v === STORE_ONBOARDING || v.startsWith(`${STORE_ONBOARDING}/`) || v.startsWith(`${STORE_ONBOARDING}?`)) return null;
  return v;
 }
 

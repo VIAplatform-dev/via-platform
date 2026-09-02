@@ -54,13 +54,16 @@ export default function OnboardingWizard() {
   (async () => {
    const me = await fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).catch(() => null);
    if (!active) return;
-   // `admin` is the VYA owner cookie, which is not a store identity — she needs a seller session.
-   if (!me || me.admin === true || (!me.needsOnboarding && !me.slug)) {
+   // Nobody signed in at all → the seller sign-in.
+   if (!me || (!me.needsOnboarding && !me.slug && me.admin !== true)) {
     window.location.href = "/store/login?next=%2Fadmin%2Fonboarding";
     return;
    }
-   // Already has a store: nothing to onboard, send her to the workspace.
-   if (me.slug) { window.location.href = "/admin/home"; return; }
+   // The OWNER is not signed out — she is signed in as VYA, and already has a workspace. Sending
+   // her to the seller sign-in was an infinite loop: this page bounced her to /store/login, which
+   // asked whoami, got a perfectly valid identity back, honoured ?next and returned her here.
+   // Onboarding builds a SELLER's store; the owner's destination is her workspace.
+   if (me.admin === true || me.slug) { window.location.href = "/admin/home"; return; }
    setChecking(false);
   })();
   return () => { active = false; };

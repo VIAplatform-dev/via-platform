@@ -103,3 +103,22 @@ test("loginHref carries the destination and swaps between sign-in and sign-up", 
  assert.equal(loginHref(null), "/store/login");
  assert.equal(loginHref("https://evil.example"), "/store/login");
 });
+
+test("a `next` pointing at onboarding is refused — it is a router, not a destination", () => {
+ // This was an infinite loop in production: /admin/onboarding bounced the owner to /store/login,
+ // which honoured ?next=/admin/onboarding and sent her straight back. Anyone who genuinely needs
+ // onboarding is routed there by destinationAfterAuth itself, so the parameter is never needed.
+ assert.equal(safeNext("/admin/onboarding"), null);
+ assert.equal(safeNext("/admin/onboarding/build"), null);
+ assert.equal(safeNext("/admin/onboarding?from=x"), null);
+ assert.equal(loginHref("/admin/onboarding"), "/store/login");
+ // Everything else still travels.
+ assert.equal(safeNext("/admin/orders"), "/admin/orders");
+ assert.equal(safeNext("/admin/onboarding-notes"), "/admin/onboarding-notes");
+});
+
+test("a seller who needs onboarding still gets there, without the parameter", async () => {
+ const s = stubWhoAmI([{ status: 200, body: { admin: false, needsOnboarding: true } }]);
+ assert.equal(await destinationAfterAuth("/admin/orders"), "/admin/onboarding");
+ s.restore();
+});
