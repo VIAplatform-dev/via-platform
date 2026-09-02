@@ -8,7 +8,7 @@ import type { SearchResponse } from "../../lib/types";
 export default function HomeScreen() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["home-feed"],
-    queryFn: () => apiGet<SearchResponse>("/api/search?q="),
+    queryFn: () => apiGet<SearchResponse>("/api/mobile/feed"),
   });
 
   if (isLoading) {

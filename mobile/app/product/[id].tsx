@@ -39,7 +39,7 @@ export default function ProductScreen() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["product", id],
-    queryFn: () => apiGet<ProductDetail>(`/api/products/${id}`),
+    queryFn: () => apiGet<ProductDetail>(`/api/mobile/products/${id}`),
     enabled: !!id,
   });
 

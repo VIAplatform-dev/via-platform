@@ -19,7 +19,7 @@ export default function BrowseScreen() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["browse", debounced],
-    queryFn: () => apiGet<SearchResponse>(`/api/search?q=${encodeURIComponent(debounced)}`),
+    queryFn: () => apiGet<SearchResponse>(`/api/mobile/search?q=${encodeURIComponent(debounced)}`),
   });
 
   return (

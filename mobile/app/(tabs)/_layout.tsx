@@ -2,21 +2,31 @@ import { Tabs } from "expo-router";
 import { Text } from "react-native";
 import { colors } from "../../lib/theme";
 
+// Rendered through tabBarIcon rather than tabBarLabel so the type can stay
+// letter-spaced uppercase. The icon slot is sized for a glyph, not a word, so it
+// has to be told explicitly not to wrap — without this, "Account" breaks as
+// "ACC / OUNT" and "Shop" as "SHO / P".
 function TabIcon({ label, focused }: { label: string; focused: boolean }) {
   return (
     <Text
+      numberOfLines={1}
       style={{
         fontSize: 10,
         letterSpacing: 1.5,
         color: focused ? colors.text : colors.textDim,
         fontWeight: focused ? "600" : "400",
         textTransform: "uppercase",
+        width: TAB_LABEL_WIDTH,
+        textAlign: "center",
       }}
     >
       {label}
     </Text>
   );
 }
+
+// Wide enough for "ACCOUNT" at 10pt with 1.5 tracking, which is the longest label.
+const TAB_LABEL_WIDTH = 76;
 
 export default function TabsLayout() {
   return (
