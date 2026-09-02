@@ -17,7 +17,9 @@ export async function GET(request: Request) {
  const collections = COLLECTIONS
  .map((col) => {
   const colPicks = picks[col.slug] ?? [];
-  const coverImage = colPicks[0]?.product?.image ?? null;
+  // The collection's own editorial art where it has some, otherwise its first piece. A commissioned
+  // cover says what a collection IS; a product photo only says what happens to be first in it.
+  const coverImage = (col as { image?: string }).image ?? colPicks[0]?.product?.image ?? null;
   return {
   slug: col.slug,
   name: col.name,

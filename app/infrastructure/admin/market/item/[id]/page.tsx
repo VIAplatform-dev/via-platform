@@ -190,9 +190,9 @@ function ItemInner() {
  {cart.length > 0 && <BigButton variant="secondary" onClick={() => router.push(href(`${B}/item/${cart[0].itemId}`))}>Go to basket ({cart.length})</BigButton>}
  </>
  ) : (<>
- <BigButton onClick={() => start("qr")} disabled={!cart.length || totals.saleCents <= 0 || busy !== null || editing !== null} className="min-h-[64px] text-[17px]">{busy === "card" ? "Starting…" : cart.length > 1 ? `Checkout ${cart.length} items · ${money(totals.saleCents)}` : "Checkout in person"}</BigButton>
+ <BigButton onClick={() => start("qr")} disabled={!cart.length || totals.saleCents <= 0 || busy !== null || editing !== null} className="min-h-[64px] text-[17px]">{busy === "card" ? "Starting…" : cart.length > 1 ? `Card · ${cart.length} items · ${money(totals.saleCents)}` : "Card"}</BigButton>
  <div className="grid grid-cols-2 gap-2">
- <BigButton variant="secondary" onClick={() => start("cash")} disabled={!cart.length || totals.saleCents <= 0 || busy !== null || editing !== null}>{busy === "cash" ? "…" : "Paid in cash"}</BigButton>
+ <BigButton variant="secondary" onClick={() => start("cash")} disabled={!cart.length || totals.saleCents <= 0 || busy !== null || editing !== null}>{busy === "cash" ? "…" : "Cash"}</BigButton>
  <BigButton variant="ghost" onClick={() => { clearCart(); setCart([]); router.push(href(`${B}/find`)); }}>{cart.length > 1 ? "Clear basket" : "Not this item"}</BigButton>
  </div>
  </>)}

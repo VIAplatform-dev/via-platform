@@ -203,6 +203,10 @@
     {
       "path": "/api/cron/domain-renewals",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/embed-item-index",
+      "schedule": "0 * * * *"
     }
   ]
 }

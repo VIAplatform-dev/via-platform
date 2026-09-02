@@ -17,14 +17,14 @@ import {
 /** POST /api/track — record a product page view (fire-and-forget from client) */
 export async function POST(request: NextRequest) {
  try {
- const { productId } = await request.json();
+ const { productId, dwellMs } = await request.json();
  if (!productId || typeof productId !== "string") {
  return NextResponse.json({ ok: false }, { status: 400 });
  }
  const session = await auth().catch(() => null);
  // Web resolves the user from the session; the mobile app sends a Bearer JWT.
  const userId = session?.user?.id ?? getMobileUserId(request) ?? null;
- await saveProductView(productId, userId);
+ await saveProductView(productId, userId, typeof dwellMs === "number" ? dwellMs : null);
  } catch {
  // Silently swallow — view tracking should never break the page
  }

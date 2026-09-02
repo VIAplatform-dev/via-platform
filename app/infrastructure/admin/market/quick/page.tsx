@@ -175,9 +175,9 @@ function QuickInner() {
  <BigButton onClick={() => create(null)} disabled={busy !== null} className="min-h-[64px] text-[17px]">{busy ? "Adding…" : "Add to sale"}</BigButton>
  ) : (
  <>
- <BigButton onClick={() => create("qr")} disabled={busy !== null} className="min-h-[64px] text-[17px]">{busy === "qr" ? "Listing…" : "List & checkout"}</BigButton>
+ <BigButton onClick={() => create("qr")} disabled={busy !== null} className="min-h-[64px] text-[17px]">{busy === "qr" ? "…" : "Card"}</BigButton>
  <div className="grid grid-cols-2 gap-2">
- <BigButton variant="secondary" onClick={() => create("cash")} disabled={busy !== null}>{busy === "cash" ? "…" : "List & take cash"}</BigButton>
+ <BigButton variant="secondary" onClick={() => create("cash")} disabled={busy !== null}>{busy === "cash" ? "…" : "Cash"}</BigButton>
  <BigButton variant="ghost" onClick={() => create(null)} disabled={busy !== null}>{busy === "list" ? "…" : "Just list"}</BigButton>
  </div>
  </>

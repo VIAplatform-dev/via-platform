@@ -1,83 +1,48 @@
-import { View, Text, Pressable, StyleSheet, Dimensions } from "react-native";
-import { Image } from "expo-image";
+import { Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
-import { colors } from "../lib/theme";
+import CardGallery from "./CardGallery";
+import HeartButton from "./HeartButton";
 import type { Product } from "../lib/types";
+import { colors, spacing } from "../lib/theme";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 36) / 2; // 12px gutter on each side + 12px center
-const IMAGE_HEIGHT = CARD_WIDTH * 1.25;
+// One piece in the grid. Swipe the photograph, tap it to open, tap the heart to save — three
+// different gestures on the same card, which is why none of them may wrap the others.
 
-export function ProductCard({ product }: { product: Product }) {
-  const image = product.images?.[0] ?? product.image;
+export default function ProductCard({
+  product, width, favorited, onToggleFavorite,
+}: {
+  product: Product;
+  width: number;
+  favorited?: boolean;
+  onToggleFavorite?: (p: Product) => void;
+}) {
+  const images = product.images?.length ? product.images : product.image ? [product.image] : [];
+  const height = width / 0.82;
+  const open = () => router.push(`/product/${product.id}`);
 
   return (
-    <Pressable
-      onPress={() =>
-        router.push({
-          pathname: "/product/[id]",
-          params: { id: `${product.storeSlug}-${product.id}` },
-        })
-      }
-      style={styles.card}
-    >
-      {image ? (
-        <Image
-          source={{ uri: image }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-        />
-      ) : (
-        <View style={[styles.image, styles.imagePlaceholder]} />
-      )}
+    <View style={{ width, marginBottom: spacing.xl }}>
+      <View style={{ width, height }}>
+        <CardGallery images={images} width={width} height={height} onPress={open} />
+        {onToggleFavorite ? (
+          <View style={{ position: "absolute", top: 10, right: 10 }}>
+            <HeartButton favorited={favorited} onPress={() => onToggleFavorite(product)} onImage />
+          </View>
+        ) : null}
+      </View>
 
-      <View style={styles.info}>
-        <Text numberOfLines={2} style={styles.title}>
+      <Pressable onPress={open}>
+        <Text numberOfLines={2} style={{ marginTop: spacing.md, fontSize: 15, lineHeight: 20, fontWeight: "600", color: colors.text }}>
           {product.name}
         </Text>
-        <Text style={styles.store}>{product.storeName}</Text>
-        <Text style={styles.price}>{product.price}</Text>
-      </View>
-    </Pressable>
+        <Text numberOfLines={1} style={{ marginTop: 5, fontSize: 12, letterSpacing: 1.1, textTransform: "uppercase", color: colors.textMuted }}>
+          {product.storeName}
+        </Text>
+        <Text style={{ marginTop: 5, fontSize: 15, color: colors.text }}>{product.price}</Text>
+        {product.size ? (
+          <Text style={{ marginTop: 3, fontSize: 14, color: colors.textMuted }}>Size {product.size}</Text>
+        ) : null}
+      </Pressable>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    marginBottom: 24,
-  },
-  image: {
-    width: CARD_WIDTH,
-    height: IMAGE_HEIGHT,
-    backgroundColor: "rgba(216, 202, 189, 0.3)",
-  },
-  imagePlaceholder: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  info: {
-    paddingTop: 8,
-    gap: 2,
-  },
-  title: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-    lineHeight: 17,
-  },
-  store: {
-    fontSize: 10,
-    letterSpacing: 0.5,
-    color: colors.textMuted,
-    textTransform: "uppercase",
-    marginTop: 2,
-  },
-  price: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.text,
-    marginTop: 2,
-  },
-});

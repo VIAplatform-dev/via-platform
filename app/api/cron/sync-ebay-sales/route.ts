@@ -34,7 +34,7 @@ export async function GET(request: Request) {
  await delistEverywhere(s.sku, "ebay").catch(() => {});
  // Consigned? Credit the consignor their split (payout stays manual — eBay paid the store,
  // not VYA, so there's no routed balance to auto-transfer from).
- await creditConsignedSale({ productId: s.sku, orderId: `ebay-${s.orderId}`, soldPriceCents: s.soldPriceCents }).catch(() => {});
+ await creditConsignedSale({ productId: s.sku, orderId: `ebay-${s.orderId}`, soldPriceCents: s.soldPriceCents, channel: "ebay" }).catch(() => {});
  pulled++;
  }
  }

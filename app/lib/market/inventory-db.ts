@@ -90,10 +90,23 @@ export async function searchMarketItems(sellerId: string, q: string, sessionId: 
  const term = q.trim();
  if (!term) return [];
  const bring = await bringSet(sessionId);
- const like = `%${term.replace(/[%_]/g, (m) => "\\" + m)}%`;
- const rows = await db()`SELECT id, title, price_cents, currency, images, brand, size, category, status, sold_at FROM items
+ // EVERY WORD, ANYWHERE — not the whole phrase in one field.
+ //
+ // This used to build a single `%dior blazer%` and test it against title, brand, size and category
+ // separately. No one field holds that string: the brand is "Dior", the title says "Jacket". So a
+ // seller standing at a market typing the two words she'd actually say got "not in your inventory"
+ // for a piece sitting right there. Any natural multi-word search failed, and the failure looked
+ // exactly like the item not existing.
+ //
+ // Now each word must appear somewhere in the piece's text — and description is included, because
+ // "the yellow one" is a real way to search for something you can see in your hand.
+ const tokens = term.split(/\s+/).filter(Boolean).slice(0, 6).map((t) => `%${t.replace(/[%_]/g, (m) => "\\" + m)}%`);
+ const rows = await db()`SELECT id, title, price_cents, currency, images, brand, size, category, status, sold_at FROM items i
   WHERE seller_id = ${sellerId} AND status IN ('active','draft','reserved','sold')
-  AND (title ILIKE ${like} OR coalesce(brand,'') ILIKE ${like} OR coalesce(size,'') ILIKE ${like} OR coalesce(category,'') ILIKE ${like})
+  AND NOT EXISTS (
+   SELECT 1 FROM unnest(${tokens}::text[]) AS t(tok)
+   WHERE concat_ws(' ', i.title, i.brand, i.size, i.category, i.description) NOT ILIKE t.tok
+  )
   ORDER BY CASE WHEN status IN ('active','draft') THEN 0 WHEN status = 'reserved' THEN 1 ELSE 2 END, created_at DESC
   LIMIT ${limit}`;
  return rows.map((r) => toItem(r, bring));

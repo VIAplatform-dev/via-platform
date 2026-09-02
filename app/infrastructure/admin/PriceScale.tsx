@@ -19,13 +19,16 @@ export function PriceScale({ low, high, market, value }: { low: number; high: nu
  return (
  <div className="mt-2">
  <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg,#10b98155,#f59e0b55,#ef444455)" }}>
- {market != null && <div className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-stone-900 shadow" style={{ left: pos(market) }} title={`AI rec $${market.toLocaleString()}`} />}
+ {market != null && <div className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-stone-900 shadow" style={{ left: pos(market) }} title={`Suggested listing price $${market.toLocaleString()}`} />}
  {value > 0 && <div className="absolute -top-1 h-4 w-[3px] -translate-x-1/2 rounded bg-[var(--accent,#0e9f76)]" style={{ left: pos(value) }} title={`Your price $${value.toLocaleString()}`} />}
  </div>
- <div className="mt-1.5 flex items-center justify-between text-[10px] text-stone-400">
- <span>${low.toLocaleString()} <span className="text-stone-300">quick sale</span></span>
+ {/* 10px grey-on-cream was reported as hard to read, and this is the line a seller uses to decide
+     what to charge. 11.5px, darker, with the amounts in their own weight so the eye lands on the
+     numbers rather than the labels. */}
+ <div className="mt-2 flex items-center justify-between text-[11.5px] text-stone-500">
+ <span><span className="font-semibold text-stone-700 tabular-nums">${low.toLocaleString()}</span> <span className="text-stone-400">quick sale</span></span>
  {verdict && <span className={cn("font-semibold", verdict.c)}>{verdict.t}</span>}
- <span>${high.toLocaleString()} <span className="text-stone-300">top demand</span></span>
+ <span><span className="font-semibold text-stone-700 tabular-nums">${high.toLocaleString()}</span> <span className="text-stone-400">top demand</span></span>
  </div>
  </div>
  );

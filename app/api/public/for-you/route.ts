@@ -139,7 +139,17 @@ export async function GET(request: Request) {
    SELECT pf.product_id AS product_id, NULL AS store_slug, 8 AS weight
    FROM product_favorites pf WHERE pf.user_id = ${userId}
    UNION ALL
-   SELECT vp.id AS product_id, NULL AS store_slug, 1 AS weight
+   -- Views are weighted by how long the piece was actually on screen: a scroll-past is 1, a
+   -- lingering look is up to 4. Still below a favourite (8) — dwelling on something is interest,
+   -- saying so outright is intent.
+   SELECT vp.id AS product_id, NULL AS store_slug,
+    CASE
+     WHEN pv.dwell_ms IS NULL THEN 1
+     WHEN pv.dwell_ms >= 30000 THEN 4
+     WHEN pv.dwell_ms >= 10000 THEN 3
+     WHEN pv.dwell_ms >= 4000  THEN 2
+     ELSE 1
+    END AS weight
    FROM product_views pv
    JOIN products vp ON (vp.store_slug || '-' || vp.id::text) = pv.product_id
    WHERE pv.user_id = ${userId} AND pv.timestamp >= NOW() - INTERVAL '60 days'

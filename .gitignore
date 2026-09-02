@@ -74,3 +74,7 @@ mobile/expo-env.d.ts
 # Generated QR images (.qr/) — a pure function of QR_CODES in app/lib/qr-codes.ts.
 # Regenerate with `node --experimental-strip-types scripts/make-qr.mts`.
 .qr/
+
+# Full-resolution collection art. The served copies next to it are downscaled for mobile;
+# the originals are kept locally for re-exporting and are far too large for git.
+public/collections/originals/

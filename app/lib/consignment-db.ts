@@ -1,6 +1,8 @@
 import { neon } from "@neondatabase/serverless";
+import { consignorCutWithFee, settledThroughVya, estimateMarketplaceFeeCents, DEFAULT_FEE_POLICY, type FeePolicy } from "./consignment-fees";
 import { randomUUID } from "node:crypto";
 import { resolveSplitPct, consignorCutCents, type SplitRule } from "./consignment-logic";
+import { canTransition, ledgerEffect, type PayoutStatus } from "./consignment-payout-core";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Consignment core — native to VYA (no Shopify). A thin layer over the existing products +
@@ -98,6 +100,12 @@ export async function ensureConsignmentTables(): Promise<void> {
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_ledger_consignor ON consignor_ledger(consignor_id, created_at)`;
+ // Where the sale happened, and what the marketplace kept. Without the channel nothing downstream
+ // can tell money that came through VYA from money that went straight to the seller's own eBay
+ // account — and the auto-payout transfers from VYA's balance, so it must be able to tell.
+ await sql`ALTER TABLE consignor_ledger ADD COLUMN IF NOT EXISTS channel TEXT`;
+ await sql`ALTER TABLE consignor_ledger ADD COLUMN IF NOT EXISTS fee_cents INT`;
+ await sql`ALTER TABLE consignment_settings ADD COLUMN IF NOT EXISTS marketplace_fee TEXT NOT NULL DEFAULT 'store'`;
  await sql`
  CREATE TABLE IF NOT EXISTS consignor_payouts (
   id BIGSERIAL PRIMARY KEY,
@@ -113,6 +121,11 @@ export async function ensureConsignmentTables(): Promise<void> {
   paid_at TIMESTAMPTZ
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_payouts_consignor ON consignor_payouts(consignor_id)`;
+ // The ACH debit that funds an off-platform payout. Held here rather than in a side table because
+ // the webhook only ever knows the PaymentIntent, and it has to find THIS row to settle or release
+ // it — an unfindable row is a hold that never comes off someone's balance.
+ await sql`ALTER TABLE consignor_payouts ADD COLUMN IF NOT EXISTS payment_intent_id TEXT`;
+ await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_intent ON consignor_payouts(payment_intent_id) WHERE payment_intent_id IS NOT NULL`;
  ensured = true;
 }
 
@@ -129,11 +142,15 @@ export type ConsignmentSettings = {
  requireAgreement: boolean;
  agreementTerms: string | null;
  collectW9: boolean;
+ /** Who absorbs eBay's / Depop's cut on an off-platform sale. Defaults to the store, which is what
+  *  the code did before there was a choice — so no existing store's numbers move. */
+ marketplaceFee: FeePolicy;
 };
 
 const DEFAULT_SETTINGS = (storeSlug: string): ConsignmentSettings => ({
  storeSlug, payoutMethods: ["store_credit"], defaultPayoutMethod: "store_credit", payoutCycle: "monthly",
  holdDays: 14, autoPayout: false, storeCreditBonusPct: null, storeDefaultSplitPct: 50, requireAgreement: true, agreementTerms: null, collectW9: true,
+ marketplaceFee: DEFAULT_FEE_POLICY,
 });
 
 export async function getConsignmentSettings(storeSlug: string): Promise<ConsignmentSettings> {
@@ -152,6 +169,7 @@ export async function getConsignmentSettings(storeSlug: string): Promise<Consign
  storeCreditBonusPct: r.store_credit_bonus_pct != null ? Number(r.store_credit_bonus_pct) : null,
  storeDefaultSplitPct: Number(r.store_default_split_pct ?? 50),
  requireAgreement: !!r.require_agreement,
+ marketplaceFee: (r.marketplace_fee === "split" ? "split" : "store") as FeePolicy,
  agreementTerms: (r.agreement_terms as string) ?? null,
  collectW9: !!r.collect_w9,
  };
@@ -424,7 +442,7 @@ export async function listConsignmentItemsByConsignor(consignorId: number): Prom
  * their split. Idempotent: only an item still 'active' is credited, so a re-delivered webhook
  * won't double-pay.
  */
-export async function creditConsignedSale(opts: { productId: string; orderId: string; soldPriceCents: number }): Promise<{ credited: boolean; consignorId?: number; cutCents?: number }> {
+export async function creditConsignedSale(opts: { productId: string; orderId: string; soldPriceCents: number; channel?: string | null; feeCents?: number | null }): Promise<{ credited: boolean; consignorId?: number; cutCents?: number }> {
  await ensureConsignmentTables();
  const sql = db();
  const rows = (await sql`SELECT id, store_slug, consignor_id, split_pct FROM consignment_items WHERE product_id = ${opts.productId} AND status = 'active' LIMIT 1`) as Array<Record<string, unknown>>;
@@ -432,10 +450,16 @@ export async function creditConsignedSale(opts: { productId: string; orderId: st
  const item = rows[0];
  const itemId = Number(item.id);
  const consignorId = Number(item.consignor_id);
- const cutCents = consignorCutCents(opts.soldPriceCents, Number(item.split_pct));
+ const channel = (opts.channel || "vya").toLowerCase();
+ // The fee only ever applies off-platform, and only when the store has said to share it.
+ const settings = await getConsignmentSettings(item.store_slug as string).catch(() => null);
+ const fee = opts.feeCents ?? (settledThroughVya(channel) ? null : estimateMarketplaceFeeCents(channel, opts.soldPriceCents));
+ const { cutCents } = consignorCutWithFee(opts.soldPriceCents, Number(item.split_pct), {
+  feeCents: fee, policy: settings?.marketplaceFee ?? DEFAULT_FEE_POLICY,
+ });
  const updated = (await sql`UPDATE consignment_items SET status = 'sold', sold_order_id = ${opts.orderId}, sold_price_cents = ${opts.soldPriceCents}, sold_at = NOW() WHERE id = ${itemId} AND status = 'active' RETURNING id`) as unknown[];
  if (!updated.length) return { credited: false };
- await sql`INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, item_id, order_id) VALUES (${item.store_slug as string}, ${consignorId}, 'sale_credit', ${cutCents}, ${itemId}, ${opts.orderId})`;
+ await sql`INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, item_id, order_id, channel, fee_cents) VALUES (${item.store_slug as string}, ${consignorId}, 'sale_credit', ${cutCents}, ${itemId}, ${opts.orderId}, ${channel}, ${fee ?? null})`;
  return { credited: true, consignorId, cutCents };
 }
 
@@ -577,13 +601,44 @@ export async function getConsignmentSummary(storeSlug: string): Promise<Consignm
 }
 
 /** Balance eligible for payout now: sale credits older than the store's return-hold, minus payouts. */
+/**
+ * What can be paid out AUTOMATICALLY — which is not the same as what is owed.
+ *
+ * The auto-payout is a Stripe transfer from VYA's own balance. That balance holds the consignor's
+ * cut only for sales that came through VYA: her storefront, or Market Mode. When a cross-listed
+ * piece sells on eBay, eBay pays the SELLER directly and VYA is given nothing — so transferring
+ * against that credit would be VYA sending its own money for a sale it never processed.
+ *
+ * Off-platform credits are therefore excluded here. The consignor is still owed every cent of them;
+ * see offPlatformOwedCents, which the payouts screen shows as owed and payable by the store.
+ */
 export async function getPayableBalanceCents(consignorId: number, holdDays: number): Promise<number> {
  await ensureConsignmentTables();
  const sql = db();
  const rows = (await sql`
  SELECT COALESCE(SUM(amount_cents), 0) AS bal FROM consignor_ledger
- WHERE consignor_id = ${consignorId} AND (type NOT IN ('sale_credit', 'sale_reversal') OR created_at <= NOW() - (${holdDays} || ' days')::interval)`) as Array<Record<string, unknown>>;
+ WHERE consignor_id = ${consignorId}
+  AND (channel IS NULL OR channel IN ('vya', 'storefront', 'market'))
+  AND (type NOT IN ('sale_credit', 'sale_reversal') OR created_at <= NOW() - (${holdDays} || ' days')::interval)`) as Array<Record<string, unknown>>;
  return Number(rows[0]?.bal ?? 0);
+}
+
+/**
+ * Owed for sales that happened somewhere else — real debt, just not VYA's to transfer.
+ *
+ * Broken out by channel so the store can reconcile it against the eBay or Depop payout that landed
+ * in its own account, which is where that money actually is.
+ */
+export async function offPlatformOwedCents(consignorId: number): Promise<{ totalCents: number; byChannel: Record<string, number> }> {
+ await ensureConsignmentTables();
+ const rows = (await db()`
+ SELECT channel, COALESCE(SUM(amount_cents), 0)::int AS bal FROM consignor_ledger
+ WHERE consignor_id = ${consignorId} AND channel IS NOT NULL AND channel NOT IN ('vya', 'storefront', 'market')
+ GROUP BY channel`) as Array<{ channel: string; bal: number }>;
+ const byChannel: Record<string, number> = {};
+ let totalCents = 0;
+ for (const r of rows) { byChannel[r.channel] = Number(r.bal); totalCents += Number(r.bal); }
+ return { totalCents, byChannel };
 }
 
 export async function listLedger(consignorId: number, limit = 200): Promise<Array<{ type: string; amountCents: number; orderId: string | null; createdAt: string; note: string | null }>> {
@@ -593,11 +648,12 @@ export async function listLedger(consignorId: number, limit = 200): Promise<Arra
  return rows.map((r) => ({ type: r.type as string, amountCents: Number(r.amount_cents), orderId: (r.order_id as string) ?? null, createdAt: String(r.created_at), note: (r.note as string) ?? null }));
 }
 
-export type Payout = { id: number; consignorId: number; amountCents: number; method: string; status: string; stripeTransferId: string | null; createdAt: string; paidAt: string | null };
+export type Payout = { id: number; storeSlug: string; consignorId: number; amountCents: number; method: string; status: string; stripeTransferId: string | null; paymentIntentId: string | null; createdAt: string; paidAt: string | null };
 
 const toPayout = (r: Record<string, unknown>): Payout => ({
- id: Number(r.id), consignorId: Number(r.consignor_id), amountCents: Number(r.amount_cents), method: r.method as string,
- status: r.status as string, stripeTransferId: (r.stripe_transfer_id as string) ?? null, createdAt: String(r.created_at), paidAt: r.paid_at ? String(r.paid_at) : null,
+ id: Number(r.id), storeSlug: String(r.store_slug), consignorId: Number(r.consignor_id), amountCents: Number(r.amount_cents), method: r.method as string,
+ status: r.status as string, stripeTransferId: (r.stripe_transfer_id as string) ?? null, paymentIntentId: (r.payment_intent_id as string) ?? null,
+ createdAt: String(r.created_at), paidAt: r.paid_at ? String(r.paid_at) : null,
 });
 
 export async function listPayouts(consignorId: number, limit = 100): Promise<Payout[]> {
@@ -609,12 +665,12 @@ export async function listPayouts(consignorId: number, limit = 100): Promise<Pay
 
 /** Record a payout + its ledger debit. Returns the payout id. `status`/`stripeTransferId` are
  *  set by the caller once the Stripe transfer (or manual payout) resolves. */
-export async function recordPayout(opts: { storeSlug: string; consignorId: number; amountCents: number; method: string; status?: string; stripeTransferId?: string | null }): Promise<number> {
+export async function recordPayout(opts: { storeSlug: string; consignorId: number; amountCents: number; method: string; status?: string; stripeTransferId?: string | null; paymentIntentId?: string | null }): Promise<number> {
  await ensureConsignmentTables();
  const sql = db();
  const rows = (await sql`
- INSERT INTO consignor_payouts (store_slug, consignor_id, amount_cents, method, status, stripe_transfer_id, paid_at)
- VALUES (${opts.storeSlug}, ${opts.consignorId}, ${opts.amountCents}, ${opts.method}, ${opts.status ?? "pending"}, ${opts.stripeTransferId ?? null}, ${opts.status === "paid" ? new Date().toISOString() : null})
+ INSERT INTO consignor_payouts (store_slug, consignor_id, amount_cents, method, status, stripe_transfer_id, payment_intent_id, paid_at)
+ VALUES (${opts.storeSlug}, ${opts.consignorId}, ${opts.amountCents}, ${opts.method}, ${opts.status ?? "pending"}, ${opts.stripeTransferId ?? null}, ${opts.paymentIntentId ?? null}, ${opts.status === "paid" ? new Date().toISOString() : null})
  RETURNING id`) as Array<Record<string, unknown>>;
  const payoutId = Number(rows[0].id);
  await sql`INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, payout_id, note) VALUES (${opts.storeSlug}, ${opts.consignorId}, 'payout', ${-Math.abs(opts.amountCents)}, ${payoutId}, ${opts.method})`;
@@ -630,4 +686,67 @@ export async function getConsignorStatement(consignorId: number): Promise<{ item
  getConsignorBalanceCents(consignorId),
  ]);
  return { items, ledger, payouts, balanceCents };
+}
+
+// ── ACH-funded payouts (off-platform sales) ──────────────────────────────────
+//
+// recordPayout debits the consignor's ledger the moment the row exists, which RESERVES the money so
+// two payouts can't be started for the same $50. For an ACH-funded payout that reservation is held
+// for days while the debit clears, and if the debit bounces it has to come back — see
+// consignment-payout-core.ts, which owns the rules; this half just applies them to the database.
+
+/** Money already reserved by a debit that hasn't cleared. Subtracted before starting another. */
+export async function inFlightOffPlatformCents(consignorId: number): Promise<number> {
+ await ensureConsignmentTables();
+ const rows = (await db()`
+ SELECT COALESCE(SUM(amount_cents), 0)::int AS c FROM consignor_payouts
+ WHERE consignor_id = ${consignorId} AND status = 'awaiting_funds'`) as Array<{ c: number }>;
+ return Number(rows[0]?.c ?? 0);
+}
+
+export async function getPayoutByIntent(paymentIntentId: string): Promise<Payout | null> {
+ await ensureConsignmentTables();
+ const rows = (await db()`SELECT * FROM consignor_payouts WHERE payment_intent_id = ${paymentIntentId} LIMIT 1`) as Array<Record<string, unknown>>;
+ return rows.length ? toPayout(rows[0]) : null;
+}
+
+/**
+ * Move an ACH-funded payout to its next state and fix the ledger to match.
+ *
+ * Guarded by canTransition, so a duplicate or out-of-order webhook (Stripe redelivers, and a
+ * `succeeded` can arrive before the `processing` that preceded it) cannot pay twice or release a
+ * hold that already became a payment. The UPDATE re-checks the status it read, so two webhooks
+ * racing on the same row still produce exactly one transition.
+ *
+ * Returns what actually happened, so the caller knows whether to send the transfer.
+ */
+export async function settlePayoutByIntent(
+ paymentIntentId: string,
+ to: PayoutStatus,
+ opts: { stripeTransferId?: string | null } = {},
+): Promise<{ changed: boolean; payout: Payout | null }> {
+ await ensureConsignmentTables();
+ const sql = db();
+ const payout = await getPayoutByIntent(paymentIntentId);
+ if (!payout) return { changed: false, payout: null };
+ const from = payout.status as PayoutStatus;
+ if (!canTransition(from, to)) return { changed: false, payout };
+
+ const updated = (await sql`
+ UPDATE consignor_payouts
+ SET status = ${to},
+     paid_at = ${to === "paid" ? new Date().toISOString() : null},
+     stripe_transfer_id = COALESCE(${opts.stripeTransferId ?? null}, stripe_transfer_id)
+ WHERE id = ${payout.id} AND status = ${from} RETURNING id`) as unknown[];
+ if (!updated.length) return { changed: false, payout }; // another delivery won the race
+
+ if (ledgerEffect(from, to) === "release") {
+  // Give the money back. A positive entry rather than deleting the debit, so the history still
+  // shows that a payout was attempted and bounced — she can see why the balance moved twice.
+  const note = to === "failed" ? "bank debit didn’t clear" : "payout cancelled";
+  await sql`
+  INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, payout_id, note)
+  VALUES (${payout.storeSlug}, ${payout.consignorId}, 'payout_reversal', ${Math.abs(payout.amountCents)}, ${payout.id}, ${note})`;
+ }
+ return { changed: true, payout: { ...payout, status: to } };
 }

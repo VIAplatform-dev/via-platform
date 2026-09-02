@@ -1,0 +1,25 @@
+# What EAS Build uploads. This is a WHITELIST, and deliberately so.
+#
+# `mobile/` sits inside the website's repo with no npm workspaces joining them, so EAS archives from
+# the git root and takes everything. .easignore REPLACES .gitignore rather than adding to it, which
+# means every gitignored directory has to be named here or it lands in the archive.
+#
+# Enumerating what to exclude does not survive contact with a real repo: the first attempt at this
+# listed .next/ and missed .next-os/, and the archive went from 664 MB to 2.1 GB — over the limit —
+# because a 2.5 GB build cache was silently included. Any new cache directory would do it again.
+#
+# So: exclude everything at the root, then re-admit only the app.
+
+/*
+!/mobile
+
+# ...and within the app, the things that are generated, installed, or secret.
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/ios/
+mobile/android/
+
+# Development-only credentials — see mobile/lib/devAuth.ts. Gitignored already, but .easignore
+# replaces .gitignore for the archive, so leaving this out would upload them to the build server.
+mobile/.env*.local

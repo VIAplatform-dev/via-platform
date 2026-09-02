@@ -315,7 +315,10 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
    COALESCE(json_object_agg(c.platform, c.external_url) FILTER (WHERE c.status = 'error' AND c.external_url IS NOT NULL), '{}') AS errors
   FROM items i JOIN sellers s ON s.id = i.seller_id
   LEFT JOIN cross_listings c ON c.item_id = i.id::text AND c.store_slug = ${storeSlug}
-  WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved')
+  -- Drafts included on purpose. A draft cannot be cross-listed, but leaving it out meant a piece
+  -- the seller had just made was simply absent here with no explanation — "missing my dior blazer".
+  -- It shows with its status so she can see where it is and what it needs, rather than hunting.
+  WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved', 'draft')
   GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand
   ORDER BY i.created_at DESC LIMIT 200
  `.catch(() => []),

@@ -51,7 +51,7 @@ export async function GET(request: Request) {
    await delistEverywhere(s.sku, "depop").catch(() => {});
    // Consigned? Credit the consignor their split. Payout stays manual for the same reason it does on
    // eBay: Depop paid the seller directly, so there is no routed VYA balance to transfer from.
-   await creditConsignedSale({ productId: s.sku, orderId: `depop-${s.orderId}`, soldPriceCents: s.soldPriceCents }).catch(() => {});
+   await creditConsignedSale({ productId: s.sku, orderId: `depop-${s.orderId}`, soldPriceCents: s.soldPriceCents, channel: "depop" }).catch(() => {});
    pulled++;
   }
  }

@@ -282,7 +282,7 @@ export async function finalizeMarketSale(o: { checkoutId: string; paymentIntent:
  orderIds.push(orderId);
  await recordPayout({ orderId, sellerId: c.sellerId, amountCents: l.saleCents - fee, currency: (sold.currency || "USD").toUpperCase() }).catch((e) => logError("market-payout", e, { context: { orderId } }));
  if (seller?.slug) recordEvent({ type: "purchase", storeSlug: seller.slug, itemId: l.itemId, priceCents: l.saleCents, surface: "market" }).catch(() => {});
- creditConsignedSale({ productId: l.itemId, orderId, soldPriceCents: l.saleCents }).catch(() => {});
+ creditConsignedSale({ productId: l.itemId, orderId, soldPriceCents: l.saleCents, channel: "market" }).catch(() => {});
  markCheckoutRecovered(l.itemId).catch(() => {});
  delistEverywhere(l.itemId, "vya").catch(() => {});
  }
