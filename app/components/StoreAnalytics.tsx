@@ -2,7 +2,21 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import posthog from "posthog-js";
+// The FULL bundle, not the default entry.
+//
+// posthog-js normally lazy-loads the session recorder from {api_host}/static/<v>/posthog-recorder.js
+// at runtime. That request is blocked in ordinary Chrome — not by an ad blocker, by the browser's
+// own tracking protection matching the filename — and the block is silent: events keep arriving, so
+// the data looks healthy while every replay is missing.
+//
+// The reverse proxy already defeats DOMAIN blocking (the request goes to our origin, never
+// posthog.com). It cannot defeat FILENAME blocking, and the filename comes from the SDK.
+//
+// This entry ships the recorder inside our own bundle instead, so it arrives as a hashed Next.js
+// chunk with no name worth matching and no separate request to block. Costs ~370KB of JS, which is
+// a fair trade on a workspace people keep open all day — and it is the admin only; the marketplace
+// never loads any of this.
+import posthog from "posthog-js/dist/module.full.no-external";
 import { redactOnPrivateScreens } from "./analytics-redact";
 
 // PostHog, mounted ONLY inside the seller workspace.
