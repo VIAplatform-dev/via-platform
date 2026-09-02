@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Package, Search, List, LayoutGrid, Check, X } from "lucide-react";
+import { Package, Search, List, LayoutGrid, Check, X, SlidersHorizontal } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, ConfirmDialog, cn } from "../ui";
 import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
@@ -64,6 +64,9 @@ export default function ItemsPage() {
  const missingParam = searchParams.get("missing");
  const [missingTag, setMissingTag] = useState<"photo" | "price" | "details" | null>(missingParam === "photo" || missingParam === "price" || missingParam === "details" ? missingParam : null);
  const [quickOnly, setQuickOnly] = useState(searchParams.get("source") === "market");
+ // ?status=active — so the Active listings card has somewhere to go. Drafts and Sold already have
+ // routes of their own; without this, the one card in the middle would be the odd one out.
+ const statusParam = searchParams.get("status");
  // List vs thumbnail grid (?layout=grid deep-links; the choice is remembered per device).
  const [layout, setLayout] = useState<"list" | "grid">(searchParams.get("layout") === "grid" ? "grid" : "list");
  useEffect(() => { try { if (!searchParams.get("layout") && localStorage.getItem("inventory:layout") === "grid") void Promise.resolve().then(() => setLayout("grid")); } catch { /* storage off */ } }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -77,7 +80,14 @@ export default function ItemsPage() {
  const [importOpen, setImportOpen] = useState(false);
  const [q, setQ] = useState(""); // client-side search over title/category
  // Tag filters — the same tags the editor assigns. null = no filter on that axis.
- const [statusTag, setStatusTag] = useState<ItemStatus | null>(null);
+ const [filterOpen, setFilterOpen] = useState(false);
+ const [statusTag, setStatusTag] = useState<ItemStatus | null>((ITEM_STATUSES as readonly string[]).includes(statusParam || "") ? (statusParam as ItemStatus) : null);
+ // Sorting. Filters answer "which pieces"; sorting answers "which first" — and for a seller the
+ // useful order is almost always by money, which the table could show but never order by.
+ type SortKey = "recent" | "revenue" | "cost" | "margin" | "title";
+ const [sortKey, setSortKey] = useState<SortKey>("recent");
+ const [sortDesc, setSortDesc] = useState(true);
+ const sortBy = (k: SortKey) => { if (k === sortKey) { setSortDesc((d) => !d); } else { setSortKey(k); setSortDesc(k !== "title"); } };
  const [famTag, setFamTag] = useState<string | null>(null);   // family alone = the whole family
  const [catTag, setCatTag] = useState<string | null>(null);      // a category inside it
  const [page, setPage] = useState(1); // client-side pagination of the rendered rows
@@ -106,6 +116,16 @@ export default function ItemsPage() {
  // Collections: the store's collections + the ones selected for the item being edited.
  const [cols, setCols] = useState<{ id: string; title: string; itemCount?: number }[]>([]);
  const [selCols, setSelCols] = useState<string[]>([]);
+ /** Fold a typed-but-uncommitted collection name into the selection. Returns the resulting list so
+  *  the save path can use it without waiting for a state update it will not see in time. */
+ function commitNewCol(): string[] {
+  const t = newCol.trim();
+  setNewCol("");
+  if (!t || selCols.includes(t)) return selCols;
+  const next = [...selCols, t];
+  setSelCols(next);
+  return next;
+ }
  const [newCol, setNewCol] = useState("");
 
  async function load() {
@@ -304,6 +324,9 @@ export default function ItemsPage() {
  async function saveEdit() {
  if (!editing) return;
  const n = (s: string) => (s.trim() === "" ? null : Number(s));
+ // Take whatever is sitting in the new-collection box with us. setSelCols would not have landed
+ // by the time this request is built, so commitNewCol hands back the list to send.
+ const colsForSave = commitNewCol();
  setSavingEdit(true);
  await fetch(withStore(`/api/store/items/${editing.id}`), {
  method: "PATCH",
@@ -314,7 +337,7 @@ export default function ItemsPage() {
  // category is omitted when no tag is picked, so an unrecognised stored value survives an edit.
  size: editForm.size, ...(editForm.category ? { category: editForm.category } : {}), description: editForm.description, status: editForm.status,
  weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
- images: editImages, collections: selCols,
+ images: editImages, collections: colsForSave,
  }),
  }).catch(() => {});
  setSavingEdit(false);
@@ -384,8 +407,106 @@ export default function ItemsPage() {
  ...(customPresent.size ? [{ label: OTHER_FAMILY, values: [...customPresent].sort() }] : []),
  ];
  const untagged = base.filter((i) => !slugOf.get(i.id)).length;
- const filtering = !!(statusTag || famTag || catTag || missingTag || colTag || quickOnly);
  const clearFilters = () => { setStatusTag(null); setFamTag(null); setCatTag(null); setMissingTag(null); setColTag(null); setQuickOnly(false); };
+ const filtering = !!(statusTag || famTag || catTag || missingTag || colTag || quickOnly);
+ const filterCount = [statusTag, famTag || catTag, missingTag, colTag, quickOnly || null].filter(Boolean).length;
+
+ // A real filter button.
+ //
+ // Status, category and collection have always been filterable — from dropdowns hidden inside the
+ // table's column headers, which nobody opens and which vanish entirely in the thumbnail view. So
+ // the feature existed and the seller could not find it. One button, everything in it, a count of
+ // what is on, and one way to clear.
+ const filterMenu = (
+  <div className="relative shrink-0">
+   <button
+    type="button"
+    onClick={() => setFilterOpen((o) => !o)}
+    aria-expanded={filterOpen}
+    className={cn("flex h-8 items-center gap-1.5 rounded-xl border px-3 text-[12px] font-medium transition",
+     filterCount ? "border-[var(--accent,#0e9f76)] bg-[var(--accent-soft,#eafaf3)] text-[var(--accent-ink,#0b7a5c)]" : "border-stone-200 bg-white text-stone-600 hover:border-stone-400")}
+   >
+    <SlidersHorizontal size={13} strokeWidth={2} />
+    Filter{filterCount ? ` · ${filterCount}` : ""}
+   </button>
+   {filterOpen && (
+    <>
+     <button type="button" aria-label="Close filters" className="fixed inset-0 z-20 cursor-default" onClick={() => setFilterOpen(false)} />
+     <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-stone-200 bg-white p-3 shadow-[0_18px_44px_-16px_rgba(43,36,29,0.45)]">
+      <div className="mb-3">
+       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Status</p>
+       <div className="flex flex-wrap gap-1.5">
+        {(ITEM_STATUSES as readonly ItemStatus[]).map((st) => (
+         <button key={st} type="button" onClick={() => setStatusTag((v) => (v === st ? null : st))}
+          className={cn("rounded-full border px-2.5 py-1 text-[11.5px] transition", statusTag === st ? "border-transparent bg-[#5D0F17] text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
+          {statusLabel(st)}
+         </button>
+        ))}
+       </div>
+      </div>
+
+      {filterGroups.length > 0 && (
+       <div className="mb-3">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Category</p>
+        <div className="max-h-32 overflow-y-auto pr-1">
+         {filterGroups.map((g) => (
+          <div key={g.label} className="mb-1.5">
+           <button type="button" onClick={() => { setFamTag((v) => (v === g.label ? null : g.label)); setCatTag(null); }}
+            className={cn("mb-1 rounded-full border px-2.5 py-1 text-[11.5px] transition", famTag === g.label ? "border-transparent bg-[#5D0F17] text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
+            {g.label}
+           </button>
+           {famTag === g.label && (
+            <div className="ml-1 flex flex-wrap gap-1">
+             {g.values.map((v) => (
+              <button key={v} type="button" onClick={() => setCatTag((c) => (c === v ? null : v))}
+               className={cn("rounded-full border px-2 py-0.5 text-[11px] transition", catTag === v ? "border-transparent bg-stone-700 text-white" : "border-stone-200 text-stone-500 hover:border-stone-400")}>
+               {v}
+              </button>
+             ))}
+            </div>
+           )}
+          </div>
+         ))}
+        </div>
+       </div>
+      )}
+
+      {cols.length > 0 && (
+       <div className="mb-3">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Collection</p>
+        <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto pr-1">
+         {cols.map((c) => (
+          <button key={c.id} type="button" onClick={() => setColTag((v) => (v === c.title ? null : c.title))}
+           className={cn("rounded-full border px-2.5 py-1 text-[11.5px] transition", colTag === c.title ? "border-transparent bg-[#5D0F17] text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
+           {c.title}
+          </button>
+         ))}
+        </div>
+       </div>
+      )}
+
+      <div className="mb-3">
+       <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Needs attention</p>
+       <div className="flex flex-wrap gap-1.5">
+        {([["photo", "No photo"], ["price", "No price"], ["details", "Missing details"]] as const).map(([k, lab]) => (
+         <button key={k} type="button" onClick={() => setMissingTag((v) => (v === k ? null : k))}
+          className={cn("rounded-full border px-2.5 py-1 text-[11.5px] transition", missingTag === k ? "border-transparent bg-amber-600 text-white" : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400")}>
+          {lab}
+         </button>
+        ))}
+       </div>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+       <button type="button" onClick={clearFilters} disabled={!filtering}
+        className="text-[12px] text-stone-500 underline underline-offset-2 transition hover:text-stone-800 disabled:opacity-40">Clear all</button>
+       <button type="button" onClick={() => setFilterOpen(false)} className="text-[12px] font-semibold text-[#5D0F17]">Done</button>
+      </div>
+     </div>
+    </>
+   )}
+  </div>
+ );
  const colCounts: Record<string, number> = {};
  for (const i of items) for (const c of i.collections || []) colCounts[c] = (colCounts[c] || 0) + 1;
  const needsDetails = (i: Item) => i.costCents == null || !i.size || !i.brand;
@@ -397,7 +518,16 @@ export default function ItemsPage() {
  .filter(inCategory)
  .filter(lacks)
  .filter((i) => (colTag ? (i.collections || []).includes(colTag) : true))
- .filter((i) => (quickOnly ? i.source === "market" : true));
+ .filter((i) => (quickOnly ? i.source === "market" : true))
+ .sort((a, b) => {
+  if (sortKey === "recent") return 0; // the list already arrives newest-first
+  const marginOf = (i: Item) => (i.priceCents > 0 && i.costCents != null ? (i.priceCents - i.costCents) / i.priceCents : -Infinity);
+  const v = sortKey === "title" ? a.title.localeCompare(b.title)
+   : sortKey === "revenue" ? (a.priceCents || 0) - (b.priceCents || 0)
+   : sortKey === "cost" ? ((a.costCents ?? -1) - (b.costCents ?? -1))
+   : marginOf(a) - marginOf(b);
+  return sortDesc ? -v : v;
+ });
  const allChecked = shown.length > 0 && shown.every((i) => selected.has(i.id));
 
  // Exports everything currently filtered, not just the rendered page — an export
@@ -460,7 +590,7 @@ export default function ItemsPage() {
  <AdminHeader
  eyebrow="Sell · Inventory"
  title={heading}
- subtitle="Text a photo — VYA writes the listing and prices it from real comps."
+ subtitle="Upload a photo — VYA writes the listing and prices it from real comps."
  actions={
  <>
  {isAdmin && items.length > 0 && <button onClick={() => setConfirmReset(true)} className="text-[12px] text-rose-500/80 underline hover:text-rose-600">Clear all (owner)</button>}
@@ -497,9 +627,11 @@ export default function ItemsPage() {
  {/* Real inventory snapshot — counts from the items list (no fabricated trend/delta). */}
  {items.length > 0 && (
  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
- <MetricCard label="Active listings" value={counts.active} sub={`${money0(activeValueCents)} live value`} />
- <MetricCard label="Drafts" value={counts.draft} sub={counts.draft ? "Ready to publish" : "None waiting"} />
- <MetricCard label="Sold" value={counts.sold} sub="All-time" />
+ {/* Clickable. A count is a question — "which four?" — and the answer was two dropdowns away in
+     a column header nobody opens. These are the obvious place to reach for. */}
+ <MetricCard label="Active listings" value={counts.active} sub={`${money0(activeValueCents)} live value`} href="/admin/inventory?status=active" />
+ <MetricCard label="Drafts" value={counts.draft} sub={counts.draft ? "Ready to publish" : "None waiting"} href="/admin/inventory/drafts" />
+ <MetricCard label="Sold" value={counts.sold} sub="All-time" href="/admin/inventory/sold" />
  </div>
  )}
 
@@ -558,7 +690,7 @@ export default function ItemsPage() {
  />
  ) : layout === "grid" ? (
  <div>
- <ViewToggle value={layout} onChange={changeLayout} count={shown.length} q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} />
+ <ViewToggle value={layout} onChange={changeLayout} count={shown.length} q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} filter={filterMenu} />
  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
  {paged.map((it) => (
  <div key={it.id} className={cn("group overflow-hidden rounded-2xl border bg-white transition", selected.has(it.id) ? "border-[var(--accent,#0e9f76)]" : "border-stone-200 hover:border-stone-300")}>
@@ -584,14 +716,14 @@ export default function ItemsPage() {
  </div>
  ) : (
  <TechCard className="overflow-hidden">
- <ViewToggle value={layout} onChange={changeLayout} count={shown.length} inCard q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} />
+ <ViewToggle value={layout} onChange={changeLayout} count={shown.length} inCard q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} filter={filterMenu} />
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
  <tr>
  <TH className="w-9 pl-4 pr-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label="Select all" /></TH>
  {/* Category and Status get their own filterable headers — see HeaderFilter. */}
- <TH className="px-3">Item</TH>
+ <TH className="px-3"><button type="button" onClick={() => sortBy("title")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Item{sortKey === "title" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH className="px-3">
        {filterGroups.length > 0 ? (
  <HeaderFilter
@@ -609,9 +741,9 @@ export default function ItemsPage() {
  </HeaderFilter>
  ) : "Category"}
  </TH>
- <TH right className="px-3">Revenue</TH>
- <TH right className="px-3">Cost</TH>
- <TH right className="px-3">Margin</TH>
+ <TH right className="px-3"><button type="button" onClick={() => sortBy("revenue")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Revenue{sortKey === "revenue" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
+ <TH right className="px-3"><button type="button" onClick={() => sortBy("cost")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Cost{sortKey === "cost" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
+ <TH right className="px-3"><button type="button" onClick={() => sortBy("margin")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Margin{sortKey === "margin" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH className="px-3">
  {statusFilter ? "Status" : (
  <HeaderFilter label="Status" value={statusTag ? statusLabel(statusTag) : null} onClear={() => setStatusTag(null)}>
@@ -836,9 +968,13 @@ export default function ItemsPage() {
  className="rounded-full border border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] px-3 py-1.5 text-xs text-white">{t} ✕</button>
  ))}
  </div>
+ {/* Commits on Enter, on blur, and on save. It used to commit ONLY on Enter, so typing
+     "blazer" and pressing Save Draft threw the word away — the seller had done everything
+     that looks like entering a collection and the piece came back without one. */}
  <input value={newCol} onChange={(e) => setNewCol(e.target.value)}
- onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const t = newCol.trim(); if (t && !selCols.includes(t)) setSelCols((s) => [...s, t]); setNewCol(""); } }}
- placeholder="New collection — type &amp; Enter (Y2K, Designer bags…)"
+ onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitNewCol(); } }}
+ onBlur={commitNewCol}
+ placeholder="New collection — type it, then Enter (Y2K, Designer bags…)"
  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </div>
  </div>
@@ -989,7 +1125,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
 
 /** List ↔ thumbnail grid switch, same look as Market Mode's. */
-function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick }: { value: "list" | "grid"; onChange: (v: "list" | "grid") => void; count: number; inCard?: boolean; q: string; onQuery: (v: string) => void; quick?: { total: number; needs: number; on: boolean; needsOn: boolean; toggle: () => void; toggleNeeds: () => void } }) {
+function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick, filter }: { value: "list" | "grid"; onChange: (v: "list" | "grid") => void; count: number; inCard?: boolean; q: string; onQuery: (v: string) => void; quick?: { total: number; needs: number; on: boolean; needsOn: boolean; toggle: () => void; toggleNeeds: () => void }; filter?: React.ReactNode }) {
  const btn = (v: "list" | "grid", Icon: typeof List, label: string) => (
  <button type="button" onClick={() => onChange(v)} aria-label={label} aria-pressed={value === v} className={cn("flex h-8 items-center gap-1 px-2.5 text-[12px] transition", value === v ? "bg-[#5D0F17]/10 text-[#5D0F17]" : "bg-white text-stone-500 hover:text-stone-800")}>
  {value === v && <Check size={12} strokeWidth={2.5} />}<Icon size={15} strokeWidth={2} />
@@ -1010,6 +1146,7 @@ function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick }: { val
  <input value={q} onChange={(e) => onQuery(e.target.value)} placeholder="Filter by name, brand, size, SKU, collection…" className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-stone-400" />
  {q && <button type="button" onClick={() => onQuery("")} className="text-[11px] text-stone-400 hover:text-stone-700">Clear</button>}
  </label>
+ {filter}
  <div className="flex overflow-hidden rounded-xl border border-stone-200 divide-x divide-stone-200">{btn("list", List, "List view")}{btn("grid", LayoutGrid, "Thumbnail view")}</div>
  </div>
  );

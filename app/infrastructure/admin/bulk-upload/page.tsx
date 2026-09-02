@@ -434,7 +434,7 @@ export default function BulkUploadPage() {
    <AdminHeader
     eyebrow="Sell · Bulk upload"
     title="List a whole batch at once"
-    subtitle="Drop in all your photos — VYA groups them into items, you tweak, then draft them all in one go with AI title, brand, description and price. Publish or keep as drafts right here."
+    subtitle="Drop in all your photos at once. VYA sorts them into pieces and writes each one — title, brand, description and price. Check them over, then publish or save them all as drafts."
     actions={<a href="/admin/add-listing" className="text-[13px] font-medium text-stone-500 hover:text-stone-800">One at a time →</a>}
    />
 

@@ -76,7 +76,7 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  // Clean event stream: the purchase, canonical items.id, at the price actually charged.
  if (sellerSlug) recordEvent({ type: "purchase", storeSlug: sellerSlug, itemId, priceCents: salePriceCents, surface: "storefront" }).catch(() => {});
  // Consignment: if this piece was taken on consignment, credit the consignor their split.
- creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: salePriceCents }).catch(() => {});
+ creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: salePriceCents, channel: "vya" }).catch(() => {});
  // Binding offer redeemed → mark it used so the link can't buy the piece twice.
  if (idx === 0 && o.offerToken) markOfferConsumed(o.offerToken, String(order.id)).catch(() => {});
  markCheckoutRecovered(itemId).catch(() => {}); // sold → stop any abandoned-cart nudge

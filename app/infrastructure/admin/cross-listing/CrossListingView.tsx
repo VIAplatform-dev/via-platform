@@ -366,9 +366,13 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  <div className="flex items-center gap-3">
  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-stone-100">{it.image && <img src={it.image} alt="" className="h-full w-full object-cover" />}</div>
  <div className="min-w-0 max-w-[240px]">
- <p className="truncate text-[13px] font-medium text-stone-800">{it.title}</p>
+ {/* Openable. The board answers "where is this piece listed"; the next question is always
+     "and what does it say", which was a trip back to Inventory and a search by name.
+     ?item= is the deep link Inventory already honours. */}
+ <a href={`/admin/inventory?item=${it.itemId}`} className="block truncate text-[13px] font-medium text-stone-800 hover:text-[var(--accent-ink,#0b7a5c)] hover:underline" title={`Open ${it.title}`}>{it.title}</a>
  <div className="flex items-center gap-2 text-[12px] text-stone-400">
  <span>{money(it.priceCents)}</span>
+ {it.status === "draft" && <span className="rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Draft</span>}
  {it.stats && it.stats.totals.offers > 0 && <span className="inline-flex items-center gap-1 font-medium text-[var(--accent-ink,#0b7a5c)]" title={statTip(it.stats.byPlatform)}><Tag size={11} />{it.stats.totals.offers}</span>}
  {it.stats && it.stats.totals.likes > 0 && <span className="inline-flex items-center gap-1 text-stone-400"><Heart size={11} className="text-rose-400" fill="currentColor" />{it.stats.totals.likes}</span>}
  </div>
@@ -381,9 +385,14 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  // Vestiaire is curated — it only takes designer brands. Saying so in the cell beats letting her
  // queue it and meet a refusal at the end of their form.
  const blocked = p.key === "vestiaire" && !st ? vestiaireEligibility(it.brand) : ({ ok: true } as const);
+ // A draft is on this board so she can find it, not so she can list it — nothing can go to a
+ // marketplace before it is live on her own shop.
+ const isDraft = it.status === "draft";
  return (
  <td key={p.key} className="whitespace-nowrap px-3 py-3 text-center">
- {!blocked.ok ? (
+ {isDraft && !st ? (
+ <span className="text-[11px] text-stone-400">Publish first</span>
+ ) : !blocked.ok ? (
  <span className="inline-flex items-center gap-1 text-[11px] text-stone-400" title={blocked.reason}><Ban size={12} />Not accepted</span>
  ) : st === "listed" ? (
  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><Check size={13} strokeWidth={2.6} />Listed</span>

@@ -89,11 +89,14 @@ export function AreaChart({ data, up = true, h = 168, className }: { data?: numb
 }
 
 // ── Metric card — uppercase label + big number + sparkline + delta pill (deck) ──
-export function MetricCard({ label, value, delta, sub, data, up = true, className }: {
+export function MetricCard({ label, value, delta, sub, data, up = true, className, href }: {
  label: string; value: React.ReactNode; delta?: string; sub?: string; data?: number[]; up?: boolean; className?: string;
+ /** Makes the whole card a link — a count is a question ("which four?"), so it should be openable. */
+ href?: string;
 }) {
  return (
- <TechCard className={cn("relative overflow-hidden p-4", className)}>
+ <TechCard className={cn("relative overflow-hidden p-4", href && "transition hover:border-stone-300 hover:shadow-md", className)}>
+ {href && <a href={href} aria-label={label} className="absolute inset-0 z-10" />}
  <div className="flex items-start justify-between gap-2">
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">{label}</p>
  {delta && (

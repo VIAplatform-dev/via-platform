@@ -129,6 +129,9 @@ export default function IntakePage() {
  const dragIdx = useRef<number | null>(null);
  const [markupPct, setMarkupPct] = useState<number | null>(null);
  const [aiDraft, setAiDraft] = useState<Record<string, string | null>>({});
+ // The cover photo these details were written from. Swap the photo and the words stay — describing
+ // a garment that is no longer on the screen, which is worse than an empty form: it looks filled in.
+ const [aiPhoto, setAiPhoto] = useState<string | null>(null);
  const [embedding, setEmbedding] = useState<number[] | null>(null);
  const [marketPrice, setMarketPrice] = useState<number | null>(null);
  const [rawMarketCents, setRawMarketCents] = useState<number | null>(null);
@@ -349,7 +352,7 @@ export default function IntakePage() {
  { const predicted: Record<string, string | null> = {};
  ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["condition", dr.condition?.value], ["category", dr.category], ["description", dr.description]] as [keyof Form, string | null | undefined][])
  .forEach(([k, aiVal]) => { if (!String(form[k]).trim() && aiVal) predicted[k] = aiVal; });
- setAiDraft(predicted); }
+ setAiDraft(predicted); setAiPhoto(photos[0] ?? null); }
  }
 
  // Merge — only ever fill EMPTY fields; never overwrite what the seller typed.
@@ -471,6 +474,13 @@ export default function IntakePage() {
  if (!photos.length) { setErr("Add at least one photo."); return; }
  if ((status === "active" || publishAt) && !allConfirmed) { setErr("Confirm the flagged fields first."); return; }
  if (publishAt && new Date(publishAt).getTime() <= Date.now()) { setErr("Pick a time in the future to schedule."); return; }
+ // A name typed into "add a new consignor" that was never Added. Publishing here used to succeed
+ // with no consignor attached and say nothing — so the piece sells, the split never happens, and
+ // nobody notices until the consignor asks. Refuse instead, and name the button she has to press.
+ if (consigned && consign.newName.trim() && !consign.consignorId) {
+  setErr(`Press “Add” next to “${consign.newName.trim()}” to save them as a consignor first — or clear the box if this piece isn’t on consignment.`);
+  return;
+ }
  setBusy(true);
  setBusyMsg(publishAt ? "Scheduling…" : status === "draft" ? "Saving draft…" : "Publishing…");
  setErr(null);
@@ -495,11 +505,20 @@ export default function IntakePage() {
  setBusy(false);
  }
 
+ /** Wipe everything the AI wrote, and anything typed over it, but keep the photos. */
+ function clearDetails() {
+  setForm(BLANK); setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null);
+  setRunway(null); setCelebrity(null); setSpecificPiece(null); setFlaws([]); setCareTag(null);
+  setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote("");
+  setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false);
+  setAiDraft({}); setAiPhoto(null); setPromptVersion(null); setEmbedding(null); setReverseImage(null);
+ }
+
  function reset() {
  draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
  setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
+ setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setAiPhoto(null); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
  }
 
  // ── Done ──
@@ -624,6 +643,15 @@ export default function IntakePage() {
  )}
  </div>
  {photos.length > 1 && <p className="mt-1 text-[10px] text-stone-400">Drag to reorder{ghost ? "" : " · first is the cover"}</p>}
+ {aiPhoto && photos[0] && photos[0] !== aiPhoto && (
+  <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+   <p><strong>These details were written from a different photo.</strong> Everything below still describes the piece you removed.</p>
+   <div className="mt-1.5 flex gap-3">
+    <button type="button" onClick={clearDetails} className="font-semibold underline underline-offset-2">Clear them</button>
+    <button type="button" onClick={() => setAiPhoto(photos[0])} className="text-amber-800/70 underline underline-offset-2">Keep — they still apply</button>
+   </div>
+  </div>
+ )}
  </>
  ) : (
  <div
@@ -725,11 +753,27 @@ export default function IntakePage() {
  </div>
  <div><label className={label}>Consignor split %</label><input className={input} value={consign.split} onChange={(e) => setConsign({ ...consign, split: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" placeholder="auto from rules" /></div>
  </div>
+ {/* Typing a name and NOT pressing Add used to lose it: the piece published with no consignor,
+     and nothing said so. The field turns red and the button reads "Add — don't forget" while a
+     name is sitting there uncommitted, and publish refuses (see consignBlocker). */}
  <div className="flex items-end gap-2">
- <div className="flex-1"><label className={label}>…or add a new consignor</label><input className={input} value={consign.newName} onChange={(e) => setConsign({ ...consign, newName: e.target.value })} placeholder="Name" /></div>
- <button type="button" onClick={addConsignor} disabled={!consign.newName.trim()} className="rounded-lg border border-stone-200 px-3 py-2 text-[12.5px] text-stone-600 hover:bg-stone-50 disabled:opacity-40">Add</button>
+ <div className="flex-1">
+  <label className={label}>…or add a new consignor</label>
+  <input
+   className={`${input} ${consign.newName.trim() ? "border-red-400 bg-red-50/40" : ""}`}
+   value={consign.newName}
+   onChange={(e) => setConsign({ ...consign, newName: e.target.value })}
+   placeholder="Name"
+  />
  </div>
- <div><label className={label}>Consignment ends <span className="font-normal text-stone-400">— optional</span></label><input type="date" className={input} value={consign.expiresAt} onChange={(e) => setConsign({ ...consign, expiresAt: e.target.value })} /></div>
+ <button type="button" onClick={addConsignor} disabled={!consign.newName.trim()}
+  className={`rounded-lg border px-3 py-2 text-[12.5px] disabled:opacity-40 ${consign.newName.trim() ? "border-red-400 bg-red-50 font-semibold text-red-600" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>
+  {consign.newName.trim() ? "Add — don’t forget" : "Add"}
+ </button>
+ </div>
+ {consign.newName.trim() && (
+  <p className="text-[11.5px] font-medium text-red-600">Press <strong>Add</strong> to save “{consign.newName.trim()}” as a consignor — otherwise this piece publishes with none.</p>
+ )}
  {consign.split && <p className="text-[11px] text-stone-400">Consignor gets {consign.split}% · store keeps {100 - (Number(consign.split) || 0)}%.</p>}
  </div>
  )}
@@ -860,6 +904,19 @@ export default function IntakePage() {
  <div className="flex flex-wrap items-center gap-4 border-t border-stone-100 pt-4">
  <TechButton onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>
  <TechButton variant="secondary" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</TechButton>
+ {/* Always available, not only when we happen to notice the photo changed — "start this piece
+     again" is a thing a seller wants for plenty of reasons we can't detect. Confirms first,
+     because it throws away written work. */}
+ {(form.title.trim() || Object.keys(aiDraft).length > 0) && (
+  <button
+   type="button"
+   disabled={busy}
+   onClick={() => { if (confirm("Clear everything written about this piece? Your photos stay.")) clearDetails(); }}
+   className="text-[12.5px] text-stone-500 underline underline-offset-2 transition hover:text-stone-800 disabled:opacity-40"
+  >
+   Clear details
+  </button>
+ )}
  {!allConfirmed && <span className="text-[11px] text-amber-600">Confirm the flagged fields to publish — or save as a draft for now</span>}
  {err && <span className="text-xs text-red-600">{err}</span>}
  {/* Schedule publish: pick a future time → saved as a draft now, auto-published then. */}
