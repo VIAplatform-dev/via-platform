@@ -62,3 +62,11 @@ next-env.d.ts
 /_*.mts
 /_*.mjs
 /gc*.mts
+
+# Expo app (mobile/) — its own build artefacts. The source is tracked; these never are.
+mobile/node_modules
+mobile/ios
+mobile/android
+mobile/.expo
+mobile/dist
+mobile/expo-env.d.ts

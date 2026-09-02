@@ -10,8 +10,6 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
-    // Local imports in app/lib carry explicit ".ts" extensions so Node's test runner (npm test →
-    // node --test) can resolve them; bundler resolution needs this flag to accept the same specifier.
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -55,6 +53,7 @@
     "node_modules",
     "scripts",
     "extension",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "mobile"
   ]
 }

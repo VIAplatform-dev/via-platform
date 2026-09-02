@@ -29,7 +29,6 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="product/[id]" options={{ title: "" }} />
           <Stack.Screen name="store/[slug]" options={{ title: "" }} />
-          <Stack.Screen name="connect-depop" options={{ title: "Connect Depop", presentation: "modal" }} />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>
