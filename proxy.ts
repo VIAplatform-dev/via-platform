@@ -7,6 +7,9 @@ import { capturedSlugForDomain } from "@/app/lib/domain-routing-edge";
 // Routes accessible without any authentication or approval
 const PUBLIC_ROUTES = [
   "/pay", // customer-facing "payment sent" pages after a Market Mode QR payment
+  // Printed QR codes (/q/{code} → app/q/[code]/route.ts). Whoever picks up a business card
+  // has no session and no pilot approval — gating this would send every scan to /login.
+  "/q",
   "/login",
   "/register",
   "/pilot-pending",
@@ -355,6 +358,10 @@ export async function proxy(request: NextRequest) {
       // rewrite, which has no consignor.html and 404s. Stripe's Connect return
       // URL points here too.
       pathname === "/consignor" || pathname.startsWith("/consignor/") ||
+      // Printed QR codes point at getvya.ai/q/{code}. It's a route handler that logs the
+      // scan and redirects, so it must reach the app rather than the marketing rewrite —
+      // otherwise every scanned card lands on /infra/q/{code}.html and 404s.
+      pathname.startsWith("/q/") ||
       pathname.startsWith("/infra/") ||
       pathname === "/infrastructure" ||
       pathname.startsWith("/infrastructure/") ||

@@ -70,3 +70,7 @@ mobile/android
 mobile/.expo
 mobile/dist
 mobile/expo-env.d.ts
+
+# Generated QR images (.qr/) — a pure function of QR_CODES in app/lib/qr-codes.ts.
+# Regenerate with `node --experimental-strip-types scripts/make-qr.mts`.
+.qr/

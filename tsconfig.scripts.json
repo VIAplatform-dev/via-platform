@@ -1,0 +1,14 @@
+{
+  // The main tsconfig excludes "scripts", so `npx tsc --noEmit` cannot catch a broken .mts —
+  // an orphaned import there stays invisible until someone runs the script. This config
+  // typechecks the scripts and the library code they import, with the real path aliases.
+  //
+  //   npx tsc --noEmit -p tsconfig.scripts.json
+  //
+  // Scoped to scripts + app/lib on purpose: the generated .next/types and the app's own
+  // components carry pre-existing errors that would bury the signal this check exists for.
+  // TypeScript still follows imports out of app/lib, so nothing a script depends on escapes.
+  "extends": "./tsconfig.json",
+  "include": ["scripts/**/*.mts", "scripts/**/*.ts", "app/lib/**/*.ts"],
+  "exclude": ["node_modules", "**/*.test.ts"]
+}

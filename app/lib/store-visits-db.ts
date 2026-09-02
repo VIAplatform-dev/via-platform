@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import type { NextRequest } from "next/server";
-import { classifySource } from "./traffic-source";
+import { classifySource } from "./traffic-source.ts";
 
 // Storefront visits, recorded server-side as pages are served so we capture the
 // real entry source (search / social / direct / referral) even with no UTM tag.
