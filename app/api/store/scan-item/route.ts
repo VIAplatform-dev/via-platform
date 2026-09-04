@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
-import { resolveStoreSlug } from "@/app/lib/storeAuth";
+import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { isStorePro } from "@/app/lib/store-plans-db";
 import { gateSegments, type RawSegment } from "@/app/lib/data-layer/privacy";
 import { PRIVACY, SOURCING, BLEND } from "@/app/lib/data-layer/config";
@@ -31,7 +31,8 @@ function parseDataUrl(url: string): VisionImage | null {
 // Identifies the item by photo, then returns the same privacy-gated demand
 // verdict the text search gives — for the brand, category, and era it detects.
 export async function POST(request: NextRequest) {
- const storeSlug = await resolveStoreSlug(request);
+ // ...Any: the listing flow calls this from the phone with a bearer JWT, not a web session.
+ const storeSlug = await resolveStoreSlugAny(request);
  if (!storeSlug) return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
  if (!(await isStorePro(storeSlug))) return NextResponse.json({ locked: true }); // Pro feature
 

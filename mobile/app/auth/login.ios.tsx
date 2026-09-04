@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, useWindowDimensions, View } from "react-native";
+import {
+ ActivityIndicator,
+ LayoutChangeEvent,
+ Pressable,
+ Text,
+ TextInput,
+ useWindowDimensions,
+ View,
+} from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as WebBrowser from "expo-web-browser";
@@ -21,46 +29,49 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // Sign in, over a wall of pieces that drifts.
 //
 // The email path deliberately does NOT wait for the person to come back. Requesting the link ends
-// the interaction here; tapping the link opens auth/callback, which finishes the sign-in. Anything
-// else means holding a spinner on screen while someone leaves for their mail app.
+// the interaction here; tapping the link opens auth/callback, which finishes the sign-in.
 //
 // WHY THE COLLAGE IS BUNDLED AND NOT FETCHED. This screen renders before anybody has a token, and
 // every catalogue route — /api/public/* included — answers 403 without one (see the note at the top
-// of lib/api.ts: for the app, a valid login IS the approval). So there is no list of images to ask
-// for here. These seven ship with the app, which also means the wall is on screen the instant it
-// opens rather than after a cold-start round trip. Each is centre-cropped to 4:5 at 800px wide and
-// around 130KB — 0.9MB for the set, down from 12.5MB of originals.
+// of lib/api.ts: for the app, a valid login IS the approval). These seven ship with the app, so the
+// wall is there the instant it opens rather than after a cold-start round trip.
 
 const GAP = 6;
 const DRIFT_MS = 48_000; // one full cycle. Linear, never eased — an eased loop pulses.
+const TILES_PER_COLUMN = 9; // enough to fill a column taller than the screen
 
-// How far down the screen the photographs run, and where the cream starts taking over. Kept as
-// named constants because they have to stay in step: the wall must extend past the point the veil
-// turns opaque, or the fade ends on bare background instead of on a photograph.
-const WALL_HEIGHT = 0.82;
-const VEIL_HEIGHT = 0.9;
+// The photographs stop this many points above the wordmark. Measured against the wordmark's real
+// laid-out position rather than a fraction of screen height, so it holds on any device: the type
+// block is a fixed height in points, so its distance from the top changes with every screen size.
+const CLEARANCE = 5;
 
-// Static requires: Metro resolves these at bundle time, so the paths cannot be built dynamically.
-const PHOTOS = [
- require("../../assets/collage/01.jpg"), // Fendi gold/green sandals, orchids
- require("../../assets/collage/02.jpg"), // Manolo / Jimmy Choo flat-lay
- require("../../assets/collage/03.jpg"), // pink Fendi baguette, held
- require("../../assets/collage/04.jpg"), // silk scarf stack
- require("../../assets/collage/05.jpg"), // Dior / LV / Prada
- require("../../assets/collage/06.jpg"), // purple houndstooth suit
- require("../../assets/collage/07.jpg"), // Gucci bag and wine, convertible
+// How much of the wall above that line is spent fading. 0.42 puts the first hint of cream a little
+// under halfway up the picture area — high enough to be gradual, low enough to keep the top sharp.
+const FADE_SPAN = 0.42;
+
+// THE TWO COLUMNS SHARE NO PHOTOGRAPHS. This is the only arrangement that guarantees the same
+// piece never appears on both sides at once. An offset into one shared list cannot do it: the
+// columns drift in OPPOSITE directions, so their alignment changes continuously and every
+// photograph eventually meets itself — an offset only decides when, not whether.
+const LEFT_SET = [
+ require("../../assets/collage/01.jpg"), // Fendi gold/green sandals, orchids — pale
+ require("../../assets/collage/04.jpg"), // silk scarf stack — colour
+ require("../../assets/collage/05.jpg"), // Dior / LV / Prada on the sink — busy
+ require("../../assets/collage/07.jpg"), // Gucci bag and wine, convertible — warm
+];
+const RIGHT_SET = [
+ require("../../assets/collage/02.jpg"), // Manolo / Jimmy Choo flat-lay — pale
+ require("../../assets/collage/03.jpg"), // pink Fendi baguette, held — colour
+ require("../../assets/collage/06.jpg"), // purple houndstooth suit — studio
 ];
 
-// Nine tiles fill a column taller than the screen. The right column starts three along so the two
-// walls open on different pieces — though because the columns drift in OPPOSITE directions their
-// alignment keeps changing, so a photograph will still eventually sit beside itself. Fixing that
-// properly needs either disjoint sets per column or about twelve photographs.
-const TILES_PER_COLUMN = 9;
-const sequence = (offset: number) =>
- Array.from({ length: TILES_PER_COLUMN * 2 }, (_, i) => PHOTOS[(i + offset) % PHOTOS.length]);
+// The cost of disjoint sets is repetition WITHIN a column: four on the left recur every fourth
+// tile, three on the right every third. Twelve photographs (six each) would remove that too.
+const fill = (set: number[]) =>
+ Array.from({ length: TILES_PER_COLUMN * 2 }, (_, i) => set[i % set.length]);
 
-const LEFT_TILES = sequence(0);
-const RIGHT_TILES = sequence(3);
+const LEFT_TILES = fill(LEFT_SET);
+const RIGHT_TILES = fill(RIGHT_SET);
 
 /** One column, rendered twice over so a −50% translation loops without a seam. */
 function Column({
@@ -79,8 +90,6 @@ function Column({
     <Image
      key={i}
      source={source}
-     // bgCard behind each tile so the wall is composed before anything decodes, rather
-     // than flashing the cream ground through.
      style={{ height: tileHeight, borderRadius: 2, backgroundColor: colors.bgCard }}
      contentFit="cover"
      transition={220}
@@ -102,6 +111,16 @@ export default function LoginScreen() {
  const [busy, setBusy] = useState(false);
  const [error, setError] = useState<string | null>(null);
 
+ // Where the wall ends and the cream begins. Null until the wordmark has been laid out; the
+ // fallback keeps the first frame composed rather than showing a bare wall for one tick.
+ const [wallBottom, setWallBottom] = useState<number | null>(null);
+ const measureWordmark = (e: LayoutChangeEvent) => {
+  // The sheet fills the screen from y=0, so the wordmark's own y IS its distance from the top.
+  const next = Math.max(0, e.nativeEvent.layout.y - CLEARANCE);
+  setWallBottom((prev) => (prev === next ? prev : next));
+ };
+ const wallHeight = wallBottom ?? height * 0.55;
+
  const columnWidth = (width - spacing.sm * 2 - GAP) / 2;
  const tileHeight = Math.round(columnWidth * 1.25); // 4:5, the ratio ProductCard already uses
  const runHeight = TILES_PER_COLUMN * (tileHeight + GAP);
@@ -113,7 +132,6 @@ export default function LoginScreen() {
 
  useEffect(() => {
   if (reducedMotion) {
-   // Held at a staggered offset, so the composition still looks composed rather than aligned.
    left.value = -runHeight / 2;
    right.value = 0;
    return;
@@ -153,7 +171,7 @@ export default function LoginScreen() {
   }
  }
 
- // Creating a store is a web flow (/store/signup); there is no native equivalent to send her to.
+ // Creating a store is a web flow (/store/signup); there is no native equivalent.
  async function openStoreSignup() {
   await WebBrowser.openBrowserAsync(`${API_BASE_URL}/store/signup`, {
    presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
@@ -176,11 +194,11 @@ export default function LoginScreen() {
 
  return (
   <View style={{ flex: 1, backgroundColor: colors.bg }}>
-   {/* The wall. Clipped to the screen and pinned behind everything. */}
+   {/* The wall, clipped to end CLEARANCE points above the wordmark. */}
    <View
     pointerEvents="none"
     style={{
-     position: "absolute", top: 0, left: 0, right: 0, height: height * WALL_HEIGHT,
+     position: "absolute", top: 0, left: 0, right: 0, height: wallHeight,
      flexDirection: "row", gap: GAP, paddingHorizontal: spacing.sm, overflow: "hidden",
     }}
    >
@@ -192,23 +210,18 @@ export default function LoginScreen() {
     </View>
    </View>
 
-   {/* Fades the wall into the ground so the sheet has a clean bed to sit on. Fully clear for the
-       top half — the photographs are the point and a wash over them costs more than it buys — then
-       most of the work happens between 60% and 88%, which is the band just above the wordmark. */}
+   {/* Exactly as tall as the wall, so it reaches full cream on the wall's last row of pixels —
+       the photographs meet the ground rather than stopping at a visible edge. */}
    <LinearGradient
     pointerEvents="none"
-    colors={[
-     "rgba(255,253,248,0)",
-     "rgba(255,253,248,0.06)",
-     "rgba(255,253,248,0.72)",
-     colors.bg,
-    ]}
-    locations={[0, 0.56, 0.8, 0.94]}
-    style={{ position: "absolute", top: 0, left: 0, right: 0, height: height * VEIL_HEIGHT }}
+    colors={["rgba(255,253,248,0)", "rgba(255,253,248,0.08)", colors.bg]}
+    locations={[0, FADE_SPAN, 1]}
+    style={{ position: "absolute", top: 0, left: 0, right: 0, height: wallHeight }}
    />
 
    <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl + spacing.md }}>
     <Text
+     onLayout={measureWordmark}
      style={{
       fontFamily: fonts.serif, fontSize: 19, letterSpacing: 6,
       color: colors.text, textAlign: "center", marginBottom: spacing.md,

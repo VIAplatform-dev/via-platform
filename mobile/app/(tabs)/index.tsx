@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 import { Redirect } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -19,7 +20,8 @@ import { colors, spacing } from "../../lib/theme";
 // without endless scrolling — the sections are the navigation.
 
 export default function HomeScreen() {
-  const { user, loading } = useAuth();
+  const { user, storeSlug, loading } = useAuth();
+  const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
   const { favorites, isFavorited, toggleFavorite } = useFavorites();
   const [sizes, setSizes] = useState<string[]>([]);
@@ -63,6 +65,15 @@ export default function HomeScreen() {
 
   if (loading) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (!user) return <Redirect href="/auth/login" />;
+  // A store owner gets the seller app, not the shopper one. Both live in this bundle — sellers are
+  // shoppers too, so a second binary would mean a second listing and review cycle — and `storeSlug`
+  // (null for shoppers) is the whole switch. Sign-in lands on "/", so guarding here covers it.
+  //
+  // GUARDED BY isFocused, and this is not optional. This screen stays MOUNTED underneath the
+  // seller group once we redirect, so it keeps re-rendering — and a bare <Redirect> fires on every
+  // render, navigating again and again. That is a visible loop: the app appears to refresh and
+  // swipe forever. Only the focused screen is allowed to redirect.
+  if (storeSlug && isFocused) return <Redirect href="/(seller)" />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
