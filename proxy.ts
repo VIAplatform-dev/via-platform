@@ -10,6 +10,18 @@ const PUBLIC_ROUTES = [
   // Printed QR codes (/q/{code} → app/q/[code]/route.ts). Whoever picks up a business card
   // has no session and no pilot approval — gating this would send every scan to /login.
   "/q",
+  // The printed flyers. Same reasoning as /q, but these are the addresses themselves rather than
+  // a redirect, so each one is listed. THE LIST LIVES IN app/lib/flyers.ts — a slug added there
+  // and forgotten here sends every scan of that flyer to a sign-in wall, and the paper cannot be
+  // redeployed. flyers.test.ts holds the two in step.
+  "/vintage",
+  "/emma-stolen-bag",
+  "/trendsetter",
+  "/not-shein",
+  "/fashion-clone",
+  "/postcard",
+  // The form those pages post to. Gating it would let the page render and then refuse the signup.
+  "/api/flyer-join",
   "/login",
   "/register",
   "/pilot-pending",
