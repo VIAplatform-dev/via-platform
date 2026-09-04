@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -50,6 +51,7 @@ export default function CaptureScreen() {
   if (!permission.granted) {
     return (
       <View style={{ flex: 1, backgroundColor: "#141210", alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
+        <StatusBar style="light" />
         <Text style={{ color: "#fff", fontSize: 16, textAlign: "center" }}>VYA needs the camera to photograph a piece.</Text>
         <Pressable onPress={() => void requestPermission()} style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}>
           <Text style={{ color: colors.accentText, fontWeight: "600" }}>Allow camera</Text>
@@ -64,6 +66,8 @@ export default function CaptureScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#141210", paddingTop: insets.top }}>
+      {/* Dark ground, so the clock and battery need to be light to be legible at all. */}
+      <StatusBar style="light" />
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
         <Pressable hitSlop={12} onPress={() => router.back()}>
           <Feather name="x" size={24} color="#fff" />

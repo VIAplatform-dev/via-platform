@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -70,6 +71,14 @@ export default function MarketHome() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
 
+  // Her currency, not a constant. Market Mode is the one screen where she is taking real cash in
+  // her hand — printing the wrong symbol on the takings is worse here than anywhere else in the app.
+  const me = useQuery({
+    queryKey: ["store", "me"],
+    queryFn: () => apiGet<{ currency: string }>("/api/store/me"),
+    enabled: !!storeSlug,
+  });
+
   const q = useQuery({
     queryKey: ["market", "home"],
     queryFn: () => apiGet<Home>("/api/store/market/home"),
@@ -86,11 +95,15 @@ export default function MarketHome() {
     },
   });
 
+  const currency = me.data?.currency ?? "USD";
   const c = q.data?.counts;
   const onRack = c ? Math.max(0, c.available) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* The app sets a dark status bar globally, which is right on cream and unreadable here. A
+          per-screen StatusBar overrides it while this screen is focused and restores it on the way out. */}
+      <StatusBar style="light" />
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
         {/* The band: where she is, and how the day is going. */}
         <View style={{ backgroundColor: colors.accent, paddingTop: insets.top + spacing.lg, paddingHorizontal: spacing.xl, paddingBottom: 56 }}>
@@ -108,14 +121,14 @@ export default function MarketHome() {
           </Text>
 
           <View style={{ flexDirection: "row", gap: spacing.xxl, marginTop: spacing.lg }}>
-            <Stat value={c ? formatMoney(c.grossTodayCents, "USD") : "—"} label="today" />
+            <Stat value={c ? formatMoney(c.grossTodayCents, currency) : "—"} label="today" />
             <Stat value={c ? c.soldToday : "—"} label="sold" />
             <Stat value={onRack ?? "—"} label="on the rack" />
           </View>
 
           {c && (c.cashCents > 0 || c.cardCents > 0) ? (
             <Text style={{ fontSize: 12.5, color: "rgba(253,251,246,0.75)", marginTop: spacing.md }}>
-              In the tin: {formatMoney(c.cashCents, "USD")} cash · {formatMoney(c.cardCents, "USD")} card
+              In the tin: {formatMoney(c.cashCents, currency)} cash · {formatMoney(c.cardCents, currency)} card
             </Text>
           ) : null}
         </View>
@@ -147,7 +160,7 @@ export default function MarketHome() {
               }}
             >
               <Text style={{ fontSize: 13.5, color: colors.text }}>
-                <Text style={{ fontWeight: "700" }}>{formatMoney(k.amountCents, "USD")}</Text> checkout in progress
+                <Text style={{ fontWeight: "700" }}>{formatMoney(k.amountCents, currency)}</Text> checkout in progress
               </Text>
               <Text style={{ marginLeft: "auto", fontWeight: "700", color: colors.accent }}>Resume ›</Text>
             </Pressable>
