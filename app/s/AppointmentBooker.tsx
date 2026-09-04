@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import BookingEmbedFrame from "./BookingEmbedFrame";
+import DepositForm, { type Deposit } from "./DepositForm";
 import type { BookingEmbed } from "@/app/lib/appointments/embed-core";
 
 /**
@@ -38,6 +39,9 @@ export default function AppointmentBooker({
  const [form, setForm] = useState({ name: "", email: "", phone: "", note: "" });
  const [busy, setBusy] = useState(false);
  const [done, setDone] = useState<{ day: string; start: string } | null>(null);
+ // A deposit the shop asks for to hold the slot. The booking row exists either way; until this is
+ // paid the time isn't held and the sweep releases it — so it's a step, not a receipt.
+ const [deposit, setDeposit] = useState<Deposit | null>(null);
  const [err, setErr] = useState<string | null>(null);
 
  useEffect(() => {
@@ -67,9 +71,14 @@ export default function AppointmentBooker({
   }).then((r) => r.json()).catch(() => null);
   setBusy(false);
   if (!d?.ok) {
-   setErr(d?.error || (d?.reason === "full" ? "Someone just took that time. Pick another." : "Couldn't book that. Try again."));
+   setErr(d?.error
+    || (d?.reason === "full" ? "Someone just took that time. Pick another."
+     : d?.reason === "payments-off" ? "This shop asks for a deposit but hasn't finished setting up payments. Do get in touch."
+     : "Couldn't book that. Try again."));
    return;
   }
+  // A deposit means one more step before the time is actually held.
+  if (d.deposit?.clientSecret) { setDeposit(d.deposit as Deposit); return; }
   setDone({ day, start });
  }
 
@@ -84,6 +93,10 @@ export default function AppointmentBooker({
      className="vya-cta block w-full px-8 py-3.5 text-center text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85"
      style={{ background: accent, color: "#fff" }}>{cta}</a>
    );
+ }
+
+ if (deposit) {
+  return <DepositForm deposit={deposit} accent={accent} cta={cta} onPaid={() => { setDeposit(null); setDone({ day, start }); }} />;
  }
 
  if (done) {

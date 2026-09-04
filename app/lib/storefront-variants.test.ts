@@ -96,9 +96,14 @@ test("a pipe or a line break INSIDE a value no longer splits the row", () => {
 test("a comma inside a loose value no longer shatters it into extra items", () => {
  // A Cloudinary/imgix transform puts commas in the path, and a loose schema splits rows on commas —
  // so one gallery photo used to come back as three broken entries.
- const items = [{ src: "https://res.cloudinary.com/x/image/upload/w_800,h_600,c_fill/bag.jpg" }];
- const stored = writeItems(items, ITEM_SCHEMAS.gallery);
- assert.deepEqual(readItems({ images: stored }, ITEM_SCHEMAS.gallery), items);
+ const src = "https://res.cloudinary.com/x/image/upload/w_800,h_600,c_fill/bag.jpg";
+ const stored = writeItems([{ src }], ITEM_SCHEMAS.gallery);
+ const read = readItems({ images: stored }, ITEM_SCHEMAS.gallery);
+ // One entry, and its URL intact. Asserted on the FIELD rather than deep-equal on the whole item:
+ // a schema gains fields over time (gallery grew `pos` for focal point), and this test is about
+ // commas surviving, not about the shape of a gallery item.
+ assert.equal(read.length, 1);
+ assert.equal(read[0].src, src);
  // Same for a marquee label that just happens to contain a comma.
  const labels = [{ label: "Free shipping, always" }, { label: "Authenticated" }];
  assert.deepEqual(readItems({ items: writeItems(labels, ITEM_SCHEMAS.marquee) }, ITEM_SCHEMAS.marquee), labels);
@@ -245,10 +250,17 @@ test("no skin emits !important — per-section overrides must always win", () =>
 
 test("skin rules stay at single-class specificity and scope to their own root", () => {
  for (const s of SKINS) {
+  // Split into rules, then drop at-rule preludes (`@container (max-width:640px){`) and the stray
+  // closing brace they leave behind: the rules INSIDE them still have to be scoped, and were —
+  // this check just couldn't see past the wrapper once skins started carrying mobile padding.
   for (const rule of skinCss(s.id).split("}").filter(Boolean)) {
-   const sel = rule.split("{")[0];
-   if (!sel.trim()) continue;
-   for (const part of sel.split(",")) assert.ok(part.trim().startsWith(`.vya-skin-${s.id}`), `${s.id} leaks outside its scope: ${part}`);
+   const sel = rule.split("{").filter((part) => !part.trim().startsWith("@")).slice(0, -1).join("{") || rule.split("{")[0];
+   if (!sel.trim() || sel.trim().startsWith("@")) continue;
+   for (const part of sel.split(",")) {
+    const t = part.trim();
+    if (!t) continue;
+    assert.ok(t.startsWith(`.vya-skin-${s.id}`), `${s.id} leaks outside its scope: ${t}`);
+   }
   }
  }
 });
