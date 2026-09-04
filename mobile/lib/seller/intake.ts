@@ -1,6 +1,7 @@
 import { API_BASE_URL, getAuthToken, ApiError } from "../api";
 import { apiPost } from "../api";
 import { filledFields } from "./listing";
+import { normalizeDraft, readEstimate, type DraftFields } from "./intake-shape";
 
 // The listing pipeline, in one place.
 //
@@ -14,19 +15,7 @@ import { filledFields } from "./listing";
 // photo to JPEG with sharp, which is not optional — iPhone photos are HEIC and the AI cannot read
 // HEIC at all ("file format is invalid or unsupported").
 
-export type DraftFields = {
-  title?: string;
-  brand?: string;
-  era?: string;
-  material?: string;
-  condition?: string;
-  category?: string;
-  description?: string;
-  size?: string;
-  price?: string;
-};
-
-export type Pricing = { price?: string; priceCents?: number; compsCount?: number; comps?: unknown[] };
+export type { DraftFields };
 
 /**
  * One photo → one hosted URL.
@@ -52,20 +41,59 @@ export async function uploadPhoto(uri: string): Promise<string> {
   return url;
 }
 
-/** Phase 1 — the fields. `draftOnly` so the form can render before pricing is done. */
+/**
+ * Phase 1 — the fields. `draftOnly` so the form can render before pricing is done.
+ *
+ * The response is normalised here rather than at the call sites: the raw shape has the fields
+ * under `draft` and wraps half of them in {value, confidence}, and every screen that touched it
+ * raw got either undefined or an object it could not render.
+ */
 export async function draftListing(imageUrls: string[], typedFields: Record<string, string | undefined>) {
-  return apiPost<{ fields: DraftFields; searchQuery?: string; reverseComps?: unknown[]; reverseTitles?: string[] }>(
-    "/api/store/intake",
-    { imageUrls, filled: filledFields(typedFields), draftOnly: true },
-  );
+  const r = await apiPost<{
+    draft?: unknown; searchQuery?: string; reverseComps?: unknown[]; reverseTitles?: string[]; editorialTitles?: string[];
+  }>("/api/store/intake", { imageUrls, filled: filledFields(typedFields), draftOnly: true });
+
+  return {
+    fields: normalizeDraft(r.draft),
+    searchQuery: r.searchQuery,
+    reverseComps: r.reverseComps,
+    reverseTitles: r.reverseTitles,
+    editorialTitles: r.editorialTitles,
+  };
 }
 
-/** Phase 2 — the number, and how many comparable sales stand behind it. */
+/**
+ * Phase 2 — the number, and how many comparable sales stand behind it.
+ *
+ * The route answers { ok, estimate, priceFlag, runway, celebrity }; the price lives at
+ * estimate.suggestedCents and the comps count is estimate.comps.length. There is no top-level
+ * `price` — reading for one returned undefined and the Review screen showed an empty row.
+ */
 export async function priceListing(imageUrls: string[], fields: DraftFields, extras: Record<string, unknown> = {}) {
-  return apiPost<Pricing>("/api/store/intake/pricing", { imageUrls, fields, ...extras });
+  const r = await apiPost<{ estimate?: { suggestedCents?: number | null; marketCents?: number | null; comps?: unknown[] | null } }>(
+    "/api/store/intake/pricing",
+    { imageUrls, fields, ...extras },
+  );
+  return readEstimate(r.estimate);
 }
 
-/** Publish, or save as a draft. Same route either way — `status` decides. */
-export async function publishListing(fields: DraftFields & { imageUrls: string[] }, status: "active" | "draft") {
-  return apiPost<{ ok: boolean; item?: { id: string } }>("/api/store/intake/publish", { ...fields, status });
+/**
+ * Publish, or save as a draft. Same route either way — `status` decides.
+ *
+ * `priceCents` in, MAJOR units out: the route does `Number(body.price) * 100`. Sending cents
+ * would list a $219 pair of shoes at $21,921, so the conversion lives here rather than in each
+ * screen that publishes.
+ */
+export async function publishListing(
+  fields: DraftFields & { imageUrls: string[]; priceCents?: number | null },
+  status: "active" | "draft",
+) {
+  const { priceCents, ...rest } = fields;
+  // The route answers { ok, itemId, status, scheduled, publishAt, crossListing } — itemId at the
+  // top level, not a nested item object.
+  return apiPost<{ ok: boolean; itemId?: string; status?: string }>("/api/store/intake/publish", {
+    ...rest,
+    ...(typeof priceCents === "number" && priceCents > 0 ? { price: priceCents / 100 } : {}),
+    status,
+  });
 }

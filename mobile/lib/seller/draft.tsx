@@ -24,6 +24,9 @@ type Draft = {
   setImageUrls: (u: string[]) => void;
   compsCount: number | null;
   setCompsCount: (n: number | null) => void;
+  /** Minor units, as the pricing endpoint returns them. Formatted only at the point of display. */
+  priceCents: number | null;
+  setPriceCents: (n: number | null) => void;
   reset: () => void;
 };
 
@@ -35,13 +38,15 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
   const [fields, setFields] = useState<DraftFields>({});
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [compsCount, setCompsCount] = useState<number | null>(null);
+  const [priceCents, setPriceCents] = useState<number | null>(null);
 
   const value = useMemo<Draft>(
     () => ({
       photos, setPhotos, typed, setTyped, fields, setFields, imageUrls, setImageUrls, compsCount, setCompsCount,
-      reset: () => { setPhotos([]); setTyped({}); setFields({}); setImageUrls([]); setCompsCount(null); },
+      priceCents, setPriceCents,
+      reset: () => { setPhotos([]); setTyped({}); setFields({}); setImageUrls([]); setCompsCount(null); setPriceCents(null); },
     }),
-    [photos, typed, fields, imageUrls, compsCount],
+    [photos, typed, fields, imageUrls, compsCount, priceCents],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -6,6 +6,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, fonts } from "../../../lib/theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { publishListing } from "../../../lib/seller/intake";
+import { formatMoney } from "../../../lib/seller/home";
+import { apiGet } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth";
+import { useQuery } from "@tanstack/react-query";
 
 // Review — four rows, each with what VYA decided and a way to disagree.
 //
@@ -15,7 +19,10 @@ import { publishListing } from "../../../lib/seller/intake";
 export default function ReviewScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { photos, fields, setFields, imageUrls, compsCount, reset } = useDraft();
+  const { photos, fields, setFields, imageUrls, compsCount, priceCents, setPriceCents, reset } = useDraft();
+  const { storeSlug } = useAuth();
+  const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<{ currency: string }>("/api/store/me"), enabled: !!storeSlug });
+  const currency = me.data?.currency ?? "USD";
   const [editing, setEditing] = useState<string | null>(null);
   const [saving, setSaving] = useState<null | "active" | "draft">(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +31,8 @@ export default function ReviewScreen() {
   // only, which TypeScript rightly refuses to read off the others.
   const rows: { key: keyof typeof fields; label: string; value?: string; note?: string | null }[] = [
     { key: "brand", label: "Brand", value: fields.brand },
-    { key: "price", label: "Price", value: fields.price, note: compsCount ? `${compsCount} comps` : null },
+    // Price is held in cents and formatted here; the row edits it back through priceCents.
+    { key: "price", label: "Price", value: priceCents !== null ? formatMoney(priceCents, currency) : undefined, note: compsCount ? `${compsCount} comps` : null },
     { key: "condition", label: "Condition", value: fields.condition },
     { key: "category", label: "Category", value: fields.category },
   ];
@@ -33,7 +41,7 @@ export default function ReviewScreen() {
     setError(null);
     setSaving(status);
     try {
-      await publishListing({ ...fields, imageUrls }, status);
+      await publishListing({ ...fields, imageUrls, priceCents }, status);
       // The new piece has to show up wherever pieces are counted.
       await qc.invalidateQueries({ queryKey: ["store", "items"] });
       await qc.invalidateQueries({ queryKey: ["store", "overview", 1] });
@@ -70,8 +78,17 @@ export default function ReviewScreen() {
             {editing === r.key ? (
               <TextInput
                 autoFocus
-                value={(fields as Record<string, string | undefined>)[r.key] ?? ""}
-                onChangeText={(v) => setFields({ ...fields, [r.key]: v })}
+                value={r.key === "price"
+                  ? (priceCents !== null ? String(priceCents / 100) : "")
+                  : ((fields as Record<string, string | undefined>)[r.key] ?? "")}
+                onChangeText={(v) => {
+                  if (r.key === "price") {
+                    // Typed in whole currency, stored in cents — the same units the pricer used.
+                    const n = Number(v.replace(/[^0-9.]/g, ""));
+                    setPriceCents(Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null);
+                  } else setFields({ ...fields, [r.key]: v });
+                }}
+                keyboardType={r.key === "price" ? "numeric" : "default"}
                 onBlur={() => setEditing(null)}
                 style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}
               />

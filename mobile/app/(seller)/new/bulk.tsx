@@ -99,7 +99,7 @@ export default function BulkScreen() {
         const p = await priceListing(r.photos, d.fields, {
           searchQuery: d.searchQuery, reverseComps: d.reverseComps, reverseTitles: d.reverseTitles,
         });
-        await publishListing({ ...d.fields, price: p.price ?? d.fields.price, imageUrls: r.photos }, "draft");
+        await publishListing({ ...d.fields, priceCents: p.priceCents, imageUrls: r.photos }, "draft");
       }
       await qc.invalidateQueries({ queryKey: ["store", "items"] });
       router.dismissAll();
