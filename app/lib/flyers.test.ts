@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FLYERS, flyerBySlug, flyerSource, isFlyerSlug, flyerPaths } from "./flyers.ts";
+import { FLYERS, flyerBySlug, flyerSource, isFlyerSlug, flyerPaths, flyerDestination } from "./flyers.ts";
 
 test("every printed slug resolves to a flyer", () => {
  // If one of these ever stops resolving, a printed QR code becomes a dead link — and unlike a
@@ -59,4 +59,31 @@ test("flyerPaths lists every route that must be publicly reachable", () => {
  // These are what proxy.ts has to let through; a flyer missing here dead-ends at /login.
  assert.deepEqual(flyerPaths().sort(), FLYERS.map((f) => `/${f.slug}`).sort());
  assert.equal(flyerPaths().length, 6);
+});
+
+/* ── where a flyer sends someone once they are in ───────────────────────── */
+
+test("the Fendi flyer lands on Fendi, not the generic homepage", () => {
+ // The poster promises a specific bag. Dropping someone on the homepage makes them go and find it,
+ // which is the moment the joke stops paying off.
+ assert.equal(flyerDestination("emma-stolen-bag"), "/brands/fendi");
+});
+
+test("a flyer with no particular destination lands on the homepage", () => {
+ assert.equal(flyerDestination("vintage"), "/");
+ assert.equal(flyerDestination("postcard"), "/");
+});
+
+test("an unknown slug still yields a safe destination rather than undefined", () => {
+ // This value is interpolated into a sign-in callback; undefined there would strand someone.
+ assert.equal(flyerDestination("nonsense"), "/");
+});
+
+test("every destination is a relative path", () => {
+ // Auth.js rejects a cross-origin callbackUrl, so an absolute URL here would silently downgrade
+ // the whole sign-in hop to /login — and put a brand-new member back on the waitlist.
+ for (const f of FLYERS) {
+  const d = flyerDestination(f.slug);
+  assert.ok(d.startsWith("/") && !d.startsWith("//"), `${f.slug} destination must be a relative path`);
+ }
 });

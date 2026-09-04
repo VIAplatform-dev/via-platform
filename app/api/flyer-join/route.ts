@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPilotEntry, getPilotStatus, approvePilotUser } from "@/app/lib/pilot-db";
-import { flyerBySlug, flyerSource } from "@/app/lib/flyers";
+import { flyerBySlug, flyerSource, flyerDestination } from "@/app/lib/flyers";
 import { createMagicSignInLink } from "@/app/lib/email";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,14 @@ export async function POST(request: NextRequest) {
 
  // The link that actually gets them in. If it cannot be built (no AUTH_SECRET, DB trouble) it
  // falls back to /login — degraded, but never a dead end.
- const next = await createMagicSignInLink(email, "/api/pilot-check?next=/").catch(() => "/login");
+ // Land them where the flyer promised. pilot-check sets the approval cookie on the way through
+ // and then forwards to `next`, so the Fendi poster ends on Fendi rather than a homepage they
+ // would have to go searching from.
+ const destination = flyerDestination(flyer.slug);
+ const next = await createMagicSignInLink(
+  email,
+  `/api/pilot-check?next=${encodeURIComponent(destination)}`,
+ ).catch(() => "/login");
 
  const response = NextResponse.json({ ok: true, next });
  // Set the approval cookie here too. /api/pilot-check will set it again at the end of the sign-in

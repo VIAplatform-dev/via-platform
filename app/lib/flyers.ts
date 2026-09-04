@@ -20,6 +20,15 @@ export type Flyer = {
  headline: string;
  /** Short line under the headline. The flyer had room for a punchline; the page has room for an offer. */
  subhead: string;
+ /**
+  * Where they land once they are in. Defaults to the homepage.
+  *
+  * A flyer that promises something specific should deliver it — the Fendi poster sends people to
+  * Fendi, not to a homepage they then have to search. MUST be a relative path: Auth.js rejects a
+  * cross-origin callbackUrl, and the sign-in hop would quietly fall back to /login, which is the
+  * waitlist wall this whole flow exists to skip.
+  */
+ destination?: string;
 };
 
 export const FLYERS: Flyer[] = [
@@ -33,6 +42,7 @@ export const FLYERS: Flyer[] = [
   headline: "Emma, I know you stole my Fendi baguette.",
   // The flyer's punchline is its second line — dropping it would land the setup without the joke.
   subhead: "I have proof. Get your own — archive Fendi and more, from vintage stores around the world.",
+  destination: "/brands/fendi",
  },
  {
   slug: "trendsetter",
@@ -77,6 +87,15 @@ export function isFlyerSlug(slug: string | null | undefined): boolean {
  */
 export function flyerSource(slug: string): string {
  return `flyer:${slug}`;
+}
+
+/**
+ * Where a scan of this flyer should end up after signing in. Always a relative path, and always
+ * something — an unknown slug yields the homepage rather than undefined, because this value is
+ * interpolated into a sign-in callback and a blank there strands the person mid-signup.
+ */
+export function flyerDestination(slug: string | null | undefined): string {
+ return flyerBySlug(slug)?.destination ?? "/";
 }
 
 /** Every path that must be publicly reachable. Kept here so proxy.ts cannot drift from this list. */
