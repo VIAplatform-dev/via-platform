@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Suspense } from "react";
 import { cookies, headers } from "next/headers";
 import { recordQrScan, scanLocationFromHeaders } from "@/app/lib/qr-scans-db";
-import { isLikelyBotScan } from "@/app/lib/qr-codes";
+import { isBotScanningAFlyer } from "@/app/lib/flyer-bot";
 import EditorsPicksSection from "./EditorsPicksSection";
 import NewArrivalsSection from "./NewArrivalsSection";
 import StoreCarousel from "./StoreCarousel";
@@ -27,12 +27,15 @@ export default async function FlyerLanding({ flyer }: { flyer: Flyer }) {
  // city-level reporting the printed business cards already have. The QR encodes the pretty
  // address rather than a /q redirect, so this page is the only place it can be counted.
  //
- // ONLY when they do not already hold the access cookie: that is the arriving stranger. The
- // refresh straight after signing up carries the cookie, so a single scan cannot count twice.
- if (!alreadyIn) {
+ // EVERY ARRIVAL COUNTS, including people who are already members. An earlier version skipped
+ // anyone holding the access cookie, to avoid double-counting a post-signup refresh — but the
+ // signup now follows a sign-in link that lands on "/", so the flyer page is never re-rendered
+ // and there is nothing to dedupe. What that guard actually did was make a whole poster look
+ // unscanned the moment one person signed up and then walked past the other five.
+ {
   const h = await headers();
   const ua = h.get("user-agent");
-  if (!isLikelyBotScan(ua)) {
+  if (!isBotScanningAFlyer(ua)) {
    // Awaited, not fire-and-forget — the serverless instance can freeze once the response is
    // returned, which would drop the write.
    try {
@@ -42,8 +45,11 @@ export default async function FlyerLanding({ flyer }: { flyer: Flyer }) {
      userAgent: ua,
      referrerHost: null, // a printed scan has no referrer
     });
-   } catch {
-    // A scan must never cost someone the page. Losing the row beats losing the visit.
+   } catch (err) {
+    // A scan must never cost someone the page — losing the row beats losing the visit. But it is
+    // LOGGED, not swallowed: a silent catch here is why six scans could go missing without a
+    // single sign that anything had failed.
+    console.error(`[flyer] scan not recorded for ${flyer.slug}:`, err);
    }
   }
  }
