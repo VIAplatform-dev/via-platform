@@ -18,10 +18,10 @@ import type { BlockType, BlockField } from "./storefront-blocks.ts";
 import type { ItemSchemaName } from "./storefront-items.ts";
 
 // Picker groupings — so ~75 layouts read as an organized library instead of a wall of cards.
-export type SectionCategory = "Hero" | "Products" | "Collections" | "Editorial" | "Social Proof" | "Content" | "Media" | "Marketing" | "Miscellaneous";
+export type SectionCategory = "Hero" | "Products" | "Collections" | "Editorial" | "Social Proof" | "Content" | "Media" | "Marketing" | "Booking" | "Miscellaneous";
 // Display order in the picker. "Miscellaneous" last — it is the catch-all, so it should read as the
 // place you look when nothing else fits, not as a category with a theme of its own.
-export const SECTION_CATEGORIES: SectionCategory[] = ["Hero", "Products", "Collections", "Editorial", "Social Proof", "Content", "Media", "Marketing", "Miscellaneous"];
+export const SECTION_CATEGORIES: SectionCategory[] = ["Hero", "Products", "Collections", "Editorial", "Social Proof", "Content", "Media", "Marketing", "Booking", "Miscellaneous"];
 
 // What editing affordances a variant exposes. The editor reads this instead of special-casing
 // layouts, so a new variant gets the right controls by declaring them rather than by wiring them.
@@ -70,6 +70,14 @@ export const VARIANTS: VariantGroup[] = [
    { id: "bar", label: "Bar", description: "A thin colour bar across the very top.", supports: { free: [] } },
    { id: "quiet", label: "Hairline", description: "No fill — the message between two rules, on the page's own ground.", supports: { free: [] } },
    { id: "ticker", label: "Ticker", description: "The message repeating and scrolling across the strip.", supports: { free: [] } },
+  ],
+ },
+ {
+  type: "appointments", category: "Booking",
+  variants: [
+   { id: "centered", label: "Centred", description: "Heading, a line of copy, then the times — the simplest way to offer a booking.", supports: { free: ["heading", "subtext", "cta"] } },
+   { id: "split", label: "Split", description: "Your words on one side, the times on the other. Room to explain what an appointment is for.", supports: { free: ["heading", "subtext", "cta"], resize: ["split"] } },
+   { id: "card", label: "Card", description: "Boxed and inset — reads as a distinct offer rather than part of the page.", supports: { free: ["heading", "subtext", "cta"] } },
   ],
  },
  {

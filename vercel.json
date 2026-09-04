@@ -207,6 +207,14 @@
     {
       "path": "/api/cron/embed-item-index",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/rentals",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/appointments",
+      "schedule": "0 * * * *"
     }
   ]
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { ShoppingBag } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/app/infrastructure/admin/ui";
 import OfflinePill from "./OfflineSync";
+import { readCart } from "./cart";
 
 // Market Mode primitives: a phone-first POS look inside the workspace shell. Big targets (≥56px),
 // one primary action per screen, money always in cents → formatted here.
@@ -71,13 +73,36 @@ export type MarketItem = {
  costCents?: number | null; source?: string; soldForCents?: number | null;
 };
 
+/** How many lines are in the cart right now. Polled, because the cart is written from other pages. */
+export function useCartCount(): number {
+ const [n, setN] = useState(0);
+ useEffect(() => {
+ const read = () => setN(readCart().length);
+ read();
+ const t = setInterval(read, 1000);
+ return () => clearInterval(t);
+ }, []);
+ return n;
+}
+
+/** The running sale, always one tap away. Only shown when there's something in it. */
+export function CartButton({ count }: { count: number }) {
+ return (
+ <Link href={href(`${B}/cart`)} aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`} className="ml-auto inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold text-white" style={{ background: "#5D0F17" }}>
+ <ShoppingBag size={16} /> {count}
+ </Link>
+ );
+}
+
 export function MarketPage({ title, back, children, className }: { title?: string; back?: string; children: React.ReactNode; className?: string }) {
+ const cartCount = useCartCount();
  return (
  <div className={cn("mx-auto w-full min-w-0 max-w-lg px-4 pb-24 pt-4 sm:px-6 sm:pt-8 md:pb-10", className)}>
  {(title || back) && (
  <div className="mb-4 flex items-center gap-3">
  {back && <Link href={href(back)} className="grid h-10 w-10 place-items-center rounded-full bg-white text-stone-600 shadow-sm ring-1 ring-stone-200" aria-label="Back">←</Link>}
- {title && <h1 className="text-[22px] font-semibold tracking-tight text-stone-900">{title}</h1>}
+ {title && <h1 className="min-w-0 truncate text-[22px] font-semibold tracking-tight text-stone-900">{title}</h1>}
+ {cartCount > 0 && <CartButton count={cartCount} />}
  </div>
  )}
  <OfflinePill />
@@ -156,6 +181,22 @@ export function ItemCard({ item, to, right, dim, highlight }: { item: MarketItem
  </div>
  );
  return to ? <Link href={href(to)} className="block">{body}</Link> : body;
+}
+
+// Thumbnail grid tile — the "see the rack at a glance" view. Same data and tap target as ItemCard.
+export function ItemTile({ item, to, dim }: { item: MarketItem; to?: string; dim?: boolean }) {
+ return (
+ <Link href={href(to ?? `${B}/item/${item.id}`)} className={cn("block overflow-hidden rounded-2xl border border-stone-200 bg-white active:bg-stone-50", dim && "opacity-60")}>
+ <div className="aspect-square w-full bg-stone-100"><Thumb src={item.image} alt={item.title} fill className="!max-h-none aspect-square !object-cover" /></div>
+ <div className="p-2.5">
+ <p className="truncate text-[13px] font-medium text-stone-900">{item.title}</p>
+ <div className="mt-1 flex items-center justify-between gap-2">
+ <StatusChip status={item.status} />
+ <span className="text-[14px] font-semibold text-stone-900">{money(item.priceCents, item.currency)}</span>
+ </div>
+ </div>
+ </Link>
+ );
 }
 
 export function Thumb({ src, alt, size = 64, className, fill }: { src: string | null; alt: string; size?: number; className?: string; fill?: boolean }) {

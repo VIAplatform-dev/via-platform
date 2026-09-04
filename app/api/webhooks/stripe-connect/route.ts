@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { confirmBookingPaid } from "@/app/lib/rentals/rentals-db";
+import { getAppointmentSettings, markDepositPaid } from "@/app/lib/appointments/appointments-db";
+import { notifyAppointmentBooked } from "@/app/lib/appointments/notify";
 import Stripe from "stripe";
 import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
@@ -168,6 +171,37 @@ export async function POST(request: NextRequest) {
  }
  // charge.refunded / dispute.closed fall through to unwindByPaymentIntent below — it works by PI.
  if (event.type !== "charge.refunded" && event.type !== "charge.dispute.closed") return NextResponse.json({ received: true });
+ }
+ }
+
+ // ── Rentals ──────────────────────────────────────────────────────────────────────────────
+ // A rental is not a sale: the piece isn't sold, isn't reserved by status, and stays in inventory.
+ // What payment buys is the DATES, which the booking row has already been holding — so this never
+ // goes through fulfill(), it just turns the hold into a confirmed booking.
+ {
+ const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
+ const md = (obj.metadata || {}) as Record<string, string>;
+ if (md.rentalBookingId && event.type === "payment_intent.succeeded") {
+ await confirmBookingPaid(md.rentalBookingId, String(obj.id || "")).catch(() => null);
+ return NextResponse.json({ received: true });
+ }
+ }
+
+ // ── Appointment deposits ─────────────────────────────────────────────────────────────────
+ // A deposit buys a SLOT, not a piece. Nothing is sold, so this never goes through fulfill():
+ // the money landing is what turns a held time into a real one — and only then is anyone told,
+ // so an abandoned payment page never emails a shop about a booking that isn't happening.
+ {
+ const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
+ const md = (obj.metadata || {}) as Record<string, string>;
+ if (md.appointmentId && md.storeSlug && event.type === "payment_intent.succeeded") {
+ const settings = await getAppointmentSettings(md.storeSlug).catch(() => null);
+ if (settings) {
+ const appointment = await markDepositPaid(md.appointmentId, settings.requireApproval).catch(() => null);
+ // Null = a replayed webhook, or one the shop already dealt with. Nothing to announce.
+ if (appointment) void notifyAppointmentBooked(md.storeSlug, appointment, settings);
+ }
+ return NextResponse.json({ received: true });
  }
  }
 

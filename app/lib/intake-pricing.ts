@@ -5,7 +5,7 @@ import { getStoreBrief, briefPricingTarget } from "./store-brief-db";
 import { fetchResaleTrend, type Comp } from "./comps";
 import { resolveBrandLine, isFairComp, compQueryBrand, compExclusions, isAmbiguousHouse, linesOfHouse, lineByLabel } from "./brand-lines";
 import { identifyRunway, identifyCelebrity, isIntakeConfigured, identifyBrandTier } from "./ai-intake";
-import { matchRunwayByImage } from "./runway-index";
+import { matchRunwayByImage, rememberRunwayLook } from "./runway-index";
 import { getPieceRunway, savePieceRunway } from "./comp-cache-db";
 import { gate } from "./concurrency";
 
@@ -222,6 +222,7 @@ export async function computeListingPricing(opts: {
  // pieces whose resellers cite a famous season. When the full draft ran it already judged runway (and
  // left it null for production pieces) — we do NOT second-guess that with the title heuristic.
  let runway: string | null = opts.runwaySoFar;
+ let runwayFromIndex = false; // gates the write-back below — the index must not teach itself
  if (!runway && brandVal) {
  runway = await getPieceRunway(brandVal, opts.title).catch(() => null); // seen this exact piece before?
  // Then the look index: matching the GARMENT against documented shows beats
@@ -229,7 +230,7 @@ export async function computeListingPricing(opts: {
  // embedding instead of a vision call. Silent no-op until a corpus is loaded.
  if (!runway) {
   const matched = await matchRunwayByImage(opts.imageUrls, brandVal).catch(() => null);
-  if (matched?.runway) runway = matched.runway;
+  if (matched?.runway) { runway = matched.runway; runwayFromIndex = true; }
  }
  if (!runway && !opts.draftRanFull) {
  // Editorial/Getty captions (e.g. "…walks the runway at the Prada F/W 2004 show") are prime
@@ -243,6 +244,12 @@ export async function computeListingPricing(opts: {
  }
  }
  if (runway && brandVal && opts.title) await savePieceRunway(brandVal, opts.title, runway).catch(() => {});
+ // Teach the look index what this piece looks like, so the next one like it matches on the photo
+ // instead of costing a vision call. Skipped when the index is what named it — otherwise it would
+ // be learning from itself. Fire-and-forget: a listing must never wait on, or fail from, this.
+ if (runway && !runwayFromIndex && opts.imageUrls[0]) {
+ void rememberRunwayLook(runway, opts.imageUrls[0]).catch(() => {});
+ }
 
  return { estimate, priceFlag, runway, celebrity };
 }

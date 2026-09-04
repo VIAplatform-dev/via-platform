@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
 import type { NextRequest } from "next/server";
 import { verifyRecipientTokenEdge } from "@/app/lib/recipientToken-edge";
-import { capturedSlugForDomain } from "@/app/lib/domain-routing-edge";
+import { capturedSlugForDomain, storeHasCapture } from "@/app/lib/domain-routing-edge";
 
 // Routes accessible without any authentication or approval
 const PUBLIC_ROUTES = [
@@ -94,6 +94,15 @@ const PUBLIC_ROUTES = [
   // here cross-domain), and connect/status/setup enforce their own auth (resolveStoreSlugAny).
   // Without this, eBay's redirect to the callback hits the login wall and no token is ever stored.
   "/api/store/cross-listing",
+  // Rentals: a shopper checking dates, pricing them, holding them for checkout or
+  // applying to rent has no session and never will. The seller-facing rental routes
+  // (settings, terms, bookings, the request inbox) are deliberately NOT here — this
+  // list matches on path, not method, so public and seller paths are kept apart.
+  "/api/store/rentals/availability",
+  "/api/store/rentals/quote",
+  "/api/store/rentals/hold",
+  "/api/store/rentals/apply",
+  "/api/store/appointments/slots",
   "/api/checkout",
   "/api/storefront",
   "/checkout",
@@ -307,9 +316,14 @@ export async function proxy(request: NextRequest) {
     // their internal links to /site/{slug}/…, and prefixing those again would 404 every link on the
     // page. (New Plan B captures keep links root-relative — see CrawlOpts.linkBase.)
     if (pathname.startsWith("/site/")) return NextResponse.next();
+    // A storefront BUILT from sections has no captured pages to serve — it lives at /s/{slug}. Both
+    // kinds belong on this origin: it's the store's own address, and the only one where its own code
+    // could ever safely run (see isRefusedOnStoreHost above for what this origin refuses).
+    if (pathname.startsWith("/s/")) return NextResponse.next();
     if (!pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
       const url = request.nextUrl.clone();
-      url.pathname = `/site/${planBSlug}${pathname === "/" ? "" : pathname}`;
+      const base = (await storeHasCapture(planBSlug)) ? `/site/${planBSlug}` : `/s/${planBSlug}`;
+      url.pathname = `${base}${pathname === "/" ? "" : pathname}`;
       return NextResponse.rewrite(url);
     }
     return NextResponse.next();

@@ -39,7 +39,7 @@ function offerBtn(url: string, label: string): string {
  * shell (with a custom CTA) so shoppers get a consistent look across marketing and transactional mail.
  * A subtle "Powered by VYA" line stays in the footer. Best-effort; never throws.
  */
-async function sendStoreBrandedTransactional(
+export async function sendStoreBrandedTransactional(
  storeSlug: string,
  opts: { to: string; subject: string; body: string; cta?: { label: string; url: string } },
 ): Promise<void> {
@@ -53,11 +53,74 @@ async function sendStoreBrandedTransactional(
  await getResend().emails.send({
   from: `${cleanName} <${sender.fromAddress}>`,
   to: opts.to,
-  replyTo: sender.replyTo || undefined,
+  // A placeholder reply-to is worse than none: the customer's reply bounces instead of
+  // landing somewhere a human reads.
+  replyTo: routableEmail(sender.replyTo) || undefined,
   subject: opts.subject,
   html,
  });
 }
+
+// Addresses that exist in the database but can never receive mail: the importer stamps a synthetic
+// `slug@imported.vya` on every store it pulls in, and test data leaves .local/.invalid behind. They
+// look like real addresses to every `if (email)` check, so a notification sent to one disappears
+// with no bounce and no error — the store simply never hears from us.
+const UNROUTABLE_DOMAIN = /@(?:[\w-]+\.)*(?:imported\.vya|invalid|localhost|local|test|example\.(?:com|org|net))$/i;
+
+/** The address if mail can actually reach it, else null. */
+export function routableEmail(email: string | null | undefined): string | null {
+ const e = (email || "").trim();
+ if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return null;
+ return UNROUTABLE_DOMAIN.test(e) ? null : e;
+}
+
+/**
+ * Where a store's OWN notifications land — the address it already sends from, else the curated
+ * contact, else ops. One definition, so a store that sets a reply-to gets its alerts there too
+ * instead of us quietly mailing a hardcoded list.
+ */
+export async function storeOwnerInbox(storeSlug: string): Promise<string> {
+ const { resolveStoreSender } = await import("./email-settings-db");
+ const sender = await resolveStoreSender(storeSlug).catch(() => null);
+ return routableEmail(sender?.replyTo) || routableEmail(storeContactEmails[storeSlug]) || OPS_ALERT_EMAIL;
+}
+
+/**
+ * A VYA-branded to-do alert to the store itself (a booking to approve, a piece to check in). Stays
+ * VYA-branded on purpose: it's an internal prompt, not something a customer ever sees.
+ * Best-effort — never throws, so a mail outage can't fail the thing that triggered it.
+ */
+export async function sendStoreOwnerAlert(
+ storeSlug: string,
+ opts: { subject: string; html: string; to?: string | null },
+): Promise<boolean> {
+ try {
+  if (!process.env.RESEND_API_KEY) return false;
+  await getResend().emails.send({
+   from: FROM_EMAIL,
+   to: routableEmail(opts.to) || (await storeOwnerInbox(storeSlug)),
+   subject: opts.subject,
+   html: opts.html,
+  });
+  return true;
+ } catch (e) {
+  console.error("[email] store owner alert failed", storeSlug, e);
+  return false;
+ }
+}
+
+/** A VYA-styled button, for those owner alerts. */
+export const ownerAlertButton = offerBtn;
+
+/**
+ * A link into the Owner Workspace.
+ *
+ * The workspace lives on getvya.ai, NOT on the marketplace host: `vyaplatform.com/infrastructure/
+ * admin/…` only still works because proxy.ts 308s it across, and a store clicking a mail link
+ * shouldn't be bounced through two redirects to get to its own diary. Same form as OS_INBOX_URL in
+ * message-notify.ts.
+ */
+export const osAdminUrl = (path: string) => `https://getvya.ai/admin${path.startsWith("/") ? path : `/${path}`}`;
 
 /** Notify the store that a shopper made a fresh offer. Best-effort. */
 export async function sendNewOfferToStore(offer: Offer): Promise<void> {

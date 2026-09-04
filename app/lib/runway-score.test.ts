@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { scoreRunwayCandidates, houseKey, formatRunway, type RunwayCandidate } from "./runway-score.ts";
+import { scoreRunwayCandidates, houseKey, formatRunway, parseRunway, type RunwayCandidate } from "./runway-score.ts";
 
 // Naming a show raises the asking price and is publicly falsifiable, so these
 // tests are mostly about what the scorer REFUSES to assert.
@@ -83,4 +83,29 @@ test("with no brand known, the closest corroborated season still wins", () => {
 
 test("formatRunway matches the format the listing copy expects", () => {
  assert.equal(formatRunway({ house: "Tom Ford for Gucci", season: "S/S", year: 2004 }), "Tom Ford for Gucci S/S 2004");
+});
+
+// parseRunway gates what gets WRITTEN INTO the index, so it errs the same way the scorer does:
+// anything it can't read as a documented season comes back null rather than a guess.
+
+test("parseRunway round-trips formatRunway", () => {
+ const look = { house: "Tom Ford for Gucci", season: "S/S", year: 2004 };
+ assert.deepEqual(parseRunway(formatRunway(look)), look);
+});
+
+test("parseRunway keeps multi-word houses intact", () => {
+ assert.deepEqual(parseRunway("Roberto Cavalli S/S 2001"), { house: "Roberto Cavalli", season: "S/S", year: 2001 });
+ assert.deepEqual(parseRunway("Christian Dior by John Galliano F/W 2004"), { house: "Christian Dior by John Galliano", season: "F/W", year: 2004 });
+});
+
+test("parseRunway normalises season spelling", () => {
+ assert.equal(parseRunway("Prada f/w 1999")?.season, "F/W");
+ assert.equal(parseRunway("Blumarine prefall 2003")?.season, "Pre-Fall");
+ assert.equal(parseRunway("Escada Pre-Fall 2003")?.season, "Pre-Fall");
+});
+
+test("parseRunway refuses anything that isn't a documented season", () => {
+ for (const bad of ["", "early 2000s Cavalli", "Gucci 1999", "S/S 2004", "Gucci S/S 99", "Gucci Spring 2004"]) {
+  assert.equal(parseRunway(bad), null, `should refuse: ${bad}`);
+ }
 });

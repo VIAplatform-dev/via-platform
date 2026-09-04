@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageCircle, Settings2, Tag, Send } from "lucide-react";
+import { MessageCircle, Settings2, Tag, Send, CalendarClock } from "lucide-react";
 import { PageHeader, EmptyState, cn } from "../ui";
 
 type Conv = {
@@ -20,6 +20,14 @@ type Offer = {
  status: "pending" | "accepted" | "declined" | "expired" | "withdrawn";
  lastActor: "buyer" | "store"; binding: boolean;
 };
+// An appointment waiting on the shop. Only ever the pending ones — the diary itself lives on its
+// own page; what belongs in an inbox is the thing someone is waiting for an answer to.
+type Appt = {
+ id: string; kind: string; day: string; start: string;
+ customerName: string | null; customerEmail: string | null; customerPhone: string | null;
+ note: string | null; depositCents: number; depositPaid: boolean;
+};
+
 type Settings = { messagingEnabled: boolean; offersEnabled: boolean; offersBinding: boolean; minOfferPct: number; notifyPhone: string | null; notifySms: boolean; smsAvailable?: boolean };
 
 // Accent is theme-scoped: green inside /infrastructure/admin (via --accent), wine on the seller
@@ -44,6 +52,13 @@ function timeAgo(iso: string): string {
  const d = Math.floor(h / 24);
  if (d < 7) return `${d}d`;
  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+const apptDay = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
+function apptTime(t: string): string {
+ const [h, m] = t.split(":").map(Number);
+ if (!Number.isFinite(h) || !Number.isFinite(m)) return t;
+ return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
 function Avatar({ name, email, className }: { name: string | null; email: string | null; className?: string }) {
@@ -75,7 +90,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 const CARD = "rounded-2xl border border-stone-200/70 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-16px_rgba(16,24,40,0.12)]";
 
 export default function InboxPage() {
- const [tab, setTab] = useState<"messages" | "offers">("messages");
+ const [tab, setTab] = useState<"messages" | "offers" | "appointments">("messages");
  const [showSettings, setShowSettings] = useState(false);
 
  const [convs, setConvs] = useState<Conv[]>([]);
@@ -89,21 +104,26 @@ export default function InboxPage() {
  const [counterFor, setCounterFor] = useState<number | null>(null);
  const [counterVal, setCounterVal] = useState("");
 
+ const [appts, setAppts] = useState<Appt[]>([]);
+
  const [settings, setSettings] = useState<Settings | null>(null);
  const [saved, setSaved] = useState(false);
 
  useEffect(() => {
  let active = true;
  (async () => {
- const [list, off, set] = await Promise.all([
+ const [list, off, set, appt] = await Promise.all([
  fetch("/api/store/inbox").then((r) => (r.ok ? r.json() : null)).catch(() => null),
  fetch("/api/store/offers").then((r) => (r.ok ? r.json() : null)).catch(() => null),
  fetch("/api/store/inbox-settings").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+ // 404s for a shop that doesn't take appointments — then the tab simply never appears.
+ fetch("/api/store/appointments/pending?list=1").then((r) => (r.ok ? r.json() : null)).catch(() => null),
  ]);
  if (!active) return;
  if (list) setConvs(list.conversations || []);
  if (off) { setOffers(off.offers || []); setPending(off.pending || 0); }
  if (set?.settings) setSettings(set.settings);
+ if (appt) setAppts(appt.appointments || []);
  setLoading(false);
  })();
  return () => { active = false; };
@@ -128,6 +148,14 @@ export default function InboxPage() {
  setCounterFor(null); setCounterVal(""); reloadOffers();
  }
 
+ async function answerAppt(id: string, status: "booked" | "cancelled") {
+ // Optimistic: the row leaves the list either way, and the customer's email goes out server-side.
+ setAppts((a) => a.filter((x) => x.id !== id));
+ await fetch(`/api/store/appointments/${id}`, {
+ method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+ }).catch(() => {});
+ }
+
  async function saveSettings(patch: Partial<Settings>) {
  if (!settings) return;
  setSettings({ ...settings, ...patch });
@@ -139,7 +167,7 @@ export default function InboxPage() {
  <div className="mx-auto max-w-5xl px-6 py-10 sm:px-8">
  <PageHeader
  title="Inbox"
- subtitle="Messages and offers from your shoppers."
+ subtitle={appts.length ? "Messages, offers and appointments to approve." : "Messages and offers from your shoppers."}
  actions={
  <button onClick={() => setShowSettings((s) => !s)}
  className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium transition"
@@ -191,9 +219,11 @@ export default function InboxPage() {
  {/* tabs */}
  <div className="mb-6 flex gap-6 border-b border-stone-200">
  {([
- { key: "messages", label: "Messages", icon: MessageCircle, badge: convs.reduce((s, c) => s + (c.storeUnread > 0 ? 1 : 0), 0) },
- { key: "offers", label: "Offers", icon: Tag, badge: pending },
- ] as const).map((t) => {
+ { key: "messages" as const, label: "Messages", icon: MessageCircle, badge: convs.reduce((s, c) => s + (c.storeUnread > 0 ? 1 : 0), 0) },
+ { key: "offers" as const, label: "Offers", icon: Tag, badge: pending },
+ // Only for a shop with someone waiting — an empty tab is a tab nobody ever needs to press.
+ ...(appts.length ? [{ key: "appointments" as const, label: "Appointments", icon: CalendarClock, badge: appts.length }] : []),
+ ]).map((t) => {
  const on = tab === t.key;
  return (
  <button key={t.key} onClick={() => setTab(t.key)}
@@ -352,6 +382,52 @@ export default function InboxPage() {
  </div>
  );
  })}
+ </div>
+ )
+ )}
+
+ {/* ── APPOINTMENTS ── */}
+ {tab === "appointments" && (
+ appts.length === 0 ? (
+ <div className={cn(CARD, "py-14")}>
+ <EmptyState icon={<CalendarClock size={26} strokeWidth={1.5} />} title="Nothing to approve" body="Bookings waiting on your answer land here. Everything already confirmed lives in your diary." />
+ </div>
+ ) : (
+ <div className="space-y-3">
+ {appts.map((a) => (
+ <div key={a.id} className={cn(CARD, "p-4 sm:p-5")}>
+ <div className="flex items-start gap-3">
+ <Avatar name={a.customerName} email={a.customerEmail} />
+ <div className="min-w-0 flex-1">
+ <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+ <div className="min-w-0">
+ <p className="truncate text-[13px] font-semibold text-stone-900">{a.customerName || a.customerEmail || "Someone"}</p>
+ <p className="truncate text-[12px] text-stone-500">
+ {a.kind}
+ {a.customerEmail && <span className="ml-2 text-stone-400">{a.customerEmail}</span>}
+ {a.customerPhone && <span className="ml-2 text-stone-400">{a.customerPhone}</span>}
+ </p>
+ </div>
+ <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-100">Your move</span>
+ </div>
+
+ <p className="mt-2.5 text-[15px] font-semibold text-stone-900">{apptDay(a.day)}<span className="ml-2 tabular-nums text-stone-500">{apptTime(a.start)}</span></p>
+ {a.note && <p className="mt-1.5 text-[12.5px] leading-relaxed text-stone-600">&ldquo;{a.note}&rdquo;</p>}
+ {a.depositCents > 0 && (
+ <p className="mt-1.5 text-[12px] text-stone-400">Deposit {money(a.depositCents)} — {a.depositPaid ? "paid" : "not yet paid"}.</p>
+ )}
+
+ <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3.5">
+ <button onClick={() => answerAppt(a.id, "booked")}
+ className="rounded-lg px-4 py-2 text-[12.5px] font-medium text-white transition hover:opacity-90" style={{ background: ACCENT }}>Confirm</button>
+ <button onClick={() => answerAppt(a.id, "cancelled")}
+ className="ml-auto px-2 py-2 text-[12.5px] text-stone-400 transition hover:text-rose-600">Decline</button>
+ </div>
+ <p className="mt-2 text-[11.5px] text-stone-400">Either way we email them — you don&rsquo;t have to.</p>
+ </div>
+ </div>
+ </div>
+ ))}
  </div>
  )
  )}

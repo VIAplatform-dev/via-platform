@@ -15,6 +15,8 @@ import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
  * add stock for a seller you're previewing therefore published it into YOUR store instead, and it
  * never appeared on the storefront you were looking at.
  */
+import RentalPanel, { type TermsDraft } from "../rentals/RentalPanel";
+
 function withStore(path: string): string {
  if (typeof window === "undefined") return path;
  const s = new URLSearchParams(window.location.search).get("store");
@@ -144,6 +146,9 @@ export default function IntakePage() {
  const [priceFlag, setPriceFlag] = useState<Flag | null>(null);
  const [lowConf, setLowConf] = useState(false); // too few comps to flag over/under — show a rough range, not a verdict
  const [consigned, setConsigned] = useState(false);
+ // Rental terms decided while the piece is being written. There's no item to attach them to yet,
+ // so they're held here and written the moment publish hands back an id.
+ const [rentalDraft, setRentalDraft] = useState<TermsDraft | null>(null);
  const [consignors, setConsignors] = useState<{ id: number; name: string; defaultSplitPct: number | null }[]>([]);
  const [consignCfg, setConsignCfg] = useState<{ storeDefaultSplitPct: number } | null>(null);
  const [consign, setConsign] = useState({ consignorId: "", split: "", expiresAt: "", newName: "" });
@@ -493,6 +498,14 @@ export default function IntakePage() {
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
+ // The piece exists now, so its rental terms have somewhere to live. Deliberately not fatal: a
+ // published listing that failed to save its terms is fixable from the editor, whereas throwing
+ // here would tell the seller the whole publish failed when it didn't.
+ if (rentalDraft && d.itemId) {
+ await fetch(withStore(`/api/store/rentals/terms/${d.itemId}`), {
+ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rentalDraft),
+ }).catch(() => null);
+ }
  setScheduledAt(d.scheduled ? d.publishAt : null);
  setSavedDraft(status === "draft" && !d.scheduled);
  // The autosaved draft is promoted in place by the publish endpoint (via draftId), so there's no
@@ -735,6 +748,8 @@ export default function IntakePage() {
  Not enough comparable pieces to price this confidently — treat the range as a rough guide. Add more detail or “Fill with AI” for a firmer read.
  </div>
  )}
+
+ <RentalPanel priceCents={Math.round((Number(form.price) || 0) * 100)} onDraftChange={setRentalDraft} />
 
  <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
  <div className="flex items-center justify-between">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { missingShipFrom, describeMissing } from "@/app/lib/ship-from-core";
 import { MapPin, Store as StoreIcon } from "lucide-react";
 import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
 
@@ -74,7 +75,10 @@ export default function LocationsPage() {
 
  const setA = (k: keyof Addr, v: string) => setFrom((a) => ({ ...a, [k]: v }));
  const setP = (k: keyof Addr, v: string) => setPickup((p) => ({ enabled: true, instructions: p?.instructions ?? null, address: { ...(p?.address ?? {}), [k]: v } }));
- const complete = Boolean(from.street1 && from.city && from.country);
+ // Same rule publishing uses — this page used to call an address complete without a state or
+ // postcode, then publishing refused it, which is a maddening thing to be told twice.
+ const missing = missingShipFrom(from);
+ const complete = missing.length === 0;
 
  return (
   <>
@@ -98,6 +102,11 @@ export default function LocationsPage() {
        <h2 className="text-[13px] font-semibold text-stone-800">Ship from</h2>
        {complete ? <StatusPill tone="live">Set</StatusPill> : <StatusPill tone="pending">Needed</StatusPill>}
       </div>
+      {!complete && (
+       <p className="border-b border-stone-100 bg-amber-50 px-5 py-2.5 text-[12.5px] text-amber-900">
+        Add your {describeMissing(missing)} — carriers need all of it before you can publish a live listing or print a label.
+       </p>
+      )}
       {!complete && (
        <p className="border-b border-stone-100 bg-amber-50 px-5 py-3 text-[12.5px] leading-relaxed text-amber-900">
         Shipping labels and tax registrations both need this before they’ll work.

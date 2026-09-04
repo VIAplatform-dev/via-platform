@@ -47,6 +47,23 @@ export function formatRunway(look: Pick<RunwayLook, "house" | "season" | "year">
  return `${look.house} ${look.season} ${look.year}`.replace(/\s+/g, " ").trim();
 }
 
+/** Canonical spellings, so "s/s" and "prefall" round-trip through formatRunway unchanged. */
+const SEASONS: Record<string, string> = { "s/s": "S/S", "f/w": "F/W", resort: "Resort", "pre-fall": "Pre-Fall", prefall: "Pre-Fall", cruise: "Cruise" };
+
+/**
+ * Inverse of formatRunway: "Tom Ford for Gucci S/S 2004" back into its parts, or null when the
+ * string isn't a season at all. Deliberately strict — this gates what gets written INTO the index,
+ * and a mis-parsed house would quietly poison every future match against it.
+ */
+export function parseRunway(label: string): Pick<RunwayLook, "house" | "season" | "year"> | null {
+ const m = (label || "").trim().match(/^(.+?)\s+(S\/S|F\/W|Resort|Pre-?Fall|Cruise)\s+((?:19|20)\d{2})$/i);
+ if (!m) return null;
+ const season = SEASONS[m[2].toLowerCase()];
+ const house = m[1].trim();
+ if (!season || !house) return null;
+ return { house, season, year: Number(m[3]) };
+}
+
 /**
  * Decide whether a set of nearest neighbours amounts to a documented season.
  *

@@ -2,8 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { Camera, Plus } from "lucide-react";
-import { B, BigLink, MarketPage, Notice, api, href, money } from "./ui";
-import ReadinessTasks from "./ReadinessTasks";
+import { B, BigLink, ItemTile, MarketPage, Notice, api, href, money, type MarketItem } from "./ui";
 
 type Home = {
  session: { id: string; name: string; createdAt: string };
@@ -19,9 +18,15 @@ const WINE = "#5D0F17";
 function HomeInner() {
  const [home, setHome] = useState<Home | null>(null);
  const [err, setErr] = useState<string | null>(null);
+ const [rack, setRack] = useState<MarketItem[] | null>(null);
  useEffect(() => {
  api<Home>("/api/store/market/home").then((r) => (r.ok ? setHome(r.data) : setErr(r.data.error || "Couldn't load")));
  }, []);
+ useEffect(() => {
+ api<{ items: MarketItem[] }>("/api/store/market/inventory?view=available").then((r) => { if (r.ok) setRack(r.data.items); });
+ }, []);
+ // The rack at a glance — every active and drafted piece. The API already sorts bring-list first.
+ const tiles = rack ?? [];
  const c = home?.counts;
  const left = c ? Math.max(0, c.available) : null;
  // The auto-named session ("Market · Aug 28") already carries the date — don't print it twice.
@@ -57,7 +62,13 @@ function HomeInner() {
  <span className="ml-auto font-semibold" style={{ color: WINE }}>Resume ›</span>
  </a>
  ))}
- <ReadinessTasks compact />
+ {tiles.length > 0 && (
+ <div className="mt-3 grid grid-cols-3 gap-2">
+ {tiles.map((it) => (
+ <ItemTile key={it.id} item={it} />
+ ))}
+ </div>
+ )}
  </div>
 
  <p className="mb-2 mt-6 px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Payments</p>

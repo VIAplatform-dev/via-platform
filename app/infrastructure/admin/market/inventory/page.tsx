@@ -1,25 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { List, LayoutGrid, Check } from "lucide-react";
-import { B, ItemCard, MarketPage, Notice, StatusChip, Thumb, api, href, money, type MarketItem } from "../ui";
-
-// Thumbnail grid — the "see the rack at a glance" view. Same data, same tap target (Confirm screen).
-function ItemTile({ item, dim }: { item: MarketItem; dim?: boolean }) {
- return (
- <Link href={href(`${B}/item/${item.id}`)} className={`block overflow-hidden rounded-2xl border border-stone-200 bg-white active:bg-stone-50 ${dim ? "opacity-60" : ""}`}>
- <div className="aspect-square w-full bg-stone-100"><Thumb src={item.image} alt={item.title} fill className="!max-h-none aspect-square !object-cover" /></div>
- <div className="p-2.5">
- <p className="truncate text-[13px] font-medium text-stone-900">{item.title}</p>
- <div className="mt-1 flex items-center justify-between gap-2">
- <StatusChip status={item.status} />
- <span className="text-[14px] font-semibold text-stone-900">{money(item.priceCents, item.currency)}</span>
- </div>
- </div>
- </Link>
- );
-}
+import { B, ItemCard, ItemTile, MarketPage, Notice, api, type MarketItem } from "../ui";
 
 function ViewToggle({ value, onChange }: { value: "list" | "grid"; onChange: (v: "list" | "grid") => void }) {
  const btn = (v: "list" | "grid", Icon: typeof List, label: string) => (

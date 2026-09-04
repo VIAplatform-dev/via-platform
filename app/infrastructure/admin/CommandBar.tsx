@@ -33,7 +33,9 @@ const ACTIONS: Hit[] = [
  { id: "a-disc", label: "New discount", href: `${B}/discounts` },
 ];
 
-export default function CommandBar() {
+/** `hidden` = page ids the workspace has switched off (a closed inbox, say). The palette should
+ *  never offer a door the sidebar has taken away. */
+export default function CommandBar({ hidden }: { hidden?: string[] } = {}) {
  const router = useRouter();
  const [open, setOpen] = useState(false);
  const [q, setQ] = useState("");
@@ -79,7 +81,7 @@ export default function CommandBar() {
  const filt = (arr: Hit[]) => (ql ? arr.filter((h) => `${h.label} ${h.sub || ""}`.toLowerCase().includes(ql)) : arr);
  const localGroups: Group[] = [
  { group: "Actions", hits: filt(ACTIONS) },
- { group: "Go to", hits: filt(PAGES).slice(0, ql ? 6 : 15) },
+ { group: "Go to", hits: filt(PAGES.filter((h) => !hidden?.includes(h.id))).slice(0, ql ? 6 : 15) },
  ].filter((g) => g.hits.length > 0);
 
  const groups: Group[] = [...remote, ...localGroups];

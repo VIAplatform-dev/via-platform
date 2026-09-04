@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { embedImages, isEmbeddingConfigured } from "./embeddings";
-import { houseKey, scoreRunwayCandidates, type RunwayCandidate, type RunwayLook, type RunwayVerdict } from "./runway-score";
+import { houseKey, parseRunway, scoreRunwayCandidates, type RunwayCandidate, type RunwayLook, type RunwayVerdict } from "./runway-score";
 
 // The decision rules live next door, pure and tested; re-exported so callers need one import.
 export * from "./runway-score";
@@ -112,6 +112,29 @@ export async function ingestRunwayLooks(looks: IngestLook[]): Promise<{ added: n
   added++;
  }
  return { added: added - skipped < 0 ? 0 : added - skipped, skipped };
+}
+
+/** Looks we generated ourselves from our own listings, rather than a licensed corpus. */
+export const OWN_LICENSE_REF = "vya-own";
+
+/**
+ * Remember a piece we have just identified, using the seller's own photo as the exemplar.
+ *
+ * This is the cheap half of the index. A licensed corpus is catwalk photography — a garment on a
+ * moving model under show lighting — and matching that to a flat-lay on a bed is precisely where
+ * image embeddings are weakest. A photo from OUR OWN intake is the same context the next seller
+ * will shoot in, so it matches far better per image, costs nothing, and we already hold the rights.
+ *
+ * Two rules keep it honest:
+ *  - never call this with a label the index itself produced, or it reinforces its own guesses;
+ *  - `source_url` is the photo, so the unique index makes re-listing the same photo a no-op.
+ */
+export async function rememberRunwayLook(label: string, imageUrl: string | null | undefined): Promise<boolean> {
+ if (!label || !imageUrl || !isEmbeddingConfigured()) return false;
+ const parts = parseRunway(label);
+ if (!parts) return false; // free-text like "early 2000s Cavalli" is not a documented season
+ const res = await ingestRunwayLooks([{ ...parts, lookNo: null, sourceUrl: imageUrl, licenseRef: OWN_LICENSE_REF, imageUrl }]);
+ return res.added > 0;
 }
 
 /** Remove looks by licence — the lever to pull if a corpus licence lapses. */

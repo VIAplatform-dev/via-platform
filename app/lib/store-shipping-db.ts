@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { isShipFromComplete } from "./ship-from-core";
 import type { PickupSettings } from "./pickup-core";
 
 // Per-store shipping policy: where they ship from, and who pays.
@@ -89,6 +90,5 @@ export async function setShippingSettings(storeSlug: string, s: ShippingSettings
 
 /** Does this store have a usable ship-from address (required for rates + labels)? */
 export function hasShipFrom(s: ShippingSettings): boolean {
- const a = s.shipFrom;
- return Boolean(a && a.street1 && a.city && a.state && a.zip && a.country);
+ return isShipFromComplete(s.shipFrom);
 }

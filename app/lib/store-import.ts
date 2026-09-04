@@ -1,3 +1,6 @@
+import type { ProductPageConfig } from "./storefront-product-page";
+import type { ProductLayout } from "./storefront-templates";
+import type { SiteEffects } from "./storefront-effects";
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
 import { fetchShopifyProductsPublic, parseLooseJson } from "./shopifyClient.ts";
@@ -69,7 +72,14 @@ export type StorefrontTheme = {
  // How a single product page is arranged. Seeded by the template: "rail" keeps the details beside you
  // while the images scroll, "stacked" runs the photographs full width with the copy beneath, "classic"
  // is the conventional two-column page. Absent = classic, which is what every store rendered before.
- productLayout?: "classic" | "rail" | "stacked";
+ productLayout?: ProductLayout;
+ // What that page SAYS: which of a listing's facts are printed, in what order, inline or in a
+ // drawer, and the store's own wording for the back link and the reassurance line. Absent = the
+ // page every store rendered before this existed. See storefront-product-page.ts.
+ productPage?: ProductPageConfig;
+ // Pointer effects, drawn by our own code. See storefront-effects.ts for why this is a catalogue
+ // and not a place to paste JavaScript.
+ effects?: SiteEffects;
  blocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
  shopBlocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
  extraPages?: { slug: string; title: string; blocks: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages

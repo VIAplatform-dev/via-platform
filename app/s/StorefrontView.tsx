@@ -10,6 +10,8 @@ import { formatPrice } from "@/app/lib/formatPrice";
 import { normalizeCategory, familyMembers, CATEGORY_FAMILIES } from "@/app/lib/market-data-db";
 import type { StorefrontSettings } from "@/app/lib/storefront-db";
 import NewsletterForm from "./NewsletterForm";
+import SiteEffects from "./SiteEffects";
+import { resolveEffects, hasEffects } from "@/app/lib/storefront-effects";
 import Blocks from "./Blocks";
 import { sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
@@ -331,11 +333,17 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </h1>
  );
 
+ const siteEffects = resolveEffects(theme.effects);
+
  return (
  <main style={rootStyle} className="min-h-screen">
  {fontsHref && <link rel="stylesheet" href={fontsHref} />}
  {/* Store's own custom CSS — layered over the theme (targets .vya-* classes). Trusted: only the owner/AI set it. */}
  {theme.customCss && <style dangerouslySetInnerHTML={{ __html: stripThemeBackgroundOverrides(theme.customCss) }} />}
+
+ {/* Pointer effects. Mounted only when the store asked for one, so a shop with none ships no
+     client component at all. */}
+ {hasEffects(siteEffects) && <SiteEffects effects={siteEffects} accent={accent} />}
 
  {/* Announcement bar */}
  {header.announcement && (

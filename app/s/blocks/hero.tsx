@@ -47,14 +47,14 @@ function HeroBleed({ kit }: { kit: EditKit }) {
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-3xl text-[2rem] @lg:text-5xl leading-[1.04] @xl:text-7xl" style={{ fontFamily: head }} />
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mt-5 max-w-xl text-sm leading-relaxed text-white/85 @xl:text-[15px]" />}
-    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black" />}
+    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black" />}
    </div>
   </div>
  ) : (
   <div className="vya-hero-inner vya-free-canvas relative px-6 py-16 @lg:py-32 text-center">
    <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading mx-auto max-w-3xl text-[2rem] @lg:text-5xl leading-[1.05] @xl:text-6xl" style={{ fontFamily: head }} />
    {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mt-5 mx-auto max-w-xl text-sm leading-relaxed opacity-65 @xl:text-[15px]" />}
-   {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+   {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
   </div>
  );
 }
@@ -144,7 +144,7 @@ function HeroSplit({ kit }: { kit: EditKit }) {
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-xl text-[1.75rem] @lg:text-4xl leading-[1.06] @xl:text-6xl" style={{ fontFamily: head }} />
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mt-5 max-w-md text-sm leading-relaxed opacity-70 @xl:text-[15px]" />}
-    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-9 inline-block self-start px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-9 inline-block self-start px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
    </div>
   </div>
  );
@@ -162,7 +162,7 @@ function HeroStack({ kit }: { kit: EditKit }) {
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading mx-auto max-w-4xl text-[2rem] @lg:text-5xl leading-[1.03] @xl:text-7xl" style={{ fontFamily: head }} />
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mx-auto mt-5 max-w-xl text-sm leading-relaxed opacity-65 @xl:text-[15px]" />}
-    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
    </div>
    {/* No photo, no box. A 46vh tinted rectangle with nothing in it doesn't read as "a picture goes
        here" — it reads as a rendering fault, which is exactly how it looked on Heirloom. The editor
@@ -192,7 +192,7 @@ function HeroFrame({ kit }: { kit: EditKit }) {
      {moveGrip}
      <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-2xl text-[1.75rem] @lg:text-4xl leading-[1.05] @xl:text-6xl" style={{ fontFamily: head }} />
      {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className={`vya-sub mt-4 max-w-md text-sm leading-relaxed @xl:text-[15px] ${p.image ? "text-white/85" : "opacity-65"}`} />}
-     {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className={`vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition ${p.image ? "border border-white/70 hover:bg-white hover:text-black" : "hover:opacity-85"}`} style={p.image ? undefined : { background: colors.accent, color: "#fff" }} />}
+     {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className={`vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition ${p.image ? "border border-white/70 hover:bg-white hover:text-black" : "hover:opacity-85"}`} style={p.image ? undefined : { background: colors.accent, color: "#fff" }} />}
     </div>
    </PhotoFrame>
   </div>

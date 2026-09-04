@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, Gem, Camera, Plus, Receipt, Boxes, ClipboardList, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Sparkles, Gem, Camera, Plus, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, type LucideIcon } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
 import CommandBar from "./CommandBar";
 import { loginHref } from "@/app/store/auth-route";
@@ -11,7 +11,9 @@ import StoreAnalytics from "@/app/components/StoreAnalytics";
 import { signOut } from "next-auth/react";
 
 type Sub = { href: string; label: string };
-type NavItem = { href: string; label: string; icon: LucideIcon; children?: Sub[]; match?: string[] };
+type NavItem = { href: string; label: string; icon: LucideIcon; children?: Sub[]; match?: string[];
+ /** Counts what's waiting on the seller in this section — shown as a pill on the row. */
+ badgeKey?: "rentals" | "appointments" };
 const B = "/admin";
 const GROUPS: { label?: string; items: NavItem[] }[] = [
  { items: [{ href: `${B}/home`, label: "Home", icon: Home }] },
@@ -31,6 +33,8 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  },
  { href: `${B}/cross-listing`, label: "Cross-listing", icon: Share2, match: [`${B}/cross-listing/analytics`], children: [{ href: `${B}/cross-listing`, label: "Listings" }, { href: `${B}/cross-listing/analytics`, label: "Analytics" }, { href: `${B}/cross-listing/settings`, label: "Marketplaces" }] },
  { href: `${B}/consignment`, label: "Consignment", icon: Handshake, children: [{ href: `${B}/consignment/consignors`, label: "Consignors" }, { href: `${B}/consignment/payouts`, label: "Payouts" }, { href: `${B}/consignment/settings`, label: "Settings" }] },
+ { href: `${B}/rentals`, label: "Rentals", icon: CalendarRange, badgeKey: "rentals" },
+ { href: `${B}/appointments`, label: "Appointments", icon: CalendarClock, badgeKey: "appointments" },
  { href: `${B}/orders`, label: "Orders", icon: ShoppingBag },
  { href: `${B}/inbox`, label: "Inbox", icon: MessageCircle },
  ],
@@ -102,6 +106,7 @@ const MARKET_GROUPS: { label?: string; items: NavItem[] }[] = [
  { label: "Sell", items: [
  { href: `${M}/find`, label: "Find item", icon: Camera },
  { href: `${M}/quick`, label: "Quick list", icon: Plus },
+ { href: `${M}/cart`, label: "Cart", icon: ShoppingBag },
  { href: `${M}/sales`, label: "Sales today", icon: Receipt },
  ] },
  { label: "Inventory", items: [{ href: `${M}/inventory`, label: "At this market", icon: Boxes }, { href: `${M}/bring`, label: "Bring list", icon: ClipboardList }] },
@@ -136,6 +141,18 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  // rather than to the browser — every data fetch resolves the store server-side, not from this.
  const [storeSlug, setStoreSlug] = useState<string | null>(null);
  const [marketMode, setMarketMode] = useState<boolean | null>(null); // null = not loaded yet
+ // Rentals is a mode a store opts into. A shop that doesn't rent shouldn't carry a dead section
+ // around its sidebar, so the nav asks before showing it — and stays quiet until it knows.
+ const [rentalsOn, setRentalsOn] = useState<boolean | null>(null);
+ // Appointments to confirm and rental applications to answer — someone standing at the counter.
+ const [rentalPending, setRentalPending] = useState(0);
+ // Appointments are their own feature, so they get their own switch and their own count.
+ const [apptsOn, setApptsOn] = useState<boolean | null>(null);
+ const [apptPending, setApptPending] = useState(0);
+ // Messaging and offers are ON for every store by default, so this hides the Inbox only once we
+ // KNOW both are off — the opposite default to rentals and appointments, which a store opts into.
+ // The switches live in Settings › Messages & offers, so turning them off isn't a one-way door.
+ const [inboxOff, setInboxOff] = useState(false);
  const [marketBusy, setMarketBusy] = useState(false);
 
  // The onboarding wizard lives at /admin/onboarding but is self-contained — it renders
@@ -167,6 +184,11 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  setStoreSlug(data?.slug || null);
  setOk(true);
  fetch(withPreview("/api/store/market/mode")).then((m) => (m.ok ? m.json() : null)).then((m) => setMarketMode(Boolean(m?.enabled))).catch(() => setMarketMode(false));
+ fetch(withPreview("/api/store/rentals/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setRentalsOn(Boolean(m?.settings?.enabled))).catch(() => setRentalsOn(false));
+ fetch(withPreview("/api/store/appointments/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setApptsOn(Boolean(m?.settings?.enabled))).catch(() => setApptsOn(false));
+ fetch(withPreview("/api/store/inbox-settings")).then((m) => (m.ok ? m.json() : null))
+  .then((m) => setInboxOff(m?.settings ? !m.settings.messagingEnabled && !m.settings.offersEnabled : false))
+  .catch(() => {});
  })
  .catch(() => setOk(false));
  }, [isOnboarding, router]);
@@ -177,11 +199,38 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  // VYA's own tooling, not a store's. Trends, AI accuracy and the golden set are how WE measure the
  // model; Apps & integrations is platform plumbing. A seller opening her workspace should see her
  // shop, not the instruments pointed at it.
+ // Re-read on a slow loop: a customer booking a fitting at 2pm should surface without the seller
+ // reloading the workspace, but this is a sidebar badge, not a live feed.
+ useEffect(() => {
+ if (rentalsOn !== true && apptsOn !== true) return;
+ let live = true;
+ const read = () => {
+ if (rentalsOn === true) {
+ fetch(withPreview("/api/store/rentals/pending"))
+ .then((r) => (r.ok ? r.json() : null))
+ .then((d) => { if (live) setRentalPending(Number(d?.total) || 0); })
+ .catch(() => {});
+ }
+ if (apptsOn === true) {
+ fetch(withPreview("/api/store/appointments/pending"))
+ .then((r) => (r.ok ? r.json() : null))
+ .then((d) => { if (live) setApptPending(Number(d?.pending) || 0); })
+ .catch(() => {});
+ }
+ };
+ read();
+ const t = setInterval(read, 60_000);
+ return () => { live = false; clearInterval(t); };
+ }, [rentalsOn, apptsOn]);
+
  const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/apps`, `${B}/import`]);
  const normalGroups = GROUPS
   .map((g) => ({
    ...g,
-   items: g.items.filter((n) => isOwner || !INTERNAL.has(n.href)),
+   items: g.items.filter((n) => (isOwner || !INTERNAL.has(n.href))
+ && (n.href !== `${B}/rentals` || rentalsOn === true)
+ && (n.href !== `${B}/appointments` || apptsOn === true)
+ && (n.href !== `${B}/inbox` || !inboxOff)),
   }))
   .filter((g) => g.items.length > 0);
  const visibleGroups = marketMode ? MARKET_GROUPS : normalGroups;
@@ -318,6 +367,12 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  {active && <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--accent)]" />}
  <Icon size={16} strokeWidth={1.9} className={active ? "text-[var(--accent)]" : "text-stone-400 group-hover:text-stone-500"} />
  {n.label}
+ {((n.badgeKey === "rentals" && rentalPending > 0) || (n.badgeKey === "appointments" && apptPending > 0)) && (
+ <span
+ aria-label={`${n.badgeKey === "rentals" ? rentalPending : apptPending} waiting`}
+ className="ml-auto grid min-w-[18px] place-items-center rounded-full bg-[var(--accent,#0e9f76)] px-1.5 text-[10.5px] font-semibold leading-[17px] text-white"
+ >{n.badgeKey === "rentals" ? rentalPending : apptPending}</span>
+ )}
  </Link>
  {/* Sub-tabs: revealed when the section is active. */}
  {n.children && active && (
@@ -376,7 +431,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </nav>
  )}
  {!marketMode && <Sidekick />}
- <CommandBar />
+ <CommandBar hidden={inboxOff ? ["p-inbox"] : undefined} />
  </div>
  </>
  );

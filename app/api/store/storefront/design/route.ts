@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, normalizeHandle } from "@/app/lib/storefront-db";
 import { getVersionTheme, setVersionTheme } from "@/app/lib/storefront-versions-db";
-import { STOREFRONT_TEMPLATES, getTemplate, templateTheme, HEADING_FONTS, BODY_FONTS } from "@/app/lib/storefront-templates";
+import { STOREFRONT_TEMPLATES, getTemplate, templateTheme, HEADING_FONTS, BODY_FONTS, isProductLayout } from "@/app/lib/storefront-templates";
 import { BLOCK_TYPES, sanitizeBlocks, sanitizePages, safeSrc } from "@/app/lib/storefront-blocks";
 import { isSkin } from "@/app/lib/storefront-skins";
+import { resolveProductPage, type ProductPageConfig } from "@/app/lib/storefront-product-page";
+import { resolveEffects, type SiteEffects } from "@/app/lib/storefront-effects";
 import { getListingsByStore } from "@/app/lib/listings-db";
+import { listStorefrontItems } from "@/app/lib/db/inventory";
 import { loadStoreProducts } from "@/app/lib/loadStoreProducts";
 import { formatPrice } from "@/app/lib/formatPrice";
 import { defaultStarterTheme } from "@/app/lib/storefront-default";
@@ -72,6 +75,32 @@ export async function GET(request: NextRequest) {
  : (await loadStoreProducts(slug).catch(() => []))
    .slice(0, 30)
    .map((p) => ({ title: p.name, price: p.price, image: p.image || p.images?.[0] || "" }));
+ // ONE real listing, with the facts a product page can print. The Product preview used to fill these
+ // with invented copy ("Alexander Wang", "2000s"), which made the builder promise a page the store's
+ // own listings couldn't produce — the seller then went to the live site and found it unchanged. A
+ // preview of a product page has to be a preview of a PRODUCT.
+ const sampleItem = seller ? (await listStorefrontItems(seller.id).catch(() => []))[0] ?? null : null;
+ const sampleProduct = sampleItem
+  ? {
+   id: sampleItem.id,
+   title: sampleItem.title,
+   price: formatPrice((sampleItem.priceCents ?? 0) / 100, sampleItem.currency),
+   comparePrice: sampleItem.compareAtCents && sampleItem.compareAtCents > (sampleItem.priceCents ?? 0)
+    ? formatPrice(sampleItem.compareAtCents / 100, sampleItem.currency) : null,
+   images: ((sampleItem.images as string[] | null) ?? []).slice(0, 6),
+   facts: {
+    brand: sampleItem.brand ?? null,
+    era: sampleItem.era ?? null,
+    material: sampleItem.material ?? null,
+    condition: sampleItem.condition ?? null,
+    origin: sampleItem.origin ?? null,
+    size: sampleItem.size ?? null,
+    description: sampleItem.description ?? null,
+    measurements: sampleItem.measurements ?? null,
+   },
+  }
+  : null;
+
  // Collections for the "Products shown" picker — ALL of them, so a seller can point a section at any
  // collection they have. Only the ones a section actually names get their items fetched: that's one
  // query per USED collection rather than per existing one, and a store with forty collections would
@@ -105,6 +134,14 @@ export async function GET(request: NextRequest) {
  preSkin: theme.preSkin ?? null,
  logo: theme.logo ?? "",
  headerLayout: theme.headerLayout ?? "inline",
+ // How a single piece is presented. The POST has always accepted this; without it in the GET the
+ // editor had no way to show which layout a store was on, so the control couldn't exist.
+ productLayout: theme.productLayout ?? "classic",
+ // Resolved rather than raw, so the editor and the live page start from the same answer for a store
+ // that has never saved one.
+ productPage: resolveProductPage(theme.productPage),
+ effects: resolveEffects(theme.effects),
+ sampleProduct,
  customCss: theme.customCss ?? "",
  blocks: theme.blocks ?? [],
  shopBlocks: theme.shopBlocks ?? [],
@@ -227,7 +264,19 @@ export async function POST(request: NextRequest) {
  theme.shopGrid = next;
  }
 
- if (["classic", "rail", "stacked"].includes(String(body?.productLayout))) theme.productLayout = body.productLayout;
+ // Validated against the catalogue itself, so a new arrangement is one entry in one file rather
+ // than a list to remember to widen here too.
+ if (isProductLayout(body?.productLayout)) theme.productLayout = body.productLayout;
+
+ // What the product page says. Sanitized through the same resolver the page renders with, so an
+ // unknown field, a duplicate, or a 4,000-character "label" can't reach a live storefront.
+ if (body?.effects && typeof body.effects === "object") {
+  theme.effects = resolveEffects(body.effects as Partial<SiteEffects>);
+ }
+
+ if (body?.productPage && typeof body.productPage === "object") {
+  theme.productPage = resolveProductPage(body.productPage as Partial<ProductPageConfig>);
+ }
 
  if (Array.isArray(body?.blocks)) theme.blocks = sanitizeBlocks(body.blocks);
  if (Array.isArray(body?.shopBlocks)) theme.shopBlocks = sanitizeBlocks(body.shopBlocks);

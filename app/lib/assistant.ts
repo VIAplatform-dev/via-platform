@@ -5,6 +5,7 @@
 // the Sidekick can only ever act on that seller's own store.
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, revertStorefrontTheme } from "./storefront-db";
 import { getTemplate, STOREFRONT_TEMPLATES, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
+import { resolveEffects, type SiteEffects } from "./storefront-effects";
 import { makeBlock, sanitizeBlocks, sanitizePages, pageSlugify, BLOCK_TYPE_IDS } from "./storefront-blocks";
 import { checkCustomHtml } from "./custom-html-guard";
 import { listCapturePaths, getCapturePage, updateCapturePageHtml, setSiteCss } from "./site-capture-db";
@@ -81,6 +82,7 @@ const TOOLS = [
  { name: "get_storefront", description: "Read the store's current storefront: design (template, colors, fonts), handle, tagline, hero image, and whether it's live.", input_schema: { type: "object", properties: {} } },
  { name: "update_storefront_design", description: "Change the storefront look. Provide any of: a starter template id, colors (hex like #1a1a1a), fonts. Confirm with the seller before calling this.", input_schema: { type: "object", properties: { template: { type: "string", enum: templateIds }, colors: { type: "object", properties: { bg: { type: "string" }, text: { type: "string" }, accent: { type: "string" } } }, fonts: { type: "object", properties: { heading: { type: "string", enum: HEADING_FONTS }, body: { type: "string", enum: BODY_FONTS } } } } } },
  { name: "style_storefront", description: "Apply raw custom CSS to the block-based storefront, layered over the theme site-wide — for ANY styling or layout change the section fields can't do: repositioning, alignment, spacing, sizing, per-element colors, borders, hover effects, etc. This is how you fulfill open-ended design requests. Pass the FULL CSS to set (it REPLACES the previous custom CSS — include everything you want kept); pass empty css to clear. Target these stable classes the storefront outputs: each section is `.vya-sec` + `.vya-<type>` (`.vya-hero`, `.vya-featured`, `.vya-text`, `.vya-newsletter`, `.vya-announcement`, `.vya-image`, `.vya-gallery`, `.vya-video`) + `.vya-b-<id>` to target ONE section by id (from list_sections). Inside a section: `.vya-heading` (heading), `.vya-sub` (subtext), `.vya-body` (text body), `.vya-cta` (button), `.vya-img` (image), and `.vya-hero-inner` (the hero's content box — change its flex to move content). Example — move the hero heading to the bottom-left: `.vya-hero .vya-hero-inner{align-items:flex-start;justify-content:flex-end;text-align:left}`. State the change and confirm before calling.", input_schema: { type: "object", properties: { css: { type: "string" } }, required: ["css"] } },
+ { name: "set_site_effects", description: "Turn on a pointer effect across the whole storefront — the answer to 'can my cursor leave glitter', 'add sparkles', 'make the cursor trail'. cursor: 'glitter' (specks that fall and fade), 'sparkle' (four-point stars that twinkle out), 'trail' (a dot that chases the pointer), 'ring' (a quiet circle), or 'none' to switch it off. Optional colour as a #hex — leave it out to use the store's accent. These are drawn by VYA's own code, which is why they work site-wide where a pasted script can't: a storefront shares an origin with the marketplace, so seller JavaScript is never injected into the page. Say what you'll turn on and confirm first.", input_schema: { type: "object", properties: { cursor: { type: "string", enum: ["none", "glitter", "sparkle", "trail", "ring"] }, color: { type: "string", description: "hex like #FF66CC; omit to follow the store's accent" } }, required: ["cursor"] } },
  { name: "list_photos", description: "List the photo URLs in the store's media library.", input_schema: { type: "object", properties: {} } },
  { name: "set_hero_photo", description: "Set the storefront hero banner image to a URL (usually from the library). Confirm first.", input_schema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
  { name: "list_inventory", description: "List the store's listings: id, title, price, status, and whether it has a description.", input_schema: { type: "object", properties: { activeOnly: { type: "boolean" } } } },
@@ -213,6 +215,16 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  theme.customCss = css;
  await setStorefrontTheme(slug, theme);
  return { ok: true, applied: css.trim() ? `${css.length} chars of CSS` : "cleared" };
+ }
+ case "set_site_effects": {
+ const theme = await loadTheme(slug);
+ theme.effects = resolveEffects({ cursor: input.cursor as SiteEffects["cursor"], cursorColor: typeof input.color === "string" ? input.color : null });
+ await setStorefrontTheme(slug, theme);
+ const on = theme.effects.cursor !== "none";
+ return { ok: true, cursor: theme.effects.cursor, color: theme.effects.cursorColor ?? "the store accent",
+  note: on
+   ? "Live on every page. It's skipped automatically for anyone who has reduced motion switched on, and on touch screens where there's no pointer to follow."
+   : "Switched off." };
  }
  case "update_storefront_design": {
  const sf = (await getStorefrontBySlug(slug)) ?? (await upsertStorefront(slug, { handle: slug, enabled: false, tagline: "", accentColor: "#5D0F17", heroImage: "", about: "" }));

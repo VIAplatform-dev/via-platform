@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, ChevronLeft } from "lucide-react";
+import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, ChevronLeft } from "lucide-react";
 import { SETTINGS_GROUPS, sectionFor } from "./sections";
 import { cn } from "../ui";
 
@@ -19,7 +19,7 @@ import { cn } from "../ui";
 const INDEX_HREF: string = "/admin/settings";
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
- Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText,
+ Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle,
 };
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {

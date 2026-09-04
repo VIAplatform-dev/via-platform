@@ -38,15 +38,30 @@ export type TemplateGrid = {
 };
 
 /**
- * How a single product is presented. Three arrangements, because these are the three that actually
- * differ in how a shopper reads the page:
- *   classic — gallery left, details right. The conventional two-column product page.
- *   rail    — images stacked down a wide column, details in a narrow rail that stays with you while
- *             you scroll. For stores where the detail (era, measurements, authentication) is the sale.
- *   stacked — full-width images one after another, details centred beneath in a narrow measure.
- *             For stores where the photography is the argument and copy is an afterthought.
+ * How a single product is presented.
+ *
+ * These differ in how a shopper READS the page, not in decoration — which is why they're a choice
+ * and not a skin. Where the eye lands first is the decision: the photograph (gallery, slideshow,
+ * full width, editorial) or the writing (details first, photo rail).
  */
-export type ProductLayout = "classic" | "rail" | "stacked";
+export type ProductLayout = "classic" | "mirror" | "rail" | "gallery" | "slideshow" | "stacked";
+
+/**
+ * Every arrangement, in the order the picker shows them — photo-forward at the end, detail-forward
+ * at the start. One list, so the editor, the API's allowlist and the page renderer can't disagree
+ * about what exists.
+ */
+export const PRODUCT_LAYOUTS: { id: ProductLayout; label: string; description: string }[] = [
+ { id: "classic", label: "Side by side", description: "Photo left, the details and buy button beside it." },
+ { id: "mirror", label: "Details first", description: "The writing leads, the photographs sit to the right." },
+ { id: "rail", label: "Photo rail", description: "Photos run down a wide column; the details stay with you as you scroll." },
+ { id: "gallery", label: "Gallery", description: "Every photograph in a grid, the details held beside them." },
+ { id: "slideshow", label: "Slideshow", description: "One photograph at a time, thumbnails beneath to move between them." },
+ { id: "stacked", label: "Full width", description: "The photograph takes the page, the writing sits beneath it." },
+];
+
+export const isProductLayout = (v: unknown): v is ProductLayout =>
+ PRODUCT_LAYOUTS.some((l) => l.id === v);
 
 export type StorefrontTemplate = {
  id: string;

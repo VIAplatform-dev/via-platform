@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { missingShipFrom, describeMissing } from "@/app/lib/ship-from-core";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { createConsignmentItem, resolveSplitForIntake } from "@/app/lib/consignment-db";
 import { stores, storeContactEmails } from "@/app/lib/stores";
@@ -40,7 +41,10 @@ export async function POST(request: NextRequest) {
  // draft is fine (stage now, add the address before it goes live).
  if (goLiveNow || scheduled) {
  const shipping = await getShippingSettings(slug);
- if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping before publishing or scheduling a live listing." }, { status: 400 });
+ if (!hasShipFrom(shipping)) {
+  const gaps = describeMissing(missingShipFrom(shipping.shipFrom));
+  return NextResponse.json({ error: `Your ship-from address is missing its ${gaps}. Add it in Settings → Locations, then publish.` }, { status: 400 });
+ }
  }
 
  const store = stores.find((s) => s.slug === slug);

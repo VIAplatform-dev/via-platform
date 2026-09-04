@@ -81,7 +81,7 @@ function CheckoutInner() {
  setBusy("cancel"); setErr(null);
  const r = await api(`/api/store/market/checkout/${id}/cancel`, { method: "POST" });
  setBusy(null);
- if (!r.ok) { setErr(r.data.error || "Couldn't reopen the basket"); return; }
+ if (!r.ok) { setErr(r.data.error || "Couldn't reopen the cart"); return; }
  writeCart(data.items.map((l) => ({ itemId: l.itemId, title: l.item?.title || "Item", image: l.item?.image ?? null, size: l.item?.size ?? null, listCents: l.listCents, saleCents: l.saleCents, discount: l.saleCents === l.listCents ? null : { type: "price", value: l.saleCents } })));
  router.push(href(`${B}/find?add=1`));
  }
@@ -119,7 +119,7 @@ function CheckoutInner() {
  <div className="py-2">
  <p className="text-center text-[18px] font-semibold text-stone-900">Collect {money(c.amountCents, c.currency)} in cash</p>
  <p className="mt-1 text-center text-[12.5px] text-stone-500">Optional: what did they hand you? We’ll do the change.</p>
- <button onClick={addAnother} disabled={busy !== null} className="mt-1 w-full text-center text-[13px] font-semibold" style={{ color: "#5D0F17" }}>+ Add another item to this sale</button>
+ <button onClick={addAnother} disabled={busy !== null} className="mt-1 w-full text-center text-[13px] font-semibold" style={{ color: "#5D0F17" }}>+ Add another item to cart</button>
  <div className="mt-3 flex items-center gap-2 rounded-2xl border border-stone-200 px-3 focus-within:border-stone-400"><span className="text-[22px] font-semibold text-stone-400">$</span><input inputMode="decimal" value={tendered} onChange={(e) => setTendered(e.target.value)} placeholder={(c.amountCents / 100).toFixed(2)} className="min-h-[52px] w-full bg-transparent text-[24px] font-semibold outline-none" /></div>
  <div className="mt-2 flex flex-wrap gap-1.5">
  {[c.amountCents, ...[500, 1000, 2000, 5000, 10000].map((n) => Math.ceil(c.amountCents / n) * n)].filter((v, i, a) => v >= c.amountCents && a.indexOf(v) === i).slice(0, 5).map((v) => (
@@ -147,7 +147,7 @@ function CheckoutInner() {
  {qr ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={qr} alt="Scan to pay" className="h-full w-full" /> : <div className="grid h-full place-items-center text-[13px] text-stone-400">{payUrl ? "Drawing code…" : "Starting payment…"}</div>}
  </div>
  <p className="mt-3 flex items-center justify-center gap-2 text-[12.5px] text-stone-500"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-stone-400" />Customer scans · Apple Pay · Google Pay · any card</p>
- <button onClick={addAnother} disabled={busy !== null} className="mt-2 w-full text-center text-[13px] font-semibold" style={{ color: "#5D0F17" }}>+ Add another item to this sale</button>
+ <button onClick={addAnother} disabled={busy !== null} className="mt-2 w-full text-center text-[13px] font-semibold" style={{ color: "#5D0F17" }}>+ Add another item to cart</button>
  {poll.error && <div className="mt-3"><Notice tone="warn">{poll.error}</Notice></div>}
  <div className="mt-3 grid grid-cols-2 gap-2">
  <button onClick={share} disabled={!payUrl} className="min-h-[48px] rounded-2xl border border-stone-200 bg-white text-[14px] font-medium text-stone-800">Share link</button>

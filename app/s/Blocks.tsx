@@ -6,6 +6,7 @@ import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
 import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
 import { resolveVariant } from "@/app/lib/storefront-variants";
 import { skinCss } from "@/app/lib/storefront-skins";
+import { radiusCss } from "@/app/lib/storefront-chrome-css";
 import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import SandboxEmbed from "./SandboxEmbed";
 // The shared editing kit + the per-family layout files. See blocks/kit.tsx for why the editing
@@ -23,6 +24,7 @@ import { renderAnnouncement, renderText, renderStatement, renderMarquee } from "
 import { renderImage, renderGallery, renderVideo } from "./blocks/media";
 import { renderCountdown, renderNewsletter, renderContact } from "./blocks/marketing";
 import { renderBlog, renderSpotlight } from "./blocks/editorial";
+import { renderAppointments } from "./blocks/appointments";
 import { renderFaq } from "./blocks/faq";
 
 export type { BlockProduct };
@@ -32,8 +34,7 @@ export type Radius = "sharp" | "soft" | "round";
 
 // Corner style ("shapes") → CSS radius, in px. Images/cards get a moderate curve; buttons go fully
 // pill on "round". A single scoped <style> drives it so it's one control, applied everywhere at once.
-const IMG_RADIUS: Record<Radius, number> = { sharp: 0, soft: 14, round: 26 };
-const BTN_RADIUS: Record<Radius, number> = { sharp: 0, soft: 8, round: 999 };
+
 
 // ── Free-form overlay elements (a button / text / image dragged onto a section) ──
 // Rendered both live (interactive: real anchors/images) and in the editor (inert content, the wrapper
@@ -447,6 +448,7 @@ function blockBody(b: Block, ctx: Ctx) {
  case "contact": return renderContact(kit, variant);
 
  case "faq": return renderFaq(kit, variant);
+ case "appointments": return renderAppointments(kit, variant);
 
  case "custom": {
  // Interactive components (js present, or mode "sandbox") run in an isolated sandboxed iframe —
@@ -550,8 +552,7 @@ export default function Blocks({
 }) {
  const head = ff(fonts.heading);
  const body = ff(fonts.body);
- const ir = IMG_RADIUS[radius] ?? 0;
- const br = BTN_RADIUS[radius] ?? 0;
+
  // Corner style, scoped to this storefront's sections. `.vya-round` marks the image/card frames that
  // should curve; the full-bleed hero, announcement bar, and marquee deliberately stay square.
  // Always emitted, including for "sharp" where both values are 0. Skipping it when there is nothing
@@ -559,7 +560,7 @@ export default function Blocks({
  // rounding (the contact form's `rounded-md` CTA) had nothing to override it, so a template set to
  // sharp corners still drew a rounded button. The token has to be authoritative, not conditional.
  // `.vya-field` keeps form inputs on the same curve as the images rather than a fixed 6px.
- const radiusCss = `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}.vya-field{border-radius:${ir}px}`;
+ const radiusRules = radiusCss(radius);
  // Overlay elements are absolutely placed (% coords) on wide layouts; on a narrow container they stack
  // into normal flow — centred, padded — so a button dragged over the hero never overlaps or runs off a
  // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.
@@ -620,7 +621,7 @@ export default function Blocks({
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
  <div className={`@container${skinRules ? ` vya-skin-${skin}` : ""}`} style={{ fontFamily: body, color: colors.text }}>
- <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + photoLayerCss + freePosCss + overlayCss + skinRules + placeholderCss }} />
+ <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusRules + photoLayerCss + freePosCss + overlayCss + skinRules + placeholderCss }} />
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient

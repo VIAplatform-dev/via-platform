@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, ChevronRight } from "lucide-react";
+import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, ChevronRight } from "lucide-react";
 import { SETTINGS_GROUPS } from "./sections";
 import { AdminHeader, TechCard } from "../ui";
 
@@ -12,7 +12,7 @@ import { AdminHeader, TechCard } from "../ui";
 // most of them. That's why each row carries a line about what it's FOR rather than what it contains.
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
- Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText,
+ Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle,
 };
 
 export default function SettingsIndex() {

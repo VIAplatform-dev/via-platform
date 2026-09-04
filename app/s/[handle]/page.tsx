@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
 import type { Metadata } from "next";
 import { stores } from "@/app/lib/stores";
 import { getStorefrontByHandle, getStorefrontByHandleAny } from "@/app/lib/storefront-db";
@@ -30,13 +31,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  // Index a LIVE storefront so it's findable on Google. If the store connected a custom
  // domain, that domain is canonical — noindex this /s/{handle} mirror and point canonical
  // at the domain, so search indexes the real domain instead of a duplicate.
+ // A store's real address is its own: the domain it connected, else its {slug}.vyasites.com origin.
+ // /s/{handle} is a mirror of it, so it points canonical at the real one and stays out of the index
+ // — otherwise Google picks between two copies of the same shop and often picks ours.
  const hasDomain = !!sf.customDomain;
- const url = hasDomain ? `https://${sf.customDomain}` : `${STOREFRONT_BASE}/s/${handle}`;
+ const ownOrigin = storePublicOrigin(sf.storeSlug);
+ const url = hasDomain ? `https://${sf.customDomain}` : (ownOrigin ?? `${STOREFRONT_BASE}/s/${handle}`);
+ const isMirror = hasDomain || !!ownOrigin;
  return {
  title: name,
  description,
  alternates: { canonical: url },
- robots: { index: sf.enabled && !hasDomain, follow: true },
+ robots: { index: sf.enabled && !isMirror, follow: true },
  openGraph: { title: name, description, type: "website", url, siteName: name, ...(image ? { images: [{ url: image }] } : {}) },
  twitter: { card: image ? "summary_large_image" : "summary", title: name, description, ...(image ? { images: [image] } : {}) },
  };

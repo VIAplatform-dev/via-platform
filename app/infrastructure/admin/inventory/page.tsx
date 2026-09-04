@@ -7,6 +7,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty
 import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
+import RentalPanel from "../rentals/RentalPanel";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 
 /**
@@ -978,6 +979,7 @@ export default function ItemsPage() {
  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </div>
  </div>
+ <RentalPanel itemId={editing.id} priceCents={Math.round((Number(editForm.price) || 0) * 100)} />
  {/* The * fields are what a LIVE listing needs. A draft can be saved half-finished —
  the gate only bites when the item is going (or staying) active. */}
  {(() => {

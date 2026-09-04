@@ -47,6 +47,12 @@ export const CUSTOM_TRIGGERS: { value: string; label: string }[] = [
  { value: "new_listing", label: "When I publish a new listing" },
  { value: "new_customer", label: "When a new customer is added" },
  { value: "order_placed", label: "After a customer places an order" },
+ // Appointments. The reminder is the one stores ask for by name ("email them the day before") —
+ // when it goes out is the store's own lead time, set in Settings › Appointments.
+ { value: "appointment_booked", label: "When someone books an appointment" },
+ { value: "appointment_confirmed", label: "When I confirm an appointment" },
+ { value: "appointment_cancelled", label: "When an appointment is cancelled" },
+ { value: "appointment_reminder", label: "Before an appointment (reminder)" },
 ];
 
 export type BuiltinAutomation = { kind: "builtin"; key: string; name: string; body: string; cadence: string; enabled: boolean };
