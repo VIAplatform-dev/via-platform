@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stores, convertCurrencyToUSD } from "@/app/lib/stores";
-import { resolveStoreSlug } from "@/app/lib/storeAuth";
+import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { neon } from "@neondatabase/serverless";
 
 function getDatabaseUrl() {
@@ -10,7 +10,10 @@ function getDatabaseUrl() {
 }
 
 export async function GET(request: NextRequest) {
- const storeSlug = await resolveStoreSlug(request);
+ // ...Any, not the web-only resolver: the mobile app authenticates with a bearer JWT, and every
+ // other /api/store/* route the app calls already accepts it. Rejecting it here made the app
+ // see a 403 for a legitimate seller.
+ const storeSlug = await resolveStoreSlugAny(request);
  if (!storeSlug) {
  return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
  }

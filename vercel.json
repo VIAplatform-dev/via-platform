@@ -215,6 +215,10 @@
     {
       "path": "/api/cron/appointments",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/flyer-welcome",
+      "schedule": "0 16 * * *"
     }
   ]
 }

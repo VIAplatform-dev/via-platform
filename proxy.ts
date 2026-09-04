@@ -10,6 +10,18 @@ const PUBLIC_ROUTES = [
   // Printed QR codes (/q/{code} → app/q/[code]/route.ts). Whoever picks up a business card
   // has no session and no pilot approval — gating this would send every scan to /login.
   "/q",
+  // The printed flyers. Same reasoning as /q, but these are the addresses themselves rather than
+  // a redirect, so each one is listed. THE LIST LIVES IN app/lib/flyers.ts — a slug added there
+  // and forgotten here sends every scan of that flyer to a sign-in wall, and the paper cannot be
+  // redeployed. flyers.test.ts holds the two in step.
+  "/vintage",
+  "/emma-stolen-bag",
+  "/trendsetter",
+  "/not-shein",
+  "/fashion-clone",
+  "/postcard",
+  // The form those pages post to. Gating it would let the page render and then refuse the signup.
+  "/api/flyer-join",
   "/login",
   "/register",
   "/pilot-pending",
@@ -83,7 +95,21 @@ const PUBLIC_ROUTES = [
   "/api/store/instagram",
   "/api/store/orders",
   "/api/store/inbox",
+  // Consignment enforces its own auth with resolveStoreSlugAny, exactly like orders and inbox
+  // above. Without it here the mobile app's bearer token never reaches the route — the gate
+  // answers 307 to /login first, which the app can only read as a failed request.
+  "/api/store/consignment",
   "/api/store/customers",
+  // The rest of what the mobile seller app calls. Each enforces its own auth with
+  // resolveStoreSlugAny; listed here only so the bearer token reaches the route at all.
+  // Market Mode's app/lib/market/auth.ts resolves the acting seller from a web session, an admin
+  // preview or the mobile JWT — it was built for this, but the gate answered 307 first.
+  "/api/store/market",
+  "/api/store/profile",
+  "/api/store/discounts",
+  "/api/store/offers",
+  "/api/store/price-check",
+  "/api/store/scan-item",
   "/api/store/collections",
   "/api/store/pricing",
   "/api/store/shipping",
