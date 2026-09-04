@@ -1,6 +1,8 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { headers } from "next/headers";
+import { isStoreHost } from "./lib/plan-b/store-host";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { AdminHide, MainWrapper } from "./components/RootLayoutWrapper";
@@ -45,11 +47,20 @@ export const metadata: Metadata = {
  },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
  children,
 }: {
  children: React.ReactNode;
 }) {
+ // A store's own domain shows the STORE's chrome, never VYA's.
+ //
+ // AdminHide decides by path, from the browser's URL — and on a store's own origin the browser's
+ // URL is "/", because the proxy rewrites to /s/{slug} internally where usePathname can't see it.
+ // So the marketplace header (VYA's wordmark, Stores/Categories/Designers, its cart and account)
+ // rendered on top of the seller's shop. Decided here instead, on the server, from the Host: the
+ // one thing that is true regardless of how the path was rewritten.
+ const onStoreHost = isStoreHost((await headers()).get("host"));
+
  return (
  <html lang="en">
  <head>
@@ -91,9 +102,9 @@ export default function RootLayout({
  <GlobalPageTracker />
  <ScrollToTop />
  <FeedbackModal />
- <AdminHide><Header /></AdminHide>
- <MainWrapper>{children}</MainWrapper>
- <AdminHide><Footer /></AdminHide>
+ {!onStoreHost && <AdminHide><Header /></AdminHide>}
+ <MainWrapper bare={onStoreHost}>{children}</MainWrapper>
+ {!onStoreHost && <AdminHide><Footer /></AdminHide>}
  {/* </GiveawayProvider> */}
  <Analytics />
  </SignUpProvider>
