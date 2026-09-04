@@ -4,13 +4,15 @@ import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, spacing, fonts } from "../../lib/theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
+import { planLabel, billingLine, type CurrentPlan } from "../../lib/seller/billing";
 
 // The plan card in burgundy so it reads as a statement rather than a row.
 
 type Billing = {
   configured: boolean;
   trialDays: number;
-  current: { tier: string; interval: string; status: string; plan: string | null; currentPeriodEnd: string | null };
+  // Every one of these is genuinely null for an unbilled store — see lib/seller/billing.ts.
+  current: CurrentPlan;
 };
 
 export default function BillingScreen() {
@@ -30,21 +32,27 @@ export default function BillingScreen() {
         <>
           <View style={{ borderWidth: 1.5, borderColor: colors.accent, borderRadius: 14, padding: spacing.xl }}>
             <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.accent }}>YOUR PLAN</Text>
-            <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.accent, marginTop: spacing.sm, textTransform: "capitalize" }}>
-              {c.tier}
+            <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.accent, marginTop: spacing.sm }}>
+              {planLabel(c)}
             </Text>
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm }}>
-              Billed {c.interval}
-              {c.currentPeriodEnd ? ` · renews ${new Date(c.currentPeriodEnd).toLocaleDateString()}` : ""}
-            </Text>
+            {billingLine(c) ? (
+              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm }}>{billingLine(c)}</Text>
+            ) : (
+              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm }}>
+                No subscription yet — {q.data?.trialDays ?? 30} days free when you start one.
+              </Text>
+            )}
           </View>
 
-          <View style={{ marginTop: spacing.xl }}>
-            <View style={{ flexDirection: "row", paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-              <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>Status</Text>
-              <Text style={{ fontSize: 15, color: colors.textMuted, textTransform: "capitalize" }}>{c.status}</Text>
+          {/* Only shown when there IS a status. An empty value beside a label reads as a failure. */}
+          {c.status ? (
+            <View style={{ marginTop: spacing.xl }}>
+              <View style={{ flexDirection: "row", paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>Status</Text>
+                <Text style={{ fontSize: 15, color: colors.textMuted, textTransform: "capitalize" }}>{c.status}</Text>
+              </View>
             </View>
-          </View>
+          ) : null}
 
           <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
             Changing plan, invoices and the card on file are on the desktop.

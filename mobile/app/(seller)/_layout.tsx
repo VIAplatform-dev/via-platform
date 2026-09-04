@@ -78,7 +78,10 @@ export default function SellerTabsLayout() {
        * the bar grows a nameless icon per screen. Orders comes off the Home tile; Piece and Message
        * come off a list; the rest come off the ☰ menu on the Store tab. Five tabs is the design. */}
       <Tabs.Screen name="orders" options={{ href: null }} />
-      <Tabs.Screen name="settings" options={{ href: null }} />
+      {/* Named "menu", not "settings": app/settings.tsx (the SHOPPER settings screen) already
+       * owns /settings, and expo-router resolves that one first — the seller drawer was simply
+       * unreachable, and the ☰ opened the shopper's Sizes and Saved Searches instead. */}
+      <Tabs.Screen name="menu" options={{ href: null }} />
       <Tabs.Screen name="analytics" options={{ href: null }} />
       <Tabs.Screen name="customers" options={{ href: null }} />
       <Tabs.Screen name="discounts" options={{ href: null }} />

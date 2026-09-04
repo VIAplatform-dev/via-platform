@@ -58,7 +58,7 @@ export default function StoreScreen() {
         <Text style={{ flex: 1, textAlign: "center", fontSize: 14, color: colors.text }} numberOfLines={1}>
           {host}
         </Text>
-        <Pressable hitSlop={10} onPress={() => router.push("/(seller)/settings")}>
+        <Pressable hitSlop={10} onPress={() => router.push("/(seller)/menu")}>
           <Feather name="menu" size={20} color={colors.text} />
         </Pressable>
       </View>
