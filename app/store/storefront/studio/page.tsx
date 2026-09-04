@@ -2302,11 +2302,17 @@ export default function StorefrontStudio() {
  // "View" means "show me THIS, live" — it used to always open the home page, so checking a change to
  // the shop or a product meant landing on the home page and navigating back to where you already
  // were. The product template has no URL of its own, so it opens the real listing it's drawn from.
+ const viewPath = activeSlug === "home" ? ""
+  : activeSlug === "shop" ? "/shop"
+  : activeSlug === "product" ? (sampleProduct ? `/p/${sampleProduct.id}` : "/shop")
+  : `/${activeSlug}`;
+ // A LIVE store's real address is its own — that's the URL to check, to share, and the one Google
+ // indexes. The /s/ path is the preview: it renders a store that isn't published yet, which its own
+ // address (correctly) will not. Sending a seller to /s/ for a live store meant the editor handed
+ // out a link to the copy rather than to their shop.
  const viewHref = !handle ? "#"
-  : activeSlug === "home" ? `/s/${handle}?preview=1`
-  : activeSlug === "shop" ? `/s/${handle}/shop?preview=1`
-  : activeSlug === "product" ? (sampleProduct ? `/s/${handle}/p/${sampleProduct.id}?preview=1` : `/s/${handle}/shop?preview=1`)
-  : `/s/${handle}/${activeSlug}?preview=1`;
+  : settings?.enabled && publicHost ? `https://${publicHost}${viewPath}`
+  : `/s/${handle}${viewPath}?preview=1`;
  const headerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: l.href }))];
  const footerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: l.href }))];
 
