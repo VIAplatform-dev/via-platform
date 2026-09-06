@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, ChevronLeft } from "lucide-react";
+import { useEffect, useState } from "react";
 import { SETTINGS_GROUPS, sectionFor } from "./sections";
 import { cn } from "../ui";
 
@@ -22,7 +23,28 @@ const ICONS: Record<string, React.ComponentType<{ size?: number; className?: str
  Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle,
 };
 
+
+/**
+ * VYA's own sections are hidden from sellers.
+ *
+ * "Who can open a store" is our list, not a shop's. A seller seeing it would be reading our front
+ * door policy from inside their own settings.
+ */
+function useSettingsGroups() {
+ const [isVyaOwner, setIsVyaOwner] = useState(false);
+ useEffect(() => {
+  fetch("/api/infrastructure/whoami")
+   .then((r) => (r.ok ? r.json() : null))
+   .then((d) => setIsVyaOwner(d?.admin === true))
+   .catch(() => {});
+ }, []);
+ return SETTINGS_GROUPS
+  .map((g) => ({ ...g, items: g.items.filter((i) => isVyaOwner || !i.vyaOnly) }))
+  .filter((g) => g.items.length > 0);
+}
+
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
+ const groups = useSettingsGroups();
  const pathname = usePathname() || "";
  const current = sectionFor(pathname);
  const onIndex = !current;
@@ -32,7 +54,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
    {/* The rail. On small screens it collapses to a back link rather than eating the screen. */}
    <nav className="w-[188px] shrink-0 border-r border-stone-200/70 pr-6 max-lg:w-full max-lg:border-r-0 max-lg:pr-0" aria-label="Settings">
     <div className="max-lg:hidden">
-     {SETTINGS_GROUPS.map((g) => (
+     {groups.map((g) => (
       <div key={g.label} className="mb-5">
        <p className="mb-1 px-2 text-[11px] font-medium uppercase tracking-wide text-stone-400">{g.label}</p>
        {g.items.map((s) => {

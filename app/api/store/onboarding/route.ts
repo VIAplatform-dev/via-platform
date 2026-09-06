@@ -3,6 +3,10 @@ import { auth } from "@/app/lib/auth";
 import { createStoreAccount, generateUniqueSlug, getStoreAccountByOwner } from "@/app/lib/store-accounts-db";
 import { addStoreUser, storeSlugForEmail } from "@/app/lib/store-users-db";
 import { getOrCreateSeller } from "@/app/lib/db/sellers";
+import { mayOpenStore, chooseStoreSlug, NOT_INVITED_MESSAGE } from "@/app/lib/seller-access";
+import { isInvited, markInviteUsed, reservedStoreFor } from "@/app/lib/seller-invites-db";
+import { hasCaptures } from "@/app/lib/site-capture-db";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +37,16 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, slug: existingAccount.slug, existing: true });
  }
 
+ // VYA is invite-only. Checked AFTER the "already has a store" paths above, so that removing an
+ // invite can never lock an existing seller out of a shop she's been running.
+ const adminPw = process.env.ADMIN_PASSWORD;
+ const adminToken = request.cookies.get("via_admin_token")?.value;
+ const isVyaOwner = Boolean(adminPw && adminToken && adminToken === crypto.createHash("sha256").update(adminPw).digest("hex"));
+ const decision = mayOpenStore({ email, invited: await isInvited(email), isVyaOwner });
+ if (!decision.ok) {
+  return NextResponse.json({ error: NOT_INVITED_MESSAGE, notInvited: true }, { status: 403 });
+ }
+
  const name = String(body?.name || "").trim().slice(0, 80);
  if (name.length < 2) return NextResponse.json({ error: "Enter your store name." }, { status: 400 });
 
@@ -48,12 +62,19 @@ export async function POST(request: NextRequest) {
  const sellsCategories = Array.isArray(body?.sellsCategories) ? body.sellsCategories.map((c: unknown) => String(c).slice(0, 40)).filter(Boolean).slice(0, 12) : [];
  const sellsChannel = CHANNELS.has(body?.sellsChannel) ? String(body.sellsChannel) : null;
 
- const slug = await generateUniqueSlug(name);
+ // A store we imported for her ahead of time, handed over only if she says she HAS a website.
+ //
+ // She still chooses. Pick "import my store" and the pieces are already there; pick "from scratch"
+ // and she gets a clean shop, with the imported one left untouched for another day. Forcing the
+ // seed on someone who chose to start fresh would be answering a question she just answered.
+ const reserved = await reservedStoreFor(email);
+ const { slug, seeded } = chooseStoreSlug({ reserved, generated: await generateUniqueSlug(name), hasWebsite });
  await createStoreAccount({
   slug, name, ownerEmail: email, hasWebsite, websiteUrl, sellsCategory, sellsChannel,
   onboarding: { hasWebsite, websiteUrl, sellsCategory, sellsCategories, sellsChannel },
  });
  await addStoreUser(slug, email, "owner");
+ void markInviteUsed(email);
  // And a seller row, now rather than on her first write.
  //
  // Everything downstream keys off seller.id — inventory, orders, every analytics metric — and it
@@ -67,5 +88,11 @@ export async function POST(request: NextRequest) {
  // The 30-day trial starts now (store_accounts.created_at); payouts/going-live stay held
  // until they pick a paid tier (store_plans / isEntitled). hasWebsite tells the client
  // whether to route into import (paste URL → scrape) or the builder.
- return NextResponse.json({ ok: true, slug, hasWebsite, websiteUrl });
+ // `seeded` tells the client her pieces are already in — so it can send her to inventory rather
+ // than to a "paste your website" step that would re-import what she already has.
+ // A seeded store may ALSO have had its site captured ahead of time — pages, theme, the lot. When
+ // it has, there is nothing left to import and re-scraping would only rebuild what's already live.
+ // When it hasn't, she has her pieces but a stock storefront, and the capture still has to run.
+ const alreadyCaptured = seeded ? await hasCaptures(slug).catch(() => false) : false;
+ return NextResponse.json({ ok: true, slug, hasWebsite, websiteUrl, seeded, alreadyCaptured });
 }

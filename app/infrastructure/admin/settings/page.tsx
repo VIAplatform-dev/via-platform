@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { SETTINGS_GROUPS } from "./sections";
 import { AdminHeader, TechCard } from "../ui";
 
@@ -15,11 +16,32 @@ const ICONS: Record<string, React.ComponentType<{ size?: number; className?: str
  Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle,
 };
 
+
+/**
+ * VYA's own sections are hidden from sellers.
+ *
+ * "Who can open a store" is our list, not a shop's. A seller seeing it would be reading our front
+ * door policy from inside their own settings.
+ */
+function useSettingsGroups() {
+ const [isVyaOwner, setIsVyaOwner] = useState(false);
+ useEffect(() => {
+  fetch("/api/infrastructure/whoami")
+   .then((r) => (r.ok ? r.json() : null))
+   .then((d) => setIsVyaOwner(d?.admin === true))
+   .catch(() => {});
+ }, []);
+ return SETTINGS_GROUPS
+  .map((g) => ({ ...g, items: g.items.filter((i) => isVyaOwner || !i.vyaOnly) }))
+  .filter((g) => g.items.length > 0);
+}
+
 export default function SettingsIndex() {
+ const groups = useSettingsGroups();
  return (
   <>
    <AdminHeader eyebrow="Your store" title="Settings" subtitle="How your store runs: your details, payments, shipping, tax and the rest." />
-   {SETTINGS_GROUPS.map((g) => (
+   {groups.map((g) => (
     <div key={g.label} className="mb-6">
      <p className="mb-2 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">{g.label}</p>
      <TechCard className="overflow-hidden">

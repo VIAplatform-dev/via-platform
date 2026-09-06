@@ -15,6 +15,8 @@ export type SettingsSection = {
  blurb: string;
  /** Lucide icon name, resolved by the components so this file stays free of JSX. */
  icon: string;
+ /** VYA's own, not a store's. Hidden from sellers; only the VYA owner sees it. */
+ vyaOnly?: boolean;
 };
 
 export type SettingsGroup = { label: string; items: SettingsSection[] };
@@ -31,6 +33,9 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
    { href: `${B}/plan`, label: "Plan & billing", blurb: "What you’re on, what you’ve been charged, and your card on file.", icon: "Sparkles" },
    { href: `${B}/payments`, label: "Payments", blurb: "How you get paid, and the Stripe account payouts land in.", icon: "CreditCard" },
    { href: `${B}/users`, label: "People", blurb: "Who can sign in and work on this store, and how many seats your plan includes.", icon: "Users" },
+   // VYA's own list of who may open a store at all — nothing to do with a seller's own settings, and
+   // hidden from them. Kept here so it's one place to look rather than a URL you have to remember.
+   { href: `${B}/invites`, label: "Who can open a store", blurb: "VYA is invite-only. The emails allowed to create a store here.", icon: "Mail", vyaOnly: true },
   ],
  },
  {
