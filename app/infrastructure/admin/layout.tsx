@@ -232,6 +232,22 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  return () => { live = false; clearInterval(t); };
  }, [rentalsOn, apptsOn]);
 
+ // A quiet record of which screens get opened, for watching a single store find its way around.
+ // Server-side rather than an analytics SDK: this is what you read when something went wrong for one
+ // seller, so it has to survive an ad blocker and a locked-down browser.
+ useEffect(() => {
+  if (!pathname?.startsWith("/admin")) return;
+  const id = setTimeout(() => {
+   void fetch("/api/store/activity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: pathname }),
+    keepalive: true,
+   }).catch(() => {});
+  }, 400); // a beat, so a redirect chain logs where she LANDED, not every hop
+  return () => clearTimeout(id);
+ }, [pathname]);
+
  const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/apps`, `${B}/import`]);
  const normalGroups = GROUPS
   .map((g) => ({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logActivity } from "@/app/lib/seller-activity-db";
 import { missingShipFrom, describeMissing } from "@/app/lib/ship-from-core";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { createConsignmentItem, resolveSplitForIntake } from "@/app/lib/consignment-db";
@@ -223,5 +224,6 @@ export async function POST(request: NextRequest) {
  trust: !usedAi ? "high" : body.reviewed ? "high" : "medium",
  }).catch(() => {});
 
+ logActivity({ storeSlug: slug, kind: item.status === "draft" ? "listed" : "published", detail: title });
  return NextResponse.json({ ok: true, itemId: item.id, status: item.status, scheduled, publishAt: publishAt?.toISOString() ?? null, crossListing });
 }

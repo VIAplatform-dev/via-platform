@@ -36,6 +36,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
    // VYA's own list of who may open a store at all — nothing to do with a seller's own settings, and
    // hidden from them. Kept here so it's one place to look rather than a URL you have to remember.
    { href: `${B}/invites`, label: "Who can open a store", blurb: "VYA is invite-only. The emails allowed to create a store here.", icon: "Mail", vyaOnly: true },
+   { href: `${B}/activity`, label: "What sellers are doing", blurb: "Every screen opened and every piece published, as it happens.", icon: "Activity", vyaOnly: true },
   ],
  },
  {

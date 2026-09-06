@@ -6,6 +6,7 @@ import { getOrCreateSeller } from "@/app/lib/db/sellers";
 import { mayOpenStore, chooseStoreSlug, NOT_INVITED_MESSAGE } from "@/app/lib/seller-access";
 import { isInvited, markInviteUsed, reservedStoreFor } from "@/app/lib/seller-invites-db";
 import { hasCaptures } from "@/app/lib/site-capture-db";
+import { logActivity } from "@/app/lib/seller-activity-db";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
  });
  await addStoreUser(slug, email, "owner");
  void markInviteUsed(email);
+ // The moment worth knowing about: whether she took the shop we'd built or started her own.
+ logActivity({ storeSlug: slug, email, kind: seeded ? "store-claimed" : "store-created", detail: name });
  // And a seller row, now rather than on her first write.
  //
  // Everything downstream keys off seller.id — inventory, orders, every analytics metric — and it
