@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import StartingPoints from "./StartingPoints";
 import Link from "next/link";
 import { Users, Send, Check, AlertCircle, Palette } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton } from "../../ui";
@@ -38,7 +39,7 @@ export default function CampaignsPage() {
 
  return (
  <AdminPage className="max-w-5xl">
- <AdminHeader eyebrow="Store · Marketing" title="Campaigns" subtitle="Write an email, see exactly how it lands, and send it to your customers — as your store." />
+ <AdminHeader eyebrow="Store · Marketing" title="Campaigns" subtitle="Write an email, see how it will look, and send it to your customers from your store’s address." />
 
  <TechCard className="overflow-hidden">
  {/* Who it's from / who it's going to — the context you want before you write a word. */}
@@ -57,6 +58,9 @@ export default function CampaignsPage() {
  </span>
  </div>
  </div>
+
+ {/* A gallery before the blank box. A seller facing an empty composer usually closes the tab. */}
+ <StartingPoints />
 
  {/* Compose */}
  <div className="space-y-5 px-5 py-5">

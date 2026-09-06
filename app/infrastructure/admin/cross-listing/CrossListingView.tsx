@@ -2,12 +2,13 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download, ExternalLink, Ban } from "lucide-react";
-import { vestiaireEligibility } from "@/app/lib/vestiaire";
+import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Download, ExternalLink, Ban , PlugZap } from "lucide-react";
+import { vestiaireReadiness } from "@/app/lib/vestiaire";
 import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD } from "../ui";
 
-// VYA Cross-Lister on the Chrome Web Store (Unlisted) — live once Google's review passes.
-const EXTENSION_URL = "https://chromewebstore.google.com/detail/jcbjeoingkdkodflfbachfpllmkgojkp";
+// VYA Cross-Lister on the Chrome Web Store — reviewed and published (Unlisted, so it's reachable by
+// this link rather than by search, which is why the button matters).
+const EXTENSION_URL = "https://chromewebstore.google.com/detail/vya-cross-lister/jcbjeoingkdkodflfbachfpllmkgojkp";
 
 // Where each extension-marketplace's "create a listing" page lives (opened after queueing).
 const CREATE_URL: Record<string, string> = {
@@ -23,7 +24,9 @@ type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { connected: boolean };
 type Etsy = { connected: boolean };
 type PlatformStats = { likes: number; offers: number; views: number; watchers: number };
-type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand?: string | null; listings: Record<string, string>; errors?: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand?: string | null;
+ photoCount?: number; category?: string | null; condition?: string | null; material?: string | null; size?: string | null; description?: string | null;
+ listings: Record<string, string>; errors?: Record<string, string>; stats?: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 type Rollup = { platform: string; listed: number; queued: number; error: number; offers: number; likes: number; views: number; watchers: number; sold: number; revenueCents: number };
 type Content = { title: string; body: string; tags: string[]; price: string };
 
@@ -52,7 +55,16 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const [soldMenu, setSoldMenu] = useState<string | null>(null);
  const [retrying, setRetrying] = useState<string | null>(null);
  const [extInstalled, setExtInstalled] = useState(false);
+ // Keyed "platform:itemId", NOT itemId.
+ //
+ // With one key per item, queueing a piece for Depop turned its VESTIAIRE cell green too — same
+ // item, same key — so a piece that had never been sent to Vestiaire read "Queued ✓", the server
+ // had no record of it, and the "Open Vestiaire to list" card never appeared because nothing was
+ // actually queued. A cell must only ever reflect its own marketplace.
  const [queueState, setQueueState] = useState<Record<string, "queuing" | "ok" | "err">>({});
+ // "platform:itemId" → staged into the extension during this session. The card below follows this
+ // as well as the server's own record, so a staged piece always has somewhere to click.
+ const [queuedHere, setQueuedHere] = useState<Record<string, boolean>>({});
  const [errors, setErrors] = useState<Record<string, string>>({});
  const [notice, setNotice] = useState<string | null>(null);
 
@@ -82,7 +94,13 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const onMsg = (e: MessageEvent) => {
  const d = e.data;
  if (!d || d.source !== "vya-ext" || d.type !== "queued") return;
- setQueueState((st) => ({ ...st, [d.itemId]: d.ok ? "ok" : "err" }));
+ // The extension's reply carries the item but not the marketplace, so settle whichever cell for
+ // that item is currently waiting — never every cell for it.
+ setQueueState((st) => {
+  const next = { ...st };
+  for (const k of Object.keys(st)) if (k.endsWith(`:${d.itemId}`) && st[k] === "queuing") next[k] = d.ok ? "ok" : "err";
+  return next;
+ });
    // A marketplace can refuse a piece outright (Vestiaire only takes designer brands). Its reason
    // is more useful than "couldn't queue", so it goes straight to the seller.
    if (!d.ok && d.error) setErrors((e) => ({ ...e, [d.itemId]: String(d.error) }));
@@ -117,6 +135,34 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  }
  }, [board, extInstalled]);
 
+ // A board row carries only what the board needs; the check wants the listing's shape.
+/**
+ * A blocking reason, short enough for a table cell.
+ *
+ * The full sentence is written for a seller reading it on its own ("Vestiaire only takes pieces
+ * with a designer brand — add one first"), and in a column three words wide it wrapped over three
+ * lines and pushed the row apart. The whole sentence is still there on hover.
+ */
+function shortBlock(reason: string): string {
+ const r = reason.toLowerCase();
+ if (/brand/.test(r)) return "Needs a brand";
+ if (/photo/.test(r)) return /only (\d+)/.test(r) ? `Needs 3 photos (has ${(r.match(/only (\d+)/) || [])[1] ?? "1"})` : "Needs 3 photos";
+ if (/material/.test(r)) return "Needs a material";
+ if (/colou?r/.test(r)) return "Needs a colour";
+ if (/condition/.test(r)) return "Needs a condition";
+ if (/categor/.test(r)) return "Needs a category";
+ if (/price/.test(r)) return "Needs a price";
+ if (/doesn.t accept/.test(r)) return "Brand not accepted";
+ return reason.length > 28 ? reason.slice(0, 27).trimEnd() + "…" : reason;
+}
+
+ const vestReady = (it: BoardRow) => vestiaireReadiness({
+  title: it.title, brand: it.brand, category: it.category, condition: it.condition,
+  material: it.material, size: it.size, description: it.description, priceCents: it.priceCents,
+  // The board sends a count, not the URLs — enough to know whether Vestiaire's minimum is met.
+  images: Array.from({ length: it.photoCount ?? 0 }, (_, i) => `https://x/${i}`),
+ });
+
  const acct = (k: string) => accounts.find((a) => a.platform === k);
 
  async function openContent(itemId: string) {
@@ -130,13 +176,20 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  // callers reload once so a single click and a bulk run behave the same.
  async function queueOne(itemId: string, title: string, platformKey: string) {
  if (!QUEUEABLE.has(platformKey)) return;
- setQueueState((st) => ({ ...st, [itemId]: "queuing" }));
+ const key = `${platformKey}:${itemId}`;
+ setQueueState((st) => ({ ...st, [key]: "queuing" }));
+ setQueuedHere((q) => ({ ...q, [key]: true }));
  // Tell the extension to stage the payload (no-op if the extension isn't installed)…
  try { window.postMessage({ source: "vya-crosslist", type: `queue-${platformKey}`, itemId, title }, window.location.origin); } catch { /* ignore */ }
  // …and record intent so the board shows "Queued" and it survives a reload.
- await fetch(`/api/store/cross-listing/${platformKey}/queue`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId }) }).catch(() => null);
+ // Reported, not swallowed. When this fails the row still says "Queued ✓" from the optimistic
+ // settle below, and the disagreement between the two is invisible — which is how a queued piece
+ // ended up with no "Open … to list" card and no explanation.
+ const rec = await fetch(`/api/store/cross-listing/${platformKey}/queue`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId }) })
+  .then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) as { error?: string } })).catch(() => null);
+ if (!rec?.ok) setErrors((e) => ({ ...e, [itemId]: rec?.d?.error || "Staged for the extension, but VYA couldn't record it — the board won't remember after a reload." }));
  // No extension → no "queued" message comes back; settle the button optimistically off the server write.
- setTimeout(() => setQueueState((st) => (st[itemId] === "queuing" ? { ...st, [itemId]: "ok" } : st)), 1200);
+ setTimeout(() => setQueueState((st) => (st[key] === "queuing" ? { ...st, [key]: "ok" } : st)), 1200);
  }
  async function queueForPlatform(itemId: string, title: string, platformKey: string) {
  await queueOne(itemId, title, platformKey);
@@ -144,7 +197,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  }
  // Bulk: queue every selected item that isn't already listed/sold on this marketplace.
  async function bulkQueue(platformKey: string) {
- const eligible = (it: BoardRow) => platformKey !== "vestiaire" || vestiaireEligibility(it.brand).ok;
+ const eligible = (it: BoardRow) => platformKey !== "vestiaire" || vestReady(it).ready;
  const chosen = board.filter((it) => selected.has(it.itemId) && it.listings[platformKey] !== "listed" && it.listings[platformKey] !== "sold");
  // A marketplace that won't take the piece shouldn't be queued it in bulk either.
  const targets = chosen.filter(eligible);
@@ -202,7 +255,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const toggleSelectAll = () => setSelected(allSelected ? new Set() : new Set(board.map((it) => it.itemId)));
 
  const settingsBtn = <TechButtonLink variant="secondary" href="/admin/cross-listing/settings"><Settings2 size={14} /> Marketplace settings</TechButtonLink>;
- const installBtn = <TechButtonLink variant="secondary" href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Get the extension</TechButtonLink>;
+ const installBtn = <TechButtonLink variant="secondary" href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Install the extension</TechButtonLink>;
 
 
  return (
@@ -210,9 +263,28 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  <AdminHeader
  eyebrow="Sell · Cross-listing"
  title="Cross-listing"
- subtitle="List every piece everywhere you sell — and see what's live, what's queued, and where the sales come from."
+ subtitle="List your pieces on the other sites you sell on, and see what’s live, what’s waiting, and where your sales come from."
  actions={<>{installBtn}{settingsBtn}</>}
  />
+
+   {/* Whether the extension is actually talking to this page.
+       Depop and Vestiaire are filled by the extension, so if it isn't here NOTHING happens when a
+       piece is queued — the board says "queued", the server agrees, and the extension's own queue
+       stays empty. That was invisible: the only hint was which button appeared. Now it's stated. */}
+   {!extInstalled ? (
+    <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+     <PlugZap size={15} className="shrink-0 text-amber-700" />
+     <p className="text-[13px] text-amber-900">
+      <span className="font-semibold">The VYA extension isn&rsquo;t running on this page.</span>{" "}
+      Depop and Vestiaire are filled by it, so pieces will queue here but nothing will be waiting when you open them.
+     </p>
+     <a href={EXTENSION_URL} target="_blank" rel="noopener" className="ml-auto shrink-0 rounded-lg bg-amber-900 px-3 py-1.5 text-[12.5px] font-medium text-white transition hover:opacity-90">Install it</a>
+    </div>
+   ) : (
+    <p className="mb-4 flex items-center gap-1.5 text-[12px] text-stone-400">
+     <PlugZap size={13} /> Extension connected
+    </p>
+   )}
 
  {loading ? (
  <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>
@@ -220,7 +292,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  <TechEmpty
  icon={<Tag size={28} strokeWidth={1.5} />}
  title="No marketplaces connected yet"
- body="Connect eBay, Depop, Poshmark and more — then publish once to VYA and list everywhere. Sales, offers and revenue per channel show up here."
+ body="Connect eBay, Depop, Poshmark and others. Publish a piece once on VYA and it goes to all of them. You’ll see sales and offers from each site here."
  action={<TechButtonLink href="/admin/cross-listing/settings">Connect a marketplace</TechButtonLink>}
  />
  ) : (
@@ -286,22 +358,37 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  </>
  ) : (
  <>
- {/* Posting CTAs — one per extension marketplace with queued items. Makes "now go post these" obvious. */}
- {extMarketplaces.map((p) => {
- const n = board.filter((it) => it.listings[p.key] === "pending").length;
- if (!n) return null;
+ {/* One banner, not one per marketplace.
+     Every queue was drawing its own full-width card with the same sentence in it, so two queues
+     meant two stacked green boxes saying nearly the same thing above the only table on the page.
+     The counts differ; the explanation doesn't — so the explanation is said once. */}
+ {(() => {
+ // Server-pending OR staged in this session. The extension's own queue is what "open the site and
+ // list" actually depends on, so a piece that reached it should offer the button even when the
+ // server write didn't land — otherwise a seller stages something and has nowhere to click.
+ const queues = extMarketplaces
+  .map((p) => ({ p, n: board.filter((it) => it.listings[p.key] === "pending" || queuedHere[`${p.key}:${it.itemId}`]).length }))
+  .filter((q) => q.n > 0);
+ if (!queues.length) return null;
  return (
- <div key={p.key} className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--accent-ink,#0b7a5c)]/25 bg-[var(--accent-ink,#0b7a5c)]/[0.06] px-4 py-3">
- <div className="min-w-0 flex-1">
- <p className="text-[13px] font-semibold text-stone-800">{n} item{n === 1 ? "" : "s"} queued for {p.name}</p>
- <p className="text-[12px] text-stone-500">{extInstalled ? `Open ${p.name} and the VYA extension auto-fills each listing — review and press Post.` : `Install the VYA extension, then open ${p.name} and it auto-fills each listing.`}</p>
- </div>
+ <div className="mb-4 rounded-xl border border-[var(--accent-ink,#0b7a5c)]/25 bg-[var(--accent-ink,#0b7a5c)]/[0.06] px-4 py-3">
+ <p className="text-[12.5px] text-stone-600">
  {extInstalled
- ? <TechButtonLink href={CREATE_URL[p.key] || "#"} target="_blank" rel="noopener"><ExternalLink size={14} /> Open {p.name} to list ({n})</TechButtonLink>
- : <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Get the extension</TechButtonLink>}
+  ? "Open each site and the extension fills the listing in. Check it over and press publish."
+  : "Install the VYA extension first, then open each site and it fills the listing in for you."}
+ </p>
+ <div className="mt-2.5 flex flex-wrap gap-2">
+ {extInstalled
+  ? queues.map(({ p, n }) => (
+   <TechButtonLink key={p.key} href={CREATE_URL[p.key] || "#"} target="_blank" rel="noopener">
+    <ExternalLink size={14} /> {p.name} ({n})
+   </TechButtonLink>
+  ))
+  : <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Install the extension</TechButtonLink>}
+ </div>
  </div>
  );
- })}
+ })()}
 
  {notice && (
  <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-900">
@@ -336,12 +423,12 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  )}
  <div className="flex-1">
  <h3 className="text-[13px] font-semibold text-stone-900">Listings</h3>
- <p className="mt-0.5 text-[12px] text-stone-500">Where each piece stands on every channel — select items to queue them in bulk.</p>
+ <p className="mt-0.5 text-[12px] text-stone-500">Where each piece stands on each site. Tick several to queue them together.</p>
  </div>
  </div>
  {board.length === 0 ? (
  <div className="p-3">
- <TechEmpty icon={<Tag size={28} strokeWidth={1.5} />} title="No active listings" body="Publish a piece to VYA and it’ll show here, ready to cross-list." />
+ <TechEmpty icon={<Tag size={28} strokeWidth={1.5} />} title="No active listings" body="Publish a piece on VYA and it appears here, ready to list on other sites." />
  </div>
  ) : (
  <div className="overflow-x-auto">
@@ -357,7 +444,6 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  </thead>
  <tbody className="divide-y divide-stone-100">
  {board.map((it) => {
- const qs = queueState[it.itemId];
  return (
  <Fragment key={it.itemId}>
  <tr className={selected.has(it.itemId) ? "bg-[var(--accent-ink,#0b7a5c)]/[0.04]" : "hover:bg-stone-50/60"}>
@@ -384,16 +470,25 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const isExt = p.mode === "extension" && QUEUEABLE.has(p.key);
  // Vestiaire is curated — it only takes designer brands. Saying so in the cell beats letting her
  // queue it and meet a refusal at the end of their form.
- const blocked = p.key === "vestiaire" && !st ? vestiaireEligibility(it.brand) : ({ ok: true } as const);
+ // Everything Vestiaire's five-step form would refuse — brand, three photos, material, condition,
+     // category, price — checked here so it's said before she opens their site, not four screens in.
+     const vest = p.key === "vestiaire" && !st ? vestReady(it) : null;
  // A draft is on this board so she can find it, not so she can list it — nothing can go to a
  // marketplace before it is live on her own shop.
  const isDraft = it.status === "draft";
+     // Per cell, not per row: this is the marketplace whose button we're drawing. Computed once
+     // per row before, which is how Depop's "Queued ✓" appeared in the Vestiaire column.
+     const qs = queueState[`${p.key}:${it.itemId}`];
  return (
  <td key={p.key} className="whitespace-nowrap px-3 py-3 text-center">
  {isDraft && !st ? (
  <span className="text-[11px] text-stone-400">Publish first</span>
- ) : !blocked.ok ? (
- <span className="inline-flex items-center gap-1 text-[11px] text-stone-400" title={blocked.reason}><Ban size={12} />Not accepted</span>
+ ) : vest && !vest.ready ? (
+              // The first thing standing in the way, with the rest on hover — a cell can hold one
+              // sentence, and "only 1 photo" is the one that matters most often.
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-700" title={vest.blocking.join("\n")}>
+               <Ban size={12} />{shortBlock(vest.blocking[0])}
+              </span>
  ) : st === "listed" ? (
  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><Check size={13} strokeWidth={2.6} />Listed</span>
  ) : st === "pending" ? (

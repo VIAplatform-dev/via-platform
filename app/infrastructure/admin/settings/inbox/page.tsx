@@ -75,7 +75,7 @@ export default function InboxSettingsPage() {
    <AdminHeader
     eyebrow="Settings"
     title="Messages & offers"
-    subtitle="How shoppers reach you about a piece — and whether they can haggle."
+    subtitle="How people contact you about a piece, and whether they can make an offer."
     actions={saved ? <StatusPill tone="live" dot>Saved</StatusPill> : undefined}
    />
 
@@ -92,8 +92,8 @@ export default function InboxSettingsPage() {
      </div>
     </TechCard>
 
-    <Card title="Messages" blurb="Questions about a piece — measurements, condition, whether it still fits.">
-     <Row label="Let shoppers message me" hint="A message button on every product page.">
+    <Card title="Messages" blurb="Questions about a piece: measurements, condition, whether it still fits.">
+     <Row label="Let shoppers message me" hint="Adds a message button to every product page.">
       <Toggle on={s.messagingEnabled} onClick={() => set({ messagingEnabled: !s.messagingEnabled })} />
      </Row>
      <Row
@@ -118,20 +118,20 @@ export default function InboxSettingsPage() {
     </Card>
 
     <Card title="Offers" blurb="Let people name their price. You accept, counter, or pass.">
-     <Row label="Take offers" hint="An offer button alongside Buy on every piece.">
+     <Row label="Take offers" hint="Adds an offer button next to Buy on every piece.">
       <Toggle on={s.offersEnabled} onClick={() => set({ offersEnabled: !s.offersEnabled })} />
      </Row>
      {s.offersEnabled && (
       <>
        <Row
-        label="Accepting is binding"
+        label="Accepting an offer is final"
         hint={s.offersBinding
          ? "Accepting reserves the piece and they check out at the agreed price."
          : "Accepting is a soft yes — the piece stays on sale until they pay."}
        >
         <Toggle on={s.offersBinding} onClick={() => set({ offersBinding: !s.offersBinding })} />
        </Row>
-       <Row label="Ignore offers below" hint="As a share of the asking price. 0 lets everything through.">
+       <Row label="Don’t show me offers below" hint="As a percentage of the asking price. 0 means you see every offer.">
         <span className="flex items-center gap-1.5">
          <input
           inputMode="decimal"

@@ -25,11 +25,11 @@ export type Platform = { key: string; name: string; hasApi: boolean; live?: bool
  * it — Depop, Vestiaire — is presented as coming soon rather than as a switch that silently does
  * nothing when flipped. eBay is a real API integration and is unaffected.
  *
- * FLIP THIS TO false THE DAY THE EXTENSION IS APPROVED. It is the only thing to change: the
- * platform table below still describes Depop and Vestiaire as extension channels, which is what
- * they are, and this only changes how they are offered while nobody can install the thing.
+ * Flipped to false on 2026-09-04, when Google approved VYA Cross-Lister and the Web Store listing
+ * went live. Depop and Vestiaire are offered as what they are again: extension channels a seller
+ * can queue to. Set it back to true only if the extension is ever pulled from the store.
  */
-export const EXTENSION_IN_REVIEW = true;
+export const EXTENSION_IN_REVIEW = false;
 
 /** How a platform should be OFFERED right now, as opposed to what it fundamentally is. */
 export function effectiveMode(p: Platform): PlatformMode {
@@ -302,7 +302,10 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
  return toPull;
 }
 
-export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand: string | null; listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand: string | null;
+ /** What Vestiaire's form gates on — carried so the board can warn before the seller opens their site. */
+ photoCount: number; category: string | null; condition: string | null; material: string | null; size: string | null; description: string | null;
+ listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 
 /** Every active/pending item with its per-platform cross-listing status + engagement, for the tab. */
 export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> {
@@ -311,6 +314,9 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  const [rows, statRows, vyaOffers] = await Promise.all([
  sql`
   SELECT i.id::text AS item_id, i.title, i.price_cents, i.images, i.status, i.brand,
+   -- The fields Vestiaire's form gates on, so the board can say "only 1 photo" BEFORE a seller
+   -- opens their site and retypes everything to find out.
+   i.category, i.condition, i.material, i.size, i.description,
    COALESCE(json_object_agg(c.platform, c.status) FILTER (WHERE c.platform IS NOT NULL), '{}') AS listings,
    COALESCE(json_object_agg(c.platform, c.external_url) FILTER (WHERE c.status = 'error' AND c.external_url IS NOT NULL), '{}') AS errors
   FROM items i JOIN sellers s ON s.id = i.seller_id
@@ -319,7 +325,8 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
   -- the seller had just made was simply absent here with no explanation — "missing my dior blazer".
   -- It shows with its status so she can see where it is and what it needs, rather than hunting.
   WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved', 'draft')
-  GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand
+  GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand,
+   i.category, i.condition, i.material, i.size, i.description
   ORDER BY i.created_at DESC LIMIT 200
  `.catch(() => []),
  sql`SELECT item_id, platform, likes, offers, views, watchers FROM cross_listing_stats WHERE store_slug = ${storeSlug}`.catch(() => []),
@@ -344,6 +351,9 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  return {
  itemId: r.item_id, title: String(r.title || "Item"), priceCents: Number(r.price_cents || 0),
  image: Array.isArray(r.images) ? (r.images[0] ?? null) : null, status: String(r.status), brand: r.brand ?? null,
+ photoCount: Array.isArray(r.images) ? r.images.filter((u: unknown) => typeof u === "string" && /^https?:\/\//.test(u)).length : 0,
+ category: r.category ?? null, condition: r.condition ?? null, material: r.material ?? null,
+ size: r.size ?? null, description: r.description ?? null,
  listings: (r.listings && typeof r.listings === "object") ? r.listings : {},
  errors: (r.errors && typeof r.errors === "object") ? r.errors : {},
  stats: { totals, byPlatform },

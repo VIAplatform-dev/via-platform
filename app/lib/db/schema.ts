@@ -41,6 +41,9 @@ export const items = pgTable(
  brand: text("brand"),
  era: text("era"),
  material: text("material"),
+ // Vestiaire requires a colour and won't take a guess; VYA had nowhere to put one, so every piece
+ // failed that field however well filled in it was. Free text, like material.
+ colour: text("colour"),
  condition: text("condition"),
  size: text("size"),
  // Garment/flat measurements (bust/waist/length, or a bag's dimensions) — the #1 thing a secondhand

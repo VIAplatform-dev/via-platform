@@ -92,7 +92,7 @@ export default function CollectionsPage() {
 
  return (
  <AdminPage>
- <AdminHeader eyebrow="Sell · Inventory" title="Collections" subtitle="Group your pieces so they sell — a piece can live in as many collections as you like." />
+ <AdminHeader eyebrow="Sell · Inventory" title="Collections" subtitle="Group pieces together so shoppers can browse them. A piece can be in as many collections as you like." />
 
  <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
  {/* Collections list */}
@@ -131,7 +131,7 @@ export default function CollectionsPage() {
  {/* Selected collection's items */}
  <TechCard className="p-4">
  {!sel ? (
- <TechEmpty icon={<Package size={28} strokeWidth={1.5} />} title="Pick a collection" body="Select one on the left, or create a new collection to start grouping items." />
+ <TechEmpty icon={<Package size={28} strokeWidth={1.5} />} title="Pick a collection" body="Pick a collection on the left, or make a new one." />
  ) : (
  <>
  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -144,7 +144,7 @@ export default function CollectionsPage() {
  {detailBusy && items.length === 0 ? (
  <p className="py-10 text-center text-[13px] text-stone-400">Loading…</p>
  ) : items.length === 0 ? (
- <TechEmpty icon={<Package size={26} strokeWidth={1.5} />} title="No items yet" body="Add items to this collection — a piece can be in several at once." />
+ <TechEmpty icon={<Package size={26} strokeWidth={1.5} />} title="No items yet" body="Add pieces to this collection. A piece can be in more than one." />
  ) : (
  <>
  {/* The order is the seller's control over WHICH pieces lead: a storefront section showing
@@ -164,11 +164,16 @@ export default function CollectionsPage() {
  >
  <span className="absolute left-1.5 top-1.5 z-10 grid h-5 min-w-[20px] place-items-center rounded-full bg-stone-900/75 px-1 text-[10px] font-semibold tabular-nums text-white">{i + 1}</span>
  <button type="button" title="Remove from collection" onClick={() => removeItem(it.id)} className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-stone-500 opacity-0 shadow transition hover:text-rose-600 group-hover:opacity-100"><X size={13} /></button>
- <div className="aspect-[4/5] w-full bg-stone-100">{it.image && <img src={it.image} alt={it.title} className="pointer-events-none h-full w-full object-cover" />}</div>
+ {/* The tile opens the piece. A grid of photos that can't be clicked into is a dead end —
+     a seller looking at a collection is usually looking for the piece, not the grid.
+     Dragging still works: a drag never fires a click. */}
+ <a href={`/admin/inventory?item=${it.id}`} title={`Open ${it.title}`} className="block">
+ <div className="aspect-[4/5] w-full bg-stone-100">{it.image && <img src={it.image} alt={it.title} draggable={false} className="pointer-events-none h-full w-full object-cover" />}</div>
  <div className="p-2">
- <p className="line-clamp-1 text-[12px] text-stone-700">{it.title}</p>
+ <p className="line-clamp-1 text-[12px] text-stone-700 group-hover:underline">{it.title}</p>
  <p className="text-[12px] text-stone-400">{money(it.priceCents, it.currency)}{it.status !== "active" ? ` · ${it.status}` : ""}</p>
  </div>
+ </a>
  </div>
  ))}
  </div>

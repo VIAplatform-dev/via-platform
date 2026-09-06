@@ -6,6 +6,7 @@ import type { DBProduct } from "@/app/lib/db";
 import { makeRecipientToken } from "@/app/lib/recipientToken";
 import { signUnsubToken } from "@/app/lib/buyer-auth";
 import { storeContactEmails } from "@/app/lib/stores";
+import { storeEmailHtml } from "@/app/lib/email-template";
 import type { Offer } from "@/app/lib/offers-db";
 
 const getResend = () => {
@@ -862,49 +863,42 @@ export async function sendStoreCampaign(opts: {
 // The pure HTML for the new-arrivals email — a store name, intro, a 2-up grid of REAL product
 // cards (photo + title + price, each linking to the piece), and a Shop CTA. Exported so it can be
 // previewed without sending.
+/**
+ * New arrivals, in the shared automated-email format.
+ *
+ * Was a 2-up grid of tiles, which reads as a catalogue page. One piece per row — photo, name, its
+ * own button — reads like a shop showing you what came in, and it's the same shape as every other
+ * automatic email the store sends. See email-template.ts for why that sameness matters.
+ */
 export function newArrivalsEmailHtml(opts: {
  storeName: string;
  intro: string;
  products: { title: string; image: string | null; priceCents: number; currency: string; url: string }[];
  shopUrl?: string;
+ brand?: EmailBrand;
+ unsubscribeUrl?: string;
 }): string {
- const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
- const sans = "'Helvetica Neue',Arial,sans-serif";
- // Uniform tiles: a FIXED-height cover image + a fixed-height (2-line) title block, so every card in
- // a row lines up — the price sits on the same baseline regardless of title length or photo aspect.
- const card = (p: { title: string; image: string | null; priceCents: number; currency: string; url: string }) => {
- const img = p.image
- ? `<a href="${p.url}" style="text-decoration:none;"><img src="${p.image}" alt="${escapeHtml(p.title)}" width="260" style="display:block;width:100%;height:300px;object-fit:cover;border-radius:10px;border:0;background:#efe6d7;" border="0" /></a>`
- : `<div style="width:100%;height:300px;background:#efe6d7;border-radius:10px;"></div>`;
- return `<td width="50%" valign="top" style="padding:10px;">
- ${img}
- <a href="${p.url}" style="text-decoration:none;display:block;">
- <div style="margin:12px 2px 0;font-family:${sans};font-size:13px;line-height:1.35;color:#44403c;height:36px;overflow:hidden;">${escapeHtml(p.title)}</div>
- <div style="margin:6px 2px 0;font-family:${sans};font-size:14px;font-weight:600;color:#1c1917;">${formatEmailPrice(p.priceCents / 100, p.currency)}</div>
- </a>
- </td>`;
- };
- const rows: string[] = [];
- for (let i = 0; i < opts.products.length; i += 2) {
- rows.push(`<tr>${card(opts.products[i])}${opts.products[i + 1] ? card(opts.products[i + 1]) : '<td width="50%"></td>'}</tr>`);
- }
- const cta = opts.shopUrl
- ? `<div style="text-align:center;padding:24px 0 6px;"><a href="${withUtm(opts.shopUrl, "new_arrivals")}" style="display:inline-block;background:#1c1917;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:8px;font-family:${sans};font-size:14px;font-weight:600;letter-spacing:0.01em;">Shop new arrivals</a></div>`
- : "";
- return `<!doctype html><html><body style="margin:0;background:#f6f5f2;font-family:${sans};color:#1c1917;">
- <div style="max-width:600px;margin:0 auto;background:#ffffff;">
- <div style="padding:36px 28px 0;text-align:center;">
- <div style="font-family:${sans};font-size:11px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#a8a29e;">New arrivals</div>
- <h1 style="margin:9px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:600;letter-spacing:0.01em;color:#1c1917;">${escapeHtml(cleanName)}</h1>
- </div>
- <div style="padding:12px 34px 0;text-align:center;font-family:${sans};font-size:15px;line-height:1.6;color:#57534e;">${escapeHtml(opts.intro)}</div>
- <div style="padding:0 28px;"><div style="border-top:1px solid #ece8e1;margin:22px 0 4px;"></div></div>
- <div style="padding:2px 12px 6px;">
- <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rows.join("")}</table>
- </div>
- ${cta}
- <div style="padding:26px 28px 32px;border-top:1px solid #eeeeee;margin-top:20px;font-family:${sans};font-size:12px;line-height:1.5;color:#a8a29e;text-align:center;">You&rsquo;re receiving this because you shopped with ${escapeHtml(cleanName)}. Reply to this email to reach us.</div>
- </div></body></html>`;
+ const b = opts.brand;
+ return storeEmailHtml({
+  storeName: opts.storeName,
+  logo: b?.logo ?? null,
+  eyebrow: "New in",
+  // The intro the store wrote IS the headline — it's the one sentence they'd say.
+  headline: opts.intro,
+  button: opts.shopUrl ? { label: b?.buttonLabel || "Shop new arrivals", url: withUtm(opts.shopUrl, "new_arrivals") } : null,
+  products: opts.products.map((p) => ({
+   title: p.title,
+   image: p.image,
+   priceLabel: formatEmailPrice(p.priceCents / 100, p.currency),
+   url: withUtm(p.url, "new_arrivals"),
+  })),
+  links: undefined,
+  footerNote: b?.footerText?.trim()
+   ? b.footerText.trim().replace(/\{store\}/g, opts.storeName)
+   : `You're receiving this because you shopped with ${opts.storeName}.`,
+  unsubscribeUrl: opts.unsubscribeUrl ?? null,
+  brand: b ? { accent: b.accent, text: b.text, bg: b.bg, headingFont: b.headingFont, bodyFont: b.bodyFont, buttonLabel: b.buttonLabel, buttonStyle: b.buttonStyle, headerAlign: b.headerAlign, showAccentBar: b.showAccentBar } : null,
+ });
 }
 
 // A proper new-arrivals email: a 2-up grid of REAL product cards instead of a bulleted list of
@@ -918,12 +912,13 @@ export async function sendStoreNewArrivals(opts: {
  products: { title: string; image: string | null; priceCents: number; currency: string; url: string }[];
  shopUrl?: string;
  recipients: string[];
+ brand?: EmailBrand;
 }): Promise<{ sent: number; failed: number }> {
  const resend = getResend();
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
  const sender = (opts.fromAddress && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(opts.fromAddress)) ? opts.fromAddress : "campaigns@vyaplatform.com";
  const from = `${cleanName} <${sender}>`;
- const html = newArrivalsEmailHtml({ storeName: cleanName, intro: opts.intro, products: opts.products, shopUrl: opts.shopUrl });
+ const html = newArrivalsEmailHtml({ storeName: cleanName, intro: opts.intro, products: opts.products, shopUrl: opts.shopUrl, brand: opts.brand });
 
  let sent = 0, failed = 0;
  for (let i = 0; i < opts.recipients.length; i += 100) {
@@ -3364,4 +3359,63 @@ export async function sendReturnRejectedEmail(p: {
  subject: `About your return to ${storeName}`,
  html,
  });
+}
+
+/**
+ * One automated email, in the shared format.
+ *
+ * Automations are written as a subject and a short body. The FIRST line of that body becomes the
+ * headline — it's the sentence the store actually wants read — and the rest sits underneath in
+ * small text. That keeps a store's own words while giving every automatic email the same shape.
+ */
+export async function sendStoreAutomationEmail(opts: {
+ storeSlug: string;
+ storeName: string;
+ storeEmail: string | null;
+ fromAddress?: string;
+ subject: string;
+ body: string;
+ link?: string | null;
+ products?: { title: string; image: string | null; priceCents: number; currency: string; url: string }[];
+ recipients: string[];
+ brand?: EmailBrand;
+ unsubscribeUrl?: string | null;
+}): Promise<{ sent: number; failed: number }> {
+ const resend = getResend();
+ const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
+ const sender = (opts.fromAddress && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(opts.fromAddress)) ? opts.fromAddress : "campaigns@vyaplatform.com";
+ const from = `${cleanName} <${sender}>`;
+ const b = opts.brand;
+
+ const lines = String(opts.body || "").split(/\n+/).map((l) => l.trim()).filter(Boolean);
+ const headline = lines[0] || opts.subject;
+ const rest = lines.slice(1).join(" ");
+
+ const html = storeEmailHtml({
+  storeName: cleanName,
+  logo: b?.logo ?? null,
+  headline,
+  subhead: rest || null,
+  button: opts.link ? { label: b?.buttonLabel || "Shop now", url: withUtm(opts.link, "automation") } : null,
+  products: (opts.products || []).map((p) => ({
+   title: p.title, image: p.image,
+   priceLabel: formatEmailPrice(p.priceCents / 100, p.currency),
+   url: withUtm(p.url, "automation"),
+  })),
+  footerNote: b?.footerText?.trim()
+   ? b.footerText.trim().replace(/\{store\}/g, cleanName)
+   : `You're receiving this because you shopped with ${cleanName}.`,
+  unsubscribeUrl: opts.unsubscribeUrl ?? null,
+  brand: b ? { accent: b.accent, text: b.text, bg: b.bg, headingFont: b.headingFont, bodyFont: b.bodyFont, buttonLabel: b.buttonLabel, buttonStyle: b.buttonStyle, headerAlign: b.headerAlign, showAccentBar: b.showAccentBar } : null,
+ });
+
+ let sent = 0, failed = 0;
+ for (let i = 0; i < opts.recipients.length; i += 100) {
+  const chunk = opts.recipients.slice(i, i + 100);
+  try {
+   await resend.batch.send(chunk.map((to) => ({ from, to, replyTo: opts.storeEmail || undefined, subject: opts.subject, html })));
+   sent += chunk.length;
+  } catch { failed += chunk.length; }
+ }
+ return { sent, failed };
 }

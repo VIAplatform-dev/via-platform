@@ -31,6 +31,7 @@ export async function ensurePublishAtColumn(): Promise<void> {
  try {
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS publish_at timestamptz`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS colour text`);
  // Source identity for the import engine (see schema.ts). Additive + nullable, so existing rows
  // and any code that doesn't know about them keep working untouched.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_platform text`);

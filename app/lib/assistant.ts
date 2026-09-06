@@ -6,6 +6,15 @@
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, revertStorefrontTheme } from "./storefront-db";
 import { getTemplate, STOREFRONT_TEMPLATES, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
 import { resolveEffects, type SiteEffects } from "./storefront-effects";
+import { storePublicOrigin } from "./plan-b/store-host";
+import { sanitizeCode } from "./storefront-code";
+
+/** Where a shopper actually reaches this store: its own domain, else its own origin, else VYA's
+ *  internal path. One definition, so no caller has to assemble a URL out of a handle. */
+function storefrontUrl(customDomain: string | null | undefined, slug: string, handle: string | null | undefined): string {
+ if (customDomain) return `https://${customDomain}`;
+ return storePublicOrigin(slug) ?? `https://vyaplatform.com/s/${handle || slug}`;
+}
 import { makeBlock, sanitizeBlocks, sanitizePages, pageSlugify, BLOCK_TYPE_IDS } from "./storefront-blocks";
 import { checkCustomHtml } from "./custom-html-guard";
 import { listCapturePaths, getCapturePage, updateCapturePageHtml, setSiteCss } from "./site-capture-db";
@@ -30,8 +39,8 @@ import { getInboxSettings, updateInboxSettings } from "./storefront-settings-db"
 import { getAutomations, setBuiltinEnabled, addCustomAutomation, setCustomEnabled, removeCustomAutomation, BUILTIN_AUTOMATIONS, CUSTOM_TRIGGERS } from "./automations-db";
 import { getPlatformAccounts, upsertPlatformAccount, removePlatformAccount, createCrossListingsForItem, syncItemToApiPlatforms, delistEverywhere, getCrossListBoard, PLATFORMS } from "./cross-listing-db";
 import { getConsignmentSummary, getConsignmentSettings, upsertConsignmentSettings, listConsignors, getConsignor, createConsignor, updateConsignor, deleteConsignor, getSplitRules, setSplitRules } from "./consignment-db";
-import { getKlaviyoConnection, clearKlaviyo } from "./klaviyo-db";
-import { syncCustomersToKlaviyo } from "./klaviyo";
+// One email-tool connection, covering Klaviyo and Mailchimp. See esp-db.ts / esp-client.ts.
+import { getEspConnection, disconnectEsp } from "./esp-db";
 import { getStoreIgConnection, setStoreIgAutoPost, disconnectStoreIg, publishItemStory, igAppConfigured } from "./instagram-publish";
 import { deliverCampaign, recordSentCampaign, createScheduledCampaign, listCampaigns, cancelScheduledCampaign } from "./store-campaigns-db";
 import { getRefundPolicy, setRefundPolicy } from "./store-policy-db";
@@ -82,7 +91,8 @@ const TOOLS = [
  { name: "get_storefront", description: "Read the store's current storefront: design (template, colors, fonts), handle, tagline, hero image, and whether it's live.", input_schema: { type: "object", properties: {} } },
  { name: "update_storefront_design", description: "Change the storefront look. Provide any of: a starter template id, colors (hex like #1a1a1a), fonts. Confirm with the seller before calling this.", input_schema: { type: "object", properties: { template: { type: "string", enum: templateIds }, colors: { type: "object", properties: { bg: { type: "string" }, text: { type: "string" }, accent: { type: "string" } } }, fonts: { type: "object", properties: { heading: { type: "string", enum: HEADING_FONTS }, body: { type: "string", enum: BODY_FONTS } } } } } },
  { name: "style_storefront", description: "Apply raw custom CSS to the block-based storefront, layered over the theme site-wide — for ANY styling or layout change the section fields can't do: repositioning, alignment, spacing, sizing, per-element colors, borders, hover effects, etc. This is how you fulfill open-ended design requests. Pass the FULL CSS to set (it REPLACES the previous custom CSS — include everything you want kept); pass empty css to clear. Target these stable classes the storefront outputs: each section is `.vya-sec` + `.vya-<type>` (`.vya-hero`, `.vya-featured`, `.vya-text`, `.vya-newsletter`, `.vya-announcement`, `.vya-image`, `.vya-gallery`, `.vya-video`) + `.vya-b-<id>` to target ONE section by id (from list_sections). Inside a section: `.vya-heading` (heading), `.vya-sub` (subtext), `.vya-body` (text body), `.vya-cta` (button), `.vya-img` (image), and `.vya-hero-inner` (the hero's content box — change its flex to move content). Example — move the hero heading to the bottom-left: `.vya-hero .vya-hero-inner{align-items:flex-start;justify-content:flex-end;text-align:left}`. State the change and confirm before calling.", input_schema: { type: "object", properties: { css: { type: "string" } }, required: ["css"] } },
- { name: "set_site_effects", description: "Turn on a pointer effect across the whole storefront — the answer to 'can my cursor leave glitter', 'add sparkles', 'make the cursor trail'. cursor: 'glitter' (specks that fall and fade), 'sparkle' (four-point stars that twinkle out), 'trail' (a dot that chases the pointer), 'ring' (a quiet circle), or 'none' to switch it off. Optional colour as a #hex — leave it out to use the store's accent. These are drawn by VYA's own code, which is why they work site-wide where a pasted script can't: a storefront shares an origin with the marketplace, so seller JavaScript is never injected into the page. Say what you'll turn on and confirm first.", input_schema: { type: "object", properties: { cursor: { type: "string", enum: ["none", "glitter", "sparkle", "trail", "ring"] }, color: { type: "string", description: "hex like #FF66CC; omit to follow the store's accent" } }, required: ["cursor"] } },
+ { name: "write_storefront_code", description: "Write real JavaScript that runs on every page of the seller's storefront — THE tool for anything the sections, styles and settings can't express. A cursor that trails glitter only while moving, a scroll animation, a size calculator, a sticky bar, a countdown in the header, a confetti burst on add-to-cart: write it and it runs. Plain browser JS on the live DOM, with the store's own markup to work with (sections are .vya-sec + .vya-<type>, buttons .vya-cta, images .vya-img). Pass the FULL script — it REPLACES whatever was there, so include everything you want kept; pass an empty string to clear it. This runs ONLY on the store's own domain, never on VYA's copy, which is what makes it safe — so tell the seller to look at the URL you get back from get_storefront, not a vyaplatform.com link. Write complete working code, no placeholders, and guard for elements that may not exist on every page. Respect prefers-reduced-motion for anything that animates. State in one line what it will do, and confirm before calling.", input_schema: { type: "object", properties: { js: { type: "string" } }, required: ["js"] } },
+ { name: "set_site_effects", description: "Turn on a pointer effect across the whole storefront — the answer to 'can my cursor leave glitter', 'add sparkles', 'make the cursor trail'. cursor: 'glitter' (specks that fall and fade), 'sparkle' (four-point stars that twinkle out), 'trail' (a dot that chases the pointer), 'ring' (a quiet circle), or 'none' to switch it off. Optional colour as a #hex — leave it out to use the store's accent. These are one-line presets, drawn by VYA's own code. They are NOT the limit of what's possible: for anything they don't cover — sparkles only while the pointer moves, a different shape, a burst on click, any behaviour at all — use write_storefront_code and write it properly. Never tell a seller an effect can't behave the way they asked because these presets don't do it. Say what you'll turn on and confirm first.", input_schema: { type: "object", properties: { cursor: { type: "string", enum: ["none", "glitter", "sparkle", "trail", "ring"] }, color: { type: "string", description: "hex like #FF66CC; omit to follow the store's accent" } }, required: ["cursor"] } },
  { name: "list_photos", description: "List the photo URLs in the store's media library.", input_schema: { type: "object", properties: {} } },
  { name: "set_hero_photo", description: "Set the storefront hero banner image to a URL (usually from the library). Confirm first.", input_schema: { type: "object", properties: { url: { type: "string" } }, required: ["url"] } },
  { name: "list_inventory", description: "List the store's listings: id, title, price, status, and whether it has a description.", input_schema: { type: "object", properties: { activeOnly: { type: "boolean" } } } },
@@ -207,7 +217,10 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  }
  case "get_storefront": {
  const sf = await getStorefrontBySlug(slug);
- return { template: sf?.theme?.template ?? null, colors: sf?.theme?.colors ?? null, fonts: sf?.theme?.fonts ?? null, customCss: sf?.theme?.customCss ?? null, handle: sf?.handle ?? null, tagline: sf?.tagline ?? null, heroImage: sf?.heroImage ?? null, live: !!sf?.enabled, templatesAvailable: templateIds };
+ // The store's REAL address, so a link the assistant gives a seller is one that exists. Without it
+ // it built URLs out of the handle and guessed, handing out via-admin.vyasites.com/s/via-admin —
+ // the store's own origin with VYA's internal path stuck on the end.
+ return { template: sf?.theme?.template ?? null, colors: sf?.theme?.colors ?? null, fonts: sf?.theme?.fonts ?? null, customCss: sf?.theme?.customCss ?? null, handle: sf?.handle ?? null, tagline: sf?.tagline ?? null, heroImage: sf?.heroImage ?? null, live: !!sf?.enabled, url: storefrontUrl(sf?.customDomain, slug, sf?.handle), templatesAvailable: templateIds };
  }
  case "style_storefront": {
  const css = String(input.css ?? "").slice(0, 20000);
@@ -216,12 +229,25 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  await setStorefrontTheme(slug, theme);
  return { ok: true, applied: css.trim() ? `${css.length} chars of CSS` : "cleared" };
  }
+ case "write_storefront_code": {
+ const theme = await loadTheme(slug);
+ theme.customJs = sanitizeCode(input.js);
+ await setStorefrontTheme(slug, theme);
+ const sfc = await getStorefrontBySlug(slug).catch(() => null);
+ const url = storefrontUrl(sfc?.customDomain, slug, sfc?.handle);
+ return theme.customJs.trim()
+  ? { ok: true, chars: theme.customJs.length, seeItAt: url,
+      note: "Live on every page of the storefront. It runs on the store's own domain only — VYA's copy of the same shop doesn't carry it, so check it at the URL above." }
+  : { ok: true, cleared: true, seeItAt: url };
+ }
  case "set_site_effects": {
  const theme = await loadTheme(slug);
  theme.effects = resolveEffects({ cursor: input.cursor as SiteEffects["cursor"], cursorColor: typeof input.color === "string" ? input.color : null });
  await setStorefrontTheme(slug, theme);
  const on = theme.effects.cursor !== "none";
+ const sfx = await getStorefrontBySlug(slug).catch(() => null);
  return { ok: true, cursor: theme.effects.cursor, color: theme.effects.cursorColor ?? "the store accent",
+  seeItAt: storefrontUrl(sfx?.customDomain, slug, sfx?.handle),
   note: on
    ? "Live on every page. It's skipped automatically for anyone who has reduced motion switched on, and on touch screens where there's no pointer to follow."
    : "Switched off." };
@@ -835,20 +861,24 @@ export async function runTool(slug: string, name: string, input: any): Promise<a
  // ── Integrations ──
  case "get_integrations": {
  const [klaviyo, ig, conn] = await Promise.all([
- getKlaviyoConnection(slug).catch(() => null),
+ getEspConnection(slug).catch(() => null),
  getStoreIgConnection(slug).catch(() => null),
  getConnection(slug).catch(() => null),
  ]);
  return {
- klaviyo: klaviyo ? { connected: true } : { connected: false },
+ klaviyo: klaviyo ? { connected: true, provider: klaviyo.provider } : { connected: false },
  instagram: ig ? { connected: true, username: (ig as any).igUsername ?? null, autoPost: (ig as any).autoPost ?? null } : { connected: false, appConfigured: igAppConfigured() },
  salesPlatform: conn,
  };
  }
  case "manage_integration": {
  switch (input.action) {
- case "klaviyo_sync": { const r = await syncCustomersToKlaviyo(slug); return { ok: true, ...r }; }
- case "klaviyo_disconnect": await clearKlaviyo(slug); return { ok: true, disconnected: "klaviyo" };
+ case "klaviyo_sync": {
+   // Pushes contacts AND the store's pieces and orders — the same thing the Apps page does.
+   const { syncEspNow } = await import("./esp-sync");
+   return await syncEspNow(slug);
+  }
+ case "klaviyo_disconnect": await disconnectEsp(slug); return { ok: true, disconnected: "klaviyo" };
  case "instagram_toggle": await setStoreIgAutoPost(slug, !!input.enabled); return { ok: true, autoPost: !!input.enabled };
  case "instagram_post_now": {
  if (!input.itemId) return { error: "itemId is required." };
@@ -1000,7 +1030,8 @@ When a seller asks for a COMPONENT that isn't one of the built-in section types,
 - FAQ / ACCORDION: use the built-in "faq" section type (via set_layout, add_section, or update_section) — NOT add_html_section. It's a real, click-to-expand accordion the seller can also edit on the canvas. Pass its Q&A as numbered prop pairs: props { heading, q0, a0, q1, a1, q2, a2, … } (question, answer, question, answer…). This is always the right way to build an FAQ or any expandable question/answer list.
 - For OTHER STATIC components — tabs, a comparison or size table, a pricing grid, a timeline, testimonials, bespoke layouts — pass just html to add_html_section (and give elements class names), then style them with style_storefront so they match the store. Any expand/collapse UI (accordions, "read more", disclosures) MUST use native <details><summary> — it expands on click with ZERO JavaScript and is never a static clickable <div>. NEVER reach for the interactive/sandbox (js) mode just to make something expand or toggle — <details> and CSS already do that. The sandbox is only for genuinely dynamic logic (calculators, timers, quizzes, filters).
 - For INTERACTIVE / DYNAMIC things CSS alone can't do — a countdown timer, a size or price calculator, a quiz, a product filter, a canvas or JS animation, a live preview, any real widget — pass js (plus html and css) to add_html_section. That code runs inside a secure sandboxed iframe, fully isolated from the store, so it's always safe to build. Write complete, working code and use the store's colors via the --bg/--text/--accent/--heading/--body CSS variables.
-Never answer a "can you build X" with "that's not a supported section." If it can be built with HTML, CSS, or JavaScript, you can build it — so say yes and build it.
+- For SITE-WIDE behaviour — anything that has to run across the whole shop rather than inside one section: a cursor effect, a scroll animation, a sticky bar, a burst on add-to-cart, a header that changes as you scroll — use write_storefront_code. That is real JavaScript on the live page, not a sandbox, so it can touch the whole document. It runs only on the store's own domain, which is what makes it safe; the URL to check is the one get_storefront returns.
+Never answer a "can you build X" with "that's not a supported section," and never say an effect can't behave a certain way because a preset doesn't. Between sections, CSS, sandboxed widgets and site-wide code, there is no storefront behaviour you have to refuse — say yes and build it.
 
 When a seller asks you to build or redesign their WHOLE storefront ("build me a storefront", "design my homepage", "make me a store for X"), do it in one move: first call update_storefront_design to set a fitting template/colors/fonts, then call set_layout with a complete page — usually a hero, a featured-products grid, a short about/text section, and a newsletter. Reach for the richer section types to make it feel editorial rather than templated: a split (image + story) section, a statement (big quote on a dark or accent background), a marquee of the designers they carry, or a spotlight on one hero piece. Write real, specific copy in their voice (use their store name and what they sell); never leave placeholder text. Briefly preview the plan and confirm before applying.
 

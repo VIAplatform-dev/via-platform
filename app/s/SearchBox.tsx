@@ -4,14 +4,17 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 
 // Header search — expands to an input, submits to the shop's ?q= filter.
-export default function SearchBox({ handle, preview }: { handle: string; preview?: boolean }) {
+// `base` is "" on the store's own origin and "/s/{handle}" on VYA's — passed in because a client
+// component can't see the Host the page was served from.
+export default function SearchBox({ handle, base, preview }: { handle: string; base?: string; preview?: boolean }) {
  const [open, setOpen] = useState(false);
  const [q, setQ] = useState("");
 
  function go(e: React.FormEvent) {
  e.preventDefault();
  if (!q.trim()) return;
- window.location.href = `/s/${handle}/shop?q=${encodeURIComponent(q.trim())}${preview ? "&preview=1" : ""}`;
+ const root = base ?? `/s/${handle}`;
+ window.location.href = `${root}/shop?q=${encodeURIComponent(q.trim())}${preview ? "&preview=1" : ""}`;
  }
 
  if (!open) {

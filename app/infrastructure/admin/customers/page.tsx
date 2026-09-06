@@ -174,7 +174,7 @@ export default function CustomersPage() {
  <TechEmpty
  icon={<Users size={28} strokeWidth={1.5} />}
  title="No customers yet"
- body="As people buy from you they’ll appear here. Already have a list? Import it to bring your audience with you."
+ body="Everyone who buys from you shows up here. If you already have a customer list, you can import it."
  action={<TechButton onClick={() => setShowImport(true)}>Import list</TechButton>}
  />
  ) : (

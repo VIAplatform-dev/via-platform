@@ -60,7 +60,7 @@ export default function StoreDetailsPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Store details" subtitle="Who your store is as a business — used on receipts, invoices and customs forms." />
+   <AdminHeader eyebrow="Settings" title="Store details" subtitle="Your business name and address. Used on receipts, invoices and customs forms." />
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
    {msg && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-700">{msg}</div>}
 

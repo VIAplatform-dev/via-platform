@@ -1006,7 +1006,7 @@ function Analytics() {
        </div>
 
        <TechCard className="p-5">
-        <CardTitle hint="live at least two weeks and earning the least attention per day — the ones to re-shoot, retitle or reprice">Getting the least attention</CardTitle>
+        <CardTitle hint="Listed for at least two weeks and getting the fewest views a day. These are the ones to re-shoot, retitle or reprice">Getting the least attention</CardTitle>
         <ProductTable rows={products.worstPerformers} columns={["views", "daysLive"]} />
        </TechCard>
 
@@ -1119,7 +1119,7 @@ function Analytics() {
         </TechCard>
 
         <TechCard className="p-5">
-         <CardTitle hint="what shoppers searched for on your store — demand your catalog may not answer yet">Top searches</CardTitle>
+         <CardTitle hint="What people searched for on your store. If something comes up a lot and you don't stock it, that's worth knowing">Top searches</CardTitle>
          <Leaderboard unit="count" rows={engagement.topSearches.map((s) => ({ name: s.query, value: s.count }))} />
         </TechCard>
        </div>
@@ -1127,7 +1127,7 @@ function Analytics() {
        {(engagement.devices.length > 0 || engagement.countries.length > 0) ? (
         <div className="grid gap-4 sm:grid-cols-2">
          <TechCard className="p-5">
-          <CardTitle hint="how shoppers are browsing — it decides how you shoot and crop">Devices</CardTitle>
+          <CardTitle hint="What people browse on. Worth knowing before you decide how to shoot and crop photos">Devices</CardTitle>
           {engagement.devices.length ? (
            <Leaderboard unit="count" rows={engagement.devices.map((d) => ({ name: d.device[0].toUpperCase() + d.device.slice(1), value: d.sessions, sub: pct(d.sharePct) }))} />
           ) : <p className="py-4 text-center text-[12px] text-stone-400">No device data in this period.</p>}
@@ -1154,7 +1154,7 @@ function Analytics() {
        )}
 
        <TechCard className="p-5">
-        <CardTitle hint="the first page of each visit — where people actually enter the store">Landing pages</CardTitle>
+        <CardTitle hint="The first page people land on when they arrive">Landing pages</CardTitle>
         <Leaderboard unit="count" rows={engagement.landingPages.map((p) => ({ name: p.title || p.path, value: p.sessions }))} />
        </TechCard>
 
@@ -1184,7 +1184,7 @@ function Analytics() {
 
        {!quality.enoughData ? (
         <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Not enough listings yet"
-         body="Once you've listed enough pieces and made a handful of sales, this tab shows which listing habits actually move them." />
+         body="Once you’ve listed enough pieces and made a few sales, this shows what your fastest-selling listings have in common." />
        ) : (
         <>
          <TechCard className="p-5">
@@ -1350,7 +1350,7 @@ function Analytics() {
 
     </>
    ) : (
-    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Analytics unavailable" body="We couldn't load your analytics just now. Try refreshing." />
+    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Can’t load your numbers right now" body="We couldn’t load your numbers just now. Try refreshing the page." />
    )}
   </AdminPage>
  );

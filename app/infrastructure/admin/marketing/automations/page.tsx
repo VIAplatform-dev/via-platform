@@ -56,7 +56,7 @@ export default function AutomationsPage() {
  <AdminHeader
  eyebrow="Store · Marketing · Automations"
  title="Automations"
- subtitle="Emails that send for you automatically. Toggle VYA’s flows, or build your own."
+ subtitle="Emails that send on their own when something happens — a signup, an order, a piece left in a basket. Turn on the ones VYA writes, or write your own."
  actions={<TechButton onClick={() => { setErr(null); setAdding(true); }}><Plus size={15} className="-ml-0.5 mr-1 inline" />New automation</TechButton>}
  />
 

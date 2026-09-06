@@ -12,6 +12,9 @@ import type { StorefrontSettings } from "@/app/lib/storefront-db";
 import NewsletterForm from "./NewsletterForm";
 import SiteEffects from "./SiteEffects";
 import { resolveEffects, hasEffects } from "@/app/lib/storefront-effects";
+import { headers } from "next/headers";
+import { isStoreHost } from "@/app/lib/plan-b/store-host";
+import { storefrontScript } from "@/app/lib/storefront-code";
 import Blocks from "./Blocks";
 import { sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
@@ -38,6 +41,7 @@ function googleFontsHref(families: string[]): string | null {
 // Applies the store's extracted theme (fonts, colour palette, logo).
 export default async function StorefrontView({ settings, view = "home", preview = false, category, query, pageSlug, collectionSlug }: { settings: StorefrontSettings; view?: "home" | "shop"; preview?: boolean; category?: string; query?: string; pageSlug?: string; collectionSlug?: string }) {
  const sf = settings;
+ const onOwnOrigin = isStoreHost((await headers()).get("host"));
  // Store metadata: prefer hardcoded stores.ts, fall back to the sellers table,
  // then the handle — so DB-based sellers (not in stores.ts) still render.
  const store = stores.find((s) => s.slug === sf.storeSlug);
@@ -199,13 +203,17 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const newsletter = sections.find((s) => s.type === "newsletter");
  // Preserve the ?preview flag across internal links (so previewing an off
  // storefront doesn't 404 when you click into Shop / a page).
- const withPreview = (href: string) => (preview ? `${href}?preview=1` : href);
+ // On the store's OWN origin its pages ARE the site root — /shop, /philosophy, /p/{id}. The
+ // /s/{handle} prefix is how VYA reaches the same storefront internally, and hardcoding it meant
+ // every link on a seller's own domain read via-admin.vyasites.com/s/via-admin/shop.
+ const base = onOwnOrigin ? "" : `/s/${sf.handle}`;
+ const withPreview = (href: string) => (preview ? `${href || "/"}?preview=1` : href || "/");
  const navItems = nav.map((label) => {
  const page = pages.find((p) => p.label?.toLowerCase() === label.toLowerCase());
- const href = page ? `/s/${sf.handle}/${page.slug}` : `/s/${sf.handle}/shop`;
+ const href = page ? `${base}/${page.slug}` : `${base}/shop`;
  return { label, href: withPreview(href) };
  });
- const shopHref = withPreview(`/s/${sf.handle}/shop`);
+ const shopHref = withPreview(`${base}/shop`);
  // Products live on their own Shop page (matching real sites). On the homepage we
  // only show a grid if the cloned page actually had a products section, or if this
  // store has no cloned design at all.
@@ -274,12 +282,12 @@ export default async function StorefrontView({ settings, view = "home", preview 
    products: (await listCollectionItems(c.id).catch(() => []))
     .map((it) => byId.get(it.id))
     .filter(Boolean)
-    .map((t) => ({ key: t!.key, title: t!.title, price: t!.price, image: t!.image, href: t!.itemId ? withPreview(`/s/${sf.handle}/p/${t!.itemId}`) : t!.href || undefined })),
+    .map((t) => ({ key: t!.key, title: t!.title, price: t!.price, image: t!.image, href: t!.itemId ? withPreview(`${base}/p/${t!.itemId}`) : t!.href || undefined })),
   })),
  )).filter((c) => c.products.length > 0);
  const hasBlocks = !isShop && (!!pageSlug || homeBlocks.length > 0);
  // A clean nav for block-based stores: Home · Shop · each collection (with items) · each extra page.
- const collectionNav = storeCollections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: withPreview(`/s/${sf.handle}/collections/${c.slug}`) }));
+ const collectionNav = storeCollections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: withPreview(`${base}/collections/${c.slug}`) }));
  // Same links keyed by lowercased title, for the shop-by-category tiles. Built from each
  // collection's own slug (imported stores keep their source handle, so it is not always
  // slugify(title)) and pre-wrapped here so preview mode survives the hop.
@@ -287,7 +295,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
   collectionNav.map((c) => [c.label.trim().toLowerCase(), c.href]),
  );
  const blockNav = homeBlocks.length > 0 || extraPages.length > 0
- ? [{ label: "Home", href: withPreview(`/s/${sf.handle}`) }, { label: "Shop", href: shopHref }, ...collectionNav, ...extraPages.map((p) => ({ label: p.title, href: withPreview(`/s/${sf.handle}/${p.slug}`) }))]
+ ? [{ label: "Home", href: withPreview(`${base}`) }, { label: "Shop", href: shopHref }, ...collectionNav, ...extraPages.map((p) => ({ label: p.title, href: withPreview(`${base}/${p.slug}`) }))]
  : null;
  const finalNav = blockNav ?? navItems;
  // Custom seller-added links merge into the header and/or footer nav (external URLs pass through; internal ones keep the ?preview flag).
@@ -334,12 +342,16 @@ export default async function StorefrontView({ settings, view = "home", preview 
  );
 
  const siteEffects = resolveEffects(theme.effects);
+ const storeCode = storefrontScript(theme.customJs, onOwnOrigin);
 
  return (
  <main style={rootStyle} className="min-h-screen">
  {fontsHref && <link rel="stylesheet" href={fontsHref} />}
  {/* Store's own custom CSS — layered over the theme (targets .vya-* classes). Trusted: only the owner/AI set it. */}
  {theme.customCss && <style dangerouslySetInnerHTML={{ __html: stripThemeBackgroundOverrides(theme.customCss) }} />}
+
+ {/* The store's own code. Only ever on the store's own origin. */}
+ {storeCode && <script dangerouslySetInnerHTML={{ __html: storeCode }} />}
 
  {/* Pointer effects. Mounted only when the store asked for one, so a shop with none ships no
      client component at all. */}
@@ -354,7 +366,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
      only where the parts sit. */}
  {(headerNav.length > 0 || logo) && (() => {
  const brand = (
- <a href={withPreview(`/s/${sf.handle}`)} className="shrink-0">
+ <a href={withPreview(`${base}`)} className="shrink-0">
  {logo ? (
  <img src={logo} alt={storeName} className="h-7 w-auto object-contain" />
  ) : (
@@ -382,9 +394,9 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {shopMenu.map((c, j) => (
  <div key={j} className="contents">
  {/* The family heading is itself a destination — "Clothing" shows every bucket beneath it. */}
- <a href={withPreview(`/s/${sf.handle}/shop?category=${c.slug}`)} className={`px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100${c.children.length ? " font-medium" : ""}`} style={{ letterSpacing: "normal" }}>{c.label}</a>
+ <a href={withPreview(`${base}/shop?category=${c.slug}`)} className={`px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100${c.children.length ? " font-medium" : ""}`} style={{ letterSpacing: "normal" }}>{c.label}</a>
  {c.children.map((s, k) => (
- <a key={k} href={withPreview(`/s/${sf.handle}/shop?category=${s.slug}`)} className="px-2 py-1 pl-5 text-[11px] normal-case tracking-normal opacity-70 hover:opacity-100" style={{ letterSpacing: "normal" }}>{s.label}</a>
+ <a key={k} href={withPreview(`${base}/shop?category=${s.slug}`)} className="px-2 py-1 pl-5 text-[11px] normal-case tracking-normal opacity-70 hover:opacity-100" style={{ letterSpacing: "normal" }}>{s.label}</a>
  ))}
  </div>
  ))}
@@ -448,7 +460,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -549,7 +561,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
  )}
 
  {showGrid && !hasBlocks && (
@@ -589,7 +601,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </div>
  </>
  );
- const detailHref = it.itemId ? withPreview(`/s/${sf.handle}/p/${it.itemId}`) : null;
+ const detailHref = it.itemId ? withPreview(`${base}/p/${it.itemId}`) : null;
                 return detailHref ? (
                   <a key={it.key} href={detailHref} className="group block">{inner}</a>
                 ) : it.href ? (

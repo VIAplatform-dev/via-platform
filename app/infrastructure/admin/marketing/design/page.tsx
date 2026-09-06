@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, RotateCcw, Undo2, Upload, Type as TypeIcon, Sparkles } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, SectionLabel, Toggle, SegmentedControl } from "../../ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, SectionLabel, Toggle, SegmentedControl, cn } from "../../ui";
 import { Input } from "@/app/store/ui";
 
 type Brand = {
@@ -28,8 +28,20 @@ const PALETTE = ["#5D0F17", "#1c1917", "#b5533b", "#0e6b52", "#1f3a5f", "#a9744f
 
 // Serif display faces for headings + the store wordmark; sans faces for body copy. "" = the
 // classic default (Georgia / system sans). Values are Google font family names the renderer loads.
-const HEADING_FONTS = ["", "Playfair Display", "Bodoni Moda", "Cormorant Garamond", "Newsreader", "Instrument Serif", "Fraunces", "EB Garamond", "Lora", "DM Serif Display", "Libre Baskerville", "Prata", "Spectral"];
-const BODY_FONTS = ["", "Inter", "Work Sans", "DM Sans", "Nunito Sans", "Mulish", "Karla", "Lato"];
+// Grouped, because a list of thirty names in one column is not a choice — it's a wall. The groups
+// are what a seller is actually picking between: how do I want to sound.
+const HEADING_FONTS: { group: string; fonts: string[] }[] = [
+ { group: "Fashion serif", fonts: ["Playfair Display", "Bodoni Moda", "Prata", "DM Serif Display", "Italiana", "Marcellus", "Cormorant Garamond", "Gilda Display", "Yeseva One"] },
+ { group: "Editorial serif", fonts: ["Newsreader", "Fraunces", "Spectral", "Lora", "EB Garamond", "Libre Baskerville", "Crimson Pro", "Source Serif 4", "Bitter"] },
+ { group: "Modern serif", fonts: ["Instrument Serif", "Young Serif", "Petrona", "Literata", "Zilla Slab", "Roboto Slab"] },
+ { group: "Clean sans", fonts: ["Inter", "DM Sans", "Work Sans", "Manrope", "Outfit", "Figtree", "Plus Jakarta Sans", "Space Grotesk", "Archivo", "Syne"] },
+ { group: "Handwritten", fonts: ["Cormorant Infant", "Parisienne", "Great Vibes", "Dancing Script", "Sacramento", "Pinyon Script"] },
+];
+const BODY_FONTS: { group: string; fonts: string[] }[] = [
+ { group: "Sans", fonts: ["Inter", "DM Sans", "Work Sans", "Nunito Sans", "Mulish", "Karla", "Lato", "Manrope", "Figtree", "Plus Jakarta Sans", "Outfit", "Archivo", "Public Sans", "Rubik"] },
+ { group: "Serif", fonts: ["Lora", "EB Garamond", "Spectral", "Source Serif 4", "Crimson Pro", "Literata", "Newsreader"] },
+ { group: "Monospace", fonts: ["JetBrains Mono", "IBM Plex Mono", "Space Mono"] },
+];
 
 // A representative email so the store sees headings, body, a list, the button and the footer at once.
 const SAMPLE = `# Just landed
@@ -51,6 +63,10 @@ export default function EmailDesignPage() {
  const [savedSnap, setSavedSnap] = useState("");
  const [busy, setBusy] = useState(false);
  const [note, setNote] = useState<string | null>(null);
+ // Which of the two shapes to show. Automatic emails — new arrivals, abandoned basket, welcome —
+ // all share one simple format, and a store had no way to see it: this page only ever previewed a
+ // campaign, which is the one kind of email they design by hand.
+ const [kind, setKind] = useState<"automated" | "campaign">("automated");
  const fileRef = useRef<HTMLInputElement>(null);
 
  useEffect(() => {
@@ -71,11 +87,11 @@ export default function EmailDesignPage() {
  useEffect(() => {
  if (!brand) return;
  const id = setTimeout(() => {
- fetch("/api/store/email-preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: SAMPLE, brand }) })
+ fetch("/api/store/email-preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body: SAMPLE, brand, kind }) })
  .then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.html) setPreviewHtml(d.html); }).catch(() => {});
  }, 300);
  return () => clearTimeout(id);
- }, [brand]);
+ }, [brand, kind]);
 
  const set = (patch: Partial<Brand>) => { setBrand((b) => (b ? { ...b, ...patch } : b)); setNote(null); };
  const applyPreset = (p: Preset) => set(p.b); // theme fields only — logo/label/footer are kept
@@ -126,7 +142,7 @@ export default function EmailDesignPage() {
  <AdminHeader
  eyebrow="Store · Marketing"
  title="Email design"
- subtitle="Set the look every campaign and automation sends with — logo, colours, type, and the details. Same idea as your storefront: change it once, and every email matches."
+ subtitle="The logo, colours and fonts used in every email you send. Set them once here and all your emails match."
  actions={
  <div className="flex items-center gap-2">
  {canUndo && <TechButton variant="ghost" onClick={undo} disabled={busy}><Undo2 size={13} /> Revert last change</TechButton>}
@@ -146,9 +162,25 @@ export default function EmailDesignPage() {
  <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
  {/* Live preview */}
  <div className="lg:sticky lg:top-6 lg:self-start">
- <SectionLabel className="mb-2">Preview</SectionLabel>
+ <div className="mb-2 flex flex-wrap items-center gap-2">
+ <SectionLabel>Preview</SectionLabel>
+ <div className="ml-auto flex gap-1">
+ {([["automated", "Automatic emails"], ["campaign", "A campaign you write"]] as const).map(([k, label]) => (
+ <button
+ key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k}
+ className={cn("rounded-full px-2.5 py-1 text-[11.5px] transition",
+ kind === k ? "bg-stone-900 text-white" : "border border-stone-200 text-stone-500 hover:bg-stone-50")}
+ >{label}</button>
+ ))}
+ </div>
+ </div>
+ <p className="mb-2 text-[11.5px] leading-relaxed text-stone-400">
+ {kind === "automated"
+ ? "New arrivals, abandoned baskets and your own automations all send in this shape. Your logo, colours, fonts and button wording carry through."
+ : "How an email you write and send yourself will look."}
+ </p>
  <div className="overflow-hidden rounded-xl border border-stone-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
- <iframe srcDoc={previewHtml} title="Email preview" className="h-[620px] w-full border-0 bg-[#f1efeb]" sandbox="" />
+ <iframe srcDoc={previewHtml} title="Email preview" className="h-[620px] w-full border-0 bg-white" sandbox="" />
  </div>
  </div>
 
@@ -207,8 +239,8 @@ export default function EmailDesignPage() {
  <TechCard className="p-4">
  <SectionLabel className="mb-2.5 flex items-center gap-1.5"><TypeIcon size={12} /> Typography</SectionLabel>
  <div className="space-y-3">
- <FontRow label="Headings" value={brand.headingFont || ""} fonts={HEADING_FONTS} onChange={(v) => set({ headingFont: v || undefined })} />
- <FontRow label="Body" value={brand.bodyFont || ""} fonts={BODY_FONTS} onChange={(v) => set({ bodyFont: v || undefined })} />
+ <FontRow label="Headings" value={brand.headingFont || ""} groups={HEADING_FONTS} onChange={(v) => set({ headingFont: v || undefined })} />
+ <FontRow label="Body" value={brand.bodyFont || ""} groups={BODY_FONTS} onChange={(v) => set({ bodyFont: v || undefined })} />
  </div>
  </TechCard>
 
@@ -275,13 +307,58 @@ function ColorRow({ label, hint, value, onChange }: { label: string; hint: strin
  );
 }
 
-function FontRow({ label, value, fonts, onChange }: { label: string; value: string; fonts: string[]; onChange: (v: string) => void }) {
+/**
+ * Picking a typeface by name is guesswork, so each option is SET IN ITSELF — the list is the
+ * specimen. The faces load on demand rather than up front: thirty families fetched to draw one
+ * dropdown is a slow page for a choice most stores make once.
+ */
+function FontRow({ label, value, groups, onChange }: { label: string; value: string; groups: { group: string; fonts: string[] }[]; onChange: (v: string) => void }) {
+ const [open, setOpen] = useState(false);
+ const all = groups.flatMap((g) => g.fonts);
+
+ useEffect(() => {
+  if (!open) return;
+  const id = "vya-font-specimens";
+  const href = `https://fonts.googleapis.com/css2?${all.map((f) => `family=${f.replace(/ /g, "+")}:wght@400;500`).join("&")}&display=swap`;
+  let link = document.getElementById(id) as HTMLLinkElement | null;
+  if (!link) { link = document.createElement("link"); link.id = id; link.rel = "stylesheet"; document.head.appendChild(link); }
+  if (link.href !== href) link.href = href;
+ }, [open, all]);
+
  return (
- <label className="flex items-center justify-between gap-3">
- <span className="text-[13px] text-stone-700">{label}</span>
- <select value={value} onChange={(e) => onChange(e.target.value)} className="w-[190px] rounded-md border border-stone-200 bg-white px-2 py-1.5 text-[13px] text-stone-800 outline-none focus:border-[var(--accent,#0e9f76)]">
- {fonts.map((f) => <option key={f || "default"} value={f}>{f || "Default"}</option>)}
- </select>
- </label>
+  <div className="flex items-start justify-between gap-3">
+   <span className="pt-1.5 text-[13px] text-stone-700">{label}</span>
+   <div className="relative w-[210px]">
+    <button
+     type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+     className="flex w-full items-center justify-between gap-2 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-left text-[13px] text-stone-800 outline-none hover:border-stone-300"
+    >
+     <span className="truncate" style={value ? { fontFamily: `'${value}', Georgia, serif` } : undefined}>{value || "Default"}</span>
+     <span className="shrink-0 text-[10px] text-stone-400">▾</span>
+    </button>
+    {open && (
+     <>
+      {/* Click anywhere else to close. Without this the list stays open behind the next thing you press. */}
+      <button type="button" aria-hidden tabIndex={-1} onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default" />
+      <div className="absolute right-0 z-50 mt-1 max-h-[320px] w-[230px] overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
+       <button type="button" onClick={() => { onChange(""); setOpen(false); }}
+        className={cn("block w-full px-3 py-1.5 text-left text-[13px] hover:bg-stone-50", !value && "bg-stone-50 font-medium")}>Default</button>
+       {groups.map((g) => (
+        <div key={g.group}>
+         <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400">{g.group}</p>
+         {g.fonts.map((f) => (
+          <button
+           key={f} type="button" onClick={() => { onChange(f); setOpen(false); }}
+           style={{ fontFamily: `'${f}', Georgia, serif` }}
+           className={cn("block w-full px-3 py-1.5 text-left text-[15px] leading-tight hover:bg-stone-50", value === f && "bg-stone-50")}
+          >{f}</button>
+         ))}
+        </div>
+       ))}
+      </div>
+     </>
+    )}
+   </div>
+  </div>
  );
 }

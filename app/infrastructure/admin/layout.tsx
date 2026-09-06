@@ -57,7 +57,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { href: `${B}/import`, label: "Bring your site", icon: Plug },
  {
  href: `${B}/customers`, label: "Customers", icon: Users,
- children: [{ href: `${B}/customers/buyers`, label: "Buyers" }, { href: `${B}/recovery`, label: "Cart recovery" }],
+ children: [{ href: `${B}/customers/buyers`, label: "Buyers" }, { href: `${B}/customers/recovery`, label: "Cart recovery" }],
  },
  {
  href: `${B}/marketing`, label: "Marketing", icon: Megaphone,
@@ -65,14 +65,23 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
  { href: `${B}/marketing/campaigns`, label: "Campaigns" },
  { href: `${B}/marketing/design`, label: "Email design" },
  { href: `${B}/marketing/share-links`, label: "Share links" },
- { href: `${B}/instagram`, label: "Instagram" },
+ { href: `${B}/marketing/instagram`, label: "Instagram" },
  { href: `${B}/marketing/automations`, label: "Automations" },
  ],
  },
  { href: `${B}/discounts`, label: "Discounts", icon: Tag },
  ],
  },
- { label: "Apps", items: [{ href: `${B}/apps`, label: "Apps & integrations", icon: LayoutGrid }] },
+ {
+  label: "Apps",
+  items: [{
+   href: `${B}/apps`, label: "Apps & integrations", icon: LayoutGrid,
+   children: [
+    { href: `${B}/apps`, label: "All apps" },
+    { href: `${B}/apps/email`, label: "Klaviyo & Mailchimp" },
+   ],
+  }],
+ },
  {
  label: "Business",
  items: [

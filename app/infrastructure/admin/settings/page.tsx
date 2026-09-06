@@ -18,7 +18,7 @@ const ICONS: Record<string, React.ComponentType<{ size?: number; className?: str
 export default function SettingsIndex() {
  return (
   <>
-   <AdminHeader eyebrow="Your store" title="Settings" subtitle="Everything about how your store runs, in one place." />
+   <AdminHeader eyebrow="Your store" title="Settings" subtitle="How your store runs: your details, payments, shipping, tax and the rest." />
    {SETTINGS_GROUPS.map((g) => (
     <div key={g.label} className="mb-6">
      <p className="mb-2 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">{g.label}</p>

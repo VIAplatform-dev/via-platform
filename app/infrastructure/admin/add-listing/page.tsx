@@ -31,6 +31,7 @@ type Draft = {
  brand: Field;
  era: Field;
  material: Field;
+ colour: Field;
  condition: Field;
  conditionGrade: string | null;
  flaws: string[];
@@ -41,9 +42,9 @@ type Draft = {
  priceHint: number | null;
  parcel: { weightOz: number; lengthIn: number; widthIn: number; heightIn: number };
 };
-type Form = { title: string; brand: string; era: string; material: string; condition: string; size: string; measurements: string; category: string; price: string; cost: string; description: string; weightOz: string; lengthIn: string; widthIn: string; heightIn: string };
+type Form = { title: string; brand: string; era: string; material: string; colour: string; condition: string; size: string; measurements: string; category: string; price: string; cost: string; description: string; weightOz: string; lengthIn: string; widthIn: string; heightIn: string };
 type Collection = { id: string; title: string; itemCount: number };
-const BLANK: Form = { title: "", brand: "", era: "", material: "", condition: "", size: "", measurements: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+const BLANK: Form = { title: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", measurements: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
 
 type Flag = { level: string; message: string; marketUsd: number; pct?: number };
 
@@ -355,7 +356,7 @@ export default function IntakePage() {
  // Record the AI's proposal ONLY for fields the seller left blank (a genuine prediction).
  // Pre-typed fields aren't the AI's guess → excluded, keeping the accuracy metric honest.
  { const predicted: Record<string, string | null> = {};
- ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["condition", dr.condition?.value], ["category", dr.category], ["description", dr.description]] as [keyof Form, string | null | undefined][])
+ ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["colour", dr.colour?.value], ["condition", dr.condition?.value], ["category", dr.category], ["description", dr.description]] as [keyof Form, string | null | undefined][])
  .forEach(([k, aiVal]) => { if (!String(form[k]).trim() && aiVal) predicted[k] = aiVal; });
  setAiDraft(predicted); setAiPhoto(photos[0] ?? null); }
  }
@@ -371,6 +372,7 @@ export default function IntakePage() {
  fill("brand", dr.brand?.value);
  fill("era", dr.era?.value);
  fill("material", dr.material?.value);
+ fill("colour", dr.colour?.value);
  fill("condition", dr.condition?.value);
  fill("category", toCategorySlug(dr.category) ?? dr.category);
  fill("description", dr.description);
@@ -598,7 +600,7 @@ export default function IntakePage() {
  <AdminHeader
  eyebrow="Sell · Add listing"
  title="Add a listing"
- subtitle="Add photos and fill in what you know — then let AI complete the rest. Anything you type, it keeps."
+ subtitle="Add photos and fill in what you know. AI fills in the rest, and never overwrites anything you typed."
  actions={<a href="/admin/bulk-upload" className="text-[13px] font-medium text-stone-500 hover:text-stone-800">Bulk upload →</a>}
  />
 
@@ -720,6 +722,9 @@ export default function IntakePage() {
  </div>
  </div>
  <div className="grid grid-cols-2 gap-3">
+ {/* Vestiaire requires a colour and refuses a guessed one. Not gated like material is: a photo
+     shows colour plainly, so the AI's answer here is worth trusting without a confirmation step. */}
+ <div><label className={label}>Colour</label><input className={input} value={form.colour} onChange={(e) => set("colour", e.target.value)} placeholder="e.g. Navy" /></div>
  <div><label className={label}>Size</label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="M / US 8" /></div>
  <div>
  <label className={label}>Category</label>
@@ -808,7 +813,7 @@ export default function IntakePage() {
  <button
  type="button" onClick={polishForSeo} disabled={seoBusy || form.description.trim().length < 10}
  className="text-[11px] font-medium text-[var(--accent,#0e9f76)] transition hover:opacity-70 disabled:opacity-40"
- title="Rewrite your description for search — keeps your words and facts, just makes it more findable"
+ title="Rewrite the description so it turns up in more searches. Keeps your wording and facts."
  >
  {seoBusy ? "Polishing…" : "✨ Improve for search"}
  </button>

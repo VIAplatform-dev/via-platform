@@ -64,6 +64,9 @@ export type StorefrontTheme = {
  // applied, cleared when the skin is removed.
  preSkin?: { colors?: { bg?: string; text?: string; accent?: string }; fonts?: { heading?: string; body?: string } };
  customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
+ // The store's own JavaScript. Shipped ONLY on the store's own origin — see storefront-code.ts for
+ // why that distinction is the whole safety model.
+ customJs?: string;
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
  // The catalogue grid on the Shop page. Seeded by the template (Vitrine runs 2-up, The Index 5-up)
  // and editable after. Absent = the platform default, which is what every store rendered before

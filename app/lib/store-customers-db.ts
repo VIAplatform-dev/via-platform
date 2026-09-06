@@ -61,6 +61,16 @@ export async function importCustomers(
  phone = COALESCE(EXCLUDED.phone, store_customers.phone)`;
  }
  const total = await getCustomerCount(storeSlug);
+
+ // A store that connected Klaviyo or Mailchimp expects someone who signs up or buys to appear there
+ // now, not at the next full sync. A CSV import of ten thousand is a different case — that's what
+ // "Send everyone now" is for — so only small, live additions go across immediately.
+ if (rows.length <= 50) {
+  const { mirrorToEsp } = await import("./esp-mirror");
+  for (const r of rows) {
+   if (r.email) mirrorToEsp(storeSlug, { email: r.email.toLowerCase().trim(), name: r.name, phone: r.phone, subscribed: true });
+  }
+ }
  return { added: total - before, total };
 }
 
@@ -215,6 +225,11 @@ export async function setEmailSubscribed(storeSlug: string, email: string, subsc
  VALUES (${storeSlug}, ${email.toLowerCase().trim()}, ${subscribed}, 'unsubscribe')
  ON CONFLICT (store_slug, email) DO UPDATE SET email_subscribed = ${subscribed}
  `.catch(() => {});
+ // If the store sends from Klaviyo or Mailchimp, tell it too. An unsubscribe that VYA honours and
+ // their other tool doesn't is the worst outcome here: the person keeps getting emails and the
+ // store looks like it ignored them.
+ const { mirrorToEsp } = await import("./esp-mirror");
+ mirrorToEsp(storeSlug, { email: email.toLowerCase().trim(), subscribed });
 }
 
 // ── CRM: tags (segments) + a private note per contact ──────────────────────────

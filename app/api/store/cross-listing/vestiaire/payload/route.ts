@@ -4,7 +4,8 @@ import { getItem } from "@/app/lib/db/inventory";
 import { crossPostContent } from "@/app/lib/cross-listing-db";
 import {
  vestiaireCondition, vestiaireUniverse, vestiaireCategory,
- vestiaireMaterial, vestiaireColour, vestiaireEligibility, vestiaireTitle,
+ vestiaireMaterial, vestiaireColour, vestiaireEligibility, vestiaireTitle, vestiaireReadiness,
+ vestiairePattern, vestiaireLength, vestiaireSize,
 } from "@/app/lib/vestiaire";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +34,23 @@ export async function GET(request: NextRequest) {
  if (!item) return NextResponse.json({ error: "Item not found." }, { status: 404 });
 
  // Refuse before the seller opens the site, not after she's filled the form.
- const eligible = vestiaireEligibility(item.brand);
- if (!eligible.ok) return NextResponse.json({ ok: false, ineligible: true, error: eligible.reason }, { status: 422 });
+ //
+ // Not just eligibility any more: their manual flow gates each of five steps, so a piece with one
+ // photo or no material can't be finished either. Everything that would stop her is returned at
+ // once — finding out one problem per attempt is its own kind of awful.
+ const check = vestiaireReadiness({
+  title: item.title, brand: item.brand, category: item.category, condition: item.condition,
+  material: (item as { material?: string | null }).material ?? null,
+  colour: (item as { colour?: string | null }).colour ?? null,
+  size: item.size, description: item.description, priceCents: item.priceCents,
+  images: (item.images as string[] | null) ?? null,
+ });
+ if (!check.ready) {
+  return NextResponse.json(
+   { ok: false, ineligible: true, error: check.blocking.join(" "), blocking: check.blocking, advisory: check.advisory },
+   { status: 422 },
+  );
+ }
 
  const content = crossPostContent(
   {
@@ -65,12 +81,21 @@ export async function GET(request: NextRequest) {
    category,
    subcategory,
    condition: vestiaireCondition(item.condition),
-   colour: vestiaireColour(item.title, item.description),
+   colour: vestiaireColour(item.title, item.description, (item as { colour?: string | null }).colour ?? null),
    // Required by Vestiaire, and deliberately blank when nothing names it — the extension surfaces
    // that as one field for the seller rather than posting a guessed fibre.
    material,
    materialMissing: material === "",
    size: item.size || "",
+   // Their Details step requires all three, and none has a home in VYA. Decided here rather than
+   // in the extension so they're testable and the same on every marketplace path.
+   pattern: vestiairePattern(item.title, item.description, (item as { colour?: string | null }).colour ?? null),
+   length: vestiaireLength(item.category, item.title, item.description),
+   // Whether this KIND of piece is even asked for a length — so the extension can tell "we don't
+   // know it" apart from "it doesn't have one". A bag needs no length; a dress does.
+   needsLength: /dress|skirt|gown/i.test(String(item.category || "")),
+   sizeSystem: vestiaireSize(item.size).system,
+   sizeValue: vestiaireSize(item.size).value,
    photos: (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 15),
   },
  });

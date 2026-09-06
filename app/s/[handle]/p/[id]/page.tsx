@@ -21,7 +21,9 @@ import SiteEffects from "@/app/s/SiteEffects";
 import { resolveEffects, hasEffects } from "@/app/lib/storefront-effects";
 import { rentalContext } from "@/app/lib/rentals/rentals-db";
 import { storefrontCss } from "@/app/lib/storefront-chrome-css";
-import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
+import { storePublicOrigin, isStoreHost } from "@/app/lib/plan-b/store-host";
+import { storefrontScript } from "@/app/lib/storefront-code";
+import { headers } from "next/headers";
 import { resolveProductPage, visibleFields, buttonCss, type ProductSlot } from "@/app/lib/storefront-product-page";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +102,10 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const images = (item.images || []).filter(Boolean);
  const sold = item.status === "sold" || item.status === "reserved";
  const price = formatPrice(item.priceCents / 100, item.currency);
- const link = (p: string) => (preview ? `${p}?preview=1` : p);
+ // Same rule as the storefront: on the store's own origin its pages are the root, so links must
+ // not carry VYA's internal /s/{handle} prefix.
+ const base = isStoreHost((await headers()).get("host")) ? "" : `/s/${handle}`;
+ const link = (p: string) => (preview ? `${p || "/"}?preview=1` : p || "/");
  // Resolved on the server because rentals decide whether Buy is offered at all: a piece the store
  // rents but doesn't sell must not show a Buy button.
  const rental = await rentalContext(item.id, sf.storeSlug).catch(() => null);
@@ -119,10 +124,10 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const collections = await listCollections(seller.id).catch(() => []);
  const extraPages = sanitizePages(theme.extraPages ?? []);
  const nav: ChromeNav[] = [
-  { label: "Home", href: link(`/s/${handle}`) },
-  { label: "Shop", href: link(`/s/${handle}/shop`) },
-  ...collections.filter((col) => col.itemCount > 0).map((col) => ({ label: col.title, href: link(`/s/${handle}/collections/${col.slug}`) })),
-  ...extraPages.map((pg) => ({ label: pg.title, href: link(`/s/${handle}/${pg.slug}`) })),
+  { label: "Home", href: link(`${base}`) },
+  { label: "Shop", href: link(`${base}/shop`) },
+  ...collections.filter((col) => col.itemCount > 0).map((col) => ({ label: col.title, href: link(`${base}/collections/${col.slug}`) })),
+  ...extraPages.map((pg) => ({ label: pg.title, href: link(`${base}/${pg.slug}`) })),
  ];
  const customLinks = (theme.navLinks ?? []).filter((l) => l.label && l.href);
  const hrefOf = (h: string) => (h.startsWith("/") ? link(h) : h);
@@ -137,6 +142,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  // sentences that used to be hardcoded into every store's page regardless of its voice.
  const pageCopy = resolveProductPage(theme.productPage);
  const siteEffects = resolveEffects(theme.effects);
+ const storeCode = storefrontScript(theme.customJs, base === "");
  const facts = visibleFields(pageCopy, item);
  // A was-price, struck through. Stored on every listing and never shown until a store asks for it.
  const compareAt = pageCopy.comparePrice && item.compareAtCents && item.compareAtCents > item.priceCents
@@ -305,7 +311,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const details = (centered?: boolean) => (
  <div className={centered ? "mx-auto max-w-xl text-center" : undefined}>
   {pageCopy.backLabel && (
-   <a href={link(`/s/${handle}/shop`)} className="mb-5 inline-block text-[10px] uppercase tracking-[0.25em] opacity-40 hover:opacity-70">{pageCopy.backLabel}</a>
+   <a href={link(`${base}/shop`)} className="mb-5 inline-block text-[10px] uppercase tracking-[0.25em] opacity-40 hover:opacity-70">{pageCopy.backLabel}</a>
   )}
   {/* Gap, not per-part margins: a reorderable list can't carry "space above" on each piece without
       the spacing changing every time two of them swap. */}
@@ -337,6 +343,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  {/* The same pointer effect the rest of the site wears — an effect that stopped at the product
      page would be the one page where it's most obviously missing. */}
  {hasEffects(siteEffects) && <SiteEffects effects={siteEffects} accent={c.accent} />}
+ {storeCode && <script dangerouslySetInnerHTML={{ __html: storeCode }} />}
 
  <StoreHeader
   storeName={storeName}

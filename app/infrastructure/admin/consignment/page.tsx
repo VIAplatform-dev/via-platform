@@ -59,7 +59,7 @@ export default function ConsignmentPage() {
     <TechEmpty
      icon={<Users size={28} strokeWidth={1.5} />}
      title="No consignors yet"
-     body="Add your consignors and mark their pieces sold — balances, payouts and sales volume all show up here. Already run consignment somewhere else? Bring your whole book over in one import."
+     body="Add your consignors and mark their pieces sold. You’ll see what each one is owed, what you’ve paid, and how much they’ve sold. If you already track this somewhere else, you can import the whole list at once."
      action={
       <>
        <TechButtonLink href="/admin/consignment/consignors">Add a consignor</TechButtonLink>

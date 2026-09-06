@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
+import { storePublicOrigin, storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
 import type { NextRequest } from "next/server";
 import { verifyRecipientTokenEdge } from "@/app/lib/recipientToken-edge";
 import { capturedSlugForDomain, storeHasCapture } from "@/app/lib/domain-routing-edge";
@@ -100,6 +100,10 @@ const PUBLIC_ROUTES = [
   // answers 307 to /login first, which the app can only read as a failed request.
   "/api/store/consignment",
   "/api/store/customers",
+  // Klaviyo/Mailchimp. Enforces its own auth with resolveStoreSlugAny like the rest here — and the
+  // OAuth CALLBACK has to reach the route too: Mailchimp sends the seller back to a fixed URL, and
+  // a 307 to /login there loses the authorisation code entirely.
+  "/api/store/marketing",
   // The rest of what the mobile seller app calls. Each enforces its own auth with
   // resolveStoreSlugAny; listed here only so the bearer token reaches the route at all.
   // Market Mode's app/lib/market/auth.ts resolves the acting seller from a web session, an admin
@@ -360,6 +364,24 @@ export async function proxy(request: NextRequest) {
     host === "www.vyaplatform.com" ||
     host === "localhost" ||
     host.endsWith(".vercel.app");
+
+  // ── One public address per store ───────────────────────────────────────────
+  // A storefront is the seller's, and it has ONE address: {slug}.vyasites.com. /s/{slug} is how VYA
+  // renders it internally and how the editor previews a store that isn't published yet — it is not
+  // a URL to hand anyone. Left reachable, it's a second copy of every shop competing with the real
+  // one in search and turning up in shared links.
+  //
+  // `?preview=` is exempt: that IS the editor's preview, and a draft store has nothing to redirect
+  // to yet. Everything else moves, permanently, keeping the rest of the path.
+  if (pathname.startsWith("/s/") && !request.nextUrl.searchParams.has("preview")) {
+    const rest = pathname.slice("/s/".length);
+    const slug = rest.split("/")[0];
+    const origin = storePublicOrigin(slug);
+    if (origin) {
+      const tail = rest.slice(slug.length); // "" | "/shop" | "/p/{id}" | …
+      return NextResponse.redirect(`${origin}${tail}${request.nextUrl.search}`, 308);
+    }
+  }
 
   // ── getvya.ai — the operating-system product ────────────────────────────────
   // getvya.ai serves the seller OS on its own host: the marketing site at the root

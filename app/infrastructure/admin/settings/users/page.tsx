@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users as UsersIcon, Crown } from "lucide-react";
+import { Users as UsersIcon, Crown, ChevronDown } from "lucide-react";
+import { AREAS, areasFor, summarise, type Area } from "@/app/lib/store-permissions";
 import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
 
 // Who can get into this store.
@@ -11,7 +12,7 @@ import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
 // out you're full at the moment you invite someone is a worse experience than knowing beforehand.
 
 type Role = "owner" | "staff";
-type StoreUser = { email: string; role: Role; createdAt: string };
+type StoreUser = { email: string; role: Role; permissions: Area[] | null; createdAt: string };
 type Seats = { used: number; limit: number; remaining: number };
 
 export default function UsersSettingsPage() {
@@ -23,6 +24,21 @@ export default function UsersSettingsPage() {
  const [busy, setBusy] = useState(false);
  const [err, setErr] = useState<string | null>(null);
  const [confirm, setConfirm] = useState<string | null>(null);
+ // Which person's permissions are open. One at a time: a page of fourteen checkboxes per person is
+ // a wall, and an owner is usually changing one person.
+ const [openFor, setOpenFor] = useState<string | null>(null);
+
+ /** Save one person's areas. Optimistic — the row already shows what was ticked. */
+ async function savePermissions(target: string, areas: Area[]) {
+  setUsers((cur) => cur.map((u) => (u.email === target ? { ...u, permissions: areas } : u)));
+  setErr(null);
+  const r = await fetch("/api/store/users", {
+   method: "PATCH", headers: { "Content-Type": "application/json" },
+   body: JSON.stringify({ email: target, permissions: areas }),
+  }).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
+  if (!r?.ok) { setErr(r?.d?.error || "Couldn’t save that."); return; }
+  if (r.d.users) setUsers(r.d.users);
+ }
 
  useEffect(() => {
   let active = true;
@@ -92,6 +108,17 @@ export default function UsersSettingsPage() {
          </span>
         </span>
         {u.role !== "owner" && (
+         <button
+          type="button"
+          onClick={() => setOpenFor(openFor === u.email ? null : u.email)}
+          className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1 text-[12px] text-stone-600 transition hover:bg-stone-50"
+          aria-expanded={openFor === u.email}
+         >
+          {summarise(u)}
+          <ChevronDown size={12} className={cn("transition", openFor === u.email && "rotate-180")} />
+         </button>
+        )}
+        {u.role !== "owner" && (
          confirm === u.email ? (
           <>
            <span className="text-[12px] text-stone-500">Remove them?</span>
@@ -101,6 +128,38 @@ export default function UsersSettingsPage() {
          ) : (
           <button onClick={() => setConfirm(u.email)} className="text-[12px] text-stone-400 hover:text-rose-600">Remove</button>
          )
+        )}
+
+        {/* What this person can reach. Owners never appear here — they have everything, and a form
+            that let you untick an area for an owner would describe something we don't do. */}
+        {openFor === u.email && u.role !== "owner" && (
+         <div className="w-full border-t border-stone-100 pt-3.5">
+          <p className="mb-2.5 text-[12px] text-stone-500">
+           Tick what {u.email.split("@")[0]} can open. Billing and this page stay with owners.
+          </p>
+          <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+           {AREAS.map((a) => {
+            const on = areasFor(u).includes(a.key);
+            return (
+             <label key={a.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-stone-50">
+              <input
+               type="checkbox"
+               checked={on}
+               onChange={() => {
+                const now = areasFor(u);
+                savePermissions(u.email, on ? now.filter((k) => k !== a.key) : [...now, a.key]);
+               }}
+               className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-stone-900"
+              />
+              <span className="min-w-0">
+               <span className="block text-[13px] text-stone-800">{a.label}</span>
+               <span className="block text-[11.5px] leading-relaxed text-stone-400">{a.hint}</span>
+              </span>
+             </label>
+            );
+           })}
+          </div>
+         </div>
         )}
        </div>
       ))}
@@ -136,8 +195,9 @@ export default function UsersSettingsPage() {
          <TechButton onClick={invite} disabled={busy || !email.trim()}>{busy ? "Adding…" : "Add person"}</TechButton>
         </div>
         <p className={cn("mt-3 text-[11.5px] leading-relaxed text-stone-400")}>
-         Staff can work in the store — list, fulfil, message buyers. Owners can also change settings, billing
-         and who else has access. {seats ? `${seats.remaining} ${seats.remaining === 1 ? "seat" : "seats"} left on your plan.` : ""}
+         Owners can do everything, including billing and adding people. Staff start with the everyday
+         work — listing, orders, messages — and you can change exactly what each person can open once
+         they’re added. {seats ? `${seats.remaining} ${seats.remaining === 1 ? "seat" : "seats"} left on your plan.` : ""}
         </p>
        </>
       )}

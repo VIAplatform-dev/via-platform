@@ -34,6 +34,7 @@ type Item = {
  brand: string | null;
  era: string | null;
  material: string | null;
+ colour: string | null;
  condition: string | null;
  size: string | null;
  category: string | null;
@@ -51,7 +52,7 @@ type Item = {
 const TONE = STATUS_TONE;
 
 type EditForm = {
- title: string; price: string; cost: string; brand: string; era: string; material: string;
+ title: string; price: string; cost: string; brand: string; era: string; material: string; colour: string;
  condition: string; size: string; category: string | null; description: string; status: ItemStatus; // slug, or free text under "Other"
  weightOz: string; lengthIn: string; widthIn: string; heightIn: string;
 };
@@ -109,7 +110,7 @@ export default function ItemsPage() {
  const [bulkColName, setBulkColName] = useState("");
  const [aiNotice, setAiNotice] = useState<string | null>(null); // result of the last AI re-tag
  const [editing, setEditing] = useState<Item | null>(null);
- const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+ const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
  const [uploading, setUploading] = useState(false);
@@ -301,7 +302,7 @@ export default function ItemsPage() {
  setEditing(it);
  setEditForm({
  title: it.title, price: cents2str(it.priceCents), cost: cents2str(it.costCents),
- brand: it.brand || "", era: it.era || "", material: it.material || "", condition: it.condition || "",
+ brand: it.brand || "", era: it.era || "", material: it.material || "", colour: it.colour || "", condition: it.condition || "",
  size: it.size || "", category: toCategorySlug(it.category), description: it.description || "", status: it.status,
  weightOz: num2str(it.weightOz), lengthIn: num2str(it.lengthIn), widthIn: num2str(it.widthIn), heightIn: num2str(it.heightIn),
  });
@@ -334,7 +335,7 @@ export default function ItemsPage() {
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({
  title: editForm.title, price: Number(editForm.price) || 0, cost: editForm.cost.trim() === "" ? null : Number(editForm.cost),
- brand: editForm.brand, era: editForm.era, material: editForm.material, condition: editForm.condition,
+ brand: editForm.brand, era: editForm.era, material: editForm.material, colour: editForm.colour, condition: editForm.condition,
  // category is omitted when no tag is picked, so an unrecognised stored value survives an edit.
  size: editForm.size, ...(editForm.category ? { category: editForm.category } : {}), description: editForm.description, status: editForm.status,
  weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
@@ -535,12 +536,12 @@ export default function ItemsPage() {
  // that silently stops at the pagination boundary is worse than none.
  function exportCsv() {
   const rows = shown.map((i) => [
-   i.sku, i.title, i.brand ?? "", i.category ?? "", i.size ?? "", i.condition ?? "", i.era ?? "", i.material ?? "",
+   i.sku, i.title, i.brand ?? "", i.category ?? "", i.size ?? "", i.condition ?? "", i.era ?? "", i.material ?? "", i.colour ?? "",
    (i.priceCents / 100).toFixed(2), i.costCents != null ? (i.costCents / 100).toFixed(2) : "",
    i.currency, i.status, (i.images || []).length, (i.collections || []).join(" | "),
   ]);
   downloadCsv(datedFilename("inventory"), toCsv(
-   ["sku", "title", "brand", "category", "size", "condition", "era", "material", "price", "cost", "currency", "status", "photos", "collections"],
+   ["sku", "title", "brand", "category", "size", "condition", "era", "material", "colour", "price", "cost", "currency", "status", "photos", "collections"],
    rows,
   ));
  }
@@ -591,7 +592,7 @@ export default function ItemsPage() {
  <AdminHeader
  eyebrow="Sell · Inventory"
  title={heading}
- subtitle="Upload a photo — VYA writes the listing and prices it from real comps."
+ subtitle="Upload a photo. VYA writes the listing and suggests a price based on what similar pieces actually sold for."
  actions={
  <>
  {isAdmin && items.length > 0 && <button onClick={() => setConfirmReset(true)} className="text-[12px] text-rose-500/80 underline hover:text-rose-600">Clear all (owner)</button>}
@@ -919,6 +920,8 @@ export default function ItemsPage() {
  <div className="grid grid-cols-3 gap-3">
  <Field label="Condition"><Input value={editForm.condition} onChange={(e) => setEditForm((f) => ({ ...f, condition: e.target.value }))} placeholder="Excellent" /></Field>
  <Field label="Material"><Input value={editForm.material} onChange={(e) => setEditForm((f) => ({ ...f, material: e.target.value }))} /></Field>
+     {/* Vestiaire requires a colour and refuses a guessed one, so it has to be somewhere a seller can type it. */}
+     <Field label="Colour"><Input value={editForm.colour} onChange={(e) => setEditForm((f) => ({ ...f, colour: e.target.value }))} placeholder="e.g. Navy" /></Field>
  <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} /></Field>
  </div>
  <Field label="Category" required>
@@ -1031,7 +1034,7 @@ export default function ItemsPage() {
  <ConfirmDialog
  open={confirmBulk}
  title={`Remove ${selected.size} item${selected.size === 1 ? "" : "s"}?`}
- body="They come off your storefront and every connected channel. Sold items keep their order history."
+ body="They’re removed from your storefront and every site you’ve connected. Anything already sold keeps its order history."
  confirmLabel={`Remove ${selected.size}`}
  cancelLabel="Keep them"
  busy={bulkBusy}

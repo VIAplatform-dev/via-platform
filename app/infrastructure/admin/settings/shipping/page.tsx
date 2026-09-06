@@ -133,7 +133,7 @@ export default function ShippingSettingsPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Shipping & duties" subtitle="Who pays to get the piece there, and who pays customs when it crosses a border." />
+   <AdminHeader eyebrow="Settings" title="Shipping & duties" subtitle="Who pays for postage, and who pays customs charges on orders going abroad." />
 
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
    {msg && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-700">{msg}</div>}

@@ -55,7 +55,7 @@ export default function TaxSettingsPage() {
    <AdminHeader
     eyebrow="Store · Settings"
     title="Sales tax"
-    subtitle="Charged at checkout and paid to you, so you can file it. You sell as yourself, so the tax is yours to collect and remit — VYA never touches it."
+    subtitle="Sales tax is added at checkout and paid to you with the order. You file it yourself. VYA never holds it."
    />
 
    <TechCard className="p-5">

@@ -34,6 +34,17 @@ export async function buyLabel(rateId: string, accountId?: string | null): Promi
   : shippo.buyLabel(rateId);
 }
 
+/**
+ * Where a parcel is, from whichever carrier account is active.
+ *
+ * EasyPost's trackers are created at purchase time and we don't hold their ids, so this is Shippo's
+ * for now and returns null elsewhere — a null means "we don't know", which the rental screen already
+ * handles by falling back to the booking's own dates.
+ */
+export async function getTracking(trackingNumber: string, carrier?: string | null): Promise<shippo.TrackingSnapshot | null> {
+ return activeProvider() === "shippo" ? shippo.getTracking(trackingNumber, carrier) : null;
+}
+
 export async function voidLabel(transactionId: string, accountId?: string | null): Promise<boolean> {
  return activeProvider() === "easypost"
   ? easypost.voidLabel(transactionId, accountId ?? undefined)

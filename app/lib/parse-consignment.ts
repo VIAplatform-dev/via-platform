@@ -24,7 +24,35 @@ function splitLine(line: string, delim: string): string[] {
  return out.map((c) => c.trim());
 }
 
-const toCents = (v: string): number => Math.round((parseFloat((v || "").replace(/[^0-9.]/g, "")) || 0) * 100);
+/**
+ * A money column, in cents.
+ *
+ * Has to cope with both conventions, because a store's export follows its own locale: "1,240.50"
+ * (comma groups thousands) and "1.240,50" or "124,50" (comma is the decimal point). Getting this
+ * wrong is not a cosmetic bug — reading "124,50" as 12450 tells a store it owes a consignor
+ * $12,450 instead of $124.50.
+ *
+ * The rule is positional, which is what actually distinguishes them: whichever separator comes LAST
+ * is the decimal point, and a lone comma with exactly two digits after it is a decimal comma.
+ */
+export const toCents = (v: string): number => {
+ const raw = (v || "").replace(/[^0-9.,-]/g, "").trim();
+ if (!raw) return 0;
+ const lastComma = raw.lastIndexOf(",");
+ const lastDot = raw.lastIndexOf(".");
+ let normalised: string;
+ if (lastComma > -1 && lastDot > -1) {
+  // Both present — the later one is the decimal point, the earlier one groups thousands.
+  normalised = lastComma > lastDot ? raw.replace(/\./g, "").replace(",", ".") : raw.replace(/,/g, "");
+ } else if (lastComma > -1) {
+  // Only commas. Two digits after a single comma is a decimal ("124,50"); anything else groups.
+  const after = raw.length - lastComma - 1;
+  normalised = after === 2 && raw.indexOf(",") === lastComma ? raw.replace(",", ".") : raw.replace(/,/g, "");
+ } else {
+  normalised = raw;
+ }
+ return Math.round((parseFloat(normalised) || 0) * 100);
+};
 const toPct = (v: string): number | null => { const n = parseFloat((v || "").replace(/[^0-9.]/g, "")); return isFinite(n) && n > 0 && n <= 100 ? Math.round(n) : null; };
 
 // Map whatever the platform calls the payout method onto VYA's vocabulary; unknown → null

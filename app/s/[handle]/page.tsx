@@ -70,12 +70,15 @@ export default async function StorefrontPage({ params, searchParams }: Props) {
 
  // Store structured data → search engines treat the storefront as a real shop entity.
  const name = storeDisplayName(sf, handle);
- const hasDomain = !!sf.customDomain;
+ // The store's own address, so structured data names the same URL as the canonical tag.
+ const storeUrl = sf.customDomain
+  ? `https://${sf.customDomain}`
+  : (storePublicOrigin(sf.storeSlug) ?? `${STOREFRONT_BASE}/s/${handle}`);
  const storeLd = {
  "@context": "https://schema.org",
  "@type": "Store",
  name,
- url: hasDomain ? `https://${sf.customDomain}` : `${STOREFRONT_BASE}/s/${handle}`,
+ url: storeUrl,
  ...(sf.tagline || sf.about ? { description: (sf.tagline || sf.about || "").slice(0, 300) } : {}),
  ...(sf.heroImage ? { image: sf.heroImage } : {}),
  };

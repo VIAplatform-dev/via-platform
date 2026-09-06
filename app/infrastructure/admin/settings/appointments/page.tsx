@@ -111,7 +111,7 @@ export default function AppointmentSettingsPage() {
    <AdminHeader
     eyebrow="Settings"
     title="Appointments"
-    subtitle="Fittings, collections, sourcing chats — on your hours, whether or not you rent anything."
+    subtitle="Let people book a time with you for fittings, collections or sourcing chats. You set the hours. You don’t need to rent anything to use this."
     actions={
      <div className="flex items-center gap-3">
       {saved && <StatusPill tone="live" dot>Saved</StatusPill>}
@@ -148,7 +148,7 @@ export default function AppointmentSettingsPage() {
     )}
 
     <Card title="Already use Calendly?" blurb="Paste your link and we'll use that instead. Everything below is then ignored.">
-     <Row label="Booking link" hint="Calendly, Cal.com, Google appointment schedules, Acuity — any booking page you already run.">
+     <Row label="Booking link" hint="Works with Calendly, Cal.com, Acuity, Google appointment schedules, or any booking page you already use.">
       <input
        value={s.bookingUrl ?? ""}
        onChange={(e) => {
@@ -170,7 +170,7 @@ export default function AppointmentSettingsPage() {
      )}
      {s.bookingUrl && (
       <Row
-       label="Show the schedule on the page"
+       label="Show your opening hours on the page"
        hint={embeddable
         ? "Your real calendar appears in the section, so nobody has to leave your site to pick a time."
         : "We can show Calendly, Cal.com, Google appointment schedules and Acuity in the page. This link isn't one of those, so it stays a button."}
@@ -209,23 +209,23 @@ export default function AppointmentSettingsPage() {
       </div>
      </Card>
 
-     <Card title="How the day is cut up">
-      <Row label="How long is an appointment" hint="Slots are this long and must finish before you close.">
+     <Card title="How long each appointment is">
+      <Row label="How long is an appointment" hint="Each appointment lasts this long, and the last one has to finish before you close.">
        <Num value={s.slotMinutes} onChange={(v) => set("slotMinutes", Math.max(5, Math.round(Number(v) || 0)))} suffix="minutes" />
       </Row>
-      <Row label="How many at once" hint="Two fitting rooms means two people can book the same time.">
+      <Row label="How many at once" hint="How many people can book the same time. Two fitting rooms means two.">
        <Num value={s.slotCapacity} onChange={(v) => set("slotCapacity", Math.max(1, Math.round(Number(v) || 0)))} suffix="at a time" width="w-16" />
       </Row>
-      <Row label="Notice needed" hint="In hours, so it can bite inside today. 0 lets someone book the next free slot.">
+      <Row label="Notice needed" hint="Set in hours, so you can require notice on the same day. 0 means someone can book the next free slot.">
        <Num value={s.leadHours} onChange={(v) => set("leadHours", Math.max(0, Math.round(Number(v) || 0)))} suffix="hours" />
       </Row>
-      <Row label="Book up to" hint="How far ahead the calendar opens.">
+      <Row label="Book up to" hint="Dates beyond this don’t show on the calendar.">
        <Num value={s.horizonDays} onChange={(v) => set("horizonDays", Math.max(1, Math.round(Number(v) || 0)))} suffix="days ahead" />
       </Row>
      </Card>
 
      <Card title="What people can book">
-      <Row label="Types" hint="Shown as choices when someone books. One per kind of visit you take.">
+      <Row label="Types" hint="The options someone picks from when booking. Add one for each kind of visit you take.">
        <input
         value={s.types.join(", ")}
         onChange={(e) => set("types", e.target.value.split(",").map((t) => t.trim()).filter(Boolean))}
@@ -241,7 +241,7 @@ export default function AppointmentSettingsPage() {
       >
        <Toggle on={s.requireApproval} onClick={() => set("requireApproval", !s.requireApproval)} />
       </Row>
-      <Row label="Note above the times" hint="What an appointment with you actually is. Optional.">
+      <Row label="Note shown above the times" hint="A short line about what to expect. Optional.">
        <input
         value={s.intro ?? ""}
         onChange={(e) => set("intro", e.target.value || null)}
@@ -251,7 +251,7 @@ export default function AppointmentSettingsPage() {
       </Row>
      </Card>
 
-     <Card title="Deposit" blurb="Charge to hold the slot. The most reliable way to stop no-shows — and it can come off what they buy.">
+     <Card title="Deposit" blurb="Charge a deposit to hold the slot. It cuts down no-shows, and you can take it off what they spend.">
       <Row label="Amount" hint="Zero means booking is free.">
        <span className="flex items-center gap-1.5">
         <span className="text-[13px] text-stone-400">$</span>
@@ -259,7 +259,7 @@ export default function AppointmentSettingsPage() {
        </span>
       </Row>
       {s.depositCents > 0 && (
-       <Row label="What happens to it">
+       <Row label="What happens to the deposit">
         <span className="flex gap-1.5">
          <Tag on={s.depositCredits} onClick={() => set("depositCredits", true)}>Comes off their purchase</Tag>
          <Tag on={!s.depositCredits} onClick={() => set("depositCredits", false)}>Booking fee, kept</Tag>
@@ -268,14 +268,14 @@ export default function AppointmentSettingsPage() {
       )}
       {s.depositCents > 0 && (
        <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">
-        A slot isn&rsquo;t held until the deposit is paid, so an abandoned payment can&rsquo;t block your diary.
+        A slot isn&rsquo;t held until the deposit is paid, so an abandoned payment can&rsquo;t block your schedule.
         {s.depositCredits && " Credit against a purchase is applied by you at checkout — it isn't automatic yet."}
        </p>
       )}
      </Card>
 
-     <Card title="Emails" blurb="What goes out when someone books — and the nudge before the day.">
-      <Row label="Email me every booking" hint="A confirmation always goes to the customer. This is the copy for you.">
+     <Card title="Emails" blurb="The emails sent when someone books, and the reminder before their appointment.">
+      <Row label="Email me every booking" hint="The customer always gets a confirmation. This is about whether you get one too.">
        <Toggle on={s.notifyOnBooking} onClick={() => set("notifyOnBooking", !s.notifyOnBooking)} />
       </Row>
       {s.notifyOnBooking && (
@@ -288,7 +288,7 @@ export default function AppointmentSettingsPage() {
         />
        </Row>
       )}
-      <Row label="Remind them before" hint="Hours before the appointment. 24 is the day before; 0 sends nothing.">
+      <Row label="Remind them before" hint="How many hours before the appointment to send it. 24 is the day before. 0 sends nothing.">
        <Num value={s.reminderHours} onChange={(v) => set("reminderHours", Math.max(0, Math.round(Number(v) || 0)))} suffix="hours before" />
       </Row>
       <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">

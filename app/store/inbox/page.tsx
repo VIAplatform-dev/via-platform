@@ -390,7 +390,7 @@ export default function InboxPage() {
  {tab === "appointments" && (
  appts.length === 0 ? (
  <div className={cn(CARD, "py-14")}>
- <EmptyState icon={<CalendarClock size={26} strokeWidth={1.5} />} title="Nothing to approve" body="Bookings waiting on your answer land here. Everything already confirmed lives in your diary." />
+ <EmptyState icon={<CalendarClock size={26} strokeWidth={1.5} />} title="Nothing to approve" body="Bookings waiting on your answer land here. Everything already confirmed lives in your schedule." />
  </div>
  ) : (
  <div className="space-y-3">

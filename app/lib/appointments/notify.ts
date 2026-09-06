@@ -118,7 +118,7 @@ export async function notifyAppointmentBooked(
    ${a.customerEmail ? `<p>${esc(a.customerEmail)}${a.customerPhone ? ` · ${esc(a.customerPhone)}` : ""}</p>` : ""}
    ${a.note ? `<p><i>“${esc(a.note)}”</i></p>` : ""}
    ${a.depositCents > 0 ? `<p>Deposit ${money(a.depositCents)} — ${a.depositPaid ? "paid" : "not yet paid"}.</p>` : ""}
-   <p>${ownerAlertButton(DIARY_URL, pending ? "Approve or decline" : "Open your diary")}</p>`,
+   <p>${ownerAlertButton(DIARY_URL, pending ? "Approve or decline" : "Open your schedule")}</p>`,
   });
  }
 
@@ -171,4 +171,38 @@ export async function notifyAppointmentReminder(storeSlug: string, a: Appointmen
  }).catch((e) => console.error("[appointments] reminder failed", a.id, e));
 
  await fireFlows(storeSlug, "appointment_reminder", a);
+}
+
+/**
+ * The note after a visit — "the black slip you loved is still here".
+ *
+ * Written by the store, but the pieces come from what was actually recorded on the day, so the
+ * seller doesn't have to remember which six things someone tried. Sent in the store's brand, like
+ * every other customer email.
+ */
+export async function sendVisitFollowUp(
+ storeSlug: string,
+ a: Appointment,
+ opts: { message: string; items: { title: string | null; priceCents: number | null; currency: string | null }[]; link?: string },
+): Promise<boolean> {
+ if (!a.customerEmail) return false;
+ const name = await storeName(storeSlug).catch(() => storeSlug);
+ const price = (c: number | null, cur: string | null) =>
+  c == null ? "" : ` — $${Math.round(c / 100).toLocaleString()}${cur && cur.toUpperCase() !== "USD" ? ` ${cur.toUpperCase()}` : ""}`;
+ const list = opts.items
+  .filter((i) => i.title)
+  .map((i) => `· ${i.title}${price(i.priceCents, i.currency)}`);
+
+ const body = [
+  opts.message.trim() || `Hi ${a.customerName || "there"}, lovely to see you.`,
+  ...(list.length ? ["", "What you looked at:", ...list] : []),
+ ].join("\n");
+
+ const sent = await sendStoreBrandedTransactional(storeSlug, {
+  to: a.customerEmail,
+  subject: `Following up on your visit to ${name}`,
+  body,
+  ...(opts.link ? { cta: { label: "Shop these", url: opts.link } } : {}),
+ }).then(() => true).catch((e) => { console.error("[appointments] follow-up failed", a.id, e); return false; });
+ return sent;
 }

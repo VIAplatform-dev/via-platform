@@ -47,6 +47,17 @@ export async function ensureAppointmentTables(): Promise<void> {
  await sql`CREATE INDEX IF NOT EXISTS idx_store_appointments_day ON store_appointments (seller_id, on_day, status)`;
  // Added after the table shipped: the marker that stops a reminder going twice.
  await sql`ALTER TABLE store_appointments ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ`;
+ // What a shopper actually handled while they were in. The reason a store takes appointments is
+ // that someone comes in, tries six things and leaves — and without a record of which six, the
+ // follow-up is "hope you enjoyed your visit" instead of "the black slip you loved is still here".
+ await sql`CREATE TABLE IF NOT EXISTS appointment_items (
+  appointment_id UUID NOT NULL,
+  item_id UUID NOT NULL,
+  outcome TEXT NOT NULL DEFAULT 'tried',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (appointment_id, item_id)
+ )`;
+ await sql`CREATE INDEX IF NOT EXISTS idx_appointment_items_appt ON appointment_items (appointment_id)`;
  ensured = true;
 }
 
@@ -118,15 +129,6 @@ export async function countPendingAppointments(sellerId: string): Promise<number
  const [r] = await db()`SELECT count(*)::int AS n FROM store_appointments
   WHERE seller_id = ${sellerId} AND status = 'pending' AND (deposit_cents = 0 OR deposit_paid)` as any[];
  return r?.n ?? 0;
-}
-
-/** The ones waiting on an answer, newest request first — what the inbox shows. */
-export async function listPendingAppointments(sellerId: string, limit = 50): Promise<Appointment[]> {
- await ensureAppointmentTables();
- const rows = await db()`SELECT * FROM store_appointments
-  WHERE seller_id = ${sellerId} AND status = 'pending' AND (deposit_cents = 0 OR deposit_paid)
-  ORDER BY on_day ASC, start_time ASC LIMIT ${limit}` as any[];
- return rows.map(row);
 }
 
 export type NewAppointment = {
@@ -219,4 +221,71 @@ export async function claimReminder(id: string): Promise<boolean> {
  const rows = await db()`UPDATE store_appointments SET reminder_sent_at = now()
   WHERE id = ${id} AND reminder_sent_at IS NULL RETURNING id` as unknown[];
  return rows.length > 0;
+}
+
+// ── who's waiting, and what happened on the day ────────────────────────────
+
+/**
+ * Everything waiting on an answer, whatever week it falls in.
+ *
+ * The diary showed pending bookings inside the week you happened to be looking at, so a request for
+ * a fortnight away was invisible until you navigated to it — a store clicked "approve" in its email,
+ * landed on this week, and found nothing to approve.
+ */
+export async function listPending(sellerId: string, limit = 100): Promise<Appointment[]> {
+ await ensureAppointmentTables();
+ const rows = await db()`SELECT * FROM store_appointments
+  WHERE seller_id = ${sellerId} AND status = 'pending' AND (deposit_cents = 0 OR deposit_paid)
+  ORDER BY on_day ASC, start_time ASC LIMIT ${limit}` as any[];
+ return rows.map(row);
+}
+
+/** This person's history with this shop — every visit, newest first. Matched on email, which is the
+ *  only thing a walk-in and a web booking reliably share. */
+export async function listCustomerVisits(sellerId: string, email: string, limit = 40): Promise<Appointment[]> {
+ await ensureAppointmentTables();
+ const e = (email || "").trim().toLowerCase();
+ if (!e) return [];
+ const rows = await db()`SELECT * FROM store_appointments
+  WHERE seller_id = ${sellerId} AND lower(customer_email) = ${e}
+  ORDER BY on_day DESC, start_time DESC LIMIT ${limit}` as any[];
+ return rows.map(row);
+}
+
+export type VisitOutcome = "tried" | "liked" | "bought";
+export const VISIT_OUTCOMES: VisitOutcome[] = ["tried", "liked", "bought"];
+
+export type VisitItem = {
+ itemId: string; outcome: VisitOutcome;
+ title: string | null; priceCents: number | null; currency: string | null; image: string | null;
+};
+
+/** What was handled at a visit, with enough of each piece to show and to write an email about. */
+export async function listVisitItems(appointmentId: string): Promise<VisitItem[]> {
+ await ensureAppointmentTables();
+ const rows = await db()`SELECT ai.item_id, ai.outcome, i.title, i.price_cents, i.currency, i.images
+  FROM appointment_items ai LEFT JOIN items i ON i.id = ai.item_id
+  WHERE ai.appointment_id = ${appointmentId}
+  ORDER BY ai.created_at ASC` as any[];
+ return rows.map((r) => ({
+  itemId: String(r.item_id),
+  outcome: (VISIT_OUTCOMES.includes(r.outcome) ? r.outcome : "tried") as VisitOutcome,
+  title: r.title ?? null,
+  priceCents: r.price_cents == null ? null : Number(r.price_cents),
+  currency: r.currency ?? null,
+  image: Array.isArray(r.images) ? (r.images[0] ?? null) : null,
+ }));
+}
+
+/** Add a piece to a visit, or move it between tried / liked / bought. Idempotent per (visit, item). */
+export async function setVisitItem(appointmentId: string, itemId: string, outcome: VisitOutcome): Promise<void> {
+ await ensureAppointmentTables();
+ await db()`INSERT INTO appointment_items (appointment_id, item_id, outcome)
+  VALUES (${appointmentId}, ${itemId}, ${outcome})
+  ON CONFLICT (appointment_id, item_id) DO UPDATE SET outcome = EXCLUDED.outcome`;
+}
+
+export async function removeVisitItem(appointmentId: string, itemId: string): Promise<void> {
+ await ensureAppointmentTables();
+ await db()`DELETE FROM appointment_items WHERE appointment_id = ${appointmentId} AND item_id = ${itemId}`;
 }

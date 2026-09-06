@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
  return NextResponse.json({ ok: true, item: result, pull });
 }
 
-// PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material,
+// PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material, colour,
 // condition, size, category, description, status, images, shipping dims, and collections. Every field
 // is optional (only sent fields change). Works on any status, so drafts can be tweaked before going live.
 export async function PATCH(request: NextRequest, { params }: Ctx) {
@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
  const patch: Partial<{
  title: string; priceCents: number; costCents: number | null; size: string | null; category: string | null; description: string | null;
- brand: string | null; era: string | null; material: string | null; condition: string | null;
+ brand: string | null; era: string | null; material: string | null; colour: string | null; condition: string | null;
  status: (typeof STATUSES)[number]; images: string[]; weightOz: number | null; lengthIn: number | null; widthIn: number | null; heightIn: number | null;
  }> = {};
  if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 200);
@@ -76,6 +76,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
  if (body.brand !== undefined) patch.brand = trimOrNull(body.brand, 80);
  if (body.era !== undefined) patch.era = trimOrNull(body.era, 40);
  if (body.material !== undefined) patch.material = trimOrNull(body.material, 80);
+ if (body.colour !== undefined) patch.colour = trimOrNull(body.colour, 60);
  if (body.condition !== undefined) patch.condition = trimOrNull(body.condition, 60);
  if (typeof body.status === "string" && (STATUSES as readonly string[]).includes(body.status)) patch.status = body.status as (typeof STATUSES)[number];
  if (Array.isArray(body.images)) patch.images = body.images.filter((x: unknown) => typeof x === "string" && (x as string).trim()).map((x: string) => x.trim()).slice(0, 20);

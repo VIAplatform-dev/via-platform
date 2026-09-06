@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarRange, Inbox, PackageCheck, Truck, AlertTriangle } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, TagRow } from "../ui";
+import { CalendarRange, Inbox, PackageCheck, Truck, AlertTriangle, Settings2 } from "lucide-react";
+import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, TagRow, cn } from "../ui";
 
 // The rental day, as a queue.
 //
@@ -19,6 +19,11 @@ type Booking = {
  id: string; itemId: string; status: string; origin: string;
  rented: Span | null; blocked: Span | null; shipBy: string | null; dueBack: string | null;
  priceCents: number | null; lateFeeCents: number; damageCents: number;
+ renterName?: string | null; renterEmail?: string | null; renterPhone?: string | null;
+ delivery?: "ship" | "pickup";
+ returnLabelUrl?: string | null; returnTracking?: string | null;
+ /** Where the carrier says it is — the estimate corrected by a real scan. Null when nothing is known. */
+ whereabouts?: { stage: string; line: string; expected: string | null; runningLate: boolean } | null;
  title?: string | null; image?: string | null;
 };
 type Request = {
@@ -29,7 +34,24 @@ type Request = {
 
 const TABS = ["today", "upcoming", "out", "inspect", "requests"] as const;
 type Tab = (typeof TABS)[number];
-const TAB_LABEL: Record<Tab, string> = { today: "Today", upcoming: "Upcoming", out: "With customers", inspect: "To check", requests: "Applications" };
+// Named for the STAGE THE PIECE IS AT, in the order it travels: pack it, it's booked, it's away,
+// it's back. The old set mixed three vocabularies — "Today" and "Upcoming" are times, "With
+// customers" is a place, "To check" is a job — so nothing told you they were one sequence.
+const TAB_LABEL: Record<Tab, string> = {
+ today: "Pack today",
+ upcoming: "Booked ahead",
+ out: "Away",
+ inspect: "Back to check",
+ requests: "Requests",
+};
+/** One line under the row, so a tab never has to carry the whole explanation in two words. */
+const TAB_HINT: Record<Tab, string> = {
+ today: "Going out today — pack these and get them posted or ready to collect.",
+ upcoming: "Paid and dated, leaving another day. Nothing to do yet.",
+ out: "With a customer right now. Anything past its return date is flagged above.",
+ inspect: "Come back and waiting on you — check them over, then put them back on the rack.",
+ requests: "People asking to rent. Their dates are held while you decide, so answering frees the piece up.",
+};
 
 function withStore(path: string): string {
  if (typeof window === "undefined") return path;
@@ -109,9 +131,23 @@ export default function RentalsQueuePage() {
   out: buckets.out.length, inspect: buckets.inspect.length, requests: (requests ?? []).length,
  };
 
+ async function buyReturnLabel(id: string) {
+  setBusy(id); setErr(null);
+  const r = await fetch(withStore(`/api/store/rentals/bookings/${id}/return-label`), { method: "POST" })
+   .then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
+  setBusy(null);
+  // The reasons are things a seller can act on — a missing ship-from, a setting that says the
+  // renter pays — so they're shown as written rather than collapsed into "something went wrong".
+  if (!r?.ok) { setErr(r?.d?.error || "Couldn't buy a label just now."); return; }
+  await load();
+ }
+
  const row = (b: Booking) => {
   const next = NEXT[b.status];
-  const late = b.dueBack && b.dueBack < t && (b.status === "out" || b.status === "due");
+  const w = b.whereabouts ?? null;
+  // A scan outranks the calendar: something moving isn't late, whatever the due date says.
+  const late = b.dueBack && b.dueBack < t && (b.status === "out" || b.status === "due")
+   && w?.stage !== "coming-back" && w?.stage !== "back";
   return (
    <TechCard key={b.id} className="flex flex-wrap items-center gap-4 p-4">
     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-stone-100">
@@ -124,11 +160,40 @@ export default function RentalsQueuePage() {
       {day(b.rented?.start)} – {day(b.rented?.end)} · {usd(b.priceCents)}
       {b.origin === "request" && " · by application"}
      </p>
+     {(b.renterName || b.renterEmail) && (
+      <p className="mt-0.5 truncate text-[12px] text-stone-600">
+       {b.renterName || b.renterEmail}
+       {b.renterEmail && b.renterName ? <span className="text-stone-400"> · {b.renterEmail}</span> : null}
+       {b.delivery === "pickup" ? <span className="text-stone-400"> · collecting</span> : null}
+      </p>
+     )}
+     {/* One line saying where it actually is. Only when a carrier has told us something the dates
+         didn't already say — repeating "due back Sep 10" under a pill that says the same is noise. */}
+     {w && (w.stage === "coming-back" || w.stage === "back" || w.runningLate) && (
+      <p className={cn("mt-1 text-[12px] leading-relaxed", w.runningLate ? "text-amber-700" : "text-stone-500")}>
+       {w.line}
+       {b.returnTracking && <span className="text-stone-400"> · {b.returnTracking}</span>}
+      </p>
+     )}
     </div>
     <div className="flex shrink-0 items-center gap-2">
-     {late
-      ? <StatusPill tone="down">{`Due back ${day(b.dueBack)}`}</StatusPill>
-      : <StatusPill tone={b.status === "returned" ? "pending" : "neutral"}>{b.status === "due" ? "Out" : b.status}</StatusPill>}
+     {/* The label "a prepaid return label is in the box" promises. Offered once a piece is with
+         someone and only when it was posted — there's nothing to post back to a collection. */}
+     {(b.status === "out" || b.status === "due") && b.delivery !== "pickup" && (
+      b.returnLabelUrl
+       ? <a href={b.returnLabelUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-stone-200 px-2.5 py-1 text-[12px] font-medium text-stone-600 transition hover:bg-stone-50">Return label</a>
+       : <button type="button" onClick={() => buyReturnLabel(b.id)} disabled={busy === b.id} className="rounded-lg border border-stone-200 px-2.5 py-1 text-[12px] font-medium text-stone-600 transition hover:bg-stone-50 disabled:opacity-40">Buy return label</button>
+     )}
+     {/* The carrier's word beats ours. A piece scanned into the post is on its way back even when
+         our own due date has passed, and calling that "overdue" sends a store chasing a customer
+         who has already returned it. */}
+     {w?.stage === "coming-back"
+      ? <StatusPill tone="pending">On its way back</StatusPill>
+      : w?.stage === "back" && b.status !== "returned"
+       ? <StatusPill tone="live">Delivered back</StatusPill>
+       : late
+        ? <StatusPill tone="down">{`Due back ${day(b.dueBack)}`}</StatusPill>
+        : <StatusPill tone={b.status === "returned" ? "pending" : "neutral"}>{b.status === "due" ? "Out" : b.status}</StatusPill>}
      {b.damageCents > 0 && <StatusPill tone="down">{usd(b.damageCents)} damage</StatusPill>}
     </div>
     <div className="flex shrink-0 items-center gap-2">
@@ -198,7 +263,17 @@ export default function RentalsQueuePage() {
     eyebrow="Rentals"
     title="Rental queue"
     subtitle="What goes out, what's with a customer, and what's come back to check."
-    actions={<TechButton variant="secondary" onClick={() => { void load(); }}>Refresh</TechButton>}
+    actions={
+     <div className="flex items-center gap-2">
+      <TechButton variant="secondary" onClick={() => { void load(); }}>Refresh</TechButton>
+      {/* The terms this queue runs on — timelines, late fees, deposits — reachable from the thing
+          they govern rather than only from the settings index. */}
+      <a href={withStore("/admin/settings/rentals")}
+       className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-[12.5px] font-medium text-stone-600 transition hover:bg-stone-50">
+       <Settings2 size={14} /> Settings
+      </a>
+     </div>
+    }
    />
 
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
@@ -218,13 +293,14 @@ export default function RentalsQueuePage() {
      labelFor={(v) => TAB_LABEL[v as Tab]}
      counts={counts}
     />
+    <p className="mt-2 text-[12.5px] leading-snug text-stone-500">{TAB_HINT[tab]}</p>
    </div>
 
    {loading ? (
     <TechCard className="px-5 py-10 text-center text-[13px] text-stone-400">Loading…</TechCard>
    ) : tab === "requests" ? (
     (requests ?? []).length === 0
-     ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="When someone applies to rent a piece, it lands here with their dates held." />
+     ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="When someone asks to rent a piece, it appears here and their dates are held until you answer." />
      : <div className="flex flex-col gap-3">{(requests ?? []).map(reqRow)}</div>
    ) : shown.length === 0 ? (
     <TechEmpty

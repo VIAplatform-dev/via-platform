@@ -73,6 +73,22 @@ export async function ensureRentalTables(): Promise<void> {
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_rental_bookings_item ON rental_bookings (item_id, status)`;
+ // WHO rented it, and where it went.
+ //
+ // The checkout collects all of this and puts it in the payment's metadata — and then the webhook
+ // only flipped the status, so it was gone the moment the payment settled. A store with a piece out
+ // couldn't see whose name was on it, couldn't email them, and couldn't post them a return label,
+ // because nothing on the booking said where the piece was.
+ for (const col of [
+  "renter_name TEXT", "renter_email TEXT", "renter_phone TEXT",
+  "ship_line1 TEXT", "ship_line2 TEXT", "ship_city TEXT", "ship_state TEXT", "ship_zip TEXT", "ship_country TEXT",
+  "delivery TEXT", "return_label_url TEXT", "return_tracking TEXT", "return_label_cents INTEGER",
+  // What the CARRIER says, kept beside what the settings guessed. The turnaround numbers block the
+  // calendar (they have to — the booking is made before anything ships), but once a return label has
+  // been scanned the carrier knows more than an estimate made weeks ago, and the store should be
+  // told the real date rather than the assumed one.
+  "return_carrier TEXT", "return_tracking_status TEXT", "return_tracking_eta DATE", "return_tracking_at TIMESTAMPTZ",
+ ]) await sql`ALTER TABLE rental_bookings ADD COLUMN IF NOT EXISTS ${db().unsafe(col)}`;
  await sql`CREATE INDEX IF NOT EXISTS idx_rental_bookings_seller ON rental_bookings (seller_id, status)`;
  // ADD CONSTRAINT has no IF NOT EXISTS, so check the catalogue first.
  await sql`DO $$
@@ -203,8 +219,22 @@ export type Booking = {
  priceCents: number | null; shipBy: string | null; dueBack: string | null;
  returnedAt: string | null; expiresAt: string | null;
  lateFeeCents: number; damageCents: number; createdAt: string;
+ /** Who has it, and where it went. Written when the payment settles — see confirmBookingPaid. */
+ renterName?: string | null; renterEmail?: string | null; renterPhone?: string | null;
+ delivery?: "ship" | "pickup";
+ ship?: { line1: string; line2: string | null; city: string; state: string; zip: string; country: string } | null;
+ returnLabelUrl?: string | null; returnTracking?: string | null;
+ /** The carrier's own account of the return leg. Null until a label exists and has been checked. */
+ returnCarrier?: string | null; trackingStatus?: string | null; trackingEta?: string | null; trackingAt?: string | null;
  /** Joined for the seller's queue — a list of uuids is not a working screen. */
  title?: string | null; image?: string | null;
+};
+
+/** The renter, as the checkout collected them. Stripe metadata values are all strings. */
+export type RenterDetails = {
+ name?: string | null; email?: string | null; phone?: string | null;
+ delivery?: string | null;
+ line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string | null;
 };
 
 function bookingRow(r: any): Booking {
@@ -223,6 +253,19 @@ function bookingRow(r: any): Booking {
   lateFeeCents: Number(r.late_fee_cents) || 0,
   damageCents: Number(r.damage_cents) || 0,
   createdAt: new Date(r.created_at).toISOString(),
+  renterName: r.renter_name ?? null,
+  renterEmail: r.renter_email ?? null,
+  renterPhone: r.renter_phone ?? null,
+  delivery: r.delivery === "pickup" ? "pickup" : "ship",
+  ship: r.ship_line1
+   ? { line1: r.ship_line1, line2: r.ship_line2 ?? null, city: r.ship_city ?? "", state: r.ship_state ?? "", zip: r.ship_zip ?? "", country: r.ship_country ?? "US" }
+   : null,
+  returnLabelUrl: r.return_label_url ?? null,
+  returnTracking: r.return_tracking ?? null,
+  returnCarrier: r.return_carrier ?? null,
+  trackingStatus: r.return_tracking_status ?? null,
+  trackingEta: r.return_tracking_eta ? new Date(r.return_tracking_eta).toISOString().slice(0, 10) : null,
+  trackingAt: r.return_tracking_at ? new Date(r.return_tracking_at).toISOString() : null,
   title: r.title == null ? null : String(r.title),
   image: (() => {
    const imgs = typeof r.images === "string" ? JSON.parse(r.images) : r.images;
@@ -309,12 +352,47 @@ export async function setBookingStatus(id: string, status: BookingStatus, patch?
  * can't drag a rental that's already out with a customer back to `booked`. Returns the booking when
  * this call is the one that confirmed it, null when there was nothing left to do.
  */
-export async function confirmBookingPaid(id: string, paymentRef?: string | null): Promise<Booking | null> {
+export async function confirmBookingPaid(id: string, paymentRef?: string | null, renter?: RenterDetails | null): Promise<Booking | null> {
  await ensureRentalTables();
- const rows = await db()`UPDATE rental_bookings
-  SET status = 'booked', expires_at = NULL, deposit_intent = COALESCE(${paymentRef ?? null}, deposit_intent), updated_at = now()
+ // COALESCE on every renter field so a replayed webhook can't blank details that are already
+ // there — and so a booking the store filled in by hand isn't overwritten by a thinner payload.
+ const r = renter ?? {};
+ const rows = await db()`UPDATE rental_bookings SET
+   status = 'booked', expires_at = NULL,
+   deposit_intent = COALESCE(${paymentRef ?? null}, deposit_intent),
+   renter_name = COALESCE(NULLIF(${r.name ?? null}, ''), renter_name),
+   renter_email = COALESCE(NULLIF(${r.email ?? null}, ''), renter_email),
+   renter_phone = COALESCE(NULLIF(${r.phone ?? null}, ''), renter_phone),
+   delivery = COALESCE(NULLIF(${r.delivery ?? null}, ''), delivery),
+   ship_line1 = COALESCE(NULLIF(${r.line1 ?? null}, ''), ship_line1),
+   ship_line2 = COALESCE(NULLIF(${r.line2 ?? null}, ''), ship_line2),
+   ship_city = COALESCE(NULLIF(${r.city ?? null}, ''), ship_city),
+   ship_state = COALESCE(NULLIF(${r.state ?? null}, ''), ship_state),
+   ship_zip = COALESCE(NULLIF(${r.zip ?? null}, ''), ship_zip),
+   ship_country = COALESCE(NULLIF(${r.country ?? null}, ''), ship_country),
+   updated_at = now()
   WHERE id = ${id} AND status IN ('held','requested') RETURNING *`;
  return rows[0] ? bookingRow(rows[0] as any) : null;
+}
+
+/** What the carrier last said about the return leg. */
+export async function setRentalTracking(
+ id: string, t: { status: string; eta?: string | null; carrier?: string | null },
+): Promise<void> {
+ await ensureRentalTables();
+ await db()`UPDATE rental_bookings SET
+   return_tracking_status = ${t.status},
+   return_tracking_eta = ${t.eta ?? null},
+   return_carrier = COALESCE(${t.carrier ?? null}, return_carrier),
+   return_tracking_at = now(), updated_at = now()
+  WHERE id = ${id}`;
+}
+
+/** Store the return label bought for a rental, so it isn't bought twice. */
+export async function setRentalReturnLabel(id: string, label: { url: string; trackingNumber?: string | null; costCents?: number | null }): Promise<void> {
+ await ensureRentalTables();
+ await db()`UPDATE rental_bookings SET return_label_url = ${label.url}, return_tracking = ${label.trackingNumber ?? null},
+   return_label_cents = ${label.costCents ?? null}, updated_at = now() WHERE id = ${id}`;
 }
 
 // ── requests ───────────────────────────────────────────────────────────────

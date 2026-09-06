@@ -115,3 +115,26 @@ export async function voidLabel(transactionId: string): Promise<boolean> {
  // PENDING or SUCCESS both mean the refund was accepted (USPS refunds settle asynchronously).
  return !!r && (r.status === "SUCCESS" || r.status === "PENDING");
 }
+
+export type TrackingSnapshot = { status: string; eta: string | null; carrier: string | null };
+
+/**
+ * Ask the carrier where a parcel is.
+ *
+ * Shippo needs the carrier token as well as the number; "shippo" is their own test/self-resolving
+ * carrier and works as a fallback when we didn't record which carrier the label was bought from.
+ * Returns null on any failure — a rental screen that can't reach a carrier should show the dates it
+ * already has, not an error.
+ */
+export async function getTracking(trackingNumber: string, carrier?: string | null): Promise<TrackingSnapshot | null> {
+ if (!trackingNumber) return null;
+ const c = (carrier || "shippo").toLowerCase();
+ const r = await shippo(`/tracks/${encodeURIComponent(c)}/${encodeURIComponent(trackingNumber)}`, "GET");
+ if (!r) return null;
+ const eta = r.eta ? String(r.eta).slice(0, 10) : null;
+ return {
+  status: String(r.tracking_status?.status || "UNKNOWN"),
+  eta: eta && /^\d{4}-\d{2}-\d{2}$/.test(eta) ? eta : null,
+  carrier: r.carrier ? String(r.carrier) : null,
+ };
+}

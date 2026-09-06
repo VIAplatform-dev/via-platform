@@ -53,6 +53,11 @@ export default function SiteEffects({ effects, accent }: { effects: SiteEffects;
   let px = -1000, py = -1000;      // where the pointer is
   let tx = -1000, ty = -1000;      // where the comet/ring has got to
   let moved = false;
+ // Where the last speck was emitted. Glitter is a TRAIL — it marks where the pointer went, so it
+ // has to stop when the pointer stops. Without this, `moved` latched true on the first movement and
+ // every frame afterwards kept spawning at the last position, so a cursor left sitting still poured
+ // sparkles onto one spot for as long as the page was open.
+ let lastX = -1000, lastY = -1000;
   let raf = 0;
 
   const onMove = (e: PointerEvent) => { px = e.clientX; py = e.clientY; moved = true; };
@@ -109,7 +114,11 @@ export default function SiteEffects({ effects, accent }: { effects: SiteEffects;
      ctx.globalAlpha = 1;
     }
    } else {
-    if (moved && px > -500) spawn();
+    // Emit only where the pointer actually travelled since the last frame. The threshold is in
+    // pixels-squared to skip a square root 60 times a second, and it also swallows the sub-pixel
+    // jitter a trackpad reports when a hand is resting on it.
+    const dx = px - lastX, dy = py - lastY;
+    if (moved && px > -500 && dx * dx + dy * dy > 4) { spawn(); lastX = px; lastY = py; }
     ctx.fillStyle = colour;
     for (let i = parts.length - 1; i >= 0; i--) {
      const p = parts[i];

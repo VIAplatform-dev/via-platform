@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
  brand: str(body.brand, 80),
  era: str(body.era, 40),
  material: str(body.material, 120),
+ colour: str(body.colour, 60),
  condition: str(body.condition, 80),
  size: str(body.size, 40),
  measurements: str(body.measurements, 300),

@@ -74,7 +74,7 @@ export default function PoliciesPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Policies" subtitle="What buyers agree to, linked from every page of your storefront." />
+   <AdminHeader eyebrow="Settings" title="Policies" subtitle="Your terms and privacy policy. Linked from every page of your storefront." />
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
 
    {!p ? (

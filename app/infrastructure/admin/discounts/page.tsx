@@ -56,7 +56,7 @@ export default function DiscountsPage() {
  <AdminHeader
  eyebrow="Store · Discounts"
  title="Discounts"
- subtitle="Codes shoppers get when they click through from VYA. Star one to auto-apply it on click-through."
+ subtitle="Discount codes for people who reach your store from VYA. Star one and it’s applied for them automatically."
  />
 
  <div className="mb-5 grid grid-cols-3 gap-3">
@@ -69,7 +69,7 @@ export default function DiscountsPage() {
  <TechEmpty
  icon={<Tag size={28} strokeWidth={1.5} />}
  title="No discount codes yet"
- body="Add a code below so shoppers get it automatically when they click through from VYA."
+ body="Add a code below and it’s applied automatically for people who reach your store from VYA."
  />
  ) : (
  <TechCard className="mb-5 overflow-hidden">
@@ -98,7 +98,7 @@ export default function DiscountsPage() {
  </TD>
  <TD right className="px-5">
  <div className="flex items-center justify-end gap-2">
- <button onClick={() => patch(d.id, { autoApply: !d.autoApply })} title="Auto-apply on click-through (only one)" className={cn("text-sm leading-none", d.autoApply ? "text-[var(--accent,#0e9f76)]" : "text-stone-300 hover:text-stone-500")}>{d.autoApply ? "★" : "☆"}</button>
+ <button onClick={() => patch(d.id, { autoApply: !d.autoApply })} title="Apply this one automatically (you can only pick one)" className={cn("text-sm leading-none", d.autoApply ? "text-[var(--accent,#0e9f76)]" : "text-stone-300 hover:text-stone-500")}>{d.autoApply ? "★" : "☆"}</button>
  <TechButton variant="ghost" className="px-2.5 py-1 text-[12px]" onClick={() => patch(d.id, { active: !d.active })}>{d.active ? "Disable" : "Enable"}</TechButton>
  <TechButton variant="ghost" className="px-2 py-1 text-[12px] text-stone-300 hover:text-red-600" onClick={() => remove(d.id)}><X size={14} /></TechButton>
  </div>

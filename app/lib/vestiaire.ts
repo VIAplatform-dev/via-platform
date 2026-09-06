@@ -45,18 +45,37 @@ export function vestiaireUniverse(title: string | null | undefined, category: st
  return "Women";
 }
 
+// Vestiaire's OWN item-type list, read straight off their form's <select> (id=preductAddCategory):
+//   Handbags · Clutch bags · Backpacks · Travel bags · Boots · Trainers · Flats · Ballet flats ·
+//   Sandals · Mules & Clogs · Lace ups · Heels · Ankle boots · Espadrilles · Knitwear · Tops ·
+//   Dresses · Skirts · Trousers · Shorts · Jumpsuits · Jeans · Jackets · Coats
+//
+// Every subcategory below has to be a string from that list verbatim, or the extension picks
+// nothing and the seller is left on a step that won't advance. Checked by a test.
 const CATEGORY_MAP: [RegExp, string, string][] = [
  // category slug or title → Vestiaire category, subcategory
- [/handbag|shoulder.?bag|crossbody|tote|clutch|purse|\bbags?\b/i, "Bags", "Handbags"],
+ [/clutch/i, "Bags", "Clutch bags"],
+ [/handbag|shoulder.?bag|crossbody|tote|purse|\bbags?\b/i, "Bags", "Handbags"],
  [/backpack/i, "Bags", "Backpacks"],
  [/luggage|suitcase|trunk|weekend/i, "Bags", "Travel bags"],
  [/wallet|card ?holder|coin ?purse/i, "Accessories", "Wallets"],
+ [/ankle ?boot/i, "Shoes", "Ankle boots"],
  [/\bboots?\b/i, "Shoes", "Boots"],
- [/heel|pump|stiletto|sandal|mule|flat|loafer|sneaker|trainer|shoes?\b/i, "Shoes", "Heels"],
+ [/sneaker|trainer/i, "Shoes", "Trainers"],
+ [/sandal/i, "Shoes", "Sandals"],
+ [/mule|clog/i, "Shoes", "Mules & Clogs"],
+ [/espadrille/i, "Shoes", "Espadrilles"],
+ [/ballet/i, "Shoes", "Ballet flats"],
+ [/loafer|lace.?up|oxford|brogue/i, "Shoes", "Lace ups"],
+ [/\bflats?\b/i, "Shoes", "Flats"],
+ [/heel|pump|stiletto|shoes?\b/i, "Shoes", "Heels"],
  [/dress|gown/i, "Clothing", "Dresses"],
  [/skirt/i, "Clothing", "Skirts"],
- [/trouser|pant|jean|palazzo/i, "Clothing", "Trousers"],
- [/coat|jacket|blazer|parka/i, "Clothing", "Coats"],
+ [/jean|denim ?pant/i, "Clothing", "Jeans"],
+ [/\bshorts?\b/i, "Clothing", "Shorts"],
+ [/trouser|pant|palazzo/i, "Clothing", "Trousers"],
+ [/jacket|blazer|bomber/i, "Clothing", "Jackets"],
+ [/coat|parka|trench/i, "Clothing", "Coats"],
  [/knit|jumper|sweater|cardigan/i, "Clothing", "Knitwear"],
  [/top|blouse|shirt|tee|t-shirt|vest/i, "Clothing", "Tops"],
  [/jumpsuit|playsuit/i, "Clothing", "Jumpsuits"],
@@ -143,10 +162,87 @@ const COLOURS: [RegExp, string][] = [
  [/multi|colou?rful|floral|print|pattern|striped/i, "Multicolour"],
 ];
 
-export function vestiaireColour(title: string | null | undefined, description: string | null | undefined): string {
+export function vestiaireColour(title: string | null | undefined, description: string | null | undefined, colour?: string | null): string {
+ // A colour the seller typed is the truth; the words are only a fallback for pieces listed before
+ // there was a field for it. "Dress" / "Silk dress" name no colour, and Vestiaire requires one.
+ const typed = String(colour || "").trim();
+ if (typed) return typed;
  const hay = `${title || ""} ${description || ""}`;
  for (const [re, name] of COLOURS) if (re.test(hay)) return name;
  return "";
+}
+
+/**
+ * Their Details step asks for three more things VYA has no field for: a dress LENGTH (they label it
+ * Category), a PATTERN, and a size in a named system. Each is a required field, so a listing that
+ * skips them can't be published — the seller gets sent back to Details from the publish button,
+ * which is the worst possible moment to learn it.
+ *
+ * All three are read from what the piece already says about itself. Where the words don't say,
+ * these return "" and the seller fills it in — the same rule material follows. Never guess a fact
+ * a buyer could hold against her.
+ */
+// Their pattern list, verbatim from the form's Pattern box:
+// Plain · Zebra · Snakeskin · Leopard · Tartan · Houndstooth · Floral · Polkadot · Abstract ·
+// Gingham · Striped · Crocodile · Other
+// Anything we invent outside this list matches nothing in their dropdown and silently leaves the
+// field empty, which is a required field — so every value here is one of theirs.
+const PATTERNS: [RegExp, string][] = [
+ [/leopard|cheetah/i, "Leopard"], [/zebra/i, "Zebra"],
+ [/snake ?skin|snake|python/i, "Snakeskin"], [/crocodile|croc\b|alligator/i, "Crocodile"],
+ [/floral|flower|rose print|poppy/i, "Floral"], [/houndstooth/i, "Houndstooth"],
+ [/gingham/i, "Gingham"], [/tartan|plaid/i, "Tartan"],
+ [/polka|polkadot|spot(ted)? print|dotted/i, "Polkadot"],
+ [/stripe/i, "Striped"],
+ // Their catch-all, for a print we can name but they don't list — paisley, tie dye, camouflage.
+ [/paisley|tie ?dye|camo(uflage)?|abstract|geometric|graphic print/i, "Abstract"],
+];
+
+export function vestiairePattern(
+ title: string | null | undefined, description: string | null | undefined, colour?: string | null,
+): string {
+ const hay = `${title || ""} ${description || ""}`;
+ for (const [re, name] of PATTERNS) if (re.test(hay)) return name;
+ // Nothing named a pattern AND the piece is one colour → it's plain. That inference is safe in a
+ // way guessing a fibre never is: a solid navy dress is not a claim anyone can be misled by.
+ const c = String(colour || "").trim();
+ if (c && !/multi/i.test(c) && !/print|pattern/i.test(hay)) return "Plain";
+ return "";
+}
+
+/** Mini / Midi / Maxi — only for the pieces that have a length. */
+export function vestiaireLength(
+ category: string | null | undefined, title: string | null | undefined, description: string | null | undefined,
+): string {
+ const cat = String(category || "").toLowerCase();
+ if (!/dress|skirt|gown/.test(cat)) return "";
+ const hay = `${title || ""} ${description || ""}`;
+ if (/\bmaxi\b|floor.?length|full.?length|ankle.?length|gown/i.test(hay)) return "Maxi";
+ if (/\bmidi\b|tea.?length|below.?the.?knee|knee.?length/i.test(hay)) return "Midi";
+ if (/\bmini\b|above.?the.?knee|short dress|micro/i.test(hay)) return "Mini";
+ return "";
+}
+
+/**
+ * Their size box is two controls: the SYSTEM (FR / UK / US / IT / International) and the value.
+ * VYA stores one free-text size — "M", "US 8", "EU 40" — so the system is read off the text where
+ * it names one, and defaults to International for letter sizes and US for bare numbers.
+ */
+export function vestiaireSize(size: string | null | undefined): { system: string; value: string } {
+ const raw = String(size || "").trim();
+ if (!raw) return { system: "", value: "" };
+ const t = raw.toUpperCase();
+ const num = (t.match(/\d+(?:\.\d+)?/) || [""])[0];
+ if (/\b(EU|EUR|IT|ITALIAN)\b/.test(t)) return { system: "IT", value: num };
+ if (/\bUK\b|\bBRITISH\b/.test(t)) return { system: "UK", value: num };
+ if (/\bFR\b|\bFRENCH\b/.test(t)) return { system: "FR", value: num };
+ if (/\bUS\b|\bUSA\b/.test(t)) return { system: "US", value: num };
+ // "M", "XS", "One size" — a letter size is what they call International.
+ if (/^(XXS|XS|S|M|L|XL|XXL|XXXL)$/.test(t.replace(/[^A-Z]/g, ""))) {
+  return { system: "International", value: t.replace(/[^A-Z]/g, "") };
+ }
+ if (num) return { system: "US", value: num };
+ return { system: "", value: "" };
 }
 
 /**
@@ -180,4 +276,82 @@ export function vestiaireTitle(title: string | null | undefined, max = 50): stri
  const cut = t.slice(0, max);
  const space = cut.lastIndexOf(" ");
  return (space > max * 0.6 ? cut.slice(0, space) : cut).trim();
+}
+
+// ── is this piece ready for Vestiaire? ─────────────────────────────────────
+
+/** The minimum Vestiaire's own form enforces. Taken from their manual flow, step by step. */
+export const VESTIAIRE_MIN_PHOTOS = 3;
+export const VESTIAIRE_MIN_PHOTO_PX = 900;
+
+export type VestiaireCheck = {
+ ready: boolean;
+ /** Vestiaire's form will not let the seller finish without these. */
+ blocking: string[];
+ /** Allowed through, but a listing missing them is the kind their reviewers reject. */
+ advisory: string[];
+};
+
+export type VestiaireCandidate = {
+ title?: string | null;
+ brand?: string | null;
+ category?: string | null;
+ condition?: string | null;
+ material?: string | null;
+ colour?: string | null;
+ size?: string | null;
+ description?: string | null;
+ priceCents?: number | null;
+ images?: string[] | null;
+};
+
+/**
+ * What Vestiaire will refuse, said BEFORE the seller opens their site.
+ *
+ * Their manual flow is five steps and each one gates the next: Details (category, condition,
+ * material, colour), Photos (at least three, 900×900 minimum), Description with measurements, then
+ * price. A seller who queues a piece with one photo doesn't discover it until she's four screens in
+ * and has retyped everything — so the board says it up front instead.
+ *
+ * `blocking` is what their form itself enforces. `advisory` is what gets a listing rejected by a
+ * human reviewer afterwards, which is worse: it's already live in the seller's head by then.
+ */
+export function vestiaireReadiness(item: VestiaireCandidate): VestiaireCheck {
+ const blocking: string[] = [];
+ const advisory: string[] = [];
+
+ const eligible = vestiaireEligibility(item.brand);
+ if (!eligible.ok) blocking.push(eligible.reason);
+
+ const photos = (item.images || []).filter((u) => typeof u === "string" && /^https?:\/\//.test(u));
+ if (photos.length === 0) {
+  blocking.push("No photos. Vestiaire needs at least 3.");
+ } else if (photos.length < VESTIAIRE_MIN_PHOTOS) {
+  // Said as a count rather than "not enough photos" — the seller should know how far off she is.
+  blocking.push(`Only ${photos.length} photo${photos.length === 1 ? "" : "s"}. Vestiaire needs at least ${VESTIAIRE_MIN_PHOTOS}.`);
+ }
+
+ if (!String(item.category || "").trim()) blocking.push("No category — Vestiaire asks for one before anything else.");
+ if (!String(item.condition || "").trim()) blocking.push("No condition set.");
+ // vestiaireMaterial infers from the title and description; blank means nothing named a fibre
+ // anywhere, and Vestiaire won't take a listing without one.
+ if (!vestiaireMaterial(item.material ?? null, item.title, item.description)) {
+  blocking.push("No material. Vestiaire requires one and won't accept a guess.");
+ }
+ // Colour is required on their Details step exactly like material is, and it was the one field
+ // that got all the way to the form before failing — the extension can only report "nothing in
+ // VYA" there, which is a late and useless place to learn it.
+ if (!vestiaireColour(item.title, item.description, item.colour ?? null)) {
+  blocking.push("No colour. Vestiaire requires one and won't accept a guess.");
+ }
+ if (!item.priceCents || item.priceCents <= 0) blocking.push("No price.");
+
+ // Not enforced by the form, but their reviewers are strict about them.
+ if (!String(item.size || "").trim()) advisory.push("No size — buyers filter by it, and bags still need measurements.");
+ if (!String(item.description || "").trim()) advisory.push("No description. Vestiaire asks for flaws and alterations in detail.");
+ if (photos.length >= VESTIAIRE_MIN_PHOTOS && photos.length < 5) {
+  advisory.push("Vestiaire wants the brand label and hardware shown close up — add those shots if you have them.");
+ }
+
+ return { ready: blocking.length === 0, blocking, advisory };
 }

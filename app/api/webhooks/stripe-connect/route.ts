@@ -7,7 +7,7 @@ import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory
 import { getSellerById } from "@/app/lib/db/sellers";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
-import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
+import { syncOrderToKlaviyo } from "@/app/lib/esp-events";
 import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderPickup, setOrderTax } from "@/app/lib/db/orders";
 import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
@@ -181,8 +181,15 @@ export async function POST(request: NextRequest) {
  {
  const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
  const md = (obj.metadata || {}) as Record<string, string>;
- if (md.rentalBookingId && event.type === "payment_intent.succeeded") {
- await confirmBookingPaid(md.rentalBookingId, String(obj.id || "")).catch(() => null);
+  if (md.rentalBookingId && event.type === "payment_intent.succeeded") {
+ // The checkout wrote the renter into this payment's metadata. It's the only place those details
+ // exist, and this is the only moment we see them — so they go onto the booking here, or the store
+ // ends up with a piece out and no idea whose name is on it.
+ await confirmBookingPaid(md.rentalBookingId, String(obj.id || ""), {
+  name: md.ship_name, email: md.buyer_email, phone: md.buyer_phone, delivery: md.delivery,
+  line1: md.ship_line1, line2: md.ship_line2, city: md.ship_city,
+  state: md.ship_state, zip: md.ship_zip, country: md.ship_country,
+ }).catch(() => null);
  return NextResponse.json({ received: true });
  }
  }

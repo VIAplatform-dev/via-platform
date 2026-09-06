@@ -188,7 +188,7 @@ export default function DomainPage() {
    <AdminHeader
     eyebrow="Store · Storefront"
     title="Your own domain"
-    subtitle="Send customers to your name, not ours — connect a domain you already own, or buy one here."
+    subtitle="Use your own web address instead of a VYA one. Connect a domain you already own, or buy one here."
    />
 
    {loading ? (

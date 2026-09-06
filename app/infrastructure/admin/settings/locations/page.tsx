@@ -82,7 +82,7 @@ export default function LocationsPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Locations" subtitle="Where parcels leave from, and where buyers can collect." />
+   <AdminHeader eyebrow="Settings" title="Locations" subtitle="The address you post from, and anywhere buyers can collect in person." />
    {why && (
     <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
      {why}
