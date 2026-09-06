@@ -69,7 +69,14 @@ export async function generateUniqueSlug(name: string): Promise<string> {
   const candidate = i === 0 ? base : `${base}-${i + 1}`;
   if (RESERVED.has(candidate) || staticSlugs.has(candidate)) continue;
   const rows = await sql`SELECT 1 FROM store_accounts WHERE slug = ${candidate} LIMIT 1`;
-  if (rows.length === 0) return candidate;
+  if (rows.length) continue;
+  // A SELLER row can exist without a store account — that's what a site imported ahead of someone
+  // signing up looks like, and it owns the inventory and the captured pages. Checking only
+  // store_accounts meant a brand-new store could take that slug and inherit a stranger's shop:
+  // getOrCreateSeller finds the existing row, and 142 pieces she never imported appear in her
+  // inventory. Anyone handed such a store deliberately gets it by RESERVATION, never by collision.
+  const seller = await sql`SELECT 1 FROM sellers WHERE slug = ${candidate} LIMIT 1`;
+  if (seller.length === 0) return candidate;
  }
  // Extremely unlikely fallback: base + a suffix derived from the name length (deterministic).
  return `${base}-${(base.length % 97) + 3}`;
