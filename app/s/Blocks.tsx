@@ -16,6 +16,8 @@ import { PLACEHOLDER_MARK } from "@/app/lib/storefront-placeholder-image";
 import { renderHero } from "./blocks/hero";
 import { renderFeatured } from "./blocks/featured";
 import ContactForm from "./ContactForm";
+import { readContactFields } from "@/app/lib/contact-fields";
+import type { StorefrontWords } from "@/app/lib/storefront-words";
 import { renderCollections } from "./blocks/collections";
 import { renderTestimonials } from "./blocks/testimonials";
 import { renderColumns } from "./blocks/columns";
@@ -104,13 +106,17 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  <div className="w-full rounded-md p-4" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 10px 30px -12px rgba(0,0,0,0.35)" }}>
   <p className="mb-1 text-[13px] font-semibold text-stone-800">{title}</p>
   {p.note && <p className="mb-2 text-[11px] leading-snug text-stone-500">{p.note}</p>}
+  {/* A form element asks whatever the seller wants, exactly like the contact section — a wholesale
+      enquiry and a sourcing request don't need the same three boxes. */}
   {live && storeSlug
-   ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} compact />
+   ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} fields={readContactFields(p)} compact />
    : (
    <div className="flex flex-col gap-2 opacity-70">
-    <input disabled placeholder="Name" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
-    <input disabled placeholder="Email" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
-    <textarea disabled placeholder="Message" rows={3} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    {readContactFields(p).map((f, i) => (
+     f.type === "long"
+      ? <textarea key={i} disabled placeholder={f.label} rows={3} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+      : <input key={i} disabled placeholder={f.label} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    ))}
     <span className="mt-0.5 self-start rounded px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white" style={{ background: accent }}>{p.cta || "Send"}</span>
    </div>
    )}
@@ -489,9 +495,11 @@ export default function Blocks({
  onFaqOp,
  faqDnd,
  storeSlug,
+ words,
  collectionHrefs,
  onFieldFocus,
  onResizeSectionStart,
+ onArrangeStart,
  onPickImage,
  onDropImage,
  skin,
@@ -538,6 +546,8 @@ export default function Blocks({
  faqDnd?: FaqDnd;
  // Live-site only: the store handle, so a contact section can submit to the right store.
  storeSlug?: string;
+ // The store's own labels for the shop UI ("Sold", an empty grid). See storefront-words.ts.
+ words?: StorefrontWords;
  // Live-site only: lowercased collection title -> its page href, so shop-by-category tiles
  // deep-link the collection they name instead of all landing on the bare shop page.
  collectionHrefs?: Record<string, string>;
@@ -546,6 +556,8 @@ export default function Blocks({
  onFieldFocus?: (blockId: string, key: string) => void;
  // Editor-only: drag a section's top/bottom resize handle to set its height explicitly.
  onResizeSectionStart?: (blockId: string, edge: "top" | "bottom", e: React.PointerEvent) => void;
+ // Editor-only: drag a layout's spacing / card width / split seam directly on the canvas.
+ onArrangeStart?: (blockId: string, prop: string, e: React.PointerEvent) => void;
  // Editor-only: open the file picker for an image slot clicked directly on the canvas.
  onPickImage?: (apply: (url: string) => void) => void;
  onDropImage?: (file: File, apply: (url: string) => void) => void;
@@ -625,7 +637,7 @@ export default function Blocks({
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
- const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, collectionHrefs, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
+ const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, words, onArrangeStart, collectionHrefs, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
  const editable = typeof onSelect === "function";
  // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
  // and element: e.g. `.vya-hero .vya-heading { ... }` or `.vya-b-<id> { ... }`.

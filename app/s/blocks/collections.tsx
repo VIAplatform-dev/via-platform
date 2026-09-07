@@ -6,7 +6,7 @@
 // BlockProduct carries title/price/image/href and nothing else — so rather than print a fabricated
 // number, that slot is a typographic index ("list"), which is a real pattern and honest about the
 // data we have. If counts become available, it's a new variant, not a retrofit of this one.
-import { FreeField, emptyHint, ff, tileHref, type EditKit, type Item } from "./kit";
+import { FreeField, emptyHint, ff, tileHref, type EditKit, type Item, ArrangeHandle } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.collections;
@@ -125,7 +125,8 @@ function CollectionsGrid({ kit }: { kit: EditKit }) {
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
-   <div className={`grid grid-cols-2 gap-3 @xl:gap-4 ${p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3"}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+   <div className={`relative grid grid-cols-2 gap-3 @xl:gap-4 ${p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3"}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+    <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
     {tiles.slice(0, 12).map((t, i) => <Tile key={i} kit={kit} t={t} i={i} setLabel={setLabel} setImg={setImg} ratio="aspect-[4/5]" />)}
    </div>
   </section>
@@ -142,6 +143,8 @@ function CollectionsRow({ kit }: { kit: EditKit }) {
  const w = Math.min(40, Math.max(10, Number(p.cardW) || 15));
  return (
   <section className="vya-free-canvas relative py-10 @lg:py-16 @xl:py-24">
+   {/* See the featured rail: outside the scroll container, or it scrolls away from the pointer. */}
+   <ArrangeHandle kit={kit} prop="cardW" title="Drag to change the tile width" />
    <div className="mx-auto max-w-6xl px-5 @xl:px-8"><Heading kit={kit} className="mb-8 text-3xl @xl:text-[2.4rem] leading-tight" /></div>
    <div className="vya-rail flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 @xl:gap-4 @xl:px-8">
     {tiles.map((t, i) => (

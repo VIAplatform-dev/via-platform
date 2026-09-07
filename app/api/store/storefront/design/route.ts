@@ -148,6 +148,11 @@ export async function GET(request: NextRequest) {
  extraPages: theme.extraPages ?? [],
  socials: theme.socials ?? {},
  footerAbout: theme.footerAbout ?? "",
+ // Undefined, not "": the footer tells "never set" (keep the standard wording) apart from
+ // "deliberately blank", and coercing to "" here would erase that distinction on every load.
+ footerNewsletterHeading: theme.footerNewsletterHeading,
+ footerNewsletterText: theme.footerNewsletterText,
+ words: theme.words,
  navLinks: theme.navLinks ?? [],
  // Resolved the SAME way the live storefront resolves it (app/s/StorefrontView.tsx), so the
  // editor's header and the published page can't show two different names. The old chain fell
@@ -290,6 +295,17 @@ export async function POST(request: NextRequest) {
  theme.socials = out;
  }
  if (typeof body?.footerAbout === "string") theme.footerAbout = body.footerAbout.slice(0, 300);
+ if (typeof body?.footerNewsletterHeading === "string") theme.footerNewsletterHeading = body.footerNewsletterHeading.slice(0, 120);
+ if (typeof body?.footerNewsletterText === "string") theme.footerNewsletterText = body.footerNewsletterText.slice(0, 300);
+ // The shop's own labels. Only the four known keys, each a short string — anything else is dropped.
+ if (body?.words && typeof body.words === "object") {
+  const w: Record<string, string> = {};
+  for (const k of ["sold", "shopAll", "viewAll", "empty"]) {
+   const v = (body.words as Record<string, unknown>)[k];
+   if (typeof v === "string") w[k] = v.slice(0, 40);
+  }
+  theme.words = w;
+ }
  // Custom header/footer links (label + href + where to show).
  if (Array.isArray(body?.navLinks)) {
  theme.navLinks = (body.navLinks as unknown[]).map((l) => {

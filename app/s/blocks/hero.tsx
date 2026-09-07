@@ -9,7 +9,7 @@
 // Height: any element that forces its own height carries `.vya-fill`, which is what the section's
 // resize handle (style.minH) targets. A layout that invents its own height mechanism silently breaks
 // dragging the section taller — this class is the contract.
-import { FreeField, PhotoFrame, emptyHint, panBgImg, type EditKit } from "./kit";
+import { FreeField, PhotoFrame, emptyHint, panBgImg, type EditKit, ArrangeHandle, splitRatioOf } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
 
@@ -124,7 +124,7 @@ function HeroSplit({ kit }: { kit: EditKit }) {
  const right = (p.imageSide || "").toLowerCase().startsWith("r");
  // The divider position is a percentage the merchant drags (style-free: it's structural, so it lives
  // in props). Clamped to keep both panels usable no matter how far the handle is dragged.
- const ratio = Math.min(75, Math.max(25, Number(p.splitRatio) || 50));
+ const ratio = splitRatioOf(p);
  // A split hero with no photo is half a tinted rectangle and half a squeezed column of text. When
  // there is nothing to show, the whole split collapses and the type takes the full width — the
  // panel is hidden AND the grid stops splitting, because hiding only the panel would leave the
@@ -132,9 +132,13 @@ function HeroSplit({ kit }: { kit: EditKit }) {
  const showMedia = !!p.image || ctx.edit;
  return (
   <div
-   className={`vya-fill grid w-full items-stretch ${showMedia ? "@lg:grid-cols-[var(--vya-split)]" : ""}`}
+   className={`vya-arrange-box vya-fill relative grid w-full items-stretch ${showMedia ? "@lg:grid-cols-[var(--vya-split)]" : ""}`}
    style={showMedia ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}
   >
+   {/* The seam itself is the handle — the comment above has described a draggable divider since
+       this layout shipped, and there was never anything to drag. Only on the wide layout, where
+       the split actually exists; below @lg the two panels stack. */}
+   {showMedia && <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>}
    {showMedia && (
     <PhotoFrame kit={kit} className={`relative min-h-[42vh] w-full overflow-hidden @lg:min-h-[78vh] ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }}>
      {p.image && <img src={p.image} alt="" {...panBgImg(ctx, b)} className={`absolute inset-0 h-full w-full object-cover ${ctx.edit ? "cursor-grab touch-none" : ""}`} />}

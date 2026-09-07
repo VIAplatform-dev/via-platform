@@ -19,6 +19,7 @@ import Blocks from "./Blocks";
 import { sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { StoreFooter } from "@/app/s/StoreChrome";
+import { resolveWords } from "@/app/lib/storefront-words";
 
 /** Render the raw price string sensibly (loadStoreProducts may or may not prefix a symbol). */
 function fmtPrice(price: string): string {
@@ -118,6 +119,8 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  // ── Theme ──
  const theme = sf.theme || {};
+ // The shop's own labels — "Sold", "View all". Overridable per store; see storefront-words.ts.
+ const words = resolveWords(theme.words);
  // Headings/buttons/prices take the accent — but only when we can trust it.
  //   • A palette SCRAPED from an imported site: the extracted "accent" is often a spurious CSS
  //     colour (a sale-tag red, a link blue), so the site's own ink is the reliable match.
@@ -390,7 +393,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-3 opacity-0 transition group-hover:visible group-hover:opacity-100">
  <div className="grid min-w-[210px] gap-0.5 border border-black/10 p-3 shadow-xl" style={{ background: bg }}>
  {/* "Shop all" first — the way back to the full catalogue once you've narrowed it. */}
- <a href={n.href} className="px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100" style={{ letterSpacing: "normal" }}>Shop all</a>
+ <a href={n.href} className="px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100" style={{ letterSpacing: "normal" }}>{words.shopAll}</a>
  {shopMenu.map((c, j) => (
  <div key={j} className="contents">
  {/* The family heading is itself a destination — "Clothing" shows every bucket beneath it. */}
@@ -460,7 +463,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -561,7 +564,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} collectionHrefs={collectionHrefs} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
  )}
 
  {showGrid && !hasBlocks && (
@@ -578,7 +581,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </p>
  )}
  {gridItems.length === 0 ? (
- <p className="py-24 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">Coming soon</p>
+ <p className="py-24 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">{words.empty}</p>
  ) : (
  <div className={`grid grid-cols-2 ${gridGutterCls} ${gridColsCls}`}>
  {gridItems.map((it) => {
@@ -590,7 +593,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
  {it.sold && (
  <div className="absolute inset-0 flex items-start justify-end p-2">
- <span className="bg-black/80 px-2.5 py-1 text-[9px] uppercase tracking-[0.22em] text-white">Sold</span>
+ <span className="bg-black/80 px-2.5 py-1 text-[9px] uppercase tracking-[0.22em] text-white">{words.sold}</span>
  </div>
  )}
  </div>
@@ -614,7 +617,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
  {!isShop && items.length > gridItems.length && (
  <div className="mt-12 text-center">
- <a href={shopHref} className="inline-block border px-9 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-70" style={{ borderColor: accent, color: accent }}>View all</a>
+ <a href={shopHref} className="inline-block border px-9 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-70" style={{ borderColor: accent, color: accent }}>{words.viewAll}</a>
  </div>
  )}
  </section>

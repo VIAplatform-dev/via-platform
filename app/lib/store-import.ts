@@ -91,6 +91,12 @@ export type StorefrontTheme = {
  // Footer: the store's social links + a short about blurb, shown site-wide in the footer.
  socials?: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string; pinterest?: string; email?: string };
  footerAbout?: string;
+ // The footer's email-signup band. Unset keeps DEFAULT_FOOTER_NEWSLETTER (app/s/StoreChrome.tsx);
+ // an empty string is a store that deliberately dropped that line.
+ footerNewsletterHeading?: string;
+ footerNewsletterText?: string;
+ // The shop's own labels ("Sold", "View all"). See storefront-words.ts; unset entries fall back.
+ words?: { sold?: string; shopAll?: string; viewAll?: string; empty?: string };
  // Custom links the seller adds to the header and/or footer nav (beyond the auto page/collection links).
  navLinks?: { label: string; href: string; place?: "header" | "footer" | "both" }[];
  // cloned design (from site-clone): the original's name, nav, hero, and pages.

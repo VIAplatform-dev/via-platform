@@ -1,7 +1,7 @@
 // Columns — the general-purpose "content side by side" family: feature rows, values, how-it-works,
 // service promises. Each column is a repeated item (heading, body, image, button label, button link),
 // so all four layouts share one editor and one set of add/reorder controls.
-import { FreeField, emptyHint, ImageSlot, type EditKit, type Item } from "./kit";
+import { FreeField, emptyHint, ImageSlot, type EditKit, type Item, ArrangeHandle } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.columns;
@@ -40,7 +40,8 @@ function ColumnsImage({ kit }: { kit: EditKit }) {
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-12 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
-   <div className={`grid grid-cols-1 gap-8 @sm:grid-cols-2 @lg:gap-10 ${gridFor(p.cols)}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+   <div className={`relative grid grid-cols-1 gap-8 @sm:grid-cols-2 @lg:gap-10 ${gridFor(p.cols)}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+    <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
     {cols.slice(0, 8).map((c, i) => (
      <div key={i} className="flex flex-col">
       <ImageSlot kit={kit} src={c.img} alt={c.heading} onPick={(url) => set(i, { img: url })} className="mb-5" />

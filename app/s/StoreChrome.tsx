@@ -140,7 +140,13 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
  );
 }
 
-export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFontFamily, year, socials, footerAbout, newsletter, onNav }: ChromeProps & { tagline?: string | null; socials?: Socials; footerAbout?: string; newsletter?: React.ReactNode }) {
+/** What the footer's signup band says when a store hasn't written its own. */
+export const DEFAULT_FOOTER_NEWSLETTER = {
+ heading: "Join the list",
+ text: "Be first to know about new arrivals, drops, and private sales.",
+};
+
+export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFontFamily, year, socials, footerAbout, newsletter, newsletterHeading, newsletterText, onNav }: ChromeProps & { tagline?: string | null; socials?: Socials; footerAbout?: string; newsletter?: React.ReactNode; newsletterHeading?: string; newsletterText?: string }) {
  const links = socialList(socials);
  return (
  // Container, not viewport — same reasoning as the header above. The footer's columns stack at the
@@ -150,8 +156,11 @@ export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFont
  {/* Email signup band — every page ends with a chance to subscribe (the "Sign up" the seller asked for). */}
  {newsletter && (
  <div className="mb-14 flex flex-col items-center gap-3 border-b border-black/[0.06] pb-14 text-center">
- <p className="text-xl" style={{ fontFamily: headingFontFamily }}>Join the list</p>
- <p className="max-w-sm text-xs leading-relaxed opacity-55">Be first to know about new arrivals, drops, and private sales.</p>
+ {/* These two lines were hardcoded, so every VYA storefront ended every page with the same
+     sentence. `??` keeps that sentence for stores that haven't written their own, and lets one
+     that has clear either line to nothing. */}
+ {(newsletterHeading ?? DEFAULT_FOOTER_NEWSLETTER.heading) !== "" && <p className="text-xl" style={{ fontFamily: headingFontFamily }}>{newsletterHeading ?? DEFAULT_FOOTER_NEWSLETTER.heading}</p>}
+ {(newsletterText ?? DEFAULT_FOOTER_NEWSLETTER.text) !== "" && <p className="max-w-sm text-xs leading-relaxed opacity-55">{newsletterText ?? DEFAULT_FOOTER_NEWSLETTER.text}</p>}
  <div className="mt-2 w-full max-w-sm">{newsletter}</div>
  </div>
  )}

@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 // Editorial sections — blog (the journal row) and spotlight (one hero piece).
-import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item, panBgImg } from "./kit";
+import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item, panBgImg, ArrangeHandle, splitRatioOf } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.blog;
@@ -111,8 +111,12 @@ function SpotlightBody({ kit }: { kit: EditKit }) {
 const pickImage = (kit: EditKit) => (url: string) => kit.ctx.onEditField?.(kit.b.id, "image", url);
 
 function SpotlightHalf({ kit }: { kit: EditKit }) {
+ const ratio = splitRatioOf(kit.p);
  return (
-  <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
+  <section className={`vya-arrange-box relative mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:gap-14 ${kit.p.splitRatio ? "@lg:grid-cols-[var(--vya-split)]" : "@lg:grid-cols-2"}`} style={kit.p.splitRatio ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}>
+   {/* This layout has advertised a draggable split since it shipped and never read the prop, so the
+       control moved a number that changed nothing. Wide layout only — the columns stack below @lg. */}
+   <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>
    <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={kit.p.imageZoom} ratio="aspect-square" rounded="vya-img" />
    <div className="vya-free-canvas relative"><SpotlightBody kit={kit} /></div>
   </section>

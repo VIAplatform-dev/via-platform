@@ -5,8 +5,9 @@
 // varies between these layouts is composition: an even grid, a swipeable rail, one lead piece with
 // a supporting stack, an asymmetric mosaic, or a dense archive list. The section's own heading and
 // eyebrow are editable in all five.
-import { FreeField, productsFor, type EditKit, type BlockProduct } from "./kit";
+import { FreeField, productsFor, type EditKit, type BlockProduct, ArrangeHandle } from "./kit";
 import { featuredCount, autoColumns } from "@/app/lib/storefront-blocks";
+import { DEFAULT_WORDS } from "@/app/lib/storefront-words";
 
 // Composed layouts are built around an exact arrangement, so their capacity is a property of the
 // design rather than something a merchant sets. Named here so the number and the reason live together.
@@ -37,13 +38,17 @@ function Head({ kit, align = "text-center", className = "mb-12" }: { kit: EditKi
  if (!p.heading) return null;
  return (
   <div className={`${className} ${align}`}>
-   <span {...txt(p.eyebrow || "The Edit", "eyebrow")} className="mb-3 block text-[11px] @lg:text-[10px] uppercase tracking-[0.3em] opacity-40" />
+   {/* `??`, not `||`: a section saved before the eyebrow was editable has no key at all and keeps
+       the label it has always shown, while a seller who clears the field gets an empty one. With
+       `||` an emptied eyebrow sprang straight back to "The Edit". */}
+   {(p.eyebrow ?? "The Edit") !== "" && <span {...txt(p.eyebrow ?? "The Edit", "eyebrow")} className="mb-3 block text-[11px] @lg:text-[10px] uppercase tracking-[0.3em] opacity-40" />}
    <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-3xl @xl:text-[2.6rem] leading-tight" style={{ fontFamily: ctx.head }} />
   </div>
  );
 }
 
-const Empty = () => <p className="py-10 @lg:py-16 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">Coming soon</p>;
+// The store's own word for an empty grid (storefront-words.ts), not a fixed "Coming soon".
+const Empty = ({ kit }: { kit: EditKit }) => <p className="py-10 @lg:py-16 text-center text-[11px] uppercase tracking-[0.3em] opacity-40">{kit.ctx.words?.empty || DEFAULT_WORDS.empty}</p>;
 
 // ── grid ────────────────────────────────────────────────────────────────────────────────────────
 // The layout that shipped. Column count and gap are merchant controls; the defaults reproduce the
@@ -67,10 +72,11 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} />
    {noOrphan.length ? (
-    <div className={`grid grid-cols-2 gap-x-5 gap-y-12 @lg:gap-x-8 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+    <div className={`relative grid grid-cols-2 gap-x-5 gap-y-12 @lg:gap-x-8 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+     <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
      {noOrphan.map((it, i) => <Card key={it.key || i} it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} />)}
     </div>
-   ) : <Empty />}
+   ) : <Empty kit={kit} />}
   </section>
  );
 }
@@ -88,6 +94,10 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
  const w = Math.min(60, Math.max(18, Number(p.cardW) || 26));
  return (
   <section className="vya-free-canvas relative py-12 @lg:py-20 @xl:py-24">
+   {/* On the section, not the rail: a handle inside an overflow-x-auto strip scrolls out of reach
+       and widens the scroll area behind it. Two stacked so both measurements stay grabbable. */}
+   <ArrangeHandle kit={kit} prop="cardW" title="Drag to change the card width" style={{ marginTop: "-28px" }} />
+   <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" style={{ marginTop: "28px" }} />
    <div className="mx-auto max-w-6xl px-5 @xl:px-8"><Head kit={kit} align="text-left" className="mb-8" /></div>
    {shown.length ? (
     <div className="vya-rail flex snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-2 @xl:px-8" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
@@ -97,7 +107,7 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
       </div>
      ))}
     </div>
-   ) : <Empty />}
+   ) : <Empty kit={kit} />}
    <style dangerouslySetInnerHTML={{ __html: ".vya-rail{justify-content:safe center;scrollbar-width:none;-ms-overflow-style:none}.vya-rail::-webkit-scrollbar{display:none}" }} />
   </section>
  );
@@ -114,7 +124,7 @@ function FeaturedEditorial({ kit }: { kit: EditKit }) {
  // Composed layout: one lead piece plus a fixed stack. The count IS the composition, so a stale
  // `limit` left behind by a previous layout is deliberately ignored rather than honoured.
  const shown = products.slice(0, EDITORIAL_PIECES);
- if (!shown.length) return <section className="mx-auto max-w-6xl px-5 py-12 @lg:py-20"><Head kit={kit} /><Empty /></section>;
+ if (!shown.length) return <section className="mx-auto max-w-6xl px-5 py-12 @lg:py-20"><Head kit={kit} /><Empty kit={kit} /></section>;
  const [lead, ...rest] = shown;
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
@@ -142,7 +152,8 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} />
    {shown.length ? (
-    <div className="grid grid-cols-2 gap-4 @lg:grid-cols-4 @lg:gap-6" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+    <div className="relative grid grid-cols-2 gap-4 @lg:grid-cols-4 @lg:gap-6" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+     <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
      {shown.map((it, i) => {
       // Every fifth tile starting at the first spans two columns and two rows — a rhythm that keeps
       // repeating cleanly however many products the store has.
@@ -154,7 +165,7 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
       );
      })}
     </div>
-   ) : <Empty />}
+   ) : <Empty kit={kit} />}
   </section>
  );
 }
@@ -182,7 +193,7 @@ function FeaturedList({ kit }: { kit: EditKit }) {
       </a>
      ))}
     </div>
-   ) : <Empty />}
+   ) : <Empty kit={kit} />}
   </section>
  );
 }

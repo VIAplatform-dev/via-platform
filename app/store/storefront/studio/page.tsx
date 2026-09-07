@@ -6,12 +6,12 @@
 // which page you're editing — all on the same canvas the assistant edits. Reuses the existing
 // Blocks renderer (edit mode) + the design API. Every change autosaves; VYA's changes reload it.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useStoreBase } from "../../nav-base";
 import Sidekick from "../../Sidekick";
 import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
-import { StoreHeader, StoreFooter, HEADER_LAYOUTS, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
+import { StoreHeader, StoreFooter, HEADER_LAYOUTS, DEFAULT_FOOTER_NEWSLETTER, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
 import { IMG_RADIUS, BTN_RADIUS } from "@/app/lib/storefront-chrome-css";
@@ -20,9 +20,11 @@ import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
 import ItemsEditor from "@/app/store/storefront/ItemsEditor";
-import { variantsFor, resolveVariant, variantDefaults, normalizeVariant, SECTION_CATEGORIES, VARIANTS, type SectionCategory } from "@/app/lib/storefront-variants";
+import { variantsFor, resolveVariant, variantDefaults, normalizeVariant, arrangeControls, SECTION_CATEGORIES, VARIANTS, type SectionCategory } from "@/app/lib/storefront-variants";
 import { applyVariant, switchNotes } from "@/app/lib/storefront-variant-switch";
-import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
+import { ITEM_SCHEMAS, writeItems } from "@/app/lib/storefront-items";
+import { CONTACT_FIELD_TYPES, DEFAULT_CONTACT_FIELDS } from "@/app/lib/contact-fields";
+import { DEFAULT_WORDS, WORD_LABELS, resolveWords, type StorefrontWords } from "@/app/lib/storefront-words";
 // The skin PICKER is gone (templates replaced it), but skin state is still read and passed
 // through to <Blocks> so stores that already chose one keep rendering as they do today.
 import { isSkin, type SkinId } from "@/app/lib/storefront-skins";
@@ -538,6 +540,10 @@ export default function StorefrontStudio() {
  const [customCss, setCustomCss] = useState("");
  const [socials, setSocials] = useState<Record<string, string>>({}); // footer social links
  const [footerAbout, setFooterAbout] = useState("");
+ // undefined = never touched, so the footer keeps its default wording; "" = deliberately blank.
+ const [footerNews, setFooterNews] = useState<{ heading?: string; text?: string }>({});
+ // The shop's own labels ("Sold", "View all"). Blank entries fall back — see storefront-words.ts.
+ const [words, setWords] = useState<Partial<StorefrontWords>>({});
  type NavLink = { label: string; href: string; place: "header" | "footer" | "both" };
  const [navLinks, setNavLinks] = useState<NavLink[]>([]); // custom links the seller adds to header/footer
  const [activeSlug, setActiveSlug] = useState("home");
@@ -597,6 +603,7 @@ export default function StorefrontStudio() {
  // Which template this store is currently on, so the Design panel can mark it as
  // selected. Read from the design GET, which has always persisted it.
  const [templateId, setTemplateId] = useState<string>("");
+ const [addingPage, setAddingPage] = useState(false);
  // Section picker: a search box and a category filter, because the library is ~30 layouts today and
  // heading for ~75. A flat wall of cards stops being browsable well before that.
  const [secQuery, setSecQuery] = useState("");
@@ -735,6 +742,8 @@ export default function StorefrontStudio() {
  setCustomCss(d.customCss || "");
  setSocials(d.socials || {});
  setFooterAbout(d.footerAbout || "");
+ setFooterNews({ heading: d.footerNewsletterHeading, text: d.footerNewsletterText });
+ setWords(d.words || {});
  setNavLinks(Array.isArray(d.navLinks) ? d.navLinks : []);
  }, []);
 
@@ -970,14 +979,44 @@ export default function StorefrontStudio() {
  if (extraPages.some((p) => p.slug === activeSlug)) return;
  void Promise.resolve().then(() => switchPage("home"));
  }, [loading, activeSlug, extraPages]);
+ /**
+  * Pages from this store's template that it hasn't got.
+  *
+  * Onboarding lets a seller tick only the pages she wants, and there was no way back: choosing four
+  * of seven meant the other three were gone, and "Add page" gave a blank sheet with one empty text
+  * block on it. The template's authored Authentication page is worth considerably more than an
+  * empty page called Authentication.
+  */
+ const missingTemplatePages = useMemo(() => {
+  if (!templateId) return [];
+  const have = new Set(extraPages.map((p) => p.slug));
+  return templatePages(templateId).filter((p) => !have.has(p.slug));
+ }, [templateId, extraPages]);
+
+ function addTemplatePage(slug: string) {
+  const page = missingTemplatePages.find((p) => p.slug === slug);
+  if (!page) return;
+  setExtraPages((ps) => [...ps, { slug: page.slug, title: page.title, blocks: page.blocks }]);
+  setAddingPage(false);
+  switchPage(page.slug);
+ }
+
+ function addBlankPage() {
+  const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
+  if (!title || !title.trim()) return;
+  let slug = pageSlugify(title);
+  const taken = new Set(["home", "shop", "product", ...extraPages.map((p) => p.slug)]);
+  if (taken.has(slug)) slug = `${slug}-${extraPages.length + 1}`;
+  setExtraPages((ps) => [...ps, { slug, title: title.trim().slice(0, 60), blocks: [makeBlock("text")] }]);
+  setAddingPage(false);
+  switchPage(slug);
+ }
+
  function addPage() {
- const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
- if (!title || !title.trim()) return;
- let slug = pageSlugify(title);
- const taken = new Set(["home", "shop", "product", ...extraPages.map((p) => p.slug)]);
- if (taken.has(slug)) slug = `${slug}-${extraPages.length + 1}`;
- setExtraPages((ps) => [...ps, { slug, title: title.trim().slice(0, 60), blocks: [makeBlock("text")] }]);
- switchPage(slug);
+  // Straight to a blank page when the template has nothing left to offer — a menu of one option is
+  // a step for nothing.
+  if (missingTemplatePages.length === 0) { addBlankPage(); return; }
+  setAddingPage(true);
  }
  function deletePage(slug: string) {
  if (!window.confirm("Delete this page?")) return;
@@ -1058,7 +1097,7 @@ export default function StorefrontStudio() {
  // blocks autosave effect only handles sections). Colour pickers fire rapidly while dragging, hence the
  // debounce; palette / font / corner clicks are discrete but ride the same path.
  const designTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
- const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; skin?: string; preSkin?: { colors: Colors; fonts: Fonts } | null; customCss?: string; socials?: Record<string, string>; footerAbout?: string; navLinks?: NavLink[]; logo?: string; headerLayout?: HeaderLayout; productLayout?: ProductLayout; productPage?: ProductPageConfig }) => {
+ const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; skin?: string; preSkin?: { colors: Colors; fonts: Fonts } | null; customCss?: string; socials?: Record<string, string>; footerAbout?: string; footerNewsletterHeading?: string; footerNewsletterText?: string; words?: Partial<StorefrontWords>; navLinks?: NavLink[]; logo?: string; headerLayout?: HeaderLayout; productLayout?: ProductLayout; productPage?: ProductPageConfig }) => {
  if (designTimer.current) clearTimeout(designTimer.current);
  setSave("saving");
  designTimer.current = setTimeout(async () => {
@@ -1091,7 +1130,7 @@ export default function StorefrontStudio() {
  const clipboardRef = useRef<{ kind: "overlay"; data: Overlay } | { kind: "block"; data: Block } | null>(null);
  useEffect(() => {
  if (loading) return;
- const json = JSON.stringify({ blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout });
+ const json = JSON.stringify({ blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, footerNews, words });
  if (lastSnapRef.current === "") { lastSnapRef.current = json; return; } // seed on first settled state
  if (applyingRef.current) { applyingRef.current = false; lastSnapRef.current = json; return; } // this change WAS an undo/redo
  // A DRAG is ONE edit. Every gesture — resizing a photo, moving a heading, dragging a section's
@@ -1110,15 +1149,15 @@ export default function StorefrontStudio() {
  futureRef.current = [];
  lastSnapRef.current = json;
  setHist({ u: pastRef.current.length, r: 0 });
- }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, loading, ovlDragging]);
+ }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, footerNews, words, loading, ovlDragging]);
  const restoreSnap = useCallback((json: string) => {
  const s = JSON.parse(json);
  applyingRef.current = true;
  setBlocks(s.blocks || []); setShopBlocks(s.shopBlocks || []); setExtraPages(s.extraPages || []);
  setColors(s.colors); setBaseColors(s.colors); setFonts(s.fonts); setRadius(s.radius); setCustomCss(s.customCss || "");
- setSocials(s.socials || {}); setFooterAbout(s.footerAbout || "");
+ setSocials(s.socials || {}); setFooterAbout(s.footerAbout || ""); setFooterNews({ heading: s.footerNewsletterHeading, text: s.footerNewsletterText }); setWords(s.words || {});
  setSelBlock(null); setSelOverlay(null); setTextFocus(null); setEditingId(null);
- pushDesign({ colors: s.colors, fonts: s.fonts, radius: s.radius, customCss: s.customCss || "", socials: s.socials || {}, footerAbout: s.footerAbout || "" });
+ pushDesign({ colors: s.colors, fonts: s.fonts, radius: s.radius, customCss: s.customCss || "", socials: s.socials || {}, footerAbout: s.footerAbout || "", footerNewsletterHeading: s.footerNewsletterHeading, footerNewsletterText: s.footerNewsletterText, words: s.words });
  }, [pushDesign]);
  const undo = useCallback(() => {
  if (!pastRef.current.length) return;
@@ -1295,6 +1334,46 @@ export default function StorefrontStudio() {
  // (The percentage-based drags elsewhere divide by a measured rect, so they're already scale-free.)
  const h = Math.round(Math.max(floor, Math.min(ceiling, (startH + dir * (ev.clientY - sy)) / zoomRef.current)));
  setBlockStyle(blockId, "minH", String(h));
+ };
+ const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); };
+ window.addEventListener("pointermove", move);
+ window.addEventListener("pointerup", up);
+ }
+ /**
+  * Drag an arrangement handle on the canvas — the gutter between items, a rail card's width, the
+  * seam of a split hero. The panel sliders (arrangeControls) stay the precise surface; this is the
+  * one you reach for when the grid in front of you looks wrong.
+  *
+  * A percentage control measures against its own container, which is why the renderer marks that
+  * container `vya-arrange-box` — 30% has to mean 30% of the rail, not of the viewport. A pixel
+  * control (the gutter) divides the screen delta by the zoom, the same correction the section
+  * height handles make, so a drag at 50% zoom moves the value by what it looks like it moved.
+  */
+ function onArrangeStart(blockId: string, prop: string, e: React.PointerEvent) {
+ const block = curBlocksRef.current.find((b) => b.id === blockId);
+ if (!block) return;
+ const control = arrangeControls(block.type, block.variant).find((a) => a.prop === prop);
+ if (!control) return;
+ const handleEl = e.currentTarget as HTMLElement;
+ const box = (handleEl.closest(".vya-arrange-box") as HTMLElement | null)?.getBoundingClientRect();
+ const start = block.props?.[prop] ? Number(block.props[prop]) : control.fallback;
+ const sx = e.clientX;
+ setSelBlock(blockId); setSelOverlay(null); setTextFocus(null); setOvlDragging(true);
+ handleEl.setPointerCapture?.(e.pointerId);
+ const move = (ev: PointerEvent) => {
+  const dx = ev.clientX - sx;
+  // A percentage against the box it belongs to; pixels against the zoom. Without a box to measure,
+  // a percentage drag has no meaningful scale — leave the value alone rather than guess.
+  // A percentage divides by the box it belongs to; rem and px divide by the zoom (rem again by the
+  // root font size, since that's the unit the rails are actually written in). Without a box to
+  // measure, a percentage drag has no meaningful scale — leave the value alone rather than guess.
+  const delta = control.unit === "percent"
+   ? (box && box.width ? (dx / box.width) * 100 : 0)
+   : control.unit === "rem"
+    ? dx / zoomRef.current / 16
+    : dx / zoomRef.current;
+  const next = Math.round(Math.max(control.min, Math.min(control.max, start + delta)));
+  editField(blockId, prop, String(next));
  };
  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); };
  window.addEventListener("pointermove", move);
@@ -2278,7 +2357,7 @@ export default function StorefrontStudio() {
      <StoreHeader layout={headerLayout} storeName={storeName} logo={logo || null} nav={headerChromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} search={<Search size={16} strokeWidth={1.8} />} />
     </div>
     {pg.blocks.length > 0 && (
-     <Blocks blocks={pg.blocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} skin={skin || undefined} />
+     <Blocks blocks={pg.blocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} words={resolveWords(words)} skin={skin || undefined} />
     )}
     {pg.slug === "shop" && shopGrid}
     {pg.slug === "product" && productStage}
@@ -2286,7 +2365,7 @@ export default function StorefrontStudio() {
      <div className="flex min-h-[200px] items-center justify-center px-8 py-16 text-center text-[13px] text-stone-400">This page is empty.</div>
     )}
     <div className="relative z-20" onClick={(e) => e.stopPropagation()}>
-     <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
+     <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletterHeading={footerNews.heading} newsletterText={footerNews.text} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
     </div>
    </div>
   </div>
@@ -2433,6 +2512,26 @@ export default function StorefrontStudio() {
  <textarea value={footerAbout} onChange={(e) => { setFooterAbout(e.target.value); pushDesign({ footerAbout: e.target.value }); }} rows={2} placeholder="A short line about your store (footer)" className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50" />
  </div>
 
+ {/* The signup band at the top of the footer. Its two lines were hardcoded, so every VYA store
+     ended every page with the same sentence. Blank means "keep the standard wording". */}
+ <p className="mb-1 mt-7 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Email signup</p>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">What the signup band above your footer says. Leave blank for the standard wording.</p>
+ <div className="space-y-2">
+ <input
+  value={footerNews.heading ?? ""}
+  onChange={(e) => { const v = e.target.value; setFooterNews((n) => ({ ...n, heading: v })); pushDesign({ footerNewsletterHeading: v }); }}
+  placeholder={DEFAULT_FOOTER_NEWSLETTER.heading}
+  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
+ />
+ <textarea
+  value={footerNews.text ?? ""}
+  onChange={(e) => { const v = e.target.value; setFooterNews((n) => ({ ...n, text: v })); pushDesign({ footerNewsletterText: v }); }}
+  rows={2}
+  placeholder={DEFAULT_FOOTER_NEWSLETTER.text}
+  className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50"
+ />
+ </div>
+
  </>)}
 
  {/* Links belong to both, but a link carries WHERE it shows — so each panel lists the ones that
@@ -2495,7 +2594,26 @@ export default function StorefrontStudio() {
  {/* This one isn't decoration: it's how a seller tells two forms apart in the inbox. */}
  <p className="mt-1 text-[11px] leading-snug text-stone-400">What these messages are labelled as in your inbox. Leave blank to use the heading.</p>
  </div>
- <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">The name, email and message fields are always shown. On your live storefront the form really sends; here it stays inert so you cannot message yourself while arranging the page.</p>
+ <div className="mt-4 border-t border-black/[0.06] pt-3.5">
+ <p className="mb-2 text-[12px] font-medium text-stone-600">Questions</p>
+ <ItemsEditor
+  key={overlayId}
+  props={{ ...p, fields: p.fields || writeItems(DEFAULT_CONTACT_FIELDS.map((f) => ({ label: f.label, type: f.type, required: f.required ? "yes" : "" })), ITEM_SCHEMAS.contactFields) }}
+  schema={ITEM_SCHEMAS.contactFields}
+  onChange={(key, value) => patch({ [key]: value })}
+  pick={pickAndUpload}
+  uploading={uploading}
+  addLabel="Add a question"
+  singular="Question"
+  controls={{
+   type: { kind: "select", options: CONTACT_FIELD_TYPES },
+   required: { kind: "toggle", on: "yes", off: "", hint: "They have to answer this" },
+  }}
+  hide={(f, it) => f === "options" && it.type !== "choice"}
+  seed={{ label: "Your question", type: "text", required: "", options: "" }}
+ />
+ </div>
+ <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">On your live storefront the form really sends; here it stays inert so you cannot message yourself while arranging the page.</p>
  </div>
  );
  })()
@@ -2698,6 +2816,7 @@ export default function StorefrontStudio() {
  const vDef = resolveVariant(selBlockObj.type, selBlockObj.variant);
  const layouts = variantsFor(selBlockObj.type);
  const itemsName = vDef?.supports?.items;
+ const arrange = arrangeControls(selBlockObj.type, selBlockObj.variant);
  const itemSchema = itemsName ? ITEM_SCHEMAS[itemsName] : undefined;
  // Repeated content gets the structured row editor instead of a raw field — except single-field
  // lists (marquee names, gallery URLs), where a plain textarea is genuinely faster to fill.
@@ -2752,18 +2871,58 @@ export default function StorefrontStudio() {
  </div>
  )}
 
+ {/* How this layout ARRANGES what's in it. Sits under the layout picker because that's the
+     decision it follows from — you choose a carousel, then you say how wide its cards are. */}
+ {arrange.length > 0 && (
+ <div className="mb-5">
+ <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Arrangement</p>
+ <div className="space-y-3">
+ {arrange.map((a) => {
+ const raw = bp[a.prop];
+ const cur = raw != null && raw !== "" ? Number(raw) : undefined;
+ return (
+ <div key={a.prop}>
+ <StyleRow label={a.label}>
+ <StyleSlider
+ value={cur ?? a.fallback}
+ min={a.min}
+ max={a.max}
+ step={a.step}
+ suffix={a.suffix}
+ onChange={(v) => editField(selBlockObj.id, a.prop, String(v))}
+ // Clearing puts the layout back on its own default rather than on the number the
+ // slider happened to be showing.
+ onClear={cur == null ? undefined : () => editField(selBlockObj.id, a.prop, "")}
+ />
+ </StyleRow>
+ <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{a.hint}</p>
+ </div>
+ );
+ })}
+ </div>
+ </div>
+ )}
+
  {useItemsEditor && itemSchema ? (
  <ItemsEditor
  // Keyed by section: the editor tracks which row is expanded by position, so a fresh section
  // must start fresh rather than inherit "row 3 is open" from the one you were just editing.
  key={selBlockObj.id}
- props={bp}
+ props={itemsName === "contactFields" ? { ...bp, fields: bp.fields || writeItems(DEFAULT_CONTACT_FIELDS.map((f) => ({ label: f.label, type: f.type, required: f.required ? "yes" : "" })), itemSchema) } : bp}
  schema={itemSchema}
  onChange={(key, value) => editField(selBlockObj.id, key, value)}
  pick={pickAndUpload}
  uploading={uploading}
- addLabel={itemsName === "slides" ? "Add slide" : "Add item"}
- singular={itemsName === "slides" ? "Slide" : "Item"}
+ addLabel={itemsName === "slides" ? "Add slide" : itemsName === "contactFields" ? "Add a question" : "Add item"}
+ singular={itemsName === "slides" ? "Slide" : itemsName === "contactFields" ? "Question" : "Item"}
+ // A contact form's answer type is one of five and "required" is a yes or no — neither is
+ // something to type. Options only exist on a question that offers a list.
+ controls={itemsName === "contactFields" ? {
+ type: { kind: "select", options: CONTACT_FIELD_TYPES },
+ required: { kind: "toggle", on: "yes", off: "", hint: "They have to answer this" },
+ } : undefined}
+ hide={itemsName === "contactFields" ? (f, it) => f === "options" && it.type !== "choice" : undefined}
+ seed={itemsName === "contactFields" ? { label: "Your question", type: "text", required: "", options: "" } : undefined}
  />
  ) : null}
 
@@ -2851,6 +3010,32 @@ export default function StorefrontStudio() {
  </div>
  );
  }) : <p className="text-[13px] leading-relaxed text-stone-400">This section has no text fields — its content comes from your products.</p>}
+
+ {/* The Q&A pairs. They live in `defaults` as q0/a0…, never in `fields`, so selecting an FAQ
+     section showed only its heading and intro — the questions themselves were canvas-only. */}
+ {selBlockObj.type === "faq" && (
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Questions</label>
+ <div className="flex flex-col gap-1.5">
+ {readFaqPairs(bp).map((pair, i) => (
+ <div key={i} className="rounded-lg border border-black/10 bg-white p-2">
+ <div className="mb-1.5 flex items-center gap-1">
+ <span className="text-[11px] font-medium text-stone-400">{i + 1}.</span>
+ <span className="flex-1" />
+ <button type="button" title="Move up" disabled={i === 0} onClick={() => moveFaqRow(selBlockObj.id, i, selBlockObj.id, i - 1)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronUp size={13} /></button>
+ <button type="button" title="Move down" disabled={i === readFaqPairs(bp).length - 1} onClick={() => moveFaqRow(selBlockObj.id, i, selBlockObj.id, i + 2)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronDown size={13} /></button>
+ <button type="button" title="Remove question" onClick={() => faqOp(selBlockObj.id, { remove: i })} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={12} /></button>
+ </div>
+ {/* Uncontrolled + commit on blur, the same discipline the canvas and ItemsEditor use, so a
+     re-render can't jump the caret mid-keystroke. */}
+ <input defaultValue={pair.q} key={`q${i}-${pair.q}`} onBlur={(e) => { if (e.target.value !== pair.q) editField(selBlockObj.id, `q${i}`, e.target.value); }} placeholder="Question" className={`${inp} mb-1.5`} />
+ <textarea defaultValue={pair.a} key={`a${i}-${pair.a}`} onBlur={(e) => { if (e.target.value !== pair.a) editField(selBlockObj.id, `a${i}`, e.target.value); }} rows={2} placeholder="Answer" className={`${inp} resize-y leading-relaxed`} />
+ </div>
+ ))}
+ </div>
+ <button type="button" onClick={() => faqOp(selBlockObj.id, "add")} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-black/20 py-2 text-[12px] font-medium text-stone-500 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Plus size={13} /> Add a question</button>
+ </div>
+ )}
 
  {selBlockObj.type === "columns" && (
  <div className="mb-3.5">
@@ -2942,6 +3127,29 @@ export default function StorefrontStudio() {
  })}
  </div>
  </>)}
+ {/* The four words the shop says for itself. They were literals in the renderer, so every VYA
+     storefront said them identically — a store with its own voice couldn't change one. */}
+ <button type="button" onClick={() => toggleDesign("Wording")} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
+ <ChevronDown size={12} className={`transition ${openDesign.has("Wording") ? "" : "-rotate-90"}`} /> <span className="flex-1">Wording</span>
+ </button>
+ {openDesign.has("Wording") && (<>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">What your shop calls things. Leave blank for the standard wording.</p>
+ <div className="space-y-2.5">
+ {WORD_LABELS.map((w) => (
+ <div key={w.key}>
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">{w.label}</label>
+ <input
+  value={words[w.key] ?? ""}
+  onChange={(e) => { const next = { ...words, [w.key]: e.target.value }; setWords(next); pushDesign({ words: next }); }}
+  placeholder={DEFAULT_WORDS[w.key]}
+  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
+ />
+ <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{w.hint}</p>
+ </div>
+ ))}
+ </div>
+ </>)}
+
  <button type="button" onClick={() => toggleDesign("Colour palette")} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
  <ChevronDown size={12} className={`transition ${openDesign.has("Colour palette") ? "" : "-rotate-90"}`} /> <span className="flex-1">Colour palette</span>
  </button>
@@ -3530,7 +3738,7 @@ export default function StorefrontStudio() {
  <StoreHeader layout={headerLayout} storeName={storeName} logo={logo || null} nav={headerChromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} search={<Search size={16} strokeWidth={1.8} />} />
  </div>
  {curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setTextFocus(null); setSelFree(null); setFreeEditing(null); setSelChrome(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} freeEdit={freeEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} onFieldFocus={(blockId, key) => { setSelBlock(blockId); setSelOverlay(null); setTextFocus({ blockId, key }); setPanelOpen(true); }} onResizeSectionStart={onSectionResizeStart} onPickImage={pickAndUpload} onDropImage={dropAndUpload} skin={skin || undefined} />
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} words={resolveWords(words)} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setTextFocus(null); setSelFree(null); setFreeEditing(null); setSelChrome(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} freeEdit={freeEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} onFieldFocus={(blockId, key) => { setSelBlock(blockId); setSelOverlay(null); setTextFocus({ blockId, key }); setPanelOpen(true); }} onResizeSectionStart={onSectionResizeStart} onArrangeStart={onArrangeStart} onPickImage={pickAndUpload} onDropImage={dropAndUpload} skin={skin || undefined} />
  ) : activeSlug === "shop" || activeSlug === "product" ? null : (
  <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-8 py-20 text-center">
  <p className="text-[14px] text-stone-400" style={{ fontFamily: ff(fonts.body) }}>This page is empty.</p>
@@ -3551,7 +3759,7 @@ export default function StorefrontStudio() {
   onClick={(e) => { if ((e.target as HTMLElement).closest("button,a,input")) return; setSelChrome("footer"); setSelBlock(null); setSelOverlay(null); setPanelOpen(true); }}
   className={`relative cursor-pointer transition-shadow ${selChrome === "footer" ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}`}
  >
- <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
+ <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletterHeading={footerNews.heading} newsletterText={footerNews.text} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
  </div>
  </div>
  </div>
@@ -3588,6 +3796,36 @@ export default function StorefrontStudio() {
  <div className="flex shrink-0 flex-col items-center gap-1.5">
  <button type="button" onClick={addPage} title="Add page" className="grid h-[46px] w-[36px] place-items-center rounded-md border border-dashed border-black/20 text-stone-400 transition hover:border-[#5D0F17] hover:text-[#5D0F17]"><Plus size={16} /></button>
  <span className="text-[9px] text-stone-400">Add page</span>
+
+ {/* The pages her template came with that she doesn't have — authored, not blank. Skipping a page
+     during setup used to be permanent, because "Add page" only ever made an empty one. */}
+ {addingPage && (
+  <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/30 p-4 sm:items-center" onClick={() => setAddingPage(false)}>
+   <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="border-b border-stone-100 px-5 py-3.5">
+     <p className="text-[13.5px] font-medium text-stone-900">Add a page</p>
+     <p className="mt-0.5 text-[12px] text-stone-500">These came with your template, written and laid out. Add one and change the words.</p>
+    </div>
+    <div className="max-h-[50vh] overflow-y-auto p-2">
+     {missingTemplatePages.map((pg) => (
+      <button
+       key={pg.slug}
+       type="button"
+       onClick={() => addTemplatePage(pg.slug)}
+       className="flex w-full items-baseline justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-stone-50"
+      >
+       <span className="text-[13.5px] text-stone-800">{pg.title}</span>
+       <span className="text-[11.5px] text-stone-400">{pg.blocks.length} section{pg.blocks.length === 1 ? "" : "s"}</span>
+      </button>
+     ))}
+    </div>
+    <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-5 py-3">
+     <button type="button" onClick={addBlankPage} className="text-[12.5px] text-stone-500 underline underline-offset-2 hover:text-stone-900">Start a blank page instead</button>
+     <button type="button" onClick={() => setAddingPage(false)} className="text-[12.5px] text-stone-400 hover:text-stone-700">Cancel</button>
+    </div>
+   </div>
+  </div>
+ )}
  </div>
  </div>
  {/* Clicking the percentage clears the manual zoom, dropping back to the size that fits. */}
@@ -4025,7 +4263,9 @@ export default function StorefrontStudio() {
  <p className="text-[13px] font-semibold text-stone-900">{t.name}</p>
  <p className="mt-0.5 line-clamp-2 text-[11px] text-stone-500">{t.bestFor}</p>
  <p className="mt-1.5 text-[10px] uppercase tracking-[0.1em] text-stone-400">
- {t.grid.cols}-up · {t.layout.length} sections · {t.pages.length} pages
+ {/* "4-UP" is print jargon — it means four products to a row, and nobody outside a studio
+    reads it that way. The number of pages is what a seller is actually choosing between. */}
+{t.pages.length} page{t.pages.length === 1 ? "" : "s"} · {t.grid.cols} products a row
  </p>
  <span className="mt-2 inline-block text-[11px] font-semibold text-[#5D0F17] opacity-0 transition group-hover:opacity-100">Use this template →</span>
  </div>

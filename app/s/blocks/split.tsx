@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 // Split — a photo beside a story. The editorial workhorse: an about paragraph, a category pitch, a
 // sourcing note. Four arrangements of the same four fields (heading, body, button, photo).
-import { FreeField, ImageSlot, PhotoFrame, panBgImg, type EditKit } from "./kit";
+import { FreeField, ImageSlot, PhotoFrame, panBgImg, type EditKit, ArrangeHandle, splitRatioOf } from "./kit";
 
 // Which side the photo sits on. Stored as a word ("left"/"right") because it predates variants and
 // existing storefronts hold it that way.
@@ -22,8 +22,12 @@ function Body({ kit }: { kit: EditKit }) {
 function SplitHalf({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
  const right = imageRight(p);
+ const ratio = splitRatioOf(p);
  return (
-  <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
+  <section className={`vya-arrange-box relative mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:gap-14 ${p.splitRatio ? "@lg:grid-cols-[var(--vya-split)]" : "@lg:grid-cols-2"}`} style={p.splitRatio ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}>
+   {/* This layout has advertised a draggable split since it shipped and never read the prop, so the
+       control moved a number that changed nothing. Wide layout only — the columns stack below @lg. */}
+   <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>
    <div className={right ? "@lg:order-2" : ""}>
     <PhotoFrame kit={kit} className="relative w-full"><ImageSlot kit={kit} src={p.image} onPick={(url) => ctx.onEditField?.(kit.b.id, "image", url)} pos={p.imagePos} onPos={(v) => ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={p.imageZoom} ratio="aspect-[4/5]" rounded="vya-img" /></PhotoFrame>
    </div>

@@ -191,7 +191,9 @@ export const VARIANTS: VariantGroup[] = [
  {
   type: "gallery", category: "Media",
   variants: [
-   { id: "grid", label: "Grid", description: "A tight grid of photos — the contact sheet.", supports: { items: "gallery", resize: ["cols", "gap"] } },
+   { id: "grid", label: "Grid", description: "A tight grid of photos — the contact sheet.", supports: { items: "gallery", resize: ["cols", "gap"] },
+    // media.tsx reads `cols` for this layout; without this field nothing could ever set it.
+    fields: [{ key: "cols", label: "Photos per row", kind: "choice", options: [{ value: "", label: "Auto" }, { value: "2", label: "2" }, { value: "3", label: "3" }, { value: "4", label: "4" }, { value: "5", label: "5" }] }] },
    { id: "loose", label: "Airy", description: "Fewer per row, real gutters, page margins. Room to actually look at them.", supports: { items: "gallery", resize: ["gap"] } },
    { id: "mosaic", label: "Mosaic", description: "An uneven rhythm — every third photo runs tall.", supports: { items: "gallery", resize: ["gap"] } },
    { id: "rail", label: "Rail", description: "A swipeable strip that bleeds off the edge — a whole lookbook in one band.", supports: { items: "gallery" } },
@@ -241,9 +243,9 @@ export const VARIANTS: VariantGroup[] = [
  {
   type: "contact", category: "Miscellaneous",
   variants: [
-   { id: "form", label: "Form", description: "A name / email / message form with an optional contact address.", supports: { free: ["heading", "subtext", "cta"] } },
-   { id: "split", label: "Split", description: "Copy and contact details one side, the form the other.", supports: { free: ["heading", "subtext", "cta"] } },
-   { id: "card", label: "Card", description: "The form in a bordered card on a tinted ground — self-contained.", supports: { free: ["heading", "subtext", "cta"] } },
+   { id: "form", label: "Form", description: "Your questions in one column, with an optional contact address.", supports: { free: ["heading", "subtext", "cta"], items: "contactFields" } },
+   { id: "split", label: "Split", description: "Copy and contact details one side, the form the other.", supports: { free: ["heading", "subtext", "cta"], items: "contactFields" } },
+   { id: "card", label: "Card", description: "The form in a bordered card on a tinted ground — self-contained.", supports: { free: ["heading", "subtext", "cta"], items: "contactFields" } },
   ],
  },
  {
@@ -252,7 +254,9 @@ export const VARIANTS: VariantGroup[] = [
    { id: "accordion", label: "Accordion", description: "Expandable question-and-answer rows — click to open, one column.", supports: { free: ["heading"] } },
    { id: "two-column", label: "Two column", description: "The same accordion split down the middle. For a list long enough to read as a wall.", supports: { free: ["heading"] } },
    { id: "sided", label: "Sided", description: "Heading and intro pinned left, questions stacked right — the editorial two-up.", supports: { free: ["heading"] } },
-   { id: "cards", label: "Cards", description: "Each question in its own bordered panel, answers always visible. Best when they're short.", supports: { free: ["heading"], resize: ["cols"] } },
+   { id: "cards", label: "Cards", description: "Each question in its own bordered panel, answers always visible. Best when they're short.", supports: { free: ["heading"], resize: ["cols"] },
+    // faq.tsx reads `cols` for this layout; without this field nothing could ever write it.
+    fields: [{ key: "cols", label: "Cards per row", kind: "choice", options: [{ value: "", label: "2" }, { value: "3", label: "3" }] }] },
    { id: "numbered", label: "Numbered", description: "Display numerals beside each question, numbered by position.", supports: { free: ["heading"] } },
    { id: "index", label: "Index", description: "A contents column of questions beside the answers, all open. The documentation pattern.", supports: { free: ["heading"] } },
   ],
@@ -301,4 +305,52 @@ export function normalizeVariant(type: string, id?: string): string | undefined 
 // this module stays free of runtime imports so both halves can be unit-tested in isolation.
 export function variantDefaults(type: string, id?: string): Record<string, string> {
  return { ...(resolveVariant(type, id)?.defaults || {}) };
+}
+
+// ── arrangement controls ────────────────────────────────────────────────────────────────────────
+/**
+ * The sliders a layout offers for how its content is ARRANGED — spacing, card width, the split
+ * between a photo and its copy.
+ *
+ * `supports.resize` had described these on seventeen layouts since variants shipped, and nothing
+ * ever read it: no panel, no handle, no template. The renderers read `gap`, `cardW` and `splitRatio`
+ * faithfully, and no code anywhere wrote them, so every store sat on the hardcoded default and a
+ * seller whose grid felt cramped had no way to say so. This is the missing half.
+ *
+ * The bounds are the renderers' own clamps, restated here so the slider can't offer a value the
+ * renderer will refuse. Keep the two in step — featured and collections deliberately differ, a
+ * product card needing more room than a category tile.
+ */
+export type ArrangeControl = {
+ prop: string;
+ label: string;
+ hint: string;
+ min: number;
+ max: number;
+ step: number;
+ /** What the slider shows after the number. A card width is in rem; "26rem" means nothing to a seller. */
+ suffix: string;
+ /** How a pointer delta becomes a value change. "percent" needs the container's width to divide by. */
+ unit: "percent" | "px" | "rem";
+ fallback: number;
+};
+
+const GAP: ArrangeControl = { prop: "gap", label: "Space between", hint: "The gutter between items.", min: 0, max: 80, step: 2, suffix: "px", unit: "px", fallback: 20 };
+
+export function arrangeControls(type: string, variantId?: string): ArrangeControl[] {
+ const resize = variantSupports(type, variantId).resize || [];
+ const out: ArrangeControl[] = [];
+ for (const r of resize) {
+  // `cols` is left to the layout's own "Per row" field: it's a choice between two and five, not a
+  // slider, and offering both would be two controls fighting over one prop.
+  if (r === "gap") out.push(GAP);
+  else if (r === "cardWidth") out.push(
+   // Both rails size a card in rem (`width: min(52vw, Nrem)`), not as a share of the row.
+   type === "collections"
+    ? { prop: "cardW", label: "Tile width", hint: "How wide each tile sits in the rail.", min: 10, max: 40, step: 1, suffix: "", unit: "rem", fallback: 15 }
+    : { prop: "cardW", label: "Card width", hint: "How wide each card sits in the rail.", min: 18, max: 60, step: 1, suffix: "", unit: "rem", fallback: 26 },
+  );
+  else if (r === "split") out.push({ prop: "splitRatio", label: "Photo width", hint: "How much of the row the photo takes.", min: 25, max: 75, step: 1, suffix: "%", unit: "percent", fallback: 50 });
+ }
+ return out;
 }

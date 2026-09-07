@@ -17,6 +17,7 @@ import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
 import { SERIF_FONTS } from "@/app/lib/storefront-templates";
 import { readItems, writeItems, type Item, type ItemSchema } from "@/app/lib/storefront-items";
 import { isPlaceholderImage } from "@/app/lib/storefront-placeholder-image";
+import type { StorefrontWords } from "@/app/lib/storefront-words";
 
 export const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 
@@ -104,6 +105,13 @@ export type Ctx = {
  // straight onto the slot is the gesture people actually reach for — clicking, then hunting through
  // a file dialog for something already sitting in a folder, is the slower path.
  onDropImage?: (file: File, apply: (url: string) => void) => void;
+ // The store's own labels for the shop UI — "Sold", "View all", what an empty grid says. See
+ // storefront-words.ts; unset falls back to DEFAULT_WORDS.
+ words?: StorefrontWords;
+ // Editor-only: drag an arrangement handle (spacing, card width, the hero's split). The drag math
+ // needs the container's rect, which lives in the parent — this renderer only reports which prop
+ // the handle belongs to and where the pointer went down.
+ onArrangeStart?: (blockId: string, prop: string, e: React.PointerEvent) => void;
 };
 
 // An image slot inside a layout (a column's photo, a split's picture, a category tile).
@@ -720,3 +728,48 @@ export function panBgImg(ctx: { edit?: boolean; onEditField?: (id: string, key: 
  };
  return { style, onPointerDown, className: "cursor-grab touch-none", draggable: false };
 }
+
+
+// ── arrangement handles ─────────────────────────────────────────────────────────────────────────
+/**
+ * The drag handle for a structural measurement — the gutter between items, how wide a card sits in
+ * a rail, where a split hero divides.
+ *
+ * These are the direct-manipulation half of the Arrangement sliders (see arrangeControls). A seller
+ * whose grid feels cramped reaches for the gap between two pieces, not for a panel; the slider stays
+ * as the precise, discoverable surface and this is the fast one.
+ *
+ * Only on the selected section, and only in the editor. `vya-arrange-box` marks the element the
+ * parent measures, so a percentage is a percentage OF something real rather than of the viewport.
+ */
+export function ArrangeHandle({ kit, prop, title, at = "right", style }: {
+ kit: EditKit;
+ prop: string;
+ title: string;
+ /** "right" pins it to the container's right edge; "seam" floats it wherever `style` puts it. */
+ at?: "right" | "seam";
+ style?: React.CSSProperties;
+}) {
+ const { b, ctx } = kit;
+ if (!ctx.edit || !ctx.onArrangeStart || ctx.selectedId !== b.id) return null;
+ return (
+  <span
+   title={title}
+   onClick={(e) => e.stopPropagation()}
+   onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onArrangeStart!(b.id, prop, e); }}
+   className={`absolute z-30 cursor-col-resize touch-none ${at === "right" ? "-right-1.5 top-1/2 h-12 w-3 -translate-y-1/2" : "top-0 h-full w-3 -translate-x-1/2"}`}
+   style={style}
+  >
+   {/* A wide invisible hit box with a slim visible pill inside it, so a slightly-off grab still
+       lands — the same shape the section's own height handles use. */}
+   <span className={`pointer-events-none absolute inset-0 m-auto rounded-full border border-white bg-[#5D0F17] shadow ${at === "right" ? "h-10 w-2" : "h-full w-1"}`} />
+  </span>
+ );
+}
+
+/**
+ * Where a split layout divides, as a percentage of the row. Clamped so neither side can be dragged
+ * away to nothing. Shared by every split layout, so the slider's bounds (arrangeControls) and the
+ * renderers' clamp can't drift apart.
+ */
+export const splitRatioOf = (p: Record<string, string>) => Math.min(75, Math.max(25, Number(p.splitRatio) || 50));
