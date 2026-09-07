@@ -57,12 +57,26 @@ function Compose() {
 
  const [html, setHtml] = useState("");
  const [count, setCount] = useState(0);
+ const [allowance, setAllowance] = useState<{ label: string; canSend: boolean; reason: string | null } | null>(null);
+ // Empty = send now. A date = leave it for the cron. Scheduling is the difference between "I'll
+ // remember to send this on Monday" and it going out on Monday.
+ const [sendAt, setSendAt] = useState("");
  const [sending, setSending] = useState(false);
  const [note, setNote] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
 
  // Load the chosen starting point. Its words land in the fields as a draft — editable immediately,
  // rather than as something to accept or reject.
  useEffect(() => {
+  // Opened from the Emails page: its words come back so editing is editing, not retyping.
+  const preSubject = params.get("subject");
+  const preBody = params.get("body");
+  if (preSubject || preBody) {
+   const lines = String(preBody || "").split("\n").filter(Boolean);
+   setSubject(preSubject || "");
+   setHeadline(lines[0] || preSubject || "");
+   setSubhead(lines.slice(1).join(" "));
+  }
+
   const id = params.get("template");
   fetch("/api/store/campaign/templates").then((r) => (r.ok ? r.json() : null)).then((d) => {
    const t = d?.templates?.find((x: { id: string }) => x.id === id) ?? null;
@@ -76,7 +90,7 @@ function Compose() {
    setPieceCount(t.design === "grid" ? 4 : t.design === "photo" ? 2 : 3);
   }).catch(() => {});
   fetch("/api/store/campaign").then((r) => (r.ok ? r.json() : null))
-   .then((d) => setCount(d?.recipientCount ?? 0)).catch(() => {});
+   .then((d) => { setCount(d?.recipientCount ?? 0); setAllowance(d?.allowance ?? null); }).catch(() => {});
   fetch("/api/store/campaign/pieces").then((r) => (r.ok ? r.json() : null))
    .then((d) => setPieces(d?.pieces ?? [])).catch(() => {});
  }, [params]);
@@ -97,11 +111,11 @@ function Compose() {
   const body = [headline, subhead].filter(Boolean).join("\n");
   const r = await fetch("/api/store/campaign", {
    method: "POST", headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ subject, body, link, test }),
+   body: JSON.stringify({ subject, body, link, test, scheduledAt: !test && sendAt ? new Date(sendAt).toISOString() : undefined }),
   }).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
   setSending(false);
   setNote(r?.ok
-   ? { text: test ? "Test sent to you." : `Sent to ${count.toLocaleString()}.`, tone: "ok" }
+   ? { text: test ? "Test sent to you." : r.d?.scheduled ? "Scheduled. You'll find it under Your emails." : `Sent to ${count.toLocaleString()}.`, tone: "ok" }
    : { text: r?.d?.error || "Couldn't send that.", tone: "err" });
  }
 
@@ -147,7 +161,7 @@ function Compose() {
      </TechCard>
 
      <TechCard className="flex flex-col gap-4 p-5">
-      <Field label="Button" hint="Leave the address blank to send people to your shop.">
+      <Field label="Button" hint="Where the button takes people. Leave it blank and it goes to your shop.">
        <input className={input} value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Shop now" />
       </Field>
       <input className={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://yourshop.com/new" />
@@ -236,13 +250,22 @@ function Compose() {
           {note.tone === "ok" ? <Check size={14} /> : <AlertCircle size={14} />}{note.text}
          </span>
         ) : (
-         <span className="text-stone-400">Send one to yourself first.</span>
+         <span className="text-stone-400">{allowance?.label || "Send one to yourself first."}</span>
         )}
        </span>
        <span className="flex items-center gap-2">
+        <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+         <span className="whitespace-nowrap">Send later</span>
+         <input
+          type="datetime-local"
+          value={sendAt}
+          onChange={(e) => setSendAt(e.target.value)}
+          className="rounded-lg border border-stone-200 px-2 py-1.5 text-[12.5px] outline-none focus:border-stone-400"
+         />
+        </label>
         <TechButton variant="secondary" onClick={() => send(true)} disabled={sending || !ready}>Send test to myself</TechButton>
-        <TechButton onClick={() => send(false)} disabled={sending || !ready || !count}>
-         <Send size={14} />{sending ? "Sending…" : `Send to ${count.toLocaleString()}`}
+        <TechButton onClick={() => send(false)} disabled={sending || !ready || !count || allowance?.canSend === false} title={allowance?.reason ?? undefined}>
+         <Send size={14} />{sending ? "Sending…" : sendAt ? "Schedule it" : `Send to ${count.toLocaleString()}`}
         </TechButton>
        </span>
       </div>

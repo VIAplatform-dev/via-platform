@@ -76,6 +76,7 @@ export async function sendNewListingsDigest(storeSlug: string, newItems: NewList
  // A test send is still allowed: the seller asked for that one specifically.
  if (!testRecipient && !(await vyaSends(storeSlug, "new-arrivals"))) return null;
 
+
  // Link each piece to its storefront product page when the store has a live storefront; else the
  // store's own site, else VYA.
  const sf = await getStorefrontBySlug(storeSlug).catch(() => null);
@@ -90,6 +91,21 @@ export async function sendNewListingsDigest(storeSlug: string, newItems: NewList
  // pieces just landed. Shop them before they're gone." — which is a voice most stores wouldn't pick.
  const count = newItems.length;
  const intro = custom[0]?.body?.trim() || `${count} new ${count === 1 ? "piece" : "pieces"} just landed.`;
+ // New arrivals is NOT an automatic email any more.
+ //
+ // The others fire because a shopper did something — she bought, she abandoned a basket, she signed
+ // up — and the message is about that. "Here are four new pieces" is a shop deciding to advertise,
+ // and which four, and how it reads, are the seller's call. Sending it unattended meant a store
+ // could email its whole list without ever seeing what went out.
+ //
+ // It's now a DRAFT she finds waiting on the Emails page, with the pieces already in it. A test
+ // send still goes straight out, because that's a request, not an automation.
+ if (!testRecipient) {
+  const { draftNewArrivals } = await import("./new-arrivals-draft");
+  await draftNewArrivals(storeSlug, { subject, intro, count: products.length }).catch(() => {});
+  return null;
+ }
+
  const r = await sendStoreNewArrivals({ storeName: fromName, storeEmail: replyTo, fromAddress, subject, intro, products, shopUrl, recipients, brand }).catch(() => null);
  return r ? { sent: r.sent } : null;
 }

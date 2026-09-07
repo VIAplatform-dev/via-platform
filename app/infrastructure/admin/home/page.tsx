@@ -262,7 +262,10 @@ export default function WorkspaceHome() {
  </div>
  <div className="flex items-center gap-2.5">
  <SegmentedControl options={["Today", "7d", "30d", "90d"]} value={period} onChange={setPeriod} />
- <button onClick={() => setChatMode(true)} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-[7px] text-[13px] font-medium text-stone-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent-ink)]">
+ {/* Open the assistant where she is, rather than replacing the page she's reading.
+     Taking over the screen to ask a question means losing the numbers you were asking about —
+     the panel already supports this via the `vya:ask` event the rest of the app uses. */}
+ <button onClick={() => window.dispatchEvent(new CustomEvent("vya:ask"))} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-[7px] text-[13px] font-medium text-stone-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent-ink)]">
  <Sparkles size={14} className="text-[var(--accent)]" /> Ask VYA
  </button>
  </div>

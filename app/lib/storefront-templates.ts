@@ -890,9 +890,11 @@ const AUTHORED_TEMPLATES: StorefrontTemplate[] = [
 // AUTHORED_TEMPLATES here — that is the whole switch.
 export const STOREFRONT_TEMPLATES: StorefrontTemplate[] = AUTHORED_TEMPLATES.map((t) => ({
  ...t,
- layout: placeholderBlocks(t.layout),
- shop: placeholderBlocks(t.shop || []),
- pages: (t.pages || []).map((pg) => ({ ...pg, blocks: placeholderBlocks(pg.blocks) })),
+ layout: placeholderBlocks(t.layout, "home"),
+ shop: placeholderBlocks(t.shop || [], "shop"),
+ // The page's own slug goes in, so a text block on Shipping is headed "Shipping & returns" rather
+ // than "About us" — see PAGE_COPY in storefront-placeholder-copy.
+ pages: (t.pages || []).map((pg) => ({ ...pg, blocks: placeholderBlocks(pg.blocks, pg.slug) })),
 }));
 
 /**

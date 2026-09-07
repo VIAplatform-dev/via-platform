@@ -12,7 +12,10 @@ function db() {
  return neon(url);
 }
 
-export type CampaignStatus = "scheduled" | "sending" | "sent" | "failed" | "canceled";
+// "draft" is a campaign PREPARED for the seller but not committed to — new arrivals gathers her
+// pieces and leaves one here rather than sending behind her back. She opens it, changes it, and
+// decides. Nothing schedules or sends a draft on its own.
+export type CampaignStatus = "draft" | "scheduled" | "sending" | "sent" | "failed" | "canceled";
 export type Campaign = {
  id: number;
  subject: string;
@@ -160,4 +163,18 @@ export async function sendDueCampaigns(now: Date): Promise<{ sent: number; recip
  }
  }
  return { sent, recipients, failed };
+}
+
+/**
+ * Campaigns actually SENT since a date.
+ *
+ * Counted from what went out, never from drafts — otherwise deleting a draft would buy another
+ * send. Scheduled-but-unsent ones are excluded for the same reason: nothing has reached anyone yet.
+ */
+export async function countCampaignsSent(storeSlug: string, since: Date): Promise<number> {
+ await ensureTable();
+ const rows = (await db()`SELECT count(*)::int AS n FROM store_campaigns
+  WHERE store_slug = ${storeSlug} AND status = 'sent'
+  AND COALESCE(sent_at, created_at) >= ${since.toISOString()}`.catch(() => [{ n: 0 }])) as Array<{ n: number }>;
+ return rows[0]?.n ?? 0;
 }

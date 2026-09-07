@@ -5,6 +5,8 @@ import { listSellerOrders } from "@/app/lib/db/orders";
 import { listSellerItems } from "@/app/lib/db/inventory";
 import { listCustomerProfiles } from "@/app/lib/store-customers-db";
 import { listConsignors } from "@/app/lib/consignment-db";
+import { listCollections } from "@/app/lib/db/collections";
+import { listDiscounts } from "@/app/lib/store-discounts-db";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +23,15 @@ export async function GET(request: NextRequest) {
  if (q.length < 1) return NextResponse.json({ ok: true, groups: [] });
 
  const seller = await getSellerBySlug(slug).catch(() => null);
- const [orders, items, customers, consignors] = await Promise.all([
+ const [orders, items, customers, consignors, collections, discounts] = await Promise.all([
  seller ? listSellerOrders(seller.id).catch(() => []) : [],
  seller ? listSellerItems(seller.id).catch(() => []) : [],
  listCustomerProfiles(slug).catch(() => []),
  listConsignors(slug).catch(() => []),
+ // A seller searching "summer" means her collection, and "SPRING10" means her discount code.
+ // Neither was searchable, so both returned nothing at all.
+ seller ? listCollections(seller.id, true).catch(() => []) : [],
+ listDiscounts(slug).catch(() => []),
  ]);
 
  const has = (s: string) => s.toLowerCase().includes(q);
@@ -51,11 +57,33 @@ export async function GET(request: NextRequest) {
  .slice(0, 6)
  .map((c) => ({ id: String(c.id), label: c.name, sub: [c.email, c.status].filter(Boolean).join(" · "), href: `${B}/consignment/consignors` }));
 
+ const collectionHits: Hit[] = collections
+ .filter((c) => has(String(c.title || "")))
+ .slice(0, 5)
+ .map((c) => ({
+  id: String(c.id),
+  label: String(c.title),
+  sub: `${c.itemCount} piece${c.itemCount === 1 ? "" : "s"}`,
+  href: `${B}/inventory/collections`,
+ }));
+
+ const discountHits: Hit[] = discounts
+ .filter((d) => has(`${d.code || ""} ${d.label || ""}`))
+ .slice(0, 5)
+ .map((d) => ({
+  id: String(d.code),
+  label: String(d.code),
+  sub: [d.label, d.active ? null : "off"].filter(Boolean).join(" · ") || "discount code",
+  href: `${B}/discounts`,
+ }));
+
  const groups = [
  { group: "Orders", hits: orderHits },
  { group: "Inventory", hits: itemHits },
+ { group: "Collections", hits: collectionHits },
  { group: "Customers", hits: custHits },
  { group: "Consignors", hits: consHits },
+ { group: "Discounts", hits: discountHits },
  ].filter((g) => g.hits.length > 0);
 
  return NextResponse.json({ ok: true, groups });

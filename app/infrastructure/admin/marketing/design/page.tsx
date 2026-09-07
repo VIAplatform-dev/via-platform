@@ -153,9 +153,6 @@ export default function EmailDesignPage() {
  />
 
  <div className="mb-4 flex flex-wrap items-center gap-3">
- <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium ring-1 ${custom ? "bg-[var(--accent-soft,#eafaf3)] text-[var(--accent-ink,#0b7a5c)] ring-[var(--accent,#0e9f76)]/20" : "bg-stone-100 text-stone-500 ring-stone-200"}`}>
- {custom ? "Custom email design" : "Inheriting your storefront brand"}
- </span>
  {note && <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--accent-ink,#0b7a5c)]"><Check size={14} />{note}</span>}
  </div>
 
@@ -165,7 +162,7 @@ export default function EmailDesignPage() {
  <div className="mb-2 flex flex-wrap items-center gap-2">
  <SectionLabel>Preview</SectionLabel>
  <div className="ml-auto flex gap-1">
- {([["automated", "Automatic emails"], ["campaign", "A campaign you write"]] as const).map(([k, label]) => (
+ {([["automated", "Sent automatically"], ["campaign", "Written by you"]] as const).map(([k, label]) => (
  <button
  key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k}
  className={cn("rounded-full px-2.5 py-1 text-[11.5px] transition",

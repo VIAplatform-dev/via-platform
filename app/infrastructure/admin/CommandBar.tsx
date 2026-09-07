@@ -6,6 +6,8 @@ import { Search, CornerDownLeft } from "lucide-react";
 import { cn } from "./ui";
 
 const B = "/admin";
+import { SETTINGS_SECTIONS } from "./settings/sections";
+
 type Hit = { id: string; label: string; sub?: string; href: string };
 type Group = { group: string; hits: Hit[] };
 
@@ -26,6 +28,34 @@ const PAGES: Hit[] = [
  { id: "p-an", label: "Analytics", href: `${B}/dashboard` },
  { id: "p-trends", label: "Trends", href: `${B}/trends` },
  { id: "p-set", label: "Settings", href: `${B}/settings` },
+ // Everything the sidebar can reach should be reachable here too. Rentals and Appointments were
+ // both missing entirely — a seller typing the name of a section she can see in the sidebar got
+ // "no results", which reads as the feature not existing.
+ { id: "p-rentals", label: "Rentals", sub: "bookings, returns, rental queue", href: `${B}/rentals` },
+ { id: "p-appts", label: "Appointments", sub: "your schedule, fittings, collections, bookings", href: `${B}/appointments` },
+ { id: "p-drafts", label: "Drafts", sub: "unpublished listings", href: `${B}/inventory/drafts` },
+ { id: "p-sold", label: "Sold", sub: "past sales", href: `${B}/inventory/sold` },
+ { id: "p-collections", label: "Collections", sub: "group pieces together", href: `${B}/inventory/collections` },
+ { id: "p-bulk", label: "Bulk upload", sub: "many photos at once", href: `${B}/bulk-upload` },
+ { id: "p-import", label: "Bring your site", sub: "import an existing website", href: `${B}/import` },
+ { id: "p-emails", label: "Your emails", sub: "everything your shop sends, drafts, scheduled", href: `${B}/marketing/emails` },
+ { id: "p-campaigns", label: "Campaigns", sub: "write and send an email", href: `${B}/marketing/campaigns` },
+ { id: "p-emaildesign", label: "Email design", sub: "logo, colours and fonts for your emails", href: `${B}/marketing/design` },
+ { id: "p-automations", label: "Automations", sub: "emails that send on their own", href: `${B}/marketing/automations` },
+ { id: "p-sharelinks", label: "Share links", sub: "links for social media", href: `${B}/marketing/share-links` },
+ { id: "p-instagram", label: "Instagram", href: `${B}/marketing/instagram` },
+ { id: "p-esp", label: "Klaviyo & Mailchimp", sub: "connect your email tool", href: `${B}/apps/email` },
+ { id: "p-recovery", label: "Cart recovery", sub: "people who didn't finish checkout", href: `${B}/customers/recovery` },
+ { id: "p-marketplaces", label: "Marketplaces", sub: "depop, ebay, vestiaire cross-listing", href: `${B}/cross-listing/settings` },
+ // Every settings section, taken from the ONE list the rail and the landing page already share —
+ // so a section added there is searchable the same day rather than whenever someone remembers this
+ // file. Twenty sections were invisible to search: typing "tax" or "shipping" found nothing.
+ ...SETTINGS_SECTIONS.filter((x) => !x.vyaOnly).map((x) => ({
+  id: `s-${x.href}`,
+  label: x.label,
+  sub: `settings · ${x.blurb}`,
+  href: x.href,
+ })),
 ];
 const ACTIONS: Hit[] = [
  { id: "a-new", label: "New listing", sub: "Add an item", href: `${B}/add-listing` },

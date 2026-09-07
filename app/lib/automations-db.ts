@@ -41,7 +41,9 @@ async function ensureTable() {
 // genuinely store-scoped version exists.
 export const BUILTIN_AUTOMATIONS: { key: string; name: string; body: string; cadence: string }[] = [
  { key: "abandoned_cart", name: "Abandoned cart", body: "Nudges a shopper who added to cart but didn’t check out — with the item and a link back.", cadence: "Within a day of drop-off" },
- { key: "new_arrivals", name: "New arrivals", body: "Emails your audience when you publish fresh pieces, so your best customers see them first.", cadence: "On a new drop" },
+ // New arrivals no longer SENDS on its own — it prepares a draft with the new pieces in it and
+ // leaves it on the Emails page for the seller. Which pieces go out, and how it reads, is hers.
+ { key: "new_arrivals", name: "New arrivals", body: "Gathers the pieces you've just published into a draft email, ready for you to check and send.", cadence: "Drafted on a new drop — you send it" },
 ];
 export const CUSTOM_TRIGGERS: { value: string; label: string }[] = [
  { value: "new_listing", label: "When I publish a new listing" },

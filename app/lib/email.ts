@@ -99,7 +99,12 @@ export async function sendStoreOwnerAlert(
   if (!process.env.RESEND_API_KEY) return false;
   await getResend().emails.send({
    from: FROM_EMAIL,
-   to: routableEmail(opts.to) || (await storeOwnerInbox(storeSlug)),
+   // `to` may be several addresses, comma-separated — a shop is rarely one person. Each is checked
+   // for routability on its own, so one placeholder address can't silence the alert for everyone.
+   to: (() => {
+    const many = String(opts.to || "").split(/[,;\s]+/).map((e) => routableEmail(e.trim())).filter(Boolean) as string[];
+    return many.length ? many : null;
+   })() || (await storeOwnerInbox(storeSlug)),
    subject: opts.subject,
    html: opts.html,
   });

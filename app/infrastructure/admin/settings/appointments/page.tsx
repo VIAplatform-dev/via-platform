@@ -56,6 +56,45 @@ function Card({ title, blurb, children }: { title: string; blurb?: string; child
  );
 }
 
+/**
+ * The kinds of visit a shop takes, as removable chips.
+ *
+ * Enter or a comma commits one. Backspace on an empty box removes the last, which is what anyone who
+ * has used a tag field expects and costs nothing to support.
+ */
+function TypeChips({ values, onChange }: { values: string[]; onChange: (v: string[]) => void }) {
+ const [draft, setDraft] = useState("");
+ const add = (raw: string) => {
+  const t = raw.trim().replace(/,+$/, "").slice(0, 40);
+  // Case-insensitive, because "Try-on" and "try-on" are one option to a shopper.
+  if (!t || values.some((v) => v.toLowerCase() === t.toLowerCase())) { setDraft(""); return; }
+  onChange([...values, t].slice(0, 8));
+  setDraft("");
+ };
+ return (
+  <div className="flex w-72 flex-wrap items-center gap-1.5 rounded-lg border border-stone-200 p-1.5 focus-within:border-stone-400">
+   {values.map((t) => (
+    <span key={t} className="inline-flex items-center gap-1 rounded-full bg-stone-100 py-1 pl-2.5 pr-1.5 text-[12.5px] text-stone-700">
+     {t}
+     <button type="button" onClick={() => onChange(values.filter((v) => v !== t))}
+      aria-label={`Remove ${t}`} className="grid h-4 w-4 place-items-center rounded-full text-stone-400 hover:bg-stone-200 hover:text-stone-700">×</button>
+    </span>
+   ))}
+   <input
+    value={draft}
+    onChange={(e) => (e.target.value.includes(",") ? add(e.target.value) : setDraft(e.target.value))}
+    onKeyDown={(e) => {
+     if (e.key === "Enter") { e.preventDefault(); add(draft); }
+     if (e.key === "Backspace" && !draft && values.length) onChange(values.slice(0, -1));
+    }}
+    onBlur={() => add(draft)}
+    placeholder={values.length ? "" : "Try-on"}
+    className="min-w-[70px] flex-1 bg-transparent px-1 py-1 text-[13.5px] outline-none"
+   />
+  </div>
+ );
+}
+
 export default function AppointmentSettingsPage() {
  const [s, setS] = useState<AppointmentSettings | null>(null);
  const [warnings, setWarnings] = useState<Warning[]>([]);
@@ -111,7 +150,7 @@ export default function AppointmentSettingsPage() {
    <AdminHeader
     eyebrow="Settings"
     title="Appointments"
-    subtitle="Let people book a time with you for fittings, collections or sourcing chats. You set the hours. You don’t need to rent anything to use this."
+    subtitle="Let people book a time with you."
     actions={
      <div className="flex items-center gap-3">
       {saved && <StatusPill tone="live" dot>Saved</StatusPill>}
@@ -147,7 +186,7 @@ export default function AppointmentSettingsPage() {
      </div>
     )}
 
-    <Card title="Already use Calendly?" blurb="Paste your link and we'll use that instead. Everything below is then ignored.">
+    <Card title="Use your own calendar" blurb="If you'd rather use a calendar you already have, paste your link here and we'll use that instead. Everything below is then ignored.">
      <Row label="Booking link" hint="Works with Calendly, Cal.com, Acuity, Google appointment schedules, or any booking page you already use.">
       <input
        value={s.bookingUrl ?? ""}
@@ -210,10 +249,10 @@ export default function AppointmentSettingsPage() {
      </Card>
 
      <Card title="How long each appointment is">
-      <Row label="How long is an appointment" hint="Each appointment lasts this long, and the last one has to finish before you close.">
+      <Row label="How long is an appointment" hint="Every appointment is this long. The last one of the day has to finish before you close.">
        <Num value={s.slotMinutes} onChange={(v) => set("slotMinutes", Math.max(5, Math.round(Number(v) || 0)))} suffix="minutes" />
       </Row>
-      <Row label="How many at once" hint="How many people can book the same time. Two fitting rooms means two.">
+      <Row label="How many at once" hint="How many people can book the same time.">
        <Num value={s.slotCapacity} onChange={(v) => set("slotCapacity", Math.max(1, Math.round(Number(v) || 0)))} suffix="at a time" width="w-16" />
       </Row>
       <Row label="Notice needed" hint="Set in hours, so you can require notice on the same day. 0 means someone can book the next free slot.">
@@ -225,13 +264,12 @@ export default function AppointmentSettingsPage() {
      </Card>
 
      <Card title="What people can book">
-      <Row label="Types" hint="The options someone picks from when booking. Add one for each kind of visit you take.">
-       <input
-        value={s.types.join(", ")}
-        onChange={(e) => set("types", e.target.value.split(",").map((t) => t.trim()).filter(Boolean))}
-        placeholder="Try-on, Pickup, Return"
-        className="w-72 rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
-       />
+      {/* Chips, not a comma-separated string.
+          "Try-on, Pickup" in a text box asks a seller to know that the comma is the separator, and
+          gives her no way to see that she's made three options rather than one long one. Each is
+          now a thing she can see and remove. */}
+      <Row label="Types" hint="What someone picks from when booking. Add one for each kind of visit you take.">
+       <TypeChips values={s.types} onChange={(v) => set("types", v)} />
       </Row>
       <Row
        label="Confirm each booking yourself"
@@ -279,7 +317,7 @@ export default function AppointmentSettingsPage() {
        <Toggle on={s.notifyOnBooking} onClick={() => set("notifyOnBooking", !s.notifyOnBooking)} />
       </Row>
       {s.notifyOnBooking && (
-       <Row label="Send those to" hint={notifyTo ? `Now going to ${notifyTo}. Leave empty to keep using that.` : "Leave empty to use the address you already send from."}>
+       <Row label="Send those to" hint={notifyTo ? `Now going to ${notifyTo}. Add more addresses separated by commas, or leave empty to keep using that.` : "One address, or several separated by commas. Leave empty to use the address you already send from."}>
         <input
          value={s.notifyEmail ?? ""}
          onChange={(e) => set("notifyEmail", e.target.value.trim() || null)}
@@ -288,7 +326,7 @@ export default function AppointmentSettingsPage() {
         />
        </Row>
       )}
-      <Row label="Remind them before" hint="How many hours before the appointment to send it. 24 is the day before. 0 sends nothing.">
+      <Row label="Remind them before" hint="How long before their appointment to send the reminder. 24 hours is the day before. 0 sends no reminder at all.">
        <Num value={s.reminderHours} onChange={(v) => set("reminderHours", Math.max(0, Math.round(Number(v) || 0)))} suffix="hours before" />
       </Row>
       <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">

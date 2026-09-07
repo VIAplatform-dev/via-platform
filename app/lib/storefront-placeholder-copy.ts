@@ -27,6 +27,9 @@ const HEADING: Record<string, string> = {
  blog: "From the journal",
  faq: "Frequently asked questions",
  columns: "Why shop with us",
+ // A generic heading, used only when the PAGE doesn't tell us better — see PAGE_COPY. On a
+ // Shipping or Condition Scale page, "About us" is simply wrong, and it was appearing there
+ // because copy was keyed by block type alone.
  text: "About us",
  split: "Our story",
  spotlight: "This week's piece",
@@ -126,7 +129,75 @@ const qaMatch = (k: string) => /^([qa])(\d+)$/.exec(k);
  * A field only changes if the template actually authored something there — an empty field stays
  * empty, so a layout that deliberately omits a subtext doesn't suddenly grow one.
  */
-export function placeholderProps(type: string, props: Record<string, string> | undefined, seed = 0): Record<string, string> | undefined {
+/**
+ * What a generic block should say, given the page it's on.
+ *
+ * Copy was keyed by BLOCK TYPE alone, which is right for a home page and wrong everywhere else: a
+ * text block on Shipping was headed "About us", and so was one on Condition Scale. A template page
+ * exists to say something specific, and its placeholder should say the same specific thing.
+ *
+ * Matched on the page slug, so a template can add a page and get sensible words without touching
+ * this file — anything unmatched falls back to the generic heading, which is the old behaviour.
+ */
+const PAGE_COPY: { match: RegExp; heading: Record<string, string>; body?: Record<string, string> }[] = [
+ {
+  match: /^(about|our-story|story|philosophy)$/,
+  heading: { text: "About us", split: "Our story" },
+ },
+ {
+  match: /^(shipping|delivery|returns|shipping-returns)$/,
+  heading: { text: "Shipping & returns", split: "How we post", faq: "Shipping questions" },
+  body: { text: "How long orders take, what postage costs, and what happens if something needs to come back." },
+ },
+ {
+  match: /^(authenticity|authentication|verified)$/,
+  heading: { text: "How we check", split: "How we check", columns: "What we look at" },
+  body: { text: "What you do before a piece is listed, and what you say when you can't be certain." },
+ },
+ {
+  match: /^(condition|condition-scale|grading)$/,
+  heading: { text: "How we grade condition", split: "How we grade condition", faq: "What each grade means" },
+  body: { text: "The words you use on every listing, and what each one means. Buyers rely on these being consistent." },
+ },
+ {
+  match: /^(sizing|fit|measurements)$/,
+  heading: { text: "How we measure", split: "How we measure" },
+  body: { text: "How you take measurements and how a buyer should compare them to something they own." },
+ },
+ {
+  match: /^(consign|sell-to-us|sell|sourcing-requests)$/,
+  heading: { text: "Sell with us", split: "Sell with us", columns: "How it works" },
+  body: { text: "What you take, how you price it, and what a seller can expect to be paid." },
+ },
+ {
+  match: /^(visit|store|location|events)$/,
+  heading: { text: "Come and see us", split: "Where to find us" },
+  body: { text: "Where you are, when you're open, and what someone should expect when they visit." },
+ },
+ {
+  match: /^(faq|questions|help)$/,
+  heading: { text: "Questions", faq: "Frequently asked questions" },
+ },
+ {
+  match: /^(contact|get-in-touch)$/,
+  heading: { text: "Get in touch", contact: "Get in touch" },
+  body: { text: "How to reach you, and how long you usually take to reply." },
+ },
+ {
+  match: /^(journal|blog|notes|the-edits|drop-archive|how-drops-work)$/,
+  heading: { text: "From the journal", split: "From the journal" },
+  body: { text: "A short note about what you write here and how often." },
+ },
+];
+
+function pageOverride(page: string | undefined, type: string, field: "heading" | "body"): string | undefined {
+ const slug = String(page || "").toLowerCase().trim();
+ if (!slug) return undefined;
+ const hit = PAGE_COPY.find((p) => p.match.test(slug));
+ return hit?.[field]?.[type];
+}
+
+export function placeholderProps(type: string, props: Record<string, string> | undefined, seed = 0, page?: string): Record<string, string> | undefined {
  if (!props) return props;
  const out = { ...props };
  for (const k of Object.keys(out)) {
@@ -162,17 +233,25 @@ export function placeholderProps(type: string, props: Record<string, string> | u
   if (!CONTENT_KEYS.has(k)) continue;
 
   if (k === "items") { out[k] = withItemImages(type, ITEMS[type] ?? v, seed); continue; }
-  if (k === "heading") { const h = HEADING[type]; if (h !== undefined) out[k] = h; continue; }
+  if (k === "heading") {
+   const h = pageOverride(page, type, "heading") ?? HEADING[type];
+   if (h !== undefined) out[k] = h;
+   continue;
+  }
   if (k === "subtext") { const t = SUBTEXT[type]; if (t !== undefined) out[k] = t; continue; }
-  if (k === "body") { const b = BODY[type]; out[k] = b !== undefined ? b : BODY.text; continue; }
+  if (k === "body") {
+   const b = pageOverride(page, type, "body") ?? BODY[type];
+   out[k] = b !== undefined ? b : BODY.text;
+   continue;
+  }
   if (SIMPLE[k] !== undefined) out[k] = SIMPLE[k];
  }
  return out;
 }
 
 /** Apply the placeholder copy to every block in a list. */
-export function placeholderBlocks<T extends { type?: string; props?: Record<string, string> }>(blocks: T[]): T[] {
+export function placeholderBlocks<T extends { type?: string; props?: Record<string, string> }>(blocks: T[], page?: string): T[] {
  // Seeded by position so consecutive sections don't all show the same photograph, and so the same
  // template always produces the same page.
- return (blocks || []).map((b, i) => ({ ...b, props: placeholderProps(b.type || "", b.props, i * 3) }));
+ return (blocks || []).map((b, i) => ({ ...b, props: placeholderProps(b.type || "", b.props, i * 3, page) }));
 }

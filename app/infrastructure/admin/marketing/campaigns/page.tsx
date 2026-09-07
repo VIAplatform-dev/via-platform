@@ -12,7 +12,7 @@ export default function CampaignsPage() {
  const [subject, setSubject] = useState("");
  const [msg, setMsg] = useState("");
  const [link, setLink] = useState("");
- const [camp, setCamp] = useState<{ recipientCount: number; storeEmail: string | null; storeName?: string; audience?: { subscribers: number; unsubscribed: number; buyers: number; imported: number; total: number } } | null>(null);
+ const [camp, setCamp] = useState<{ recipientCount: number; storeEmail: string | null; storeName?: string; audience?: { subscribers: number; unsubscribed: number; buyers: number; imported: number; total: number }; allowance?: { label: string; canSend: boolean; reason: string | null } } | null>(null);
  const [sending, setSending] = useState(false);
  const [campMsg, setCampMsg] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
 
@@ -74,7 +74,7 @@ export default function CampaignsPage() {
  placeholder={"Hi! We just added a few new pieces we think you’ll love…\n\nSelect any text to make it a heading, bold, or a list with the toolbar above."} />
  </div>
 
- <Field label="“Shop now” button" hint="Where the button at the bottom of the email sends people. Leave blank to point at your store.">
+ <Field label="“Shop now” button" hint="Where the button takes people. Leave it blank and it goes to your shop.">
  <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://yourstore.com/new-arrivals" />
  </Field>
  </div>
@@ -87,12 +87,14 @@ export default function CampaignsPage() {
  {campMsg.tone === "ok" ? <Check size={14} /> : <AlertCircle size={14} />}{campMsg.text}
  </span>
  ) : (
- <span className="text-stone-400">Send a test to yourself first — links are tagged so opens &amp; clicks show up in Analytics.</span>
+ <span className="text-stone-400">
+ {camp?.allowance?.label || "Send a test to yourself first — links are tagged so opens & clicks show up in Analytics."}
+</span>
  )}
  </div>
  <div className="flex items-center gap-2">
  <TechButton variant="secondary" onClick={() => send(true)} disabled={sending || !ready}>Send test to myself</TechButton>
- <TechButton onClick={() => send(false)} disabled={sending || !ready || !count}>
+ <TechButton onClick={() => send(false)} disabled={sending || !ready || !count || camp?.allowance?.canSend === false} title={camp?.allowance?.reason ?? undefined}>
  <Send size={14} />{sending ? "Sending…" : `Send to ${count.toLocaleString()}`}
  </TechButton>
  </div>

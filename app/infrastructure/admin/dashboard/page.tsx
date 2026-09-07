@@ -695,7 +695,7 @@ function Analytics() {
         <Kpi label="Revenue" value={money(sales.current.gmvCents)} delta={sales.vsPrior?.gmvPct} yoy={sales.vsYoy?.gmvPct} data={sales.series.length >= 2 ? sales.series.map((s) => s.cents) : undefined} />
         <Kpi label="Sales" value={num(sales.current.orders)} delta={sales.vsPrior?.ordersPct} yoy={sales.vsYoy?.ordersPct} />
         <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "—"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
-        <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} hint="sold ÷ sold + listed" />
+        <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} hint="how many of your pieces sold" />
        </div>
 
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -920,7 +920,7 @@ function Analytics() {
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Avg. listed" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "—"} hint={`median ${money(catalog.medianListedPriceCents)}`} />
         <Kpi label="Avg. sold" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "—"} hint={catalog.soldInPeriod ? `median ${money(catalog.medianSoldPriceCents)}` : undefined} delta={catalog.vsPrior?.avgSoldPricePct} />
-        <Kpi label="Realisation" value={pct(catalog.realisationPct)} hint="sold ÷ asking" />
+        <Kpi label="Realisation" value={pct(catalog.realisationPct)} hint="what pieces sold for, against what you asked" />
         <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} />
        </div>
 

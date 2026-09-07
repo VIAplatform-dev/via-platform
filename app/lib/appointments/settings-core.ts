@@ -89,6 +89,28 @@ export function windows(v: unknown): OpeningWindow[] {
 }
 
 /** Fold a stored blob onto the defaults. Bad values fall back rather than throw. */
+/**
+ * A list of addresses to notify, cleaned.
+ *
+ * A shop is rarely one person: the owner wants booking alerts and so does whoever is behind the
+ * counter that day. Anything that isn't an address is DROPPED rather than stored and silently
+ * ignored at send time — a typo that costs a shop its booking alerts goes unnoticed for a month.
+ * Five is a counter, not a mailing list.
+ */
+export function cleanEmailList(raw: unknown): string | null {
+ const parts = String(typeof raw === "string" ? raw : "")
+  .split(/[,;\s]+/)
+  .map((e) => e.trim().toLowerCase())
+  .filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
+ const unique = [...new Set(parts)].slice(0, 5);
+ return unique.length ? unique.join(", ") : null;
+}
+
+/** The addresses to actually send to. */
+export function notifyRecipients(notifyEmail: string | null | undefined): string[] {
+ return String(notifyEmail || "").split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean);
+}
+
 export function resolveAppointmentSettings(stored?: Partial<AppointmentSettings> | null): AppointmentSettings {
  const s = { ...DEFAULT_APPOINTMENT_SETTINGS, ...(stored || {}) } as Record<string, unknown>;
  const d = DEFAULT_APPOINTMENT_SETTINGS;
@@ -112,8 +134,10 @@ export function resolveAppointmentSettings(stored?: Partial<AppointmentSettings>
   embedBooking: bool(s.embedBooking, d.embedBooking),
   intro: typeof s.intro === "string" && s.intro.trim() ? s.intro.trim().slice(0, 600) : null,
   notifyOnBooking: bool(s.notifyOnBooking, d.notifyOnBooking),
-  notifyEmail: typeof s.notifyEmail === "string" && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s.notifyEmail.trim())
-   ? s.notifyEmail.trim().slice(0, 200) : null,
+  // One address or several, comma-separated. A shop is rarely one person: the owner wants these and
+  // so does whoever is actually behind the counter that day. Kept as a single string so the stored
+  // shape doesn't change, and split at send time.
+  notifyEmail: cleanEmailList(s.notifyEmail),
   // Capped at four weeks: past that it isn't a reminder, it's a second confirmation.
   reminderHours: count(s.reminderHours, d.reminderHours, 24 * 28),
  };

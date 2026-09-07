@@ -41,15 +41,15 @@ const TAB_LABEL: Record<Tab, string> = {
  today: "Pack today",
  upcoming: "Booked ahead",
  out: "Away",
- inspect: "Back to check",
+ inspect: "Returned",
  requests: "Requests",
 };
 /** One line under the row, so a tab never has to carry the whole explanation in two words. */
 const TAB_HINT: Record<Tab, string> = {
  today: "Going out today — pack these and get them posted or ready to collect.",
  upcoming: "Paid and dated, leaving another day. Nothing to do yet.",
- out: "With a customer right now. Anything past its return date is flagged above.",
- inspect: "Come back and waiting on you — check them over, then put them back on the rack.",
+ out: "With a customer right now. Anything past its return date is flagged.",
+ inspect: "Returned by the renter and waiting on you. Check them over, then put them back on the rack.",
  requests: "People asking to rent. Their dates are held while you decide, so answering frees the piece up.",
 };
 
@@ -309,7 +309,7 @@ export default function RentalsQueuePage() {
       tab === "today" ? "Nothing goes out today"
       : tab === "upcoming" ? "No rentals booked yet"
       : tab === "out" ? "Nothing is with a customer"
-      : "Nothing to check"
+      : "Nothing returned to check"
      }
      body={tab === "upcoming" ? "Bookings appear here as soon as they're paid for." : undefined}
     />
