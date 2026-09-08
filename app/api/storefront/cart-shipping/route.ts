@@ -5,7 +5,8 @@ import { getItem } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { emptyBagMessage } from "@/app/lib/storefront-cart-core";
-import { assignTier, flatRateCents } from "@/app/lib/shipping-tiers";
+import { assignTier } from "@/app/lib/shipping-tiers";
+import { quoteShipping } from "@/app/lib/shipping-zones";
 import { resolveDelivery } from "@/app/lib/checkout-delivery.ts";
 
 export const dynamic = "force-dynamic";
@@ -53,8 +54,11 @@ export async function POST(request: NextRequest) {
  };
  const tier = assignTier(parcel);
  // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
- // exactly what checkout charges. No live-rate lookup, so it never varies by distance or blocks a sale.
- const charge = flatRateCents(parcel);
+ // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
+ // (shipping-zones.ts + shipping-prices-core.ts). A collection needs no zone, so a country she
+ // doesn't post to is only refused once we know this is a delivery.
+ const quote = hasAddress ? quoteShipping({ fromCountry: shipping.shipFrom?.country || "US", toCountry: to.country || "US", parcel, zones: shipping.zones }) : null;
+ const charge = quote?.ok ? quote.amountCents : 0;
 
  // The one place the choice is priced: what she claimed, checked against what this store offers.
  // A claim of "pickup" at a store with no collection address comes back as a delivery, postage and
@@ -68,6 +72,7 @@ export async function POST(request: NextRequest) {
  }
  // She asked to collect somewhere that doesn't do it — she's being posted to, so we need the address.
  if (!hasAddress) return NextResponse.json({ error: "This store isn’t offering collection — a full address is required." }, { status: 400 });
+ if (quote && !quote.ok) return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
  if (d.shippingCents === 0) return NextResponse.json({ free: true, rates: [], delivery: "ship", pickupAvailable: d.pickupAvailable });
- return NextResponse.json({ free: false, delivery: "ship", pickupAvailable: d.pickupAvailable, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: d.shippingCents, estDays: null }] });
+ return NextResponse.json({ free: false, delivery: "ship", pickupAvailable: d.pickupAvailable, currency: items[0].currency, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: d.shippingCents, estDays: null }] });
 }

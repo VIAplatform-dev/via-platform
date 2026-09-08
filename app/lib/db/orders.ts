@@ -25,6 +25,12 @@ export type SellerOrderRow = {
  status: string;
  paidAt: Date | null;
  createdAt: Date | null;
+ /** The payment every piece bought together shares — the parcel key (app/lib/parcels-core.ts). */
+ paymentIntent: string | null;
+ labelUrl: string | null;
+ trackingNumber: string | null;
+ trackingUrl: string | null;
+ trackingEmailSentAt: Date | null;
 };
 
 /** A seller's orders (most recent first), with the item title joined in. */
@@ -47,12 +53,62 @@ export async function listSellerOrders(sellerId: string): Promise<SellerOrderRow
  status: orders.status,
  paidAt: orders.paidAt,
  createdAt: orders.createdAt,
+ paymentIntent: orders.stripePaymentIntent,
+ labelUrl: orders.labelUrl,
+ trackingNumber: orders.trackingNumber,
+ trackingUrl: orders.trackingUrl,
+ trackingEmailSentAt: orders.trackingEmailSentAt,
  })
  .from(orders)
  .leftJoin(items, eq(items.id, orders.itemId))
  .where(eq(orders.sellerId, sellerId))
  .orderBy(desc(orders.createdAt))
  .limit(200);
+}
+
+/**
+ * The pieces of one parcel — every order on one payment — with what the tracking email needs.
+ * Seller-scoped so a parcel can never be acted on across stores.
+ */
+export async function listParcelOrders(sellerId: string, pi: string) {
+ const db = getDb();
+ return db
+ .select({
+ id: orders.id, status: orders.status, itemTitle: items.title, buyerEmail: orders.buyerEmail,
+ trackingNumber: orders.trackingNumber, trackingUrl: orders.trackingUrl, trackingEmailSentAt: orders.trackingEmailSentAt,
+ })
+ .from(orders)
+ .leftJoin(items, eq(items.id, orders.itemId))
+ .where(and(eq(orders.sellerId, sellerId), eq(orders.stripePaymentIntent, pi)));
+}
+
+/**
+ * Mark a whole parcel posted in ONE statement — the closest the HTTP driver gets to a transaction,
+ * and enough: every piece flips or none does. Only pieces still "paid" move; the rest are left as
+ * they are. Returns the ids that changed.
+ */
+export async function markOrdersShipped(sellerId: string, orderIds: string[]): Promise<string[]> {
+ if (!orderIds.length) return [];
+ const rows = await getDb().update(orders)
+ .set({ status: "shipped", shippedAt: new Date() })
+ .where(and(eq(orders.sellerId, sellerId), inArray(orders.id, orderIds), eq(orders.status, "paid")))
+ .returning({ id: orders.id });
+ return rows.map((r) => String(r.id));
+}
+
+/** Delivered / collected for every piece of a parcel, one statement. Never touches a refund. */
+export async function markOrdersDelivered(sellerId: string, orderIds: string[]): Promise<string[]> {
+ if (!orderIds.length) return [];
+ const rows = await getDb().update(orders)
+ .set({ status: "delivered" })
+ .where(and(eq(orders.sellerId, sellerId), inArray(orders.id, orderIds), inArray(orders.status, ["paid", "shipped"])))
+ .returning({ id: orders.id });
+ return rows.map((r) => String(r.id));
+}
+
+export async function markTrackingEmailSentMany(orderIds: string[]): Promise<void> {
+ if (!orderIds.length) return;
+ await getDb().update(orders).set({ trackingEmailSentAt: new Date() }).where(inArray(orders.id, orderIds));
 }
 
 /**
@@ -324,6 +380,23 @@ export async function markOrderRefunded(orderId: string, refundAmountCents: numb
  await rawSql()`UPDATE orders SET status = 'refunded', refunded_at = now(), refund_amount_cents = ${refundAmountCents} WHERE id = ${orderId}`;
 }
 
+/**
+ * Claim an order for refunding: paid → refunded, atomically, so two taps on "Void" can't both refund
+ * at Stripe. True if THIS call won. Follow with markOrderRefunded (records when + how much) once the
+ * money has moved, or revertOrderRefundClaim if it didn't.
+ */
+export async function claimOrderRefund(orderId: string): Promise<boolean> {
+ await ensureRefundCols();
+ const rows = await rawSql()`UPDATE orders SET status = 'refunded' WHERE id = ${orderId} AND status = 'paid' RETURNING id`;
+ return rows.length > 0;
+}
+
+/** Undo a claim whose refund failed — only while nothing has been recorded against it. */
+export async function revertOrderRefundClaim(orderId: string): Promise<void> {
+ await ensureRefundCols();
+ await rawSql()`UPDATE orders SET status = 'paid' WHERE id = ${orderId} AND status = 'refunded' AND refunded_at IS NULL`;
+}
+
 /** Reverse the seller-payout ledger row(s) for a refunded order, so seller-net reporting stops
  *  counting a sale that was given back. Idempotent (only reverses rows not already reversed). */
 export async function reversePayoutForOrder(orderId: string): Promise<void> {
@@ -410,6 +483,29 @@ export async function listMarketOrders(sellerId: string, sessionId: string): Pro
  }));
 }
 
+/** One market sale with the columns a void needs (tender, session, payment) — null if not a market order. */
+export async function getMarketOrder(orderId: string): Promise<(MarketOrderRow & { sellerId: string; sessionId: string | null; refundedAt: string | null }) | null> {
+ await ensureMarketOrderCols();
+ await ensureRefundCols();
+ const rows = (await rawSql()`
+ SELECT o.id, o.seller_id, o.item_id, i.title, i.images, i.brand, i.category, o.amount_cents, o.list_price_cents, o.discount_cents, o.fee_cents, o.currency, o.status, o.tender,
+ o.stripe_payment_intent, o.market_checkout_id, o.market_session_id, o.paid_at, o.buyer_email, o.refunded_at
+ FROM orders o LEFT JOIN items i ON i.id = o.item_id
+ WHERE o.id = ${orderId} AND o.channel = 'market' LIMIT 1`) as Array<Record<string, unknown>>;
+ const r = rows[0];
+ if (!r) return null;
+ return {
+ id: String(r.id), sellerId: String(r.seller_id), itemId: String(r.item_id), itemTitle: (r.title as string) ?? null, itemBrand: (r.brand as string) ?? null, itemCategory: (r.category as string) ?? null,
+ itemImage: Array.isArray(r.images) && r.images.length ? String(r.images[0]) : null,
+ amountCents: Number(r.amount_cents), listPriceCents: r.list_price_cents == null ? null : Number(r.list_price_cents), discountCents: r.discount_cents == null ? null : Number(r.discount_cents),
+ feeCents: r.fee_cents == null ? null : Number(r.fee_cents), currency: String(r.currency),
+ status: String(r.status), tender: (r.tender as string) ?? null, stripePaymentIntent: (r.stripe_payment_intent as string) ?? null,
+ checkoutId: (r.market_checkout_id as string) ?? null, sessionId: (r.market_session_id as string) ?? null,
+ paidAt: r.paid_at ? new Date(r.paid_at as string).toISOString() : null, buyerEmail: (r.buyer_email as string) ?? null,
+ refundedAt: r.refunded_at ? new Date(r.refunded_at as string).toISOString() : null,
+ };
+}
+
 /** The orders a market checkout already produced (one per item) — for crash-safe retries. */
 export async function getOrdersByMarketCheckout(checkoutId: string): Promise<{ id: string; itemId: string }[]> {
  await ensureMarketOrderCols();
@@ -455,6 +551,15 @@ export async function listPickupOrderIds(sellerId: string): Promise<string[]> {
  const rows = (await rawSql()`SELECT id FROM orders WHERE seller_id = ${sellerId} AND delivery_method = 'pickup'`) as Array<{ id: string }>;
  return rows.map((r) => String(r.id));
  } catch { return []; }
+}
+
+/** Collections paid for and not yet handed over — someone is coming to the counter. */
+export async function countPickupsWaiting(sellerId: string): Promise<number> {
+ await ensurePickupOrderCols();
+ try {
+ const rows = (await rawSql()`SELECT count(*)::int AS n FROM orders WHERE seller_id = ${sellerId} AND delivery_method = 'pickup' AND status = 'paid'`) as Array<{ n: number }>;
+ return Number(rows[0]?.n ?? 0);
+ } catch { return 0; }
 }
 
 /** How one order leaves the shop. Read separately from getOrderDetail — these columns aren't in the drizzle schema. */

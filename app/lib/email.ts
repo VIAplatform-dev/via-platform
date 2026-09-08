@@ -3282,6 +3282,8 @@ export async function sendBuyerTrackingEmail(p: {
  buyerEmail: string;
  storeName: string;
  itemTitle: string;
+ /** Every piece in the parcel, when the buyer took more than one — one email per bag, not per piece. */
+ itemTitles?: string[];
  trackingNumber: string;
  trackingUrl?: string | null;
  orderId?: string | null;
@@ -3293,6 +3295,10 @@ export async function sendBuyerTrackingEmail(p: {
  const [sender, brand] = await Promise.all([resolveStoreSender(p.storeSlug), getStoreEmailBrand(p.storeSlug)]);
  const storeName = sender.fromName || p.storeName;
  const t = txnTokens(brand);
+ const titles = p.itemTitles && p.itemTitles.length > 1 ? p.itemTitles : [p.itemTitle];
+ const pieces = titles.length > 1
+ ? `<p style="font-size:13px;color:${t.muted};margin:0 0 6px;">${titles.length} pieces in one parcel</p>` + titles.map((x) => `<p style="font-size:15px;font-weight:700;color:${t.text};margin:0 0 4px;">${escapeHtml(x)}</p>`).join("")
+ : `<p style="font-size:15px;font-weight:700;color:${t.text};margin:0 0 8px;">${escapeHtml(p.itemTitle)}</p>`;
  const track = p.trackingUrl
  ? `<a href="${p.trackingUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Track your package →</a>`
  : "";
@@ -3301,8 +3307,8 @@ export async function sendBuyerTrackingEmail(p: {
  const content = `
  <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">Your order from ${escapeHtml(storeName)} is on its way. 📦</p>
  <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:20px 24px;margin:0 0 24px;">
- <p style="font-size:15px;font-weight:700;color:${t.text};margin:0 0 8px;">${p.itemTitle}</p>
- <p style="font-size:13px;color:${t.muted};margin:0;">Tracking: ${p.trackingNumber}</p>
+ ${pieces}
+ <p style="font-size:13px;color:${t.muted};margin:8px 0 0;">Tracking: ${escapeHtml(p.trackingNumber)}</p>
  </div>
  ${track}
  ${orderLink}

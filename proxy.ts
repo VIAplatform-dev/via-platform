@@ -98,9 +98,14 @@ const PUBLIC_ROUTES = [
   "/api/store/policy",
   "/api/store/intake",
   "/api/store/items",
+  "/api/store/holds",
+  "/api/store/attention",
+  "/api/store/notification-prefs",
+  "/api/store/search",
   "/api/store/inventory",
   "/api/store/instagram",
   "/api/store/orders",
+  "/api/store/orders/parcel",
   "/api/store/inbox",
   // Consignment enforces its own auth with resolveStoreSlugAny, exactly like orders and inbox
   // above. Without it here the mobile app's bearer token never reaches the route — the gate

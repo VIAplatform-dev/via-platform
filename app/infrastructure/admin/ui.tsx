@@ -125,9 +125,9 @@ const PILL: Record<PillTone, string> = {
  down: "bg-rose-50 text-rose-500",
  info: "bg-sky-50 text-sky-600",
 };
-export function StatusPill({ tone = "neutral", dot, children, className }: { tone?: PillTone; dot?: boolean; children: React.ReactNode; className?: string }) {
+export function StatusPill({ tone = "neutral", dot, children, className, title }: { tone?: PillTone; dot?: boolean; children: React.ReactNode; className?: string; title?: string }) {
  return (
- <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium", PILL[tone], className)}>
+ <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium", PILL[tone], className)} title={title}>
  {dot && <span className={cn("h-1.5 w-1.5 rounded-full", tone === "live" ? "bg-[var(--accent-bright,#2fd39b)]" : "bg-current opacity-70")} />}
  {children}
  </span>
@@ -302,7 +302,7 @@ export function TechEmpty({ icon, title, body, action, className }: { icon?: Rea
  {icon && <div className="mb-3 text-stone-300">{icon}</div>}
  <p className="text-[14px] font-medium text-stone-700">{title}</p>
  {body && <p className="mt-1 max-w-sm text-[13px] text-stone-500">{body}</p>}
- {action && <div className="mt-5">{action}</div>}
+ {action && <div className="mt-5 flex flex-wrap items-center justify-center gap-2">{action}</div>}
  </div>
  );
 }

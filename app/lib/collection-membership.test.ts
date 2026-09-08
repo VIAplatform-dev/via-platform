@@ -81,6 +81,12 @@ test("a store with more collections than we will ever read says so", async () =>
  const r = await readCollectionMembership(slugs, { fetchPage: fetch, wait: noWait, maxCollections: 3 });
  assert.equal(calls.length, 3);
  assert.deepEqual(r.notAttempted, ["c3", "c4"]);
+ // …and they count as UNREAD, not as read-and-empty. A caller uses `incomplete` to decide whose
+ // membership must be preserved rather than overwritten; a collection we never asked about is the
+ // clearest case there is. It was reported only to a console.log, so 2nd Street's 461 collections
+ // past the ceiling were indistinguishable from 461 collections she had emptied — and the pass
+ // that files membership would have unfiled every piece held in them.
+ assert.ok(r.incomplete.includes("c3") && r.incomplete.includes("c4"), "past the ceiling = unread");
 });
 
 test("a piece in two collections is recorded in both", async () => {
@@ -247,4 +253,37 @@ test("a product with no variants counts as unavailable, not as absent", () => {
   fetchPage: async (_s, page) => (page === 1 ? [{ handle: "a" }] : []),
   wait: async () => {},
  }).then((r) => assert.deepEqual(r.stock.get("x"), { unavailable: 1, total: 1 }));
+});
+
+test("a read that runs out of time stops cleanly and keeps what it got", async () => {
+ // Only the CRAWL was ever time-budgeted. This read had no clock at all: on 2nd Street's shop it
+ // ran for 25 minutes against 761 collections and returned nothing, because a throw — or an
+ // invocation killed at maxDuration — loses everything it had already read. Production caps a
+ // function at 300s, so on a store this size the step could never finish, ever.
+ //
+ // A deadline it stops AT is different from a timeout that kills it: the collections already read
+ // are kept and reported, and the rest are marked unread, which is what protects their existing
+ // membership from being overwritten.
+ const slugs = ["a", "b", "c", "d"];
+ const { fetch, calls } = store(Object.fromEntries(slugs.map((s) => [s, [["x-" + s]]])));
+ let now = 0;
+ const r = await readCollectionMembership(slugs, {
+  fetchPage: fetch,
+  wait: async (ms: number) => { now += ms; },
+  delayMs: 1000,
+  budgetMs: 2500,
+  clock: () => now,
+ });
+ assert.ok(calls.length < 4, `stopped early, read ${calls.length} of 4`);
+ assert.ok(r.membership.size > 0, "what it did read is kept");
+ // Everything it never got to is UNREAD, so their membership is preserved rather than emptied.
+ for (const s of slugs.slice(calls.length)) assert.ok(r.incomplete.includes(s), `${s} marked unread`);
+});
+
+test("no budget means no deadline — the read behaves exactly as it did", async () => {
+ const slugs = ["a", "b", "c"];
+ const { fetch, calls } = store(Object.fromEntries(slugs.map((s) => [s, [["x-" + s]]])));
+ const r = await readCollectionMembership(slugs, { fetchPage: fetch, wait: noWait });
+ assert.equal(calls.length, 3);
+ assert.deepEqual(r.incomplete, []);
 });

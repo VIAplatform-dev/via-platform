@@ -23,14 +23,20 @@ import { classifyScript } from "./scripts.ts";
 
 export type AssetPlan =
  | { action: "proxy"; url: string }
- /** Answered locally with a valid-but-empty body. `import()` of an empty ES module RESOLVES, so a
-  *  theme that lazily pulls in Shop Pay gets a silent no-op instead of an unhandled rejection. */
+ /** Answered locally with a valid-but-empty body — one that parses BOTH as an ES module and as a
+  *  classic script. `import()` of it resolves, so a theme lazily pulling in Shop Pay gets a silent
+  *  no-op rather than an unhandled rejection; and a plain `<script src>` runs it without error. */
  | { action: "inert"; contentType: string; body: string }
  | { action: "deny" };
 
 /** Content types we can safely fake. Anything else is denied rather than guessed at. */
 function inertFor(pathname: string): AssetPlan {
- if (/\.m?js$/i.test(pathname)) return { action: "inert", contentType: "text/javascript; charset=utf-8", body: "export {};\n" };
+ // A COMMENT, not `export {}`. Both are empty modules, but only one is also a valid CLASSIC
+ // script — and Shopify's own bootstrap injects trekkie and shop_events_listener as classic
+ // `<script src>` tags at runtime, where `export` is a syntax error. That threw
+ // "Uncaught SyntaxError: Unexpected token 'export'" on every page of every hosted store, from the
+ // stub we serve to keep those scripts quiet. An empty module still resolves on import().
+ if (/\.m?js$/i.test(pathname)) return { action: "inert", contentType: "text/javascript; charset=utf-8", body: "/* removed by VYA */\n" };
  if (/\.css$/i.test(pathname)) return { action: "inert", contentType: "text/css; charset=utf-8", body: "/* removed by VYA */\n" };
  if (/\.json$/i.test(pathname)) return { action: "inert", contentType: "application/json; charset=utf-8", body: "{}" };
  return { action: "deny" };

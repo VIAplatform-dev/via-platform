@@ -7,7 +7,7 @@
 // eyebrow are editable in all five.
 import { FreeField, productsFor, type EditKit, type BlockProduct, ArrangeHandle } from "./kit";
 import { featuredCount, autoColumns } from "@/app/lib/storefront-blocks";
-import { DEFAULT_WORDS } from "@/app/lib/storefront-words";
+import { DEFAULT_WORDS, type StorefrontWords } from "@/app/lib/storefront-words";
 
 // Composed layouts are built around an exact arrangement, so their capacity is a property of the
 // design rather than something a merchant sets. Named here so the number and the reason live together.
@@ -19,14 +19,28 @@ const MOSAIC_PIECES = 6;    // three alternating large/small pairs
 // The shared product card. Every layout draws its products with this, so hover behaviour, image
 // radius (.vya-round), and the title/price treatment stay identical across the family — only the
 // arrangement changes.
-function Card({ it, i, shopHref, accent, fg, ratio = "aspect-[4/5]" }: { it: BlockProduct; i: number; shopHref: string; accent: string; fg: string; ratio?: string }) {
+// The badge over a sold or held piece — the SAME words and marker the classic grid uses
+// (StorefrontView: `words.sold` / `words.held`, `data-vya-held` on a hold), so a store that shows a
+// held piece as "On hold" on its Shop page shows it that way on its homepage too. Nothing about the
+// link changes: the product page is what refuses the sale.
+function Badge({ it, words }: { it: BlockProduct; words?: StorefrontWords }) {
+ if (!it.sold && !it.held) return null;
+ return (
+  <div className="absolute inset-0 flex items-start justify-end p-2">
+   <span data-vya-held={it.held && !it.sold ? "1" : undefined} className="bg-black/80 px-2.5 py-1 text-[9px] uppercase tracking-[0.22em] text-white">{it.sold ? words?.sold || DEFAULT_WORDS.sold : words?.held || DEFAULT_WORDS.held}</span>
+  </div>
+ );
+}
+
+function Card({ it, i, shopHref, accent, fg, words, ratio = "aspect-[4/5]" }: { it: BlockProduct; i: number; shopHref: string; accent: string; fg: string; words?: StorefrontWords; ratio?: string }) {
  return (
   <a key={it.key || i} href={it.href || shopHref} className="group block">
-   <div className={`vya-round ${ratio} w-full overflow-hidden`} style={{ background: `${fg}0d` }}>
+   <div className={`vya-round relative ${ratio} w-full overflow-hidden` + (it.sold ? " opacity-[0.55]" : "")} style={{ background: `${fg}0d` }}>
     {it.image && <img src={it.image} alt={it.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.045]" />}
+    <Badge it={it} words={words} />
    </div>
    <p className="mt-3.5 line-clamp-1 text-[11px] uppercase tracking-[0.1em] opacity-65">{it.title}</p>
-   <p className="mt-1 text-[13px]" style={{ color: accent }}>{it.price}</p>
+   <p className="mt-1 text-[13px]" style={{ color: it.sold ? "inherit" : accent, opacity: it.sold ? 0.45 : 1 }}>{it.price}</p>
   </a>
  );
 }
@@ -74,7 +88,7 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
    {noOrphan.length ? (
     <div className={`relative grid grid-cols-2 gap-x-5 gap-y-12 @lg:gap-x-8 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
      <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
-     {noOrphan.map((it, i) => <Card key={it.key || i} it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} />)}
+     {noOrphan.map((it, i) => <Card key={it.key || i} it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} words={ctx.words}/>)}
     </div>
    ) : <Empty kit={kit} />}
   </section>
@@ -103,7 +117,7 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
     <div className="vya-rail flex snap-x snap-mandatory gap-5 overflow-x-auto px-5 pb-2 @xl:px-8" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
      {shown.map((it, i) => (
       <div key={it.key || i} className="shrink-0 snap-start" style={{ width: `min(74vw, ${w}rem)` }}>
-       <Card it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} />
+       <Card it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} words={ctx.words}/>
       </div>
      ))}
     </div>
@@ -130,9 +144,9 @@ function FeaturedEditorial({ kit }: { kit: EditKit }) {
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-12 @lg:py-20 @xl:py-24">
    <Head kit={kit} align="text-left" className="mb-10" />
    <div className="grid gap-6 @lg:grid-cols-[1.25fr_1fr] @lg:gap-10">
-    <Card it={lead} i={0} shopHref={shopHref} accent={colors.accent} fg={fg} ratio="aspect-[4/5] @lg:aspect-[3/4]" />
+    <Card it={lead} i={0} shopHref={shopHref} accent={colors.accent} fg={fg} words={ctx.words}ratio="aspect-[4/5] @lg:aspect-[3/4]" />
     <div className="grid grid-cols-2 gap-5 @lg:gap-6 content-start">
-     {rest.map((it, i) => <Card key={it.key || i} it={it} i={i + 1} shopHref={shopHref} accent={colors.accent} fg={fg} ratio="aspect-square" />)}
+     {rest.map((it, i) => <Card key={it.key || i} it={it} i={i + 1} shopHref={shopHref} accent={colors.accent} fg={fg} words={ctx.words}ratio="aspect-square" />)}
     </div>
    </div>
   </section>
@@ -160,7 +174,7 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
       const big = i % 5 === 0;
       return (
        <div key={it.key || i} className={big ? "col-span-2 row-span-2" : ""}>
-        <Card it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} ratio={big ? "aspect-[4/5]" : "aspect-square"} />
+        <Card it={it} i={i} shopHref={shopHref} accent={colors.accent} fg={fg} words={ctx.words}ratio={big ? "aspect-[4/5]" : "aspect-square"} />
        </div>
       );
      })}
@@ -189,7 +203,9 @@ function FeaturedList({ kit }: { kit: EditKit }) {
         {it.image && <img src={it.image} alt={it.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />}
        </span>
        <span className="min-w-0 flex-1 truncate text-[13px] uppercase tracking-[0.1em] opacity-75">{it.title}</span>
-       <span className="shrink-0 text-[13px]" style={{ color: colors.accent }}>{it.price}</span>
+       {/* No photo to badge over in a list row, so the same word sits beside the price. */}
+       {(it.sold || it.held) && <span data-vya-held={it.held && !it.sold ? "1" : undefined} className="shrink-0 bg-black/80 px-2.5 py-1 text-[9px] uppercase tracking-[0.22em] text-white">{it.sold ? ctx.words?.sold || DEFAULT_WORDS.sold : ctx.words?.held || DEFAULT_WORDS.held}</span>}
+       <span className="shrink-0 text-[13px]" style={{ color: it.sold ? "inherit" : colors.accent, opacity: it.sold ? 0.45 : 1 }}>{it.price}</span>
       </a>
      ))}
     </div>

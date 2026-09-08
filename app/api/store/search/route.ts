@@ -7,6 +7,8 @@ import { listCustomerProfiles } from "@/app/lib/store-customers-db";
 import { listConsignors } from "@/app/lib/consignment-db";
 import { listCollections } from "@/app/lib/db/collections";
 import { listDiscounts } from "@/app/lib/store-discounts-db";
+import { listHolds } from "@/app/lib/holds-db";
+import { itemSearchText, itemStatusWord } from "@/app/lib/search-core";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
  if (q.length < 1) return NextResponse.json({ ok: true, groups: [] });
 
  const seller = await getSellerBySlug(slug).catch(() => null);
- const [orders, items, customers, consignors, collections, discounts] = await Promise.all([
+ const [orders, items, customers, consignors, collections, discounts, holds] = await Promise.all([
  seller ? listSellerOrders(seller.id).catch(() => []) : [],
  seller ? listSellerItems(seller.id).catch(() => []) : [],
  listCustomerProfiles(slug).catch(() => []),
@@ -32,6 +34,9 @@ export async function GET(request: NextRequest) {
  // Neither was searchable, so both returned nothing at all.
  seller ? listCollections(seller.id, true).catch(() => []) : [],
  listDiscounts(slug).catch(() => []),
+ // Which reserved pieces are HOLDS (a person) rather than a buyer mid-checkout — the sub line
+ // says "on hold" for one and "reserved" for the other.
+ seller ? listHolds(seller.id).then((h) => new Set(h.holds.map((x) => x.itemId))).catch(() => new Set<string>()) : new Set<string>(),
  ]);
 
  const has = (s: string) => s.toLowerCase().includes(q);
@@ -42,10 +47,12 @@ export async function GET(request: NextRequest) {
  .slice(0, 6)
  .map((o) => ({ id: String(o.id), label: `#${1000 + o.orderNo} · ${o.itemTitle || "Item"}`, sub: `${o.buyerEmail || "—"} · ${money(o.amountCents)} · ${o.status}`, href: `${B}/orders/${o.id}` }));
 
+ // Title, brand, category, size, SKU, status — and where it came from, its flaws and the condition
+ // note, which are how a seller actually remembers a piece (search-core.ts).
  const itemHits: Hit[] = items
- .filter((it) => has(`SKU-${1000 + it.sku} ${it.title} ${it.brand || ""} ${it.category || ""} ${it.size || ""} ${it.status}`))
+ .filter((it) => itemSearchText(it).includes(q))
  .slice(0, 6)
- .map((it) => ({ id: it.id, label: `${it.title}`, sub: `SKU-${1000 + it.sku} · ${money(it.priceCents)} · ${it.status}`, href: `${B}/inventory?item=${it.id}` }));
+ .map((it) => ({ id: it.id, label: `${it.title}`, sub: `SKU-${1000 + it.sku} · ${money(it.priceCents)} · ${itemStatusWord(it.status, holds.has(it.id))}`, href: `${B}/inventory?item=${it.id}` }));
 
  const custHits: Hit[] = customers
  .filter((c) => has(`${c.name || ""} ${c.email} ${c.phone || ""} ${c.location || ""}`))

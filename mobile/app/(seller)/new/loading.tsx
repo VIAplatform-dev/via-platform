@@ -5,7 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, fonts } from "../../../lib/theme";
 import { useDraft } from "../../../lib/seller/draft";
-import { draftListing, priceListing } from "../../../lib/seller/intake";
+import { draftListing, priceListing, publishListing } from "../../../lib/seller/intake";
 
 // Named steps, not a spinner.
 //
@@ -25,12 +25,12 @@ type Step = { key: string; label: (n: number | null) => string };
 const STEPS: Step[] = [
   { key: "brand", label: () => "Found the brand" },
   { key: "comps", label: (n) => (n === null ? "Checking comparable sales" : `Checking ${n} comparable sales`) },
-  { key: "copy", label: () => "Writing the description" },
+  { key: "copy", label: () => "Saved to Drafts" },
 ];
 
 export default function LoadingScreen() {
   const insets = useSafeAreaInsets();
-  const { photos, imageUrls, typed, setFields, setCompsCount, compsCount, setPriceCents } = useDraft();
+  const { photos, imageUrls, typed, setFields, setCompsCount, compsCount, setPriceCents, setItemId } = useDraft();
   const [done, setDone] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,7 +40,9 @@ export default function LoadingScreen() {
       try {
         const draft = await draftListing(imageUrls, typed);
         if (!alive) return;
-        setFields(draft.fields);
+        // What she paid never comes back from intake — it is hers, carried through from Details.
+        const fields = { ...draft.fields, ...(typed.cost ? { cost: typed.cost } : {}) };
+        setFields(fields);
         setDone(1);
 
         const pricing = await priceListing(imageUrls, draft.fields, {
@@ -53,7 +55,14 @@ export default function LoadingScreen() {
         // answers { estimate: { suggestedCents, comps } } and nothing at a top-level `price`.
         setCompsCount(pricing.compsCount);
         setPriceCents(pricing.priceCents);
-        setFields(draft.fields);
+        setFields(fields);
+        // Save it as a draft NOW, before she has seen Review. The copy below promises the piece
+        // "lands in Drafts" if she walks away, and until this line that was a lie — the fields lived
+        // only in this screen's memory. Review then edits this row rather than creating another.
+        // A failure here is not fatal: Review still has everything and will create the piece itself.
+        const saved = await publishListing({ ...fields, imageUrls, priceCents: pricing.priceCents }, "draft").catch(() => null);
+        if (!alive) return;
+        setItemId(saved?.itemId ?? null);
         setDone(3);
         router.replace("/(seller)/new/review");
       } catch (e) {

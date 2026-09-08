@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { addToCart, getCartItemIds } from "@/app/lib/storefront-cart-db";
-import { findItemByVariantId, isSellable } from "@/app/lib/plan-b/lookup";
+import { findItemByVariantId } from "@/app/lib/plan-b/lookup";
+import { hostedCartRefusal } from "@/app/lib/plan-b/cart-refusal-core";
 import { variantIdFromAddBody, toCartLine } from "@/app/lib/plan-b/cart-json";
 import { resolveStore, cartToken, cartResponse, errorResponse, readBody, withCartCookie, cartLines } from "@/app/lib/plan-b/cart-session";
 import { buildCartSectionsResponse, requestedSectionIds } from "@/app/lib/plan-b/cart-sections-response";
@@ -24,8 +25,10 @@ export async function POST(request: NextRequest) {
  const item = await findItemByVariantId(store.sellerId, variantId);
  if (!item) return errorResponse("That item is no longer available.", 404);
  // One-of-one: a sold piece is gone, not backorderable. Say so in the theme's own error shape
- // rather than adding a line the shopper can't actually buy.
- if (!isSellable(item)) return errorResponse(`${item.title} has sold.`, 422);
+ // rather than adding a line the shopper can't actually buy — and say WHY in the shelf's words: a
+ // held piece is on hold, not sold (cart-refusal-core.ts).
+ const refusal = hostedCartRefusal(item);
+ if (refusal) return errorResponse(refusal, 422);
 
  const { token, isNew } = cartToken(request);
  await addToCart(token, item.id, item.sellerId);

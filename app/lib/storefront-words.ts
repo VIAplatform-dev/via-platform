@@ -9,6 +9,8 @@
 export type StorefrontWords = {
  /** Badge over a piece that has already gone. */
  sold: string;
+ /** Badge over a piece kept back for someone — still on the shelf, not for sale today. */
+ held: string;
  /** The link back to the whole catalogue from a category menu. */
  shopAll: string;
  /** The button under a shortened product grid. */
@@ -19,6 +21,7 @@ export type StorefrontWords = {
 
 export const DEFAULT_WORDS: StorefrontWords = {
  sold: "Sold",
+ held: "On hold",
  shopAll: "Shop all",
  viewAll: "View all",
  empty: "Coming soon",
@@ -26,6 +29,7 @@ export const DEFAULT_WORDS: StorefrontWords = {
 
 export const WORD_LABELS: { key: keyof StorefrontWords; label: string; hint: string }[] = [
  { key: "sold", label: "Sold badge", hint: "Shown over a piece that's gone." },
+ { key: "held", label: "On hold badge", hint: "Shown over a piece you're keeping back for someone." },
  { key: "shopAll", label: "Shop all link", hint: "Back to everything, from a category menu." },
  { key: "viewAll", label: "View all button", hint: "Under a shortened row of products." },
  { key: "empty", label: "Empty grid", hint: "When there's nothing to show yet." },

@@ -23,6 +23,7 @@ function CheckoutInner() {
  const [err, setErr] = useState<string | null>(null);
  const [qr, setQr] = useState<string | null>(null);
  const [tendered, setTendered] = useState<string>(""); // cash handed over, dollars
+ const [receiptEmail, setReceiptEmail] = useState<string>(""); // optional: email them a receipt
  const [changeShown, setChangeShown] = useState<number | null>(null);
  const soldOnce = useRef(false);
  const [keyed, setKeyed] = useState<{ clientSecret: string; stripe: Promise<StripeJs | null> } | null>(null);
@@ -70,7 +71,7 @@ function CheckoutInner() {
  async function cash() {
  setBusy("cash"); setErr(null);
  if (tenderedCents != null && liveChange == null) { setBusy(null); setErr("That's short of the total."); return; }
- const r = await api<{ changeCents: number | null }>(`/api/store/market/checkout/${id}/cash`, { method: "POST", body: JSON.stringify({ tenderedCents }) });
+ const r = await api<{ changeCents: number | null }>(`/api/store/market/checkout/${id}/cash`, { method: "POST", body: JSON.stringify({ tenderedCents, receiptEmail: receiptEmail.trim() || null }) });
  setBusy(null);
  if (!r.ok) setErr(r.data.error || "Couldn't record the sale"); else setChangeShown(r.data.changeCents ?? null);
  poll.reload();
@@ -129,6 +130,9 @@ function CheckoutInner() {
  {tenderedCents != null && (liveChange != null
  ? <p className="mt-3 text-center text-[15px] text-stone-700">Change due: <b className="text-[20px]" style={{ fontFamily: "var(--font-display)" }}>{money(liveChange, c.currency)}</b></p>
  : <p className="mt-3 text-center text-[13px] text-red-700">That’s {money(c.amountCents - tenderedCents, c.currency)} short.</p>)}
+ {/* A receipt, if they want one — and they join Customers tagged with this market. */}
+ <input type="email" inputMode="email" autoComplete="off" value={receiptEmail} onChange={(e) => setReceiptEmail(e.target.value)} placeholder="Email a receipt (optional)" aria-label="Email a receipt"
+ className="mt-3 min-h-[44px] w-full rounded-2xl border border-stone-200 px-3 text-[14px] outline-none focus:border-stone-400" />
  </div>
  )}
  {c.status === "awaiting_payment" && c.tender !== "cash" && (keyed ? (

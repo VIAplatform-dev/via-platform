@@ -30,7 +30,7 @@ export default function AppsPage() {
 
  return (
  <AdminPage className="max-w-3xl">
- <AdminHeader eyebrow="Apps · Integrations" title="Apps & integrations" subtitle="Extra features you can turn on. Nothing here is required." />
+ <AdminHeader eyebrow="Settings · Apps & integrations" title="Apps & integrations" subtitle="Extra features you can turn on. Nothing here is required." />
 
  {notice && <div className="mb-4 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-4 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">{notice}</div>}
 

@@ -1,7 +1,7 @@
 import { API_BASE_URL, getAuthToken, ApiError } from "../api";
 import { apiPost } from "../api";
 import { filledFields } from "./listing";
-import { normalizeDraft, readEstimate, type DraftFields } from "./intake-shape";
+import { normalizeDraft, readEstimate, costFromText, type DraftFields } from "./intake-shape";
 
 // The listing pipeline, in one place.
 //
@@ -85,15 +85,19 @@ export async function priceListing(imageUrls: string[], fields: DraftFields, ext
  * screen that publishes.
  */
 export async function publishListing(
-  fields: DraftFields & { imageUrls: string[]; priceCents?: number | null },
+  fields: Omit<DraftFields, "cost"> & { imageUrls: string[]; priceCents?: number | null; sourceName?: string; acquiredAt?: string; lotId?: string; cost?: string | number },
   status: "active" | "draft",
 ) {
-  const { priceCents, ...rest } = fields;
+  const { priceCents, cost, ...rest } = fields;
+  // Cost travels like price: major units, and only when she gave one — a blank must not be sent
+  // as 0, which the margin report would read as free stock.
+  const costMajor = costFromText(cost);
   // The route answers { ok, itemId, status, scheduled, publishAt, crossListing } — itemId at the
   // top level, not a nested item object.
   return apiPost<{ ok: boolean; itemId?: string; status?: string }>("/api/store/intake/publish", {
     ...rest,
     ...(typeof priceCents === "number" && priceCents > 0 ? { price: priceCents / 100 } : {}),
+    ...(costMajor !== undefined ? { cost: costMajor } : {}),
     status,
   });
 }

@@ -136,6 +136,20 @@ export async function getConversationsByStore(storeSlug: string): Promise<Conver
  return rows.map((r: any) => ({ ...mapConv(r), lastMessage: r.last_message ?? null, storeUnread: Number(r.store_unread) || 0 }));
 }
 
+/** Open storefront threads where the buyer spoke last and has been waiting more than `hours`. */
+export async function countUnansweredConversations(storeSlug: string, hours = 24): Promise<number> {
+ await ensureTables();
+ const sql = neon(getDatabaseUrl());
+ const rows = await sql`
+ SELECT count(*)::int AS n
+ FROM storefront_conversations c
+ WHERE c.store_slug = ${storeSlug}
+ AND c.status = 'open'
+ AND c.last_message_at < now() - (${hours} * interval '1 hour')
+ AND (SELECT m.sender FROM storefront_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) = 'buyer'`;
+ return Number((rows[0] as { n?: number } | undefined)?.n ?? 0);
+}
+
 /** Mark a store's view of a conversation as read. */
 export async function markStoreRead(id: number, storeSlug: string): Promise<void> {
  await ensureTables();

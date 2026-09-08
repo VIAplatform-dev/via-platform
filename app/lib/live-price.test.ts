@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as cheerio from "cheerio";
-import { applyLivePrice } from "./live-price.ts";
+import { applyLivePrice, markPriceSlots } from "./live-price.ts";
 
 const GBP = { priceCents: 229500, currency: "GBP" };
 
@@ -197,4 +197,94 @@ test("a live markdown on such a theme is kept, and restated from the feed", () =
   `<compare-at-price class="line-through"> <span class="sr-only">Regular price</span>$498.00</compare-at-price></price-list>`;
  const out = applyLivePrice(html, { priceCents: 12500, currency: "USD", compareAtCents: 49800 });
  assert.match(out, /\$125\.00/, "the live price is shown");
+});
+
+// ── Deriving the price slot instead of recognising it ────────────────────────────────────────────
+// Everything above finds the price by matching a NAME, from a list that has grown after every theme
+// that broke it. There is no end to that list: themes are arbitrary markup, renameable per store.
+// markPriceSlots asks a different question. At capture time we already know what the piece costs,
+// because the same import that stored the page read the price from the seller's feed. So find the
+// element whose text IS that amount and mark it. The theme identifies its own price slot, and no
+// name is involved. Same trick as derive-cart-template.ts, which says why enumerating themes fails.
+
+test("the price slot identifies itself by holding the price we already know", () => {
+ // Nothing here says "price" — not a class, not a tag, not an attribute. This is the shape that
+ // costs us: on 2nd Street's Broadcast theme, and on the newer Shopify themes generally, the
+ // element actually holding the money describes its typography and nothing else.
+ const html = `<div class="pd__money"><span class="h4 text-on-sale">$340.00</span></div>`;
+ const marked = markPriceSlots(html, { priceCents: 34000, currency: "USD" });
+ assert.equal(cheerio.load(marked)("[data-vya-price]").text(), "$340.00");
+ // …and once marked, a later reprice lands on it without any selector matching at all.
+ const served = applyLivePrice(marked, { priceCents: 12500, currency: "USD" });
+ assert.match(served, /\$125\.00/);
+ assert.ok(!/\$340\.00/.test(served), "the crawl-day price is gone");
+});
+
+test("value, not position, tells the live price from the markdown", () => {
+ // feathers served a Karl Lagerfeld dress at its crawl-day $200 with a stale $498 beside it while
+ // the cart charged $125. Matching names, we had to learn `sale-price` and `compare-at-price` as
+ // tags. Matching VALUES, the question answers itself: one of them is what the record says the
+ // piece costs, the other is what the record says it cost before.
+ const html = `<price-list><sale-price class="h4">$200.00</sale-price><compare-at-price class="line-through">$498.00</compare-at-price></price-list>`;
+ const $ = cheerio.load(markPriceSlots(html, { priceCents: 20000, compareAtCents: 49800, currency: "USD" }));
+ assert.equal($("[data-vya-price]").text(), "$200.00");
+ assert.equal($("[data-vya-was]").text(), "$498.00");
+ assert.equal($("[data-vya-price]").length, 1, "the markdown is never marked as the live price");
+});
+
+test("only a text node that is ENTIRELY money is a price slot", () => {
+ // A sentence that happens to contain the number is not the price. Neither is a size, an order
+ // number, or a shipping threshold — all of which have cost us before.
+ const html = `<p>Free shipping on orders over $340</p><span class="note">Style 34000</span><b>$340.00</b>`;
+ const $ = cheerio.load(markPriceSlots(html, { priceCents: 34000, currency: "USD" }));
+ assert.equal($("[data-vya-price]").length, 1);
+ assert.equal($("[data-vya-price]").text(), "$340.00");
+});
+
+test("the theme's own way of writing the number is read, whichever it is", () => {
+ const at = (text: string, cents: number, cur = "USD") =>
+  cheerio.load(markPriceSlots(`<span>${text}</span>`, { priceCents: cents, currency: cur }))("[data-vya-price]").length;
+ assert.equal(at("$2,295.00", 229500), 1, "grouped with decimals");
+ assert.equal(at("£2,295", 229500, "GBP"), 1, "grouped, no decimals");
+ assert.equal(at("2295.00 USD", 229500), 1, "code after");
+ assert.equal(at("$340.00 USD", 34000), 1, "symbol and code together");
+ assert.equal(at("€2 295,00", 229500, "EUR"), 1, "space grouping, comma decimal");
+ assert.equal(at("¥12,000", 1200000, "JPY"), 1, "no decimals at all");
+ assert.equal(at("$2,295.00", 229400), 0, "a different amount is not this price");
+ // KNOWN GAPS, both PRE-EXISTING in WHOLE_MONEY rather than introduced here — the same two shapes
+ // applyLivePrice has always refused to rewrite, so a page using either falls back to PRICE_HOST
+ // exactly as it does today. Recorded rather than guessed at: neither has been seen on a real store
+ // in this fleet, and loosening a regex the rewrite path shares on speculation is how it starts
+ // matching sizes and order numbers again.
+ assert.equal(at("USD $2,295.00", 229500), 0, "a LEADING currency code is not recognised");
+ assert.equal(at("€2.295,00", 229500, "EUR"), 0, "a DOT thousands separator is not recognised");
+ // An explicit code that contradicts the record is a different currency, not this price — the
+ // blummier failure was exactly the same digits under the wrong symbol.
+ assert.equal(at("CAD $2,295.00", 229500, "USD"), 0);
+});
+
+test("marking is safe to repeat and never marks what a shopper cannot read", () => {
+ const html = `<span class="p">$340.00</span><script>var x = "$340.00"</script><style>/* $340.00 */</style>`;
+ const once = markPriceSlots(html, { priceCents: 34000, currency: "USD" });
+ const twice = markPriceSlots(once, { priceCents: 34000, currency: "USD" });
+ assert.equal(cheerio.load(twice)("[data-vya-price]").length, 1, "re-marking does not duplicate");
+ assert.ok(!/<script[^>]*data-vya-price/.test(twice) && !/<style[^>]*data-vya-price/.test(twice));
+});
+
+test("a marked page rewrites ONLY its own price, not a neighbour's", () => {
+ // Today every money-bearing price element on the page is rewritten, so a recommendations strip
+ // showing other pieces has their prices overwritten with this one's. A marked page cannot: the
+ // mark says which element belongs to this product.
+ const html = `<div class="price"><span data-vya-price="1">$340.00</span></div>`
+  + `<aside class="recs"><div class="price"><span>$95.00</span></div></aside>`;
+ const out = applyLivePrice(html, { priceCents: 12500, currency: "USD" });
+ assert.match(out, /\$125\.00/);
+ assert.match(out, /\$95\.00/, "the recommended piece keeps its own price");
+});
+
+test("an unmarked page still behaves exactly as it did before", () => {
+ // Every store captured before this existed has no marks. They must keep working off the selector
+ // list until they are re-captured — this is an addition, not a replacement.
+ const html = `<div class="price"><span class="price-item">$3,169.00</span></div>`;
+ assert.match(applyLivePrice(html, GBP), /£2,295\.00/);
 });

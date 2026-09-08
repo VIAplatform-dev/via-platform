@@ -6,6 +6,18 @@ import { CategoryBreadcrumb } from "../CategoryPicker";
 import { Input, Field } from "@/app/store/ui";
 import { ITEM_STATUSES, STATUS_TONE, toCategorySlug, categoryTagLabel, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 import { PriceScale } from "../PriceScale";
+import { todayISO } from "@/app/lib/lot-core";
+import { ConditionChips, MeasurementFields, measurementsFromForm, measurementsToForm, useStoreUnits } from "../ListingStructure";
+import { normalizeCondition } from "@/app/lib/condition-core";
+import type { MeasurementKey } from "@/app/lib/measurements-core";
+
+// Admin preview: `?store=<slug>` on the page URL is carried onto every store call, as the other
+// listing pages do. Without it an admin drafting "for" a store drafted into via-admin.
+function withStore(path: string): string {
+ if (typeof window === "undefined") return path;
+ const s = new URLSearchParams(window.location.search).get("store");
+ return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+}
 
 // One drafted item's AI results, shown inline on its card once "Draft" runs.
 type BulkItem = {
@@ -15,6 +27,9 @@ type BulkItem = {
  era: string;
  material: string;
  condition: string;
+ // Condition as structure (owner audit #17/#31): the AI's flaws list and its sentence beyond the grade.
+ flaws: string[];
+ conditionNote: string;
  category: string;
  size: string;
  description: string;
@@ -57,8 +72,9 @@ type EditForm = {
  title: string; price: string; cost: string; brand: string; era: string; material: string;
  condition: string; size: string; category: string | null; description: string; status: ItemStatus; // slug, or free text under "Other"
  weightOz: string; lengthIn: string; widthIn: string; heightIn: string;
+ conditionNote: string; measurements: Partial<Record<MeasurementKey, string>>;
 };
-const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "", conditionNote: "", measurements: {} };
 
 // Bulk intake: drop many photos, VYA clusters them into items by visual similarity, the seller
 // merges/splits, then "Draft" runs the FULL intake (title, brand, era, material, condition,
@@ -84,6 +100,10 @@ export default function BulkUploadPage() {
  const [editGi, setEditGi] = useState<number | null>(null);
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]);
+ // Flaws as a list, edited the way the inventory editor edits them; the store's unit for measurements.
+ const [editFlaws, setEditFlaws] = useState<string[]>([]);
+ const [newFlaw, setNewFlaw] = useState("");
+ const units = useStoreUnits(withStore);
  const [asks, setAsks] = useState<Record<number, SellerQuestion[]>>({});
  const [priceCtx, setPriceCtx] = useState<Record<number, PriceCtx>>({});
  // The AI's price band + reasoning per item, for the draft editor.
@@ -97,9 +117,14 @@ export default function BulkUploadPage() {
  const [newCol, setNewCol] = useState("");
  const openItemId = useRef<string | null>(null); // guards a slow hydrate landing on a re-opened editor
  const [hydrated, setHydrated] = useState(false);  // cost/dims/collections loaded — until then, don't send them
+ // THE BATCH IS A LOT — the same three answers the phone's Add many asks for: where these came
+ // from, when, and what they cost altogether. Written to every drafted piece after the run via the
+ // bulk `lot` action, the cost split by price with the same remainder rule (lot-core.ts).
+ const [lot, setLot] = useState({ sourceName: "", acquiredAt: todayISO(), lotCost: "" });
+ const [lotNote, setLotNote] = useState<string | null>(null);
 
  useEffect(() => {
-  fetch("/api/store/collections").then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+  fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  }, []);
 
  const locked = busy || saved != null; // grouping freezes once drafting starts
@@ -113,12 +138,12 @@ export default function BulkUploadPage() {
    const urls: string[] = [];
    for (const file of list) {
     const fd = new FormData(); fd.append("file", file);
-    const up = await fetch("/api/store/listings/upload", { method: "POST", body: fd });
+    const up = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd });
     const ud = await up.json(); if (!up.ok) throw new Error(ud.error || "Upload failed");
     urls.push(ud.url);
    }
    setBusyMsg("Grouping photos into items…");
-   const r = await fetch("/api/store/intake/bulk-group", {
+   const r = await fetch(withStore("/api/store/intake/bulk-group"), {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrls: urls }),
    });
    const d = await r.json().catch(() => null);
@@ -196,6 +221,7 @@ export default function BulkUploadPage() {
   setStartedAt({}); setDurations([]);
   setDrafted(Object.fromEntries(list.map((x) => [x.gi, "queued" as const])));
   let drafted = 0, failed = 0, done = 0;
+  const createdIds: string[] = [];
 
   async function draftOne(gi: number, photos: string[]) {
    const t0 = Date.now();
@@ -203,15 +229,24 @@ export default function BulkUploadPage() {
    setStartedAt((s0) => ({ ...s0, [gi]: t0 }));
    try {
     // 1) AI draft. title/description/category are plain strings; brand/era/material/condition are {value}.
-    const d = await fetch("/api/store/intake", {
+    const d = await fetch(withStore("/api/store/intake"), {
      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrls: photos, draftOnly: true }),
     }).then((r) => r.json()).catch(() => null);
     const dr = d?.draft || {};
     const S = (k: string) => (typeof dr[k] === "string" ? dr[k] : "");              // plain-string field
     const F = (k: string) => (dr[k] && typeof dr[k].value === "string" ? dr[k].value : ""); // {value} field
+    // Condition the way the one-at-a-time flow keeps it: the grade in `condition` (from the
+    // model's conditionGrade, else read out of its sentence), the sentence as the note when it
+    // says more than the grade, and the flaws as a list.
+    const sentence = F("condition");
+    const grade = normalizeCondition(typeof dr.conditionGrade === "string" ? dr.conditionGrade : null) ?? normalizeCondition(sentence);
     const fields = {
      title: S("title"), description: S("description"), category: S("category"),
-     brand: F("brand"), era: F("era"), material: F("material"), condition: F("condition"), size: F("size"),
+     brand: F("brand"), era: F("era"), material: F("material"), condition: grade ?? sentence, size: F("size"),
+    };
+    const structure = {
+     flaws: Array.isArray(dr.flaws) ? (dr.flaws as unknown[]).filter((f): f is string => typeof f === "string" && !!f.trim()).map((f) => f.trim()) : [],
+     conditionNote: sentence && normalizeCondition(sentence) !== sentence ? sentence : "",
     };
     // The intake also estimates a shipping parcel from the photos. Blank when it couldn't.
     const P = (k: "weightOz" | "lengthIn" | "widthIn" | "heightIn") =>
@@ -235,7 +270,7 @@ export default function BulkUploadPage() {
     // 2) Price it (same inputs as the single-item flow).
     let priceUsd = 0;
     try {
-     const p = await fetch("/api/store/intake/pricing", {
+     const p = await fetch(withStore("/api/store/intake/pricing"), {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ imageUrls: photos, fields: { ...fields, conditionGrade: fields.condition, price: "", runway: (d?.runway ?? dr?.runway) || "", celebrity: d?.celebrity || "" }, searchQuery: d?.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d?.reverseComps ?? [], reverseTitles: d?.reverseTitles ?? [], editorialTitles: d?.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d?.needDraft === true }),
      }).then((r) => r.json()).catch(() => null);
@@ -259,7 +294,7 @@ export default function BulkUploadPage() {
 
     // 3) Save a complete draft.
     const images = [d?.ghostUrl, ...photos].filter(Boolean) as string[];
-    const save = await fetch("/api/store/intake/autosave", {
+    const save = await fetch(withStore("/api/store/intake/autosave"), {
      method: "POST", headers: { "Content-Type": "application/json" },
      body: JSON.stringify({ title: fields.title, description: fields.description, size: fields.size, category: fields.category, price: priceUsd, images, status: "draft" }),
     });
@@ -270,19 +305,21 @@ export default function BulkUploadPage() {
     // brand, era, material, condition and the shipping parcel — is written straight after.
     // Without this the bulk flow silently loses fields the one-at-a-time flow keeps.
     if (ok && sd?.id) {
-     await fetch(`/api/store/items/${sd.id}`, {
+     createdIds.push(String(sd.id));
+     await fetch(withStore(`/api/store/items/${sd.id}`), {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
        brand: fields.brand, era: fields.era, material: fields.material, condition: fields.condition,
+       flaws: structure.flaws, conditionNote: structure.conditionNote,
        weightOz: parcel.weightOz || null, lengthIn: parcel.lengthIn || null,
        widthIn: parcel.widthIn || null, heightIn: parcel.heightIn || null,
       }),
      }).catch(() => {});
     }
-    setDrafted((d2) => ({ ...d2, [gi]: { id: sd?.id ?? null, ...fields, ...parcel, priceUsd, images, status: "draft", ok } }));
+    setDrafted((d2) => ({ ...d2, [gi]: { id: sd?.id ?? null, ...fields, ...structure, ...parcel, priceUsd, images, status: "draft", ok } }));
    } catch {
     failed++;
-    setDrafted((d2) => ({ ...d2, [gi]: { id: null, title: "", brand: "", era: "", material: "", condition: "", category: "", size: "", description: "", priceUsd: 0, weightOz: "", lengthIn: "", widthIn: "", heightIn: "", images: photos, status: "draft", ok: false } }));
+    setDrafted((d2) => ({ ...d2, [gi]: { id: null, title: "", brand: "", era: "", material: "", condition: "", flaws: [], conditionNote: "", category: "", size: "", description: "", priceUsd: 0, weightOz: "", lengthIn: "", widthIn: "", heightIn: "", images: photos, status: "draft", ok: false } }));
    }
    // Every completed item sharpens the estimate for the ones still running and still queued.
    setDurations((ds) => [...ds, Date.now() - t0]);
@@ -295,6 +332,21 @@ export default function BulkUploadPage() {
   }));
   setSaved({ drafted, failed });
   setBusy(false);
+  await applyLot(createdIds);
+ }
+
+ /** After the run: where the batch came from, when, and what it cost — onto every piece it made. */
+ async function applyLot(ids: string[]) {
+  const lotCostCents = lot.lotCost.trim() === "" ? null : Math.round(Number(lot.lotCost) * 100);
+  const sourceName = lot.sourceName.trim();
+  if (!ids.length || (!sourceName && !lot.acquiredAt && lotCostCents == null)) return;
+  if (lotCostCents != null && !(Number.isFinite(lotCostCents) && lotCostCents >= 0)) { setLotNote("The lot cost didn’t make sense — set it from Inventory (Set source / lot)."); return; }
+  const r = await fetch(withStore("/api/store/items"), {
+   method: "POST", headers: { "Content-Type": "application/json" },
+   body: JSON.stringify({ action: "lot", ids, ...(sourceName ? { sourceName } : {}), ...(lot.acquiredAt ? { acquiredAt: lot.acquiredAt } : {}), ...(lotCostCents != null ? { lotCostCents } : {}) }),
+  }).then((x) => x.json()).catch(() => null);
+  if (!r?.ok) { setLotNote(r?.error || "Couldn’t write the source and cost onto the batch — set them from Inventory (Set source / lot)."); return; }
+  setLotNote([sourceName ? `from ${sourceName}` : null, lot.acquiredAt ? `acquired ${lot.acquiredAt}` : null, lotCostCents != null ? `${(lotCostCents / 100).toFixed(2)} split across ${r.count} pieces` : null].filter(Boolean).join(" · "));
  }
 
  // ── Edit a drafted item in place — open the popup, save straight back to the draft. ──
@@ -308,7 +360,10 @@ export default function BulkUploadPage() {
    // The AI's parcel estimate is already on the card — show it immediately rather than
    // leaving the fields blank until the hydrate below lands.
    weightOz: it.weightOz, lengthIn: it.lengthIn, widthIn: it.widthIn, heightIn: it.heightIn,
+   conditionNote: it.conditionNote,
   });
+  setEditFlaws(it.flaws);
+  setNewFlaw("");
   setEditImages(it.images);
   setSelCols([]);
   setNewCol("");
@@ -319,7 +374,7 @@ export default function BulkUploadPage() {
   // seller last saw them on the card.
   const id = it.id;
   openItemId.current = id;
-  fetch("/api/store/items").then((r) => (r.ok ? r.json() : null)).then((d) => {
+  fetch(withStore("/api/store/items")).then((r) => (r.ok ? r.json() : null)).then((d) => {
    if (openItemId.current !== id) return;
    const row = (d?.items || []).find((x: { id: string }) => x.id === id);
    if (!row) return;
@@ -331,6 +386,8 @@ export default function BulkUploadPage() {
     ...f, cost: c2s(row.costCents),
     weightOz: n2s(row.weightOz) || f.weightOz, lengthIn: n2s(row.lengthIn) || f.lengthIn,
     widthIn: n2s(row.widthIn) || f.widthIn, heightIn: n2s(row.heightIn) || f.heightIn,
+    // Measurements only live on the saved item (the bulk draft never carries them).
+    measurements: measurementsToForm(row.measurementsJson),
    }));
    setSelCols(row.collections || []);
    setHydrated(true);
@@ -344,7 +401,7 @@ export default function BulkUploadPage() {
   setUploadingEdit(true);
   for (const file of Array.from(files)) {
    const fd = new FormData(); fd.append("file", file);
-   const r = await fetch("/api/store/listings/upload", { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+   const r = await fetch(withStore("/api/store/listings/upload"), { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
    if (r?.url) setEditImages((imgs) => [...imgs, r.url]);
   }
   setUploadingEdit(false);
@@ -367,7 +424,7 @@ export default function BulkUploadPage() {
   const ctx = priceCtx[gi];
   if (t(editForm.brand) !== it.brand && ctx && priceUsd === it.priceUsd) {
    setSavingEdit(true);
-   const p = await fetch("/api/store/intake/pricing", {
+   const p = await fetch(withStore("/api/store/intake/pricing"), {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
      imageUrls: editImages,
@@ -389,19 +446,24 @@ export default function BulkUploadPage() {
    // opening the editor shouldn't be enough to erase one.
    condition: t(editForm.condition), size: t(editForm.size), category: editForm.category || it.category,
    description: t(editForm.description), priceUsd, images: editImages, status: editForm.status,
+   // Whatever is still in the "add a flaw" box counts — same rule as the inventory editor.
+   flaws: newFlaw.trim() ? [...editFlaws, newFlaw.trim()] : editFlaws, conditionNote: t(editForm.conditionNote),
   };
   setSavingEdit(true); setErr(null);
-  const r = await fetch(`/api/store/items/${it.id}`, {
+  const r = await fetch(withStore(`/api/store/items/${it.id}`), {
    method: "PATCH", headers: { "Content-Type": "application/json" },
    body: JSON.stringify({
     title: next.title, price: next.priceUsd, brand: next.brand, era: next.era,
     material: next.material, condition: next.condition, size: next.size,
     description: next.description, status: next.status, images: next.images,
+    flaws: next.flaws, conditionNote: next.conditionNote,
     ...(editForm.category ? { category: editForm.category } : {}),
     // Omitted until the saved item has loaded, so a fast save can't blank what it hasn't seen.
     ...(hydrated ? {
      cost: n(editForm.cost), collections: selCols,
      weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
+     // The template's numbers as a list (empties omitted); a list clears the old free-text column.
+     measurements: measurementsFromForm(editForm.measurements, units.unit),
     } : {}),
    }),
   }).catch(() => null);
@@ -415,7 +477,7 @@ export default function BulkUploadPage() {
  // ── Publish a drafted item (flip it live). ──
  async function publishOne(gi: number) {
   const it = drafted[gi]; if (!isItem(it) || !it.id || it.status !== "draft") return;
-  const r = await fetch(`/api/store/listings/${it.id}`, {
+  const r = await fetch(withStore(`/api/store/listings/${it.id}`), {
    method: "PATCH", headers: { "Content-Type": "application/json" },
    body: JSON.stringify({ title: it.title || "Untitled", price: it.priceUsd, description: it.description, category: it.category, size: it.size, images: it.images, status: "active" }),
   });
@@ -453,6 +515,17 @@ export default function BulkUploadPage() {
     </label>
    )}
 
+   {itemCount > 0 && !saved && (
+    <div className="mt-5 rounded-xl border border-stone-200 bg-white p-4" data-testid="bulk-lot">
+     <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-400">This batch</p>
+     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <Field label="Where these came from"><Input value={lot.sourceName} onChange={(e) => setLot((l) => ({ ...l, sourceName: e.target.value }))} placeholder="Kempton, Ana’s estate, eBay…" disabled={locked} /></Field>
+      <Field label="Acquired on"><Input type="date" value={lot.acquiredAt} onChange={(e) => setLot((l) => ({ ...l, acquiredAt: e.target.value }))} disabled={locked} /></Field>
+      <Field label={`These ${itemCount} cost (USD)`} hint="in total — split across the pieces by price"><Input type="number" inputMode="decimal" value={lot.lotCost} onChange={(e) => setLot((l) => ({ ...l, lotCost: e.target.value }))} placeholder="optional, e.g. 340" disabled={locked} /></Field>
+     </div>
+    </div>
+   )}
+
    {itemCount > 0 && (
     <div className="mt-6">
      <div className="mb-3 flex items-center justify-between gap-3">
@@ -460,6 +533,7 @@ export default function BulkUploadPage() {
        <p className="text-sm font-medium text-stone-700">
         <span className="text-emerald-600">✓ Saved {saved.drafted} draft{saved.drafted === 1 ? "" : "s"}</span>
         {saved.failed > 0 && <span className="text-rose-600"> · {saved.failed} failed</span>} — publish below, or from inventory.
+        {lotNote && <span className="block text-[12px] font-normal text-stone-500">{lotNote}</span>}
        </p>
       ) : (
        <p className="text-sm font-medium text-stone-700">{itemCount} item{itemCount === 1 ? "" : "s"} — drag a photo to regroup, or split it out</p>
@@ -649,11 +723,29 @@ export default function BulkUploadPage() {
         <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Fendi" /></Field>
         <Field label="Era"><Input value={editForm.era} onChange={(e) => setEditForm((f) => ({ ...f, era: e.target.value }))} placeholder="e.g. 1990s" /></Field>
        </div>
-       <div className="grid grid-cols-3 gap-3">
-        <Field label="Condition"><Input value={editForm.condition} onChange={(e) => setEditForm((f) => ({ ...f, condition: e.target.value }))} placeholder="Excellent" /></Field>
-        <Field label="Material"><Input value={editForm.material} onChange={(e) => setEditForm((f) => ({ ...f, material: e.target.value }))} /></Field>
-        <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} /></Field>
+       <ConditionChips value={editForm.condition} onChange={(g) => setEditForm((f) => ({ ...f, condition: g }))} note={editForm.conditionNote} onNoteChange={(v) => setEditForm((f) => ({ ...f, conditionNote: v }))} />
+       <div data-testid="flaws-editor">
+        <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Flaws <span className="font-normal text-stone-400">— one per line, shown under Condition on your store</span></label>
+        {editFlaws.length > 0 && (
+         <ul className="mb-2 space-y-1">
+          {editFlaws.map((f, i) => (
+           <li key={`${f}-${i}`} className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-1.5 text-[13px] text-stone-800">
+            <span className="flex-1">{f}</span>
+            <button type="button" aria-label={`Remove flaw: ${f}`} onClick={() => setEditFlaws((a) => a.filter((_, k) => k !== i))} className="text-stone-400 hover:text-rose-500">✕</button>
+           </li>
+          ))}
+         </ul>
+        )}
+        <input value={newFlaw} onChange={(e) => setNewFlaw(e.target.value)}
+         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = newFlaw.trim(); if (v) { setEditFlaws((a) => [...a, v]); setNewFlaw(""); } } }}
+         placeholder="Add a flaw — light pilling at cuffs, scuffed toe… then Enter"
+         className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
        </div>
+       <div className="grid grid-cols-2 gap-3">
+        <Field label="Material"><Input value={editForm.material} onChange={(e) => setEditForm((f) => ({ ...f, material: e.target.value }))} /></Field>
+        <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} placeholder="As marked on the tag — IT 40, UK 12, M" /></Field>
+       </div>
+       <MeasurementFields category={editForm.category ?? it.category} values={editForm.measurements} onChange={(m) => setEditForm((f) => ({ ...f, measurements: m }))} unit={units.unit} />
        <Field label="Category" required>
         <CategoryBreadcrumb value={editForm.category} onChange={(v) => setEditForm((f) => ({ ...f, category: v }))} />
         {!editForm.category && it.category && (
@@ -662,7 +754,7 @@ export default function BulkUploadPage() {
        </Field>
        <div className="grid grid-cols-3 gap-3">
         <Field label="Price (USD)" required><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
-        <Field label="Cost (USD)"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
+        <Field label="Cost (USD)" hint="what you paid"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
         <Field label="Margin">
          {(() => {
           const p = Number(editForm.price) || 0; const hasCost = editForm.cost.trim() !== ""; const c = Number(editForm.cost) || 0;

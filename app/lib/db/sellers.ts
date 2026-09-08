@@ -19,6 +19,12 @@ export async function getSellerBySlug(slug: string): Promise<Seller | null> {
  return row ?? null;
 }
 
+/** Every store with a workspace, oldest first — the roster the owner's setup funnel walks. */
+export async function listSellers(): Promise<Seller[]> {
+ const db = getDb();
+ return db.select().from(sellers).orderBy(sellers.createdAt);
+}
+
 export async function getSellerById(id: string): Promise<Seller | null> {
  const db = getDb();
  const [row] = await db.select().from(sellers).where(eq(sellers.id, id)).limit(1);

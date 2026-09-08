@@ -21,6 +21,7 @@ import { delistEverywhere } from "@/app/lib/cross-listing-db";
 import { markOfferConsumed } from "@/app/lib/offers-db";
 import { finalizeMarketSale, closeCheckout } from "@/app/lib/market/checkout-db";
 import { MARKET_METADATA_CHANNEL } from "@/app/lib/market/stripe-market-core";
+import { pushSellerSale } from "@/app/lib/seller-push";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -78,6 +79,8 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
  // Clean event stream: the purchase, canonical items.id, at the price actually charged.
  if (sellerSlug) recordEvent({ type: "purchase", storeSlug: sellerSlug, itemId, priceCents: salePriceCents, surface: "storefront" }).catch(() => {});
+ // Her phone: "Sold: <piece>". Fire-and-forget; gated by her preferences inside (see seller-push.ts).
+ if (sellerSlug) void pushSellerSale(sellerSlug, { itemTitle: sold.title, amountCents: salePriceCents, currency: order.currency, channel: "storefront", orderId: String(order.id) });
  // Consignment: if this piece was taken on consignment, credit the consignor their split.
  creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: salePriceCents, channel: "vya" }).catch(() => {});
  // Binding offer redeemed → mark it used so the link can't buy the piece twice.

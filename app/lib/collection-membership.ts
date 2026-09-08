@@ -112,6 +112,10 @@ export async function readCollectionMembership(
   delayMs?: number;
   maxCollections?: number;
   maxPages?: number;
+  /** Stop cleanly after this long and mark the rest unread. See the deadline note in the loop. */
+  budgetMs?: number;
+  /** Injected so tests do not depend on real time. */
+  clock?: () => number;
  },
 ): Promise<MembershipRead> {
  const wait = opts.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -126,6 +130,15 @@ export async function readCollectionMembership(
  const truncated: string[] = [];
  const attempt = slugs.slice(0, cap);
  const notAttempted = slugs.slice(cap);
+ // A DEADLINE, not a timeout. This read had no clock at all: on a 761-collection store it ran for
+ // 25 minutes and returned nothing, because a throw — or an invocation killed at maxDuration —
+ // loses everything already read. Stopping AT a deadline keeps that work and marks the remainder
+ // unread, which is what protects their existing membership from being overwritten as "empty".
+ const clock = opts.clock ?? Date.now;
+ const startedAt = clock();
+ const budget = opts.budgetMs;
+ const outOfTime = () => budget != null && clock() - startedAt >= budget;
+ const ranOut: string[] = [];
  // The standing pace, which only ever gets slower. A store that objected once will object again if
  // we go straight back to the old rate — which is exactly what lost blummier everything from R on.
  let pace = opts.delayMs ?? DELAY_MS;
@@ -133,6 +146,9 @@ export async function readCollectionMembership(
 
  for (const [i, slug] of attempt.entries()) {
   if (i > 0) await wait(pace);
+  // Checked after the pace, so a store that has throttled us into a 60s standing delay stops here
+  // rather than spending the whole budget waiting.
+  if (outOfTime()) { ranOut.push(...attempt.slice(i)); break; }
   let complete = false;
   // The feed's own sequence, kept as we page through it. A Set beside it so a piece listed twice
   // holds its first position without an O(n²) scan on a 5,000-piece collection.
@@ -168,7 +184,11 @@ export async function readCollectionMembership(
    if (sequence.length) order.set(slug, sequence);
   }
  }
- return { membership, order, stock, completed, incomplete, notAttempted, truncated, throttleHits };
+ // Collections past the ceiling are UNREAD, not read-and-empty. They stay in `notAttempted` for
+ // reporting, but they also belong in `incomplete`, which is what a caller uses to decide whose
+ // membership must be preserved rather than overwritten. Reported only to a console.log, 2nd
+ // Street's 461 collections past the cap looked exactly like 461 she had emptied.
+ return { membership, order, stock, completed, incomplete: [...incomplete, ...notAttempted, ...ranOut], notAttempted: [...notAttempted, ...ranOut], truncated, throttleHits };
 
  /** One page, with the store's own answer respected. Null means we could not read it. */
  async function readPage(slug: string, page: number): Promise<CollectionProduct[] | null> {

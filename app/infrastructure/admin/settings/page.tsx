@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Activity } from "lucide-react";
-import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, ChevronRight } from "lucide-react";
+import { Mail, Activity, Bell } from "lucide-react";
+import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SETTINGS_GROUPS } from "./sections";
 import { AdminHeader, TechCard } from "../ui";
@@ -14,8 +14,8 @@ import { AdminHeader, TechCard } from "../ui";
 // most of them. That's why each row carries a line about what it's FOR rather than what it contains.
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
- Mail, Activity,
- Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle,
+ Mail, Activity, Bell,
+ Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid,
 };
 
 
