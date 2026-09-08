@@ -14,7 +14,11 @@ const REASONS = [
 
 function UnsubscribeForm() {
  const searchParams = useSearchParams();
- const email = searchParams.get("email") ?? "";
+ // Most VYA emails link here without an address (the footer has no per-recipient token), so the
+ // page has to be able to ask. With `?email=`, it's filled in and shown as before.
+ const linkEmail = searchParams.get("email") ?? "";
+ const [typedEmail, setTypedEmail] = useState("");
+ const email = linkEmail || typedEmail.trim();
 
  const [reason, setReason] = useState("");
  const [detail, setDetail] = useState("");
@@ -24,7 +28,7 @@ function UnsubscribeForm() {
 
  async function handleSubmit(e: React.FormEvent) {
  e.preventDefault();
- if (!reason) return;
+ if (!reason || !email) return;
  setLoading(true);
  setError("");
  try {
@@ -68,10 +72,26 @@ function UnsubscribeForm() {
  <p className="font-serif text-2xl text-[#5D0F17] text-center mb-2">
  Unsubscribe
  </p>
- {email && (
+ {linkEmail ? (
  <p className="text-sm text-[#5D0F17]/50 text-center mb-8">
- {email}
+ {linkEmail}
  </p>
+ ) : (
+ <div className="mb-8">
+  <label htmlFor="unsub-email" className="text-sm text-[#5D0F17] mb-2 block font-medium">
+   Which email address?
+  </label>
+  <input
+   id="unsub-email"
+   type="email"
+   required
+   autoComplete="email"
+   value={typedEmail}
+   onChange={(e) => setTypedEmail(e.target.value)}
+   placeholder="you@example.com"
+   className="w-full rounded-lg border border-[#5D0F17]/20 bg-white px-3 py-2.5 text-sm text-[#5D0F17] outline-none focus:border-[#5D0F17]/60"
+  />
+ </div>
  )}
 
  <p className="text-sm text-[#5D0F17] mb-4 font-medium">
@@ -117,7 +137,7 @@ function UnsubscribeForm() {
 
  <button
  type="submit"
- disabled={!reason || loading}
+ disabled={!reason || !email || loading}
  className="w-full bg-[#5D0F17] text-[#FFFDF8] py-3.5 text-xs uppercase tracking-[0.15em] hover:bg-[#5D0F17]/85 transition disabled:opacity-40 disabled:cursor-not-allowed"
  >
  {loading ? "Unsubscribing..." : "Confirm Unsubscribe"}

@@ -38,6 +38,13 @@ const PUBLIC_ROUTES = [
   "/api/admin/set-password",
   "/terms",
   "/privacy",
+  // Unsubscribing must never require signing in. The footer link in every VYA email landed here
+  // and this gate bounced it to /login — and someone who joined from the waitlist has no password
+  // to sign in WITH, so the only way off the list was to email us and ask. Both the page and the
+  // route it posts to are public for the same reason /api/flyer-join is: gating the form would let
+  // the page render and then refuse.
+  "/unsubscribe",
+  "/api/unsubscribe",
   // The consignor portal signs people in on its own terms: a magic link sets a
   // consignor_session cookie, which is NOT an Auth.js session — so the catch-all
   // gate below would bounce a legitimately signed-in consignor to /login, a
