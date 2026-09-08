@@ -52,7 +52,7 @@ const MARGIN_UNKNOWN = {
 };
 
 async function signIn(page: Page) {
- const base = new URL(page.context()["_options"]?.baseURL ?? process.env.E2E_BASE ?? "http://localhost:3001");
+ const base = new URL(process.env.E2E_BASE ?? "http://localhost:3001");
  await page.context().addCookies([{ name: "via_admin_token", value: adminToken(), domain: base.hostname, path: "/" }]);
 }
 

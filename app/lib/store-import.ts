@@ -9,6 +9,10 @@ import { makeBlock, type BlockType } from "./storefront-blocks.ts";
 import type { StoreProfile } from "./store-profile.ts";
 import { detectPlatform, declineMessage } from "./import-engine/detect.ts";
 import { fetchWooProducts, fetchViaJsonLd, BlockedByStoreError } from "./import-engine/rungs.ts";
+import type { ProductLayout } from "./storefront-templates";
+import type { ProductPageConfig } from "./storefront-product-page";
+import type { SiteEffects } from "./storefront-effects";
+import type { StorefrontWords } from "./storefront-words";
 
 /** One storefront section as an editable studio block (matches StorefrontTheme.blocks). */
 type HomeBlock = { id: string; type: string; props: Record<string, string>; style?: { bg?: string } };
@@ -69,7 +73,17 @@ export type StorefrontTheme = {
  // How a single product page is arranged. Seeded by the template: "rail" keeps the details beside you
  // while the images scroll, "stacked" runs the photographs full width with the copy beneath, "classic"
  // is the conventional two-column page. Absent = classic, which is what every store rendered before.
- productLayout?: "classic" | "rail" | "stacked";
+ productLayout?: ProductLayout; // every layout in storefront-templates.ts — the product page renders all six
+ // Per-store product-page copy/visibility, site effects, custom JS, storefront wording and the
+ // footer newsletter lines. All optional and resolved with defaults by their own modules
+ // (storefront-product-page.ts, storefront-effects.ts, storefront-words.ts); the design route,
+ // the assistant and the storefront read and write them, so the type has to carry them.
+ productPage?: Partial<ProductPageConfig> | null;
+ effects?: Partial<SiteEffects> | null;
+ customJs?: string;
+ words?: Partial<StorefrontWords> | null;
+ footerNewsletterHeading?: string;
+ footerNewsletterText?: string;
  blocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
  shopBlocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
  extraPages?: { slug: string; title: string; blocks: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
