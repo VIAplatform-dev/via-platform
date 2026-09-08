@@ -133,23 +133,20 @@ test.describe("Home · what needs her", () => {
 });
 
 test.describe("The sidebar", () => {
- test("says Add a piece, Site versions, Abandoned carts — and never Drafts under Storefront or Cart recovery", async ({ page }) => {
+ test("is the sidebar sellers know: Add listing under Inventory, Drafts under Storefront, Cart recovery", async ({ page }) => {
   await signIn(page);
-  await mockHome(page, true);
+  await page.goto(`/admin/home?store=${STORE}`);
+  const aside = page.locator("aside").first();
+  await expect(aside.getByText("Inventory")).toBeVisible();
+  await aside.getByText("Inventory").click();
+  await expect(aside.getByText("Add listing")).toBeVisible();
   await page.goto(`/admin/storefront/versions?store=${STORE}`);
-  const aside = page.locator("aside");
-  const add = aside.locator("a", { hasText: "Add a piece" });
-  await expect(add).toBeVisible();
-  await expect(add).toHaveAttribute("href", "/admin/add-listing");
-  await expect(aside.getByText("Site versions")).toBeVisible();
-  await expect(aside.getByText("Drafts", { exact: true })).toHaveCount(0);
-  await expect(aside.getByText("Cart recovery")).toHaveCount(0);
-  await expect(aside.getByText("Bring your site")).toHaveCount(0);
-
+  await expect(aside.getByText("Drafts").first()).toBeVisible();
+  await expect(aside.getByText("Site versions")).toHaveCount(0);
   await page.goto(`/admin/customers/recovery?store=${STORE}`);
-  await expect(aside.getByText("Abandoned carts")).toBeVisible();
-  await expect(aside.getByText("Cart recovery")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Abandoned carts" })).toBeVisible();
+  await expect(aside.getByText("Cart recovery")).toBeVisible();
+  await expect(aside.getByText("Abandoned carts")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Cart recovery" })).toBeVisible();
  });
 });
 

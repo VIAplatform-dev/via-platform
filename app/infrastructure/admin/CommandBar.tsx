@@ -24,7 +24,8 @@ const PAGES: Hit[] = [
  { id: "p-mkt", label: "Marketing", href: `${B}/marketing` },
  { id: "p-disc", label: "Discounts", href: `${B}/discounts` },
  // Apps & integrations is a settings section now, so it arrives with the SETTINGS_SECTIONS spread below.
- { id: "p-pay", label: "Payments", href: `${B}/settings/payments` },
+ { id: "p-apps", label: "Apps & integrations", href: `${B}/apps` },
+ { id: "p-pay", label: "Payments", href: `${B}/payments` },
  { id: "p-an", label: "Analytics", href: `${B}/dashboard` },
  { id: "p-trends", label: "Trends", href: `${B}/trends` },
  { id: "p-set", label: "Settings", href: `${B}/settings` },
@@ -37,7 +38,7 @@ const PAGES: Hit[] = [
  { id: "p-sold", label: "Sold", sub: "past sales", href: `${B}/inventory/sold` },
  { id: "p-collections", label: "Collections", sub: "group pieces together", href: `${B}/inventory/collections` },
  { id: "p-bulk", label: "Bulk upload", sub: "many photos at once", href: `${B}/bulk-upload` },
- { id: "p-import", label: "Import your site", sub: "bring an existing website over", href: `${B}/import` },
+ { id: "p-import", label: "Bring your site", sub: "bring an existing website over", href: `${B}/import` },
  { id: "p-emails", label: "Your emails", sub: "everything your shop sends, drafts, scheduled", href: `${B}/marketing/emails` },
  { id: "p-campaigns", label: "Campaigns", sub: "write and send an email", href: `${B}/marketing/campaigns` },
  { id: "p-emaildesign", label: "Email design", sub: "logo, colours and fonts for your emails", href: `${B}/marketing/design` },
@@ -45,7 +46,7 @@ const PAGES: Hit[] = [
  { id: "p-sharelinks", label: "Share links", sub: "links for social media", href: `${B}/marketing/share-links` },
  { id: "p-instagram", label: "Instagram", href: `${B}/marketing/instagram` },
  { id: "p-esp", label: "Klaviyo & Mailchimp", sub: "connect your email tool", href: `${B}/apps/email` },
- { id: "p-recovery", label: "Abandoned carts", sub: "people who didn't finish checkout", href: `${B}/customers/recovery` },
+ { id: "p-recovery", label: "Cart recovery", sub: "people who didn't finish checkout", href: `${B}/customers/recovery` },
  { id: "p-marketplaces", label: "Marketplaces", sub: "depop, ebay, vestiaire cross-listing", href: `${B}/cross-listing/settings` },
  // Every settings section, taken from the ONE list the rail and the landing page already share —
  // so a section added there is searchable the same day rather than whenever someone remembers this

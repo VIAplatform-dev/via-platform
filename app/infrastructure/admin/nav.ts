@@ -4,7 +4,6 @@
 // resolves, so Node can load this file and a test can say what a seller's left rail contains
 // without rendering anything. The layout owns the chrome; this file owns what is in it.
 
-import { SETTINGS_SECTIONS } from "./settings/sections.ts";
 
 export type NavSub = { href: string; label: string };
 export type NavItem = {
@@ -23,31 +22,26 @@ export type NavGroup = { label?: string; items: NavItem[] };
 export const B = "/admin";
 export const M = `${B}/market`;
 
-// Every settings section a seller can open, in the order the Settings rail shows them. One list,
-// so the sidebar can never disagree with the rail about what exists.
-const SETTINGS_CHILDREN: NavSub[] = SETTINGS_SECTIONS.filter((s) => !s.vyaOnly).map((s) => ({ href: s.href, label: s.label }));
-
 export const GROUPS: NavGroup[] = [
+ // The sidebar exactly as it was before the owner audit (2026-09-08): the owner asked for the old
+ // sidebar back, unchanged. Only the owner-only Platform group carries one extra row (the setup
+ // funnel), which no seller sees.
  { items: [{ href: `${B}/home`, label: "Home", icon: "Home" }] },
  {
   label: "Sell",
   items: [
-   // The one action that makes her money, and the one she does forty times in an afternoon —
-   // a top-level row, not a sub-tab she has to open Inventory to find.
-   { href: `${B}/add-listing`, label: "Add a piece", icon: "PlusCircle" },
    {
     href: `${B}/inventory`, label: "Inventory", icon: "Package",
-    match: [`${B}/bulk-upload`], // keep Inventory active/expanded while bulk-uploading
+    match: [`${B}/add-listing`, `${B}/bulk-upload`], // keep Inventory active/expanded while adding listings
     children: [
+     { href: `${B}/add-listing`, label: "Add listing" },
      { href: `${B}/bulk-upload`, label: "Bulk upload" },
      { href: `${B}/inventory/collections`, label: "Collections" },
      { href: `${B}/inventory/drafts`, label: "Drafts" },
      { href: `${B}/inventory/sold`, label: "Sold" },
     ],
    },
-   // The marketplace overview is a tab inside Cross-listing now, so "Analytics" means one thing
-   // in this sidebar: the store's analytics.
-   { href: `${B}/cross-listing`, label: "Cross-listing", icon: "Share2", match: [`${B}/cross-listing/analytics`], children: [{ href: `${B}/cross-listing`, label: "Listings" }, { href: `${B}/cross-listing/settings`, label: "Marketplaces" }] },
+   { href: `${B}/cross-listing`, label: "Cross-listing", icon: "Share2", match: [`${B}/cross-listing/analytics`], children: [{ href: `${B}/cross-listing`, label: "Listings" }, { href: `${B}/cross-listing/analytics`, label: "Analytics" }, { href: `${B}/cross-listing/settings`, label: "Marketplaces" }] },
    { href: `${B}/consignment`, label: "Consignment", icon: "Handshake", children: [{ href: `${B}/consignment/consignors`, label: "Consignors" }, { href: `${B}/consignment/payouts`, label: "Payouts" }, { href: `${B}/consignment/settings`, label: "Settings" }] },
    { href: `${B}/rentals`, label: "Rentals", icon: "CalendarRange", badgeKey: "rentals" },
    { href: `${B}/appointments`, label: "Appointments", icon: "CalendarClock", badgeKey: "appointments" },
@@ -61,24 +55,23 @@ export const GROUPS: NavGroup[] = [
    {
     // Lands on the storefronts list, NOT the editor. The editor is full-screen and covers this
     // sidebar, so making it the parent's destination meant one click buried the sub-items with no
-    // way back to the versions or the domain without leaving the section entirely.
+    // way back to Drafts or the domain without leaving the section entirely.
     href: `${B}/storefront/versions`, label: "Storefront", icon: "Store",
     match: [`${B}/storefront`],
     children: [
      { href: `${B}/storefront`, label: "Edit site" },
-     { href: `${B}/storefront/versions`, label: "Site versions" },
+     { href: `${B}/storefront/versions`, label: "Drafts" },
      { href: `${B}/settings/domain`, label: "Your domain" },
     ],
    },
-   { href: `${B}/import`, label: "Import your site", icon: "Plug" },
+   { href: `${B}/import`, label: "Bring your site", icon: "Plug" },
    {
     href: `${B}/customers`, label: "Customers", icon: "Users",
-    children: [{ href: `${B}/customers/recovery`, label: "Abandoned carts" }],
+    children: [{ href: `${B}/customers/buyers`, label: "Buyers" }, { href: `${B}/customers/recovery`, label: "Cart recovery" }],
    },
    {
     href: `${B}/marketing`, label: "Marketing", icon: "Megaphone",
     children: [
-     { href: `${B}/marketing/emails`, label: "Your emails" },
      { href: `${B}/marketing/campaigns`, label: "Campaigns" },
      { href: `${B}/marketing/design`, label: "Email design" },
      { href: `${B}/marketing/share-links`, label: "Share links" },
@@ -90,14 +83,28 @@ export const GROUPS: NavGroup[] = [
   ],
  },
  {
+  label: "Apps",
+  items: [{
+   href: `${B}/apps`, label: "Apps & integrations", icon: "LayoutGrid",
+   children: [
+    { href: `${B}/apps`, label: "All apps" },
+    { href: `${B}/apps/email`, label: "Klaviyo & Mailchimp" },
+   ],
+  }],
+ },
+ {
   label: "Business",
   items: [
    { href: `${B}/dashboard`, label: "Analytics", icon: "BarChart3" },
    {
     href: `${B}/settings`, label: "Settings", icon: "Settings",
-    // Apps & integrations is a setting that lives outside /settings — keep Settings lit there.
-    match: [`${B}/apps`],
-    children: SETTINGS_CHILDREN,
+    children: [
+     { href: `${B}/settings/general`, label: "General" },
+     { href: `${B}/settings/plan`, label: "Plan & billing" },
+     { href: `${B}/settings/payments`, label: "Payments" },
+     { href: `${B}/settings/shipping`, label: "Shipping & duties" },
+     { href: `${B}/settings/tax`, label: "Sales tax" },
+    ],
    },
   ],
  },
@@ -123,7 +130,7 @@ export const MARKET_GROUPS: NavGroup[] = [
  ] },
  { label: "Inventory", items: [{ href: `${M}/inventory`, label: "At this market", icon: "Boxes" }, { href: `${M}/bring`, label: "Bring list", icon: "ClipboardList" }] },
  // Payments is the SAME Payments as Settings › Payments — one place to look, whichever mode she is in.
- { label: "Market", items: [{ href: `${M}/setup`, label: "Setup", icon: "SlidersHorizontal" }, { href: `${B}/settings/payments`, label: "Payments", icon: "CreditCard" }] },
+ { label: "Market", items: [{ href: `${M}/setup`, label: "Setup", icon: "SlidersHorizontal" }, { href: `${B}/payments`, label: "Payments", icon: "CreditCard" }] },
 ];
 
 export const MARKET_TABS: { href: string; label: string; icon: string }[] = [
@@ -138,7 +145,7 @@ export const MARKET_TABS: { href: string; label: string; icon: string }[] = [
 // VYA's own tooling, not a store's. Trends, AI accuracy and the golden set are how WE measure the
 // model. "Import your site" is a step INSIDE onboarding, not a place in the workspace — a seller
 // who has just imported her site should not see an invitation to import it again. Owner-only.
-export const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/setup-funnel`, `${B}/import`]);
+export const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/setup-funnel`, `${B}/apps`, `${B}/import`]);
 
 export type NavSwitches = {
  /** The workspace owner (ADMIN_PASSWORD), NOT a signed-in store partner. */
