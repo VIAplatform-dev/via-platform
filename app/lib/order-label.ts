@@ -1,9 +1,11 @@
-import { getOrderDetail, setOrderLabel, setReturnLabel, getReturnLabelInfo, setShipBackLabel } from "./db/orders";
+import { getOrderDetail, setOrderLabel, setReturnLabel, getReturnLabelInfo, setShipBackLabel, listParcelItemSizes } from "./db/orders";
 import { getSellerById } from "./db/sellers";
 import { getShippingSettings, hasShipFrom } from "./store-shipping-db";
 import { getRates, buyLabel, voidLabel, isShipConfigured, getOrCreateShipAccount } from "./ship-provider";
 import { recordLabelTransaction, getLabelTransaction, markLabelVoided } from "./shippo-labels-db";
 import { MIN_MARGIN_CENTS } from "./shipping-tiers";
+import { parcelForLabel, combineParcels } from "./parcel-core";
+import { isoCountry } from "./ship-from-core";
 import { sendOpsAlert } from "./email";
 import { customsForOrder } from "./order-customs";
 
@@ -29,9 +31,24 @@ export async function generateOrderLabel(orderId: string): Promise<{ ok: boolean
  if (!hasShipFrom(shipping)) return { ok: false, reason: "no-ship-from" };
 
  const f = shipping.shipFrom!;
- const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: seller.email };
- const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
- const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+ // Countries go to the carrier as ISO-2. The settings form takes free text, and two live stores
+ // had "United States" saved — which Shippo and EasyPost both reject, so every rate came back
+ // empty and no label could be bought. See isoCountry.
+ const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: isoCountry(f.country), phone: f.phone, email: seller.email };
+ const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: isoCountry(order.shipCountry), phone: order.buyerPhone, email: order.buyerEmail };
+ // EVERY piece in this checkout, not just the row we were called with.
+ //
+ // Orders are one row per piece, so a bag of three shares a payment intent. Sizing the label from
+ // one row meant a t-shirt bought alongside a large bag produced a t-shirt-sized label for a box
+ // holding both. And never smaller than the buyer paid for: this used to fall back to 16oz in a
+ // 12x9x3 whatever the piece was. See combineParcels / parcelForLabel.
+ const siblings = order.stripePaymentIntent
+  ? await listParcelItemSizes(order.sellerId, order.stripePaymentIntent).catch(() => [])
+  : [];
+ const parcel = combineParcels(
+  siblings.length ? siblings : [{ weightOz: order.itemWeightOz, lengthIn: order.itemLengthIn, widthIn: order.itemWidthIn, heightIn: order.itemHeightIn }],
+  { shippingPaidCents: order.shippingPaidCents },
+ );
 
  const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
  // A parcel crossing a border needs a declaration or the carrier returns no international rates.
@@ -98,9 +115,15 @@ export async function generateReturnLabel(orderId: string): Promise<{ ok: boolea
  const s = shipping.shipFrom!;
 
  // FROM = the buyer (the return originates with them); TO = the store's ship-from.
- const from = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
- const to = { name: s.name || seller.name, street1: s.street1!, street2: s.street2, city: s.city!, state: s.state!, zip: s.zip!, country: s.country || "US", phone: s.phone, email: seller.email };
- const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+ const from = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: isoCountry(order.shipCountry), phone: order.buyerPhone, email: order.buyerEmail };
+ const to = { name: s.name || seller.name, street1: s.street1!, street2: s.street2, city: s.city!, state: s.state!, zip: s.zip!, country: isoCountry(s.country), phone: s.phone, email: seller.email };
+ // Same floor as the outbound label: it is the same physical object coming back, so a return can
+ // no more be a 16oz mailer than the original was. What the buyer paid to receive it is the size
+ // it evidently is.
+ const parcel = parcelForLabel({
+  item: { weightOz: order.itemWeightOz, lengthIn: order.itemLengthIn, widthIn: order.itemWidthIn, heightIn: order.itemHeightIn },
+  shippingPaidCents: order.shippingPaidCents,
+ });
 
  const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
  // A parcel crossing a border needs a declaration or the carrier returns no international rates.
@@ -134,9 +157,15 @@ export async function generateShipBackLabel(orderId: string): Promise<{ ok: bool
  if (!hasShipFrom(shipping)) return { ok: false, reason: "no-store-address" };
  const f = shipping.shipFrom!;
 
- const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: seller.email };
- const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
- const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+ const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: isoCountry(f.country), phone: f.phone, email: seller.email };
+ const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: isoCountry(order.shipCountry), phone: order.buyerPhone, email: order.buyerEmail };
+ // Same floor as the outbound label: it is the same physical object coming back, so a return can
+ // no more be a 16oz mailer than the original was. What the buyer paid to receive it is the size
+ // it evidently is.
+ const parcel = parcelForLabel({
+  item: { weightOz: order.itemWeightOz, lengthIn: order.itemLengthIn, widthIn: order.itemWidthIn, heightIn: order.itemHeightIn },
+  shippingPaidCents: order.shippingPaidCents,
+ });
 
  const shipAcct = await getOrCreateShipAccount(seller.slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
  // A parcel crossing a border needs a declaration or the carrier returns no international rates.

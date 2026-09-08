@@ -70,6 +70,25 @@ export async function listSellerOrders(sellerId: string): Promise<SellerOrderRow
  * The pieces of one parcel — every order on one payment — with what the tracking email needs.
  * Seller-scoped so a parcel can never be acted on across stores.
  */
+/**
+ * Every piece going in one box, with the measurements the label needs.
+ *
+ * Orders are one row per piece, so a checkout with three things is three rows sharing a payment
+ * intent — and the label was bought from ONE of them. A t-shirt and a large bag produced a
+ * t-shirt-sized label for a box holding both.
+ */
+export async function listParcelItemSizes(sellerId: string, pi: string) {
+ const db = getDb();
+ return db
+  .select({
+   id: orders.id,
+   weightOz: items.weightOz, lengthIn: items.lengthIn, widthIn: items.widthIn, heightIn: items.heightIn,
+  })
+  .from(orders)
+  .leftJoin(items, eq(items.id, orders.itemId))
+  .where(and(eq(orders.sellerId, sellerId), eq(orders.stripePaymentIntent, pi)));
+}
+
 export async function listParcelOrders(sellerId: string, pi: string) {
  const db = getDb();
  return db

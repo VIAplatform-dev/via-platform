@@ -9,6 +9,8 @@
 // keyed on a BOOKING rather than an order: rentals never create an order, because nothing is sold.
 // FROM the renter, TO the store — the piece is coming home.
 // ───────────────────────────────────────────────────────────────────────────
+import { isoCountry } from "../ship-from-core";
+import { parcelForLabel } from "../parcel-core";
 import { getBooking, setRentalReturnLabel, getStoreSettings } from "./rentals-db";
 import { resolveSettings } from "./settings-core";
 import { getSellerById } from "../db/sellers";
@@ -52,23 +54,25 @@ export async function generateRentalReturnLabel(bookingId: string): Promise<Labe
  // FROM the renter, TO the shop — the opposite of the outbound leg.
  const from = {
   name: booking.renterName || "Renter", street1: booking.ship.line1, street2: booking.ship.line2 || undefined,
-  city: booking.ship.city, state: booking.ship.state, zip: booking.ship.zip, country: booking.ship.country || "US",
+  city: booking.ship.city, state: booking.ship.state, zip: booking.ship.zip, country: isoCountry(booking.ship.country),
   phone: booking.renterPhone || undefined, email: booking.renterEmail || undefined,
  };
  const to = {
   name: s.name || seller.name, street1: s.street1!, street2: s.street2, city: s.city!, state: s.state!,
-  zip: s.zip!, country: s.country || "US", phone: s.phone, email: seller.email,
+  zip: s.zip!, country: isoCountry(s.country), phone: s.phone, email: seller.email,
  };
 
  // The piece's own measurements where it has them — a rented coat and a rented clutch are not the
  // same parcel, and a wrong guess is a wrong price.
  const item = await getItem(booking.itemId).catch(() => null);
- const parcel = {
-  weightOz: item?.weightOz || 16,
-  lengthIn: item?.lengthIn || 12,
-  widthIn: item?.widthIn || 9,
-  heightIn: item?.heightIn || 3,
- };
+ // …and where it hasn't, the middle of the ladder rather than a mailer. The line above was right
+ // about the wrong guess being a wrong price, and then guessed 16oz in a 12x9x3 — which is a
+ // clutch, so every unmeasured coat went back on a label that didn't cover it. parcelForLabel
+ // with nothing paid resolves to Medium, never Small.
+ const parcel = parcelForLabel({
+  item: { weightOz: item?.weightOz, lengthIn: item?.lengthIn, widthIn: item?.widthIn, heightIn: item?.heightIn },
+  shippingPaidCents: null,
+ });
 
  const acct = await getOrCreateShipAccount(seller.slug, seller.name);
  const rates = await getRates(from, to, parcel, acct);

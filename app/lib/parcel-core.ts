@@ -130,3 +130,95 @@ export function resolveParcelAtPublish(args: {
  };
  return { parcel, estimate };
 }
+
+/**
+ * The parcel to buy a label for.
+ *
+ * This used to be `order.itemWeightOz || 16` with 12×9×3 behind it — so a piece that reached the
+ * order without dimensions bought a small-mailer label regardless of what it was. A massive bag
+ * shipped on a 16oz label: the carrier either refuses it at the counter or bills the adjustment
+ * back weeks later, and either way the store finds out after the fact.
+ *
+ * The buyer already told us how big it is. They paid a tier — Small, Medium or Large — and that
+ * tier is a floor the label may not go under. So: use the piece's own measurements where it has
+ * them, and where it doesn't, fall back to the tier that was PAID FOR rather than to a guess. Where
+ * a piece has measurements that disagree with the tier, take the larger of the two; a heavy coat
+ * that somehow got listed at 4oz should not buy a 4oz label.
+ */
+export function parcelForLabel(args: {
+ item: { weightOz?: number | null; lengthIn?: number | null; widthIn?: number | null; heightIn?: number | null };
+ /** What the buyer actually paid for shipping, in cents — maps back to the tier they bought. */
+ shippingPaidCents?: number | null;
+}): { weightOz: number; lengthIn: number; widthIn: number; heightIn: number } {
+ const paid = Number(args.shippingPaidCents) || 0;
+ // The most expensive tier the payment covers: what the buyer bought, and our floor.
+ const paidTier = paid > 0
+  ? [...SHIPPING_TIERS].reverse().find((t) => paid >= t.priceCents)?.id ?? "small"
+  : null;
+
+ const num = (v: unknown) => { const n = Math.ceil(Number(v)); return Number.isFinite(n) && n > 0 ? n : null; };
+ const w = num(args.item.weightOz);
+ const l = num(args.item.lengthIn), wd = num(args.item.widthIn), h = num(args.item.heightIn);
+
+ // With no tier to lean on either, "medium" is the honest default — the middle of the ladder, not
+ // the bottom of it. Under-buying is the expensive mistake; over-buying costs pennies.
+ const floorTier: TierId = paidTier ?? "medium";
+ const floorBox = BOX[floorTier];
+ // Two different jobs, and conflating them over-buys. When the weight is UNKNOWN we buy the top of
+ // the tier, because that's the heaviest thing the buyer's payment could have been for. When it is
+ // KNOWN we trust it, but not below the tier's own floor — so a genuine 90oz coat buys 90oz, while
+ // one mis-typed as 4oz still buys a Large parcel.
+ const unknownWeight = floorTier === "small" ? 16 : floorTier === "medium" ? 48 : 96;
+ const minWeight = floorTier === "small" ? 1 : floorTier === "medium" ? 17 : 49;
+
+ // Item dims win only when they're at least as big as the floor, so a missing or nonsense
+ // measurement can never shrink the parcel below what was paid for.
+ return {
+  weightOz: w == null ? unknownWeight : Math.max(w, minWeight),
+  lengthIn: Math.max(l ?? 0, floorBox.lengthIn),
+  widthIn: Math.max(wd ?? 0, floorBox.widthIn),
+  heightIn: Math.max(h ?? 0, floorBox.heightIn),
+ };
+}
+
+/**
+ * One box for a whole checkout.
+ *
+ * Orders are one row per piece, and the label was bought per row from that row's measurements — so
+ * a t-shirt and a large bag bought together produced two labels, each sized for its own item. In
+ * practice the seller packs them in one box and sticks on whichever label she clicked, which is
+ * the t-shirt's. The parcel has to describe what is actually being posted.
+ *
+ * Weight adds up. Dimensions don't: things go IN a box, they don't queue end to end. Clothing packs
+ * flat and stacks, so the box is as long and wide as its largest item and as tall as the stack —
+ * max, max, sum. That errs slightly large, which is the safe direction: an over-declared parcel
+ * costs a little more, an under-declared one gets refused or billed back.
+ */
+export function combineParcels(
+ items: { weightOz?: number | null; lengthIn?: number | null; widthIn?: number | null; heightIn?: number | null }[],
+ opts: { shippingPaidCents?: number | null } = {},
+): { weightOz: number; lengthIn: number; widthIn: number; heightIn: number } {
+ const real = (items || []).filter(Boolean);
+ if (!real.length) return parcelForLabel({ item: {}, shippingPaidCents: opts.shippingPaidCents });
+ if (real.length === 1) return parcelForLabel({ item: real[0], shippingPaidCents: opts.shippingPaidCents });
+
+ // Add up what the pieces actually are. The floor is applied ONCE, to the total — applying it per
+ // item would make three t-shirts weigh more than a coat, because each would be rounded up to the
+ // middle of the ladder before anything was added together.
+ const num = (v: unknown, fallback: number) => { const n = Math.ceil(Number(v)); return Number.isFinite(n) && n > 0 ? n : fallback; };
+ const summed = real.reduce<{ weightOz: number; lengthIn: number; widthIn: number; heightIn: number }>(
+  (acc, it) => ({
+   // A piece with nothing recorded still takes up room in the box: the same unknown weight the
+   // category default uses, in a modest flat footprint.
+   weightOz: acc.weightOz + num(it.weightOz, UNKNOWN_OZ),
+   lengthIn: Math.max(acc.lengthIn, num(it.lengthIn, 12)),
+   widthIn: Math.max(acc.widthIn, num(it.widthIn, 9)),
+   heightIn: acc.heightIn + num(it.heightIn, 2),
+  }),
+  { weightOz: 0, lengthIn: 0, widthIn: 0, heightIn: 0 },
+ );
+
+ // …then the same floor a single label gets, so a combined parcel can't come out under what the
+ // buyer paid either.
+ return parcelForLabel({ item: summed, shippingPaidCents: opts.shippingPaidCents });
+}

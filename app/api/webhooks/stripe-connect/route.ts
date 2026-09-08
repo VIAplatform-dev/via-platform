@@ -13,6 +13,7 @@ import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { logError } from "@/app/lib/error-log";
 import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
+import { sendOpsAlert } from "@/app/lib/ops-alert";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { sendBuyerOrderConfirmation, sendSellerSaleNotification } from "@/app/lib/email";
 import { fireAutomationTrigger } from "@/app/lib/automation-engine";
@@ -92,7 +93,22 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  // function freezes, but a failure (no ship-from / Shippo off) just leaves the manual button.
  if (idx === 0 && o.shippingPaidCents > 0) {
  const r = await generateOrderLabel(order.id).catch((e) => { logError("auto-generate-label", e, { context: { orderId: order.id } }); return { ok: false, reason: "threw" }; });
- if (!r.ok && r.reason && r.reason !== "already-labeled") console.log(`[auto-label] order ${order.id}: ${r.reason}`);
+ // A failure here used to be a console.log and nothing else: the seller had a paid order, no
+ // label, and no way to find out why. "no-rates" in particular meant something was wrong with the
+ // store's own address — two stores had a country the carriers reject — and it was invisible.
+ // The manual button still works; this is so somebody KNOWS it has to be pressed.
+ if (!r.ok && r.reason && r.reason !== "already-labeled") {
+  console.log(`[auto-label] order ${order.id}: ${r.reason}`);
+  await sendOpsAlert(
+   `Label didn't buy itself — seller ${o.sellerId} order ${order.id}`,
+   `Reason: ${r.reason}. The buyer has paid and there is no label. ` +
+   (r.reason === "no-rates"
+    ? "No carrier would quote it — check the store's ship-from address (a country that isn't a two-letter code returns no rates) and the piece's weight."
+    : r.reason === "no-ship-from"
+     ? "The store has no complete ship-from address in Settings → Locations."
+     : "Check Shippo/EasyPost configuration."),
+  ).catch(() => {});
+ }
  }
  idx++;
  }
