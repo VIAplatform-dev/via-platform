@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ShoppingBag, Tag, MessageCircle } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButtonLink, StatusPill, MetricCard, TH, TD } from "../../ui";
+import { AdminPage, AdminHeader, TechCard, TechButtonLink, StatusPill, MetricCard, TH, TD, cn } from "../../ui";
+import { inputCls } from "@/app/store/ui";
 import { fmtOrderNo } from "@/app/store/orders/page";
 
-type Profile = { email: string; name: string | null; phone: string | null; location: string | null; subscribed: boolean; source: string; orders: number; spentCents: number; lastOrderAt: string | null; addedAt: string | null };
+type Profile = { email: string; name: string | null; phone: string | null; location: string | null; subscribed: boolean; source: string; orders: number; spentCents: number; lastOrderAt: string | null; addedAt: string | null; tags?: string[]; notes?: string | null };
 type Order = { id: string; orderNo: number; itemTitle: string | null; amountCents: number; status: string; paidAt: string | null; createdAt: string | null };
 type Offer = { id: number; itemTitle: string | null; amountCents: number; listPriceCents: number; status: string; lastActor: string; createdAt: string };
 type Conv = { id: number; itemTitle: string | null; lastMessage: string | null; lastMessageAt: string; storeUnread: number };
-type Data = { profile: Profile; orders: Order[]; offers: Offer[]; conversations: Conv[] };
+type Data = { profile: Profile; orders: Order[]; offers: Offer[]; conversations: Conv[]; allTags?: string[] };
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
@@ -27,10 +28,36 @@ export default function CustomerDetailPage() {
  const decoded = decodeURIComponent(email);
  const [data, setData] = useState<Data | null>(null);
  const [loading, setLoading] = useState(true);
+ // Her memory of this person: a private note (saved when she clicks away) and tags (saved on change).
+ const [notes, setNotes] = useState("");
+ const [tags, setTags] = useState<string[]>([]);
+ const [newTag, setNewTag] = useState("");
+ const [saved, setSaved] = useState<null | "saving" | "saved" | "error">(null);
+ const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+ async function saveMemory(patch: { notes?: string; tags?: string[] }) {
+ setSaved("saving");
+ const r = await fetch("/api/store/customers/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: decoded, ...patch }) }).catch(() => null);
+ setSaved(r?.ok ? "saved" : "error");
+ if (savedTimer.current) clearTimeout(savedTimer.current);
+ savedTimer.current = setTimeout(() => setSaved(null), 1800);
+ }
+ function addTag(raw: string) {
+ const t = raw.trim().toLowerCase();
+ if (!t || tags.includes(t)) { setNewTag(""); return; }
+ const next = [...tags, t];
+ setTags(next); setNewTag("");
+ void saveMemory({ tags: next });
+ }
+ function removeTag(t: string) {
+ const next = tags.filter((x) => x !== t);
+ setTags(next);
+ void saveMemory({ tags: next });
+ }
 
  useEffect(() => {
  let active = true;
- fetch(`/api/store/customers/profile?email=${encodeURIComponent(decoded)}`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (active && d?.ok) setData(d); }).catch(() => {}).finally(() => { if (active) setLoading(false); });
+ fetch(`/api/store/customers/profile?email=${encodeURIComponent(decoded)}`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (active && d?.ok) { setData(d); setNotes(d.profile?.notes || ""); setTags(Array.isArray(d.profile?.tags) ? d.profile.tags : []); } }).catch(() => {}).finally(() => { if (active) setLoading(false); });
  return () => { active = false; };
  }, [decoded]);
 
@@ -61,6 +88,42 @@ export default function CustomerDetailPage() {
  <MetricCard label="Offers" value={offers.length} sub={offers.filter((o) => o.status === "pending").length ? `${offers.filter((o) => o.status === "pending").length} open` : "None open"} />
  <MetricCard label="Conversations" value={conversations.length} sub={conversations.reduce((s, c) => s + c.storeUnread, 0) ? "Unread replies" : "All read"} />
  </div>
+
+ {/* Notes + tags — what she knows about this person, in her words. */}
+ <TechCard className="mb-5 p-5" data-testid="customer-memory">
+ <div className="grid gap-4 sm:grid-cols-2">
+ <div>
+ <div className="mb-1.5 flex items-center justify-between">
+ <label htmlFor="customer-notes" className="text-[12px] font-medium text-stone-700">Notes</label>
+ <span className="text-[11px] text-stone-400">{saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Couldn’t save" : "Private — saves when you click away"}</span>
+ </div>
+ <textarea id="customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => { if (notes !== (data.profile.notes || "")) void saveMemory({ notes }); }} rows={4}
+ placeholder="Size 8, loves 70s prints, asked about a Chloé bag…" className={cn(inputCls, "h-auto py-2.5 text-[13px]")} />
+ </div>
+ <div>
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-700">Tags</label>
+ <div className="flex flex-wrap items-center gap-1.5" data-testid="customer-tags">
+ {tags.map((t) => (
+ <span key={t} className="inline-flex items-center gap-1 rounded-full bg-stone-900 px-2.5 py-1 text-[12px] text-white">
+ {t}<button type="button" aria-label={`Remove tag ${t}`} onClick={() => removeTag(t)} className="ml-0.5 text-white/70 hover:text-white">×</button>
+ </span>
+ ))}
+ <input value={newTag} onChange={(e) => setNewTag(e.target.value)} list="all-tags" placeholder={tags.length ? "Add a tag…" : "vip, wholesale, market:brick-lane…"}
+ onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(newTag); } if (e.key === "Backspace" && !newTag && tags.length) removeTag(tags[tags.length - 1]); }}
+ onBlur={() => { if (newTag.trim()) addTag(newTag); }}
+ className="min-w-[140px] flex-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-[12.5px] outline-none focus:border-stone-400" />
+ <datalist id="all-tags">{(data.allTags || []).filter((t) => !tags.includes(t)).map((t) => <option key={t} value={t} />)}</datalist>
+ </div>
+ {(data.allTags || []).filter((t) => !tags.includes(t)).length > 0 && (
+ <div className="mt-2 flex flex-wrap gap-1">
+ {(data.allTags || []).filter((t) => !tags.includes(t)).slice(0, 8).map((t) => (
+ <button key={t} type="button" onClick={() => addTag(t)} className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] text-stone-500 transition hover:border-stone-400 hover:text-stone-800">+ {t}</button>
+ ))}
+ </div>
+ )}
+ </div>
+ </div>
+ </TechCard>
 
  {/* Orders */}
  <TechCard className="mb-5 overflow-hidden">

@@ -78,3 +78,6 @@ mobile/expo-env.d.ts
 # Full-resolution collection art. The served copies next to it are downscaled for mobile;
 # the originals are kept locally for re-exporting and are far too large for git.
 public/collections/originals/
+
+# Playwright output (e2e/)
+test-results/

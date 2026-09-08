@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addToCart } from "@/app/lib/storefront-cart-db";
-import { findItemByVariantId, isSellable } from "@/app/lib/plan-b/lookup";
+import { findItemByVariantId } from "@/app/lib/plan-b/lookup";
+import { hostedCartRefusal } from "@/app/lib/plan-b/cart-refusal-core";
 import { resolveStore, cartToken, cartLines, readBody, withCartCookie, withSqsCartFlag } from "@/app/lib/plan-b/cart-session";
 import { buildSqsCart, itemIdFromAddBody, toSqsEntry } from "@/app/lib/plan-b/sqs-cart-json";
 
@@ -28,8 +29,9 @@ export async function POST(request: NextRequest) {
 
  const item = await findItemByVariantId(store.sellerId, itemId);
  if (!item) return sqsError("That item is no longer available.", 404);
- // One-of-one: a sold piece is gone, not backorderable.
- if (!isSellable(item)) return sqsError(`${item.title} has sold.`);
+ // One-of-one: a sold piece is gone, not backorderable — and a held one is on hold, not sold.
+ const refusal = hostedCartRefusal(item);
+ if (refusal) return sqsError(refusal);
 
  const { token, isNew } = cartToken(request);
  await addToCart(token, item.id, item.sellerId);

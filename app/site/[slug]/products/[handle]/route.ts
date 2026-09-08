@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import { getCapturePage, getCaptureOrigin, saveCapturePage, getSiteCss, listCapturePaths } from "@/app/lib/site-capture-db";
 import { captureSite, rewireCommerce, injectCart, injectCss, stripScripts, stripVendorScripts, applyCartState, renderNativeProduct } from "@/app/lib/site-capture";
 import { getItem } from "@/app/lib/db/inventory";
+import { storefrontAvailability } from "@/app/lib/unavailable-label";
 import { getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { applyCartBadge } from "@/app/lib/plan-b/cart-badge";
 import { cartItemCount } from "@/app/lib/plan-b/cart-session";
@@ -21,9 +22,31 @@ import { listItemsBySource } from "@/app/lib/db/inventory";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { isStoreHost, storeHostSuffix } from "@/app/lib/plan-b/store-host";
 import { matchItemId } from "@/app/lib/capture-commerce";
-import { applyLivePrice } from "@/app/lib/live-price";
+import { applyLivePrice, markPriceSlots } from "@/app/lib/live-price";
 import { captureStorefrontEntry } from "@/app/lib/store-visits-db";
 import { recordProductView } from "@/app/lib/store-favorites-db";
+import { getShippingSettings, hasShippingRow } from "@/app/lib/store-shipping-db";
+import { DEFAULT_ZONES } from "@/app/lib/shipping-zones";
+import { hostedProductDetails, renderHostedDetailsHtml, type HostedDetailItem } from "@/app/lib/hosted-product-details-core";
+import { injectHostedDetails } from "@/app/lib/hosted-product-details";
+
+/**
+ * The details block for this piece — size, measurements, grade and note, flaws, where it ships —
+ * in the classic product page's words (hosted-product-details-core.ts). A captured page is frozen
+ * at crawl day and a native render only carried title/price/photos/description, so neither said
+ * any of this while /s/{handle}/p/{id} did. Shipping is read the way that page reads it: a store
+ * that never saved shipping says nothing about where it ships. Returns "" on any failure — the
+ * facts are a courtesy to the shopper, never a reason to fail the page.
+ */
+async function detailsBlockFor(slug: string, item: HostedDetailItem): Promise<string> {
+ try {
+  const [row, shipping] = await Promise.all([hasShippingRow(slug).catch(() => false), getShippingSettings(slug).catch(() => null)]);
+  const store = row && shipping ? { zones: shipping.zones ?? DEFAULT_ZONES, country: shipping.shipFrom?.country ?? null } : { zones: null, country: null };
+  return renderHostedDetailsHtml(hostedProductDetails(item, store));
+ } catch {
+  return "";
+ }
+}
 
 
 /**
@@ -138,7 +161,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
      available: item.status === "active",
     });
     const css0 = await getSiteCss(slug).catch(() => "");
-    const withState = applyCartState(out, { inCart: false, soldOut: item.status === "sold" });
+    const stated = applyCartState(out, { inCart: false, soldOut: !storefrontAvailability(item).available, unavailableReason: storefrontAvailability(item).unavailableReason });
+    // The facts the classic page prints, after the buy control — same words, same order.
+    const withState = injectHostedDetails(stated, await detailsBlockFor(slug, item));
     const badged = await withCartDrawer(applyCartBadge(withState, await cartItemCount(req.cookies.get("via_cart")?.value || "", await bagSellerFor(slug))), slug, req.cookies.get("via_cart")?.value || "", isStoreHost(req.headers.get("host")));
     // VYA's cart on every origin — see the note in the catch-all route. On a store origin the
     // theme's scripts stay (its menus and galleries need them); only commerce is ours.
@@ -172,6 +197,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // Add-to-cart is replaced rather than kept beside ours — leaving both produced a page with two Add
  // buttons, one of which quietly did nothing because its JavaScript had not booted.
  html = rewireCommerce(cap.html, buyHref, { keepThemeButtons: false });
+ // Mark this theme's price slot NOW, while the page and the item record still agree — the page was
+ // fetched a moment ago from the same shop the record came from, so the amount is the answer key.
+ // Do it before the page is stored, and every later reprice lands on the mark instead of on a
+ // guess about what this theme calls its price element. See markPriceSlots.
+ const priced = itemId ? await getItem(itemId).catch(() => null) : null;
+ if (priced) html = markPriceSlots(html, { priceCents: priced.priceCents, currency: priced.currency, compareAtCents: priced.compareAtCents });
  await saveCapturePage(slug, path, html, `${origin}${path}`);
  } catch {
  return new Response("Couldn't load that product.", { status: 502, headers: { "Content-Type": "text/plain" } });
@@ -196,14 +227,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     // A SOLD piece gets no buy href. rewireCommerce renders its own disabled "Sold out" control
     // from that, in the theme's button shape — passing a checkout link regardless is what left a
     // live "Add to cart" and a working /checkout link on every sold product page.
-    html = rewireCommerce(html, mine.status === "sold" ? null : `/checkout?item=${mine.id}`, { keepThemeButtons: false, unavailableReason: mine.unavailableReason });
+    // A held piece gets the same treatment as a sold one here — no buy href, a dead control — with
+    // its own label ("On hold"), since it is coming back and the page must not say it sold.
+    const shelf = storefrontAvailability(mine);
+    html = rewireCommerce(html, shelf.available ? `/checkout?item=${mine.id}` : null, { keepThemeButtons: false, unavailableReason: shelf.unavailableReason });
     // The captured page carries the price from crawl day; the cart charges the item record. On a
     // store repriced since capture (blummier, dollars → pounds) those were different numbers in
     // different currencies on the same screen. See applyLivePrice.
     html = applyLivePrice(html, { priceCents: mine.priceCents, currency: mine.currency, compareAtCents: mine.compareAtCents });
     const token = req.cookies.get("via_cart")?.value || "";
     const ids = token ? await getCartItemIds(token, await bagSellerFor(slug)) : [];
-    html = applyCartState(html, { inCart: ids.includes(mine.id), soldOut: mine.status === "sold", unavailableReason: mine.unavailableReason });
+    html = applyCartState(html, { inCart: ids.includes(mine.id), soldOut: !shelf.available, unavailableReason: shelf.unavailableReason });
+    // The captured page carries the seller's description from crawl day and none of what the
+    // listing has learned since — flaws, grade, measurements, where it ships. Print them here, per
+    // request, off the item record, so the theme page says what the classic page says. Idempotent:
+    // a capture that already carries a block gets the fresh one, never a second.
+    html = injectHostedDetails(html, await detailsBlockFor(slug, mine));
    }
   }
  } catch { /* allow-swallow: cart state is a display nicety — never fail the product page for it */ }
@@ -272,7 +311,10 @@ async function serveQuickshopView(slug: string, handle: string, req: NextRequest
    html = rewireCommerce(cap.html, buyHref, { keepThemeButtons: false });
    // A page captured just now is already stale if the piece was repriced after the crawl.
    const fresh = itemId ? await getItem(itemId).catch(() => null) : null;
-   if (fresh) html = applyLivePrice(html, { priceCents: fresh.priceCents, currency: fresh.currency, compareAtCents: fresh.compareAtCents });
+   if (fresh) {
+    html = markPriceSlots(html, { priceCents: fresh.priceCents, currency: fresh.currency, compareAtCents: fresh.compareAtCents });
+    html = applyLivePrice(html, { priceCents: fresh.priceCents, currency: fresh.currency, compareAtCents: fresh.compareAtCents });
+   }
    await saveCapturePage(slug, key, html, sourceUrl);
   } catch {
    return new Response("Couldn't load that product.", { status: 502, headers: { "Content-Type": "text/plain" } });
@@ -288,7 +330,7 @@ async function serveQuickshopView(slug: string, handle: string, req: NextRequest
    if (mine) {
     const token = req.cookies.get("via_cart")?.value || "";
     const ids = token ? await getCartItemIds(token, await bagSellerFor(slug)) : [];
-    html = applyCartState(html, { inCart: ids.includes(mine.id), soldOut: mine.status === "sold" });
+    html = applyCartState(html, { inCart: ids.includes(mine.id), soldOut: !storefrontAvailability(mine).available, unavailableReason: storefrontAvailability(mine).unavailableReason });
    }
   }
  } catch { /* allow-swallow: cart state is a display nicety — never fail the quick-shop view for it */ }

@@ -27,14 +27,14 @@ export async function POST(request: NextRequest) {
  try {
  const name = body?.name ? String(body.name).slice(0, 200) : null;
  const itemTitle = body?.itemTitle ? String(body.itemTitle).slice(0, 300) : null;
- const { token } = await createConversation(storeSlug, {
+ const { id, token } = await createConversation(storeSlug, {
  name,
  email: body?.email ? String(body.email).slice(0, 200) : null,
  itemTitle,
  message: message.slice(0, 5000),
  });
  // Notify the store — email + (if configured) a text to the seller's phone.
- notifyStoreOfMessage(storeSlug, { itemTitle, buyerName: name, message: message.slice(0, 5000) }).catch(() => {});
+ notifyStoreOfMessage(storeSlug, { itemTitle, buyerName: name, message: message.slice(0, 5000), conversationId: id }).catch(() => {});
  return NextResponse.json({ ok: true, token });
  } catch {
  return NextResponse.json({ error: "Couldn’t send. Try again." }, { status: 500 });

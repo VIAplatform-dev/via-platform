@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Mail, Activity } from "lucide-react";
-import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, ChevronLeft } from "lucide-react";
+import { Mail, Activity, Bell } from "lucide-react";
+import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid, ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { SETTINGS_GROUPS, sectionFor } from "./sections";
 import { cn } from "../ui";
@@ -21,8 +21,8 @@ import { cn } from "../ui";
 const INDEX_HREF: string = "/admin/settings";
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
- Mail, Activity,
- Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle,
+ Mail, Activity, Bell,
+ Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid,
 };
 
 

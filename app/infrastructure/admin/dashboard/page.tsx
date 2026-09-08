@@ -207,6 +207,29 @@ function ProfitAndLoss({ margin, period, onAdded }: {
       </td>
      </tr>
 
+     {/* Selling costs: what sat between gross and net and was never shown. Each line only when it
+         happened — a cash-only store with no labels and no consignors sees none of these. */}
+     {(cur.feeCents > 0 || cur.cardFeeCents > 0 || cur.labelCostCents > 0 || cur.consignorCutCents > 0) && (
+      <>
+       <tr>
+        <td colSpan={2} className="pb-1 pt-6 font-mono text-[10px] uppercase tracking-[0.13em] text-stone-400">Selling costs</td>
+       </tr>
+       {[
+        { label: "VYA fees", cents: cur.feeCents },
+        { label: "Card processing", cents: cur.cardFeeCents, est: true },
+        { label: "Shipping labels", cents: cur.labelCostCents },
+        { label: "Consignor payouts", cents: cur.consignorCutCents },
+       ].filter((l) => l.cents > 0).map((l) => (
+        <tr key={l.label}>
+         <td className="border-b border-stone-100 py-2.5 pl-4 text-stone-500">
+          {l.label}{l.est && <span className="ml-1 align-top text-[8.5px] uppercase tracking-wide text-stone-300">est</span>}
+         </td>
+         <td className="border-b border-stone-100 py-2.5 text-right font-medium text-stone-500">−{money(l.cents)}</td>
+        </tr>
+       ))}
+      </>
+     )}
+
      <tr>
       <td colSpan={2} className="pb-1 pt-6 font-mono text-[10px] uppercase tracking-[0.13em] text-stone-400">Operating costs</td>
      </tr>
@@ -262,7 +285,9 @@ function ProfitAndLoss({ margin, period, onAdded }: {
       <td className="border-t-2 border-stone-900 pt-3.5 text-right text-[15px] font-semibold">
        {margin.netProfitCents == null ? <span className="text-stone-300">—</span> : (
         <span className={margin.netProfitCents < 0 ? "text-rose-600" : undefined}>
-         {money(margin.netProfitCents)} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(margin.netMarginPct)}</span>
+         {/* Sign before the symbol — "−$82", never "$-82". The formatter puts a minus after the
+             currency sign, which reads as a typo on the one line where the minus is the point. */}
+         {margin.netProfitCents < 0 ? "−" : ""}{money(Math.abs(margin.netProfitCents))} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(margin.netMarginPct)}</span>
         </span>
        )}
       </td>
@@ -275,7 +300,7 @@ function ProfitAndLoss({ margin, period, onAdded }: {
    <p className="mt-4 text-[11px] leading-relaxed text-stone-400">
     You can also just tell VYA — &ldquo;spent 84 on poly mailers&rdquo; — and it files the cost for you.
     {cur.coveragePct < 100 && cur.totalSales > 0 && (
-     <> Revenue and cost of goods cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.</>
+     <> Revenue, cost of goods and selling costs cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.{margin.profit.missingCostNote ? ` ${margin.profit.missingCostNote}` : ""}</>
     )}
     {/* On a tax-inclusive store the listed price already contains VAT, which is never the seller's
         money. Say what was taken out — and, where no tax was recorded, say that too rather than
@@ -1293,14 +1318,14 @@ function Analytics() {
           <Kpi label="Stock at cost" value={money(margin.inventoryCostCents)} hint="unsold, at what you paid" />
          </div>
 
-         {(["byBrand", "byCategory"] as const).map((key) => (
-          <TechCard key={key} className="p-5">
-           <CardTitle hint="ranked by profit, not revenue">{key === "byBrand" ? "Profit by brand" : "Profit by category"}</CardTitle>
+         {(["byBrand", "byCategory", "bySource"] as const).filter((key) => key !== "bySource" || (margin.bySource ?? []).length > 0).map((key) => (
+          <TechCard key={key} className="p-5" data-testid={key === "bySource" ? "profit-by-source" : undefined}>
+           <CardTitle hint={key === "bySource" ? "where each piece came from — which buying trips pay" : "ranked by profit, not revenue"}>{key === "byBrand" ? "Profit by brand" : key === "byCategory" ? "Profit by category" : "Profit by source"}</CardTitle>
            <div className="overflow-x-auto">
             <table className="w-full">
-             <thead><tr><TH>{key === "byBrand" ? "Brand" : "Category"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
+             <thead><tr><TH>{key === "byBrand" ? "Brand" : key === "byCategory" ? "Category" : "Source"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
              <tbody>
-              {margin[key].map((r) => (
+              {(margin[key] ?? []).map((r) => (
                <tr key={r.name}>
                 <TD><span className="font-medium text-stone-800">{r.name}</span></TD>
                 <TD right>{num(r.sales)}</TD>

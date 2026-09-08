@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgEnum, uuid, text, integer, boolean, timestamp, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, uuid, text, integer, boolean, timestamp, jsonb, date, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 
 // ───────────────────────────────────────────────────────────────────────────
 // The transactional core of the VYA recommerce platform (Drizzle + Neon).
@@ -94,6 +94,27 @@ export const items = pgTable(
  // seller picked, hours later, when the cron publishes it — NULL means they made no
  // explicit choice and each channel's auto-list default applies.
  crossListChannels: text("cross_list_channels").array(),
+ // Specific visible flaws, one per entry ("light pilling at cuffs"). The intake model has always
+ // returned them; the listing finally has somewhere to keep them. Printed under Condition on the
+ // product page. See app/lib/flaws-core.ts.
+ flaws: jsonb("flaws").$type<string[]>().default([]),
+ // Where the piece came from and when — the seller's own words ("Kempton", "Ana's estate", "eBay"),
+ // NOT the `source` column above, which is how the row got into VYA (manual | imported | ai | market).
+ // Groups the P&L by source so she learns which buying trips pay. `lotId` ties a batch bought
+ // together for one price; the lot cost was split across them at the time (app/lib/lot-core.ts).
+ sourceName: text("source_name"),
+ acquiredAt: date("acquired_at"),
+ lotId: text("lot_id"),
+ // Sizing and condition as structure (owner audit #31, #27):
+ //  measurementsJson — `{ key, value, unit }[]` per app/lib/measurements-core.ts. The older
+ //   `measurements` TEXT column stays for imported prose; the product page prefers this one.
+ //  conditionNote — what she adds beyond the grade; `condition` holds the grade itself when it
+ //   was chosen from the scale (app/lib/condition-core.ts), free text on rows saved before it.
+ //  parcelEstimate — the intake model's (or the category table's) parcel, kept so the edit form
+ //   can warn when a typed weight lands in a different tier (app/lib/parcel-core.ts).
+ measurementsJson: jsonb("measurements_json").$type<{ key: string; value: number; unit: "cm" | "in" }[]>(),
+ conditionNote: text("condition_note"),
+ parcelEstimate: jsonb("parcel_estimate").$type<{ tier: "small" | "medium" | "large"; weightOz: number; lengthIn?: number; widthIn?: number; heightIn?: number; source: "ai" | "category" }>(),
  soldAt: timestamp("sold_at", { withTimezone: true }),
  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

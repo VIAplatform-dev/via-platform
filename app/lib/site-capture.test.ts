@@ -2084,3 +2084,55 @@ test("stripping the template's badge never takes the card's photographs with it"
  // The badge itself — the thing with no picture in it — is still removed for an available piece.
  assert.equal($(".product-badges__badge").length, 0, "the template's Sold out badge is gone");
 });
+
+// THE THEME KEEPS ITS OWN NAME FOR THE BUTTON WE REPLACE.
+// Horizon-family components resolve their children through `ref`, and throw on connectedCallback
+// when one is missing — so swapping the button without carrying `ref` across killed the startup of
+// add-to-cart-component and sticky-add-to-cart on every product page of every hosted store.
+test("replacing the add-to-cart button keeps the ref the theme's own component looks for", () => {
+ const html = `<form action="/cart/add">
+   <button name="add" ref="addToCartButton" class="button add-to-cart-button">Add to cart</button>
+ </form>`;
+ const $ = cheerio.load(rewireCommerce(html, "/checkout?item=abc"));
+ const primary = $("[data-vya-add]");
+ assert.equal(primary.length, 1);
+ assert.equal(primary.attr("ref"), "addToCartButton", "the theme can still find its button");
+ // Exactly one element answers to that ref — the Buy now control must not also claim it.
+ assert.equal($('[ref="addToCartButton"]').length, 1);
+});
+
+test("a theme that names no ref gets no invented one", () => {
+ const html = `<form action="/cart/add"><button name="add" class="btn">Add to cart</button></form>`;
+ const $ = cheerio.load(rewireCommerce(html, "/checkout?item=abc"));
+ assert.equal($("[data-vya-add]").attr("ref"), undefined);
+});
+
+// The refs a theme's component needs are not all ON the button — some are INSIDE it.
+// sticky-add-to-cart keeps its quantity readout in the button's own label, so replacing the button
+// discarded them and the component threw on connect even once the button's own ref was preserved.
+test("replacing the add-to-cart button keeps the refs living inside it", () => {
+ const html = `<form action="/cart/add">
+   <button name="add" ref="addToCartButton" class="btn">
+     <span class="label">Add to cart<span ref="quantityDisplay" style="display:none"> (<span ref="quantityNumber">1</span>)</span></span>
+   </button>
+ </form>`;
+ const $ = cheerio.load(rewireCommerce(html, "/checkout?item=abc"));
+ assert.equal($('[ref="addToCartButton"]').length, 1);
+ assert.equal($('[ref="quantityDisplay"]').length, 1, "carried across");
+ assert.equal($('[ref="quantityNumber"]').length, 1, "including the one nested inside it");
+ // Carried, not shown: the shopper must not read the theme's leftover label twice.
+ assert.ok($("[data-vya-theme-refs]").is("[hidden]"), "carried markup is not painted");
+ // And never duplicated — two elements answering to one ref is the same bug in mirror image.
+ for (const r of ["addToCartButton", "quantityDisplay", "quantityNumber"]) {
+  assert.equal($(`[ref="${r}"]`).length, 1, r);
+ }
+});
+
+test("prepareEditMode's editor saves through the store-aware URL (capture-edit-url-core.ts, copied into the script)", () => {
+ const out = prepareEditMode(PLAIN, "shop", "/");
+ // The verbatim ES5 copy of withStoreParam, and both saves routed through it.
+ assert.match(out, /function vyaStore\(u\)\{var m=\/\^\\\/site\\\/\(\[\^\/\?#\]\+\)\/\.exec\(location\.pathname\|\|""\)/);
+ assert.match(out, /fetch\(vyaStore\("\/api\/store\/assets"\)/);
+ assert.match(out, /fetch\(vyaStore\("\/api\/store\/capture\/edit"\)/);
+ assert.doesNotMatch(out, /fetch\("\/api\/store\/(assets|capture\/edit)"/);
+});

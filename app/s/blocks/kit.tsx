@@ -21,7 +21,9 @@ import type { StorefrontWords } from "@/app/lib/storefront-words";
 
 export const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 
-export type BlockProduct = { key?: string; title: string; price: string; image: string; href?: string };
+// `sold`/`held` travel with the tile so a section's card can badge it the way the classic grid does
+// (StorefrontView). The href stays the product page either way — that page refuses the sale itself.
+export type BlockProduct = { key?: string; title: string; price: string; image: string; href?: string; sold?: boolean; held?: boolean };
 export type Colors = { bg: string; text: string; accent: string };
 
 export type ResizeHandle = "nw" | "ne" | "sw" | "se" | "e" | "w" | "n" | "s";

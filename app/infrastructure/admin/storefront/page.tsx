@@ -6,6 +6,7 @@
 //  • Built from scratch (blocks) → the chat-first Canva-style STUDIO.
 // We check capture status once, then render the matching editor. Its back arrow returns to /admin.
 import { useEffect, useState } from "react";
+import { withStore } from "@/app/infrastructure/admin/market/ui";
 import dynamic from "next/dynamic";
 import WelcomeCoach from "@/app/store/storefront/WelcomeCoach";
 
@@ -21,11 +22,11 @@ export default function StorefrontEditorRoute() {
   // First-run coach from onboarding (?welcome=import|build) — show once, then strip the flag.
   const w = new URLSearchParams(window.location.search).get("welcome");
   if (w === "import" || w === "build") { setWelcome(w); window.history.replaceState(null, "", window.location.pathname); }
-  fetch("/api/store/capture")
+  fetch(withStore("/api/store/capture"))
    .then((r) => (r.ok ? r.json() : null))
    .then((d) => setMode(d && d.captured > 0 ? "captured" : "blocks"))
    .catch(() => setMode("blocks"));
-  fetch("/api/store/storefront")
+  fetch(withStore("/api/store/storefront"))
    .then((r) => (r.ok ? r.json() : null))
    .then((d) => { if (d?.store?.name) setStoreName(d.store.name as string); })
    .catch(() => {});

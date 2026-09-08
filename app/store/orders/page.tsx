@@ -6,6 +6,16 @@ import { ShoppingBag } from "lucide-react";
 import { Card, PageHeader, Badge, Stat, EmptyState } from "../ui";
 import { useStoreBase } from "../nav-base";
 import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
+import { groupIntoParcels, parcelsToPost, type Parcel } from "@/app/lib/parcels-core";
+import { formatPriceCents } from "@/app/lib/formatPrice";
+import { shipFromGate, type ShipFromGate } from "@/app/lib/setup-gate-core";
+
+/** Admin preview (?store=slug) must reach the API too, or a preview would read YOUR store. */
+function withStore(path: string): string {
+ if (typeof window === "undefined") return path;
+ const s = new URLSearchParams(window.location.search).get("store");
+ return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
+}
 
 type Order = {
  id: string;
@@ -19,6 +29,11 @@ type Order = {
  paidAt: string | null;
  /** "pickup" = collected in store: no label to print. Absent on orders placed before collection existed. */
  deliveryMethod?: "ship" | "pickup";
+ /** The payment every piece bought together shares — what makes three orders one parcel. */
+ paymentIntent?: string | null;
+ labelUrl?: string | null;
+ trackingNumber?: string | null;
+ trackingUrl?: string | null;
 };
 
 type ImportedOrder = {
@@ -65,6 +80,33 @@ export default function OrdersPage() {
  const [orders, setOrders] = useState<Order[]>([]);
  const [imported, setImported] = useState<ImportedOrder[]>([]);
  const [importOpen, setImportOpen] = useState(false);
+ // ?delivery=pickup — Home's "collections waiting" row lands on the orders someone is coming in
+ // for. Read once from the URL; "Show all" clears it like any other filter.
+ const [pickupOnly, setPickupOnly] = useState(false);
+ const [busyKey, setBusyKey] = useState<string | null>(null);
+ const [actErr, setActErr] = useState<string | null>(null);
+ // Option J: a label cannot be bought without a ship-from address (orders/[id] refuses), so when
+ // there are parcels to post and no address, this page says so — and only then.
+ const [gate, setGate] = useState<ShipFromGate | null>(null);
+ useEffect(() => {
+ if (new URLSearchParams(window.location.search).get("delivery") === "pickup") void Promise.resolve().then(() => setPickupOnly(true));
+ let live = true;
+ fetch(withStore("/api/store/onboarding-status")).then((r) => (r.ok ? r.json() : null)).then((d) => { if (live) setGate(shipFromGate(d?.setup)); }).catch(() => {});
+ return () => { live = false; };
+ }, []);
+
+ // One button for the whole bag: every piece flips together on the server (orders/parcel route),
+ // and the buyer gets one tracking email listing all of them.
+ async function actOnParcel(p: Parcel<Order>, action: "posted" | "delivered" | "collected") {
+ setBusyKey(p.key); setActErr(null);
+ try {
+ const r = await fetch("/api/store/orders/parcel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderIds: p.orders.map((o) => o.id), action }) });
+ const d = await r.json().catch(() => ({}));
+ if (!r.ok) { setActErr(d.error || "Couldn’t update that parcel."); return; }
+ await load();
+ } catch { setActErr("Couldn’t update that parcel."); }
+ finally { setBusyKey(null); }
+ }
 
  async function load() {
  try {
@@ -89,6 +131,12 @@ export default function OrdersPage() {
 
  const revenue = orders.reduce((a, o) => a + (o.amountCents || 0), 0);
  const aov = orders.length ? revenue / orders.length : 0;
+ const currency = orders[0]?.currency || imported[0]?.currency || "USD";
+ // Parcels, not pieces (parcels-core.ts): a buyer who took three things is one row, one label, one
+ // Mark posted — and "to post" counts bags on her table, not lines on a list.
+ const parcels = groupIntoParcels(orders);
+ const toPost = parcelsToPost(parcels).length;
+ const shown = pickupOnly ? parcels.filter((p) => p.deliveryMethod === "pickup" && p.status === "paid") : parcels;
 
  // Both sources in one file — a seller doing their books wants every sale of the
  // year, not the ones that happened to come through the storefront.
@@ -113,17 +161,31 @@ export default function OrdersPage() {
  {importOpen && <OrderImportModal onClose={() => { setImportOpen(false); load(); }} />}
 
  {orders.length > 0 && (
- <div className="mb-6 grid grid-cols-3 gap-3">
+ <div className="mb-6 grid grid-cols-4 gap-3">
+ <Stat label="Parcels to post" value={toPost} />
  <Stat label="Orders" value={orders.length} />
- <Stat label="Revenue" value={`$${(revenue / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
- <Stat label="Avg. order" value={`$${(aov / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
+ <Stat label="Revenue" value={formatPriceCents(Math.round(revenue / 100) * 100, currency)} />
+ <Stat label="Avg. order" value={formatPriceCents(Math.round(aov / 100) * 100, currency)} />
  </div>
  )}
+ {gate && toPost > 0 && (
+ <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900" data-testid="ship-from-gate">
+ <span><b className="font-semibold">Labels can’t be bought yet.</b> Add the address you ship from.</span>
+ <a href={withStore(gate.href)} className="ml-auto rounded-full bg-[var(--accent,#0e9f76)] px-3 py-1.5 text-[12px] font-medium text-white transition hover:bg-[var(--accent-hover,#0b8a66)]">{gate.verb}</a>
+ </div>
+ )}
+ {actErr && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{actErr}</div>}
 
  {orders.length === 0 && imported.length === 0 ? (
  <EmptyState icon={<ShoppingBag size={28} strokeWidth={1.5} />} title="No orders yet" body="When a buyer checks out on your storefront, the order shows up here — or import your past orders with “Import history”." />
  ) : orders.length > 0 ? (
  <Card className="overflow-hidden">
+ {pickupOnly && (
+ <div className="flex items-center justify-between gap-3 border-b border-stone-100 bg-amber-50/60 px-5 py-2.5 text-[12.5px] text-amber-900">
+ <span>{shown.length === 0 ? "No collections waiting." : `Showing ${shown.length} ${shown.length === 1 ? "collection" : "collections"} waiting to be handed over.`}</span>
+ <button type="button" onClick={() => setPickupOnly(false)} className="font-medium underline underline-offset-2">Show all orders</button>
+ </div>
+ )}
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
@@ -134,23 +196,55 @@ export default function OrdersPage() {
  <th className="px-5 py-2.5 font-medium">Date</th>
  <th className="px-5 py-2.5 font-medium">Status</th>
  <th className="px-5 py-2.5 text-right font-medium">Amount</th>
+ <th className="px-5 py-2.5" />
  </tr>
  </thead>
  <tbody className="divide-y divide-stone-100">
- {orders.map((o) => (
- <tr key={o.id} onClick={() => router.push(`${base}/orders/${o.id}`)} className="cursor-pointer transition hover:bg-stone-50">
- <td className="whitespace-nowrap px-5 py-3 font-mono text-[12px] tabular-nums text-stone-500">{fmtOrderNo(o.orderNo)}</td>
- <td className="max-w-[260px] truncate px-5 py-3 font-medium text-stone-900">{o.itemTitle || "Item"}</td>
- <td className="px-5 py-3 text-stone-600">{o.buyerEmail || "—"}</td>
- <td className="px-5 py-3 tabular-nums text-stone-500">{o.paidAt ? new Date(o.paidAt).toLocaleDateString() : "—"}</td>
+ {shown.map((p) => {
+ const first = p.orders[0];
+ const multi = p.pieces > 1;
+ const pickup = p.deliveryMethod === "pickup";
+ const busy = busyKey === p.key;
+ return (
+ <tr key={p.key} data-testid="parcel-row" data-pieces={p.pieces} onClick={() => router.push(`${base}/orders/${first.id}`)} className="cursor-pointer transition hover:bg-stone-50">
+ <td className="whitespace-nowrap px-5 py-3 font-mono text-[12px] tabular-nums text-stone-500">
+ {fmtOrderNo(first.orderNo)}{multi && <span className="ml-1 text-stone-400">+{p.pieces - 1}</span>}
+ </td>
+ <td className="max-w-[300px] px-5 py-3 font-medium text-stone-900">
+ {multi ? (
+ <>
+ <span className="mb-1 block text-[11px] font-normal uppercase tracking-[0.06em] text-stone-400">{p.pieces} pieces · one parcel</span>
+ <ul className="space-y-0.5">{p.orders.map((o) => <li key={o.id} className="truncate">{o.itemTitle || "Item"}</li>)}</ul>
+ </>
+ ) : <span className="block truncate">{first.itemTitle || "Item"}</span>}
+ </td>
+ <td className="px-5 py-3 text-stone-600">{p.buyerEmail || "—"}</td>
+ <td className="px-5 py-3 tabular-nums text-stone-500">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"}</td>
  {/* "needs shipping" is a lie for a collection — nothing is being posted. */}
  <td className="px-5 py-3">
- <Badge tone={tone(o.status)} dot>{o.deliveryMethod === "pickup" && o.status === "paid" ? "awaiting collection" : statusLabel(o.status)}</Badge>
- {o.deliveryMethod === "pickup" && <span className="ml-1.5 align-middle text-[11px] text-stone-400">collection</span>}
+ <Badge tone={tone(p.status)} dot>{pickup && p.status === "paid" ? "awaiting collection" : statusLabel(p.status)}</Badge>
+ {pickup && <span className="ml-1.5 align-middle text-[11px] text-stone-400">collection</span>}
  </td>
- <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-900">${(o.amountCents / 100).toFixed(2)}</td>
+ <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-900">{formatPriceCents(p.amountCents, p.currency || currency)}</td>
+ <td className="whitespace-nowrap px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+ {p.status === "paid" && !pickup && (
+ <span className="inline-flex items-center gap-2">
+ {p.labelUrl
+ ? <a href={p.labelUrl} target="_blank" rel="noreferrer" className="rounded-full border border-stone-200 px-3 py-1 text-[12px] text-stone-700 hover:border-stone-400">Print label</a>
+ : <button type="button" onClick={() => router.push(`${base}/orders/${first.id}`)} className="rounded-full border border-stone-200 px-3 py-1 text-[12px] text-stone-700 hover:border-stone-400">Buy label</button>}
+ <button type="button" disabled={busy} onClick={() => actOnParcel(p, "posted")} className="rounded-full bg-stone-900 px-3 py-1 text-[12px] font-medium text-white hover:bg-stone-800 disabled:opacity-40">{busy ? "…" : "Mark posted"}</button>
+ </span>
+ )}
+ {p.status === "paid" && pickup && (
+ <button type="button" disabled={busy} onClick={() => actOnParcel(p, "collected")} className="rounded-full bg-stone-900 px-3 py-1 text-[12px] font-medium text-white hover:bg-stone-800 disabled:opacity-40">{busy ? "…" : "Mark collected"}</button>
+ )}
+ {p.status === "shipped" && (
+ <button type="button" disabled={busy} onClick={() => actOnParcel(p, "delivered")} className="rounded-full border border-stone-200 px-3 py-1 text-[12px] text-stone-700 hover:border-stone-400 disabled:opacity-40">{busy ? "…" : "Mark delivered"}</button>
+ )}
+ </td>
  </tr>
- ))}
+ );
+ })}
  </tbody>
  </table>
  </div>
@@ -182,7 +276,7 @@ export default function OrdersPage() {
  <td className="max-w-[260px] truncate px-5 py-3 font-medium text-stone-800">{o.itemTitle || "—"}</td>
  <td className="px-5 py-3">{o.buyerEmail || o.buyerName || "—"}</td>
  <td className="px-5 py-3 tabular-nums text-stone-500">{o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "—"}</td>
- <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-800">${(o.amountCents / 100).toFixed(2)}</td>
+ <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-800">{formatPriceCents(o.amountCents, o.currency || currency)}</td>
  </tr>
  ))}
  </tbody>

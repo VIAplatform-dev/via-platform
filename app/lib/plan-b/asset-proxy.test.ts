@@ -32,7 +32,12 @@ test("Shop Pay / checkout modules resolve as EMPTY modules, so dynamic import() 
  const plan = planCdnRequest("/cdn/shopifycloud/shop-js/modules/v2/loader.shop-login-button.en.esm.js", "", ORIGIN);
  assert.equal(plan.action, "inert");
  assert.match((plan as { contentType: string }).contentType, /javascript/);
- assert.equal((plan as { body: string }).body.trim(), "export {};");
+ // The body must be EMPTY of behaviour, not empty of characters — and must parse as a classic
+ // script too, so it carries no `export`. (It used to be `export {};`, which threw a syntax error
+ // wherever Shopify injected the script the classic way.)
+ const body = (plan as { body: string }).body;
+ assert.ok(!/\bexport\b/.test(body));
+ assert.equal(body.replace(/\/\*[\s\S]*?\*\//g, "").trim(), "", "nothing executable is left");
 });
 
 test("portable-wallets css is inert css, not javascript", () => {
@@ -59,4 +64,14 @@ test("isDeniedScriptUrl is the denylist only — a plain theme asset is not deni
  assert.equal(isDeniedScriptUrl("https://angearchive.com/cdn/shop/t/1/assets/dialog.js"), false);
  assert.equal(isDeniedScriptUrl("https://angearchive.com/cdn/shopifycloud/perf-kit/shopify-perf-kit-3.8.4.min.js"), true);
  assert.equal(isDeniedScriptUrl(""), false);
+});
+
+// The stub we serve for a neutralised script has to parse in BOTH worlds: a theme's dynamic
+// import() AND a classic <script src>, which is how Shopify injects trekkie at runtime.
+test("the inert script body is not an ES module", () => {
+ const plan = planCdnRequest("/cdn/s/trekkie.storefront.abc.min.js", "", "https://shop.example");
+ assert.equal(plan.action, "inert");
+ if (plan.action !== "inert") return;
+ assert.ok(!/\bexport\b/.test(plan.body), "`export` is a syntax error in a classic script");
+ assert.match(plan.contentType, /javascript/);
 });

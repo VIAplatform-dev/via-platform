@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeDraft, readEstimate } from "./intake-shape.ts";
+import { normalizeDraft, readEstimate, costFromText } from "./intake-shape.ts";
 
 // The real response, copied from a live production call — see intake-shape.ts for why this
 // fixture is written out rather than paraphrased.
@@ -22,7 +22,9 @@ test("a {value, confidence} field is flattened to its value", () => {
   const d = normalizeDraft(DRAFT);
   assert.equal(d.brand, "Fendi");
   assert.equal(d.era, "Y2K / early 2000s");
-  assert.equal(d.condition, "Good — light wear consistent with use");
+  // Condition is now structure: the grade on the chips, the sentence as the note (see below).
+  assert.equal(d.condition, "Good");
+  assert.equal(d.conditionNote, "Good — light wear consistent with use");
 });
 
 test("plain string fields pass through untouched", () => {
@@ -72,4 +74,37 @@ test("no estimate is not a free piece", () => {
 test("an estimate with no comps still yields its price", () => {
   assert.equal(readEstimate({ suggestedCents: 5000 }).priceCents, 5000);
   assert.equal(readEstimate({ suggestedCents: 5000 }).compsCount, 0);
+});
+
+/* ── structure: the parcel the model judged, and the grade vs the note (owner audit #27/#31) ── */
+
+test("the AI's parcel survives normalisation, so Review can say what the piece ships as", () => {
+  const d = normalizeDraft({ title: "Coat", parcel: { weightOz: 44, lengthIn: 16, widthIn: 12, heightIn: 6 } });
+  assert.deepEqual(d.parcel, { weightOz: 44, lengthIn: 16, widthIn: 12, heightIn: 6 });
+  assert.equal(normalizeDraft({ title: "Coat", parcel: { weightOz: "heavy" } }).parcel, undefined);
+  assert.equal(normalizeDraft({ title: "Coat" }).parcel, undefined);
+});
+
+test("condition splits into the grade on the scale and the model's sentence as the note", () => {
+  const d = normalizeDraft({ conditionGrade: "Very Good", condition: { value: "Very good — light wear to the sole", confidence: 0.8 } });
+  assert.equal(d.condition, "Very good");
+  assert.equal(d.conditionNote, "Very good — light wear to the sole");
+  // The pricer's top grade maps onto the scale's.
+  assert.equal(normalizeDraft({ conditionGrade: "Deadstock/NWT" }).condition, "Mint");
+  // No grade, a bare sentence: the nearest grade, and the sentence kept as the note.
+  const bare = normalizeDraft({ condition: { value: "Excellent — barely worn", confidence: 0.7 } });
+  assert.equal(bare.condition, "Excellent");
+  assert.equal(bare.conditionNote, "Excellent — barely worn");
+  // A sentence that IS just a grade needs no note.
+  assert.equal(normalizeDraft({ condition: "Good" }).conditionNote, undefined);
+});
+
+test("cost is what she typed, in major units, and a blank is unknown rather than free", () => {
+  assert.equal(costFromText("140"), 140);
+  assert.equal(costFromText("£33.50"), 33.5);
+  assert.equal(costFromText(12), 12);
+  assert.equal(costFromText(""), undefined);
+  assert.equal(costFromText("   "), undefined);
+  assert.equal(costFromText(undefined), undefined);
+  assert.equal(costFromText(-4), undefined);
 });

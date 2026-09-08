@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
    category: item.category,
    priceCents: item.priceCents,
    description: item.description ?? null,
+   flaws: item.flaws, measurementsJson: item.measurementsJson, measurements: item.measurements,
   },
   "vestiaire",
  );

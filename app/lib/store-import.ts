@@ -1,6 +1,3 @@
-import type { ProductPageConfig } from "./storefront-product-page";
-import type { ProductLayout } from "./storefront-templates";
-import type { SiteEffects } from "./storefront-effects";
 import * as cheerio from "cheerio";
 import type { Element } from "domhandler";
 import { fetchShopifyProductsPublic, parseLooseJson } from "./shopifyClient.ts";
@@ -64,9 +61,6 @@ export type StorefrontTheme = {
  // applied, cleared when the skin is removed.
  preSkin?: { colors?: { bg?: string; text?: string; accent?: string }; fonts?: { heading?: string; body?: string } };
  customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
- // The store's own JavaScript. Shipped ONLY on the store's own origin — see storefront-code.ts for
- // why that distinction is the whole safety model.
- customJs?: string;
  template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
  // The catalogue grid on the Shop page. Seeded by the template (Vitrine runs 2-up, The Index 5-up)
  // and editable after. Absent = the platform default, which is what every store rendered before
@@ -75,14 +69,7 @@ export type StorefrontTheme = {
  // How a single product page is arranged. Seeded by the template: "rail" keeps the details beside you
  // while the images scroll, "stacked" runs the photographs full width with the copy beneath, "classic"
  // is the conventional two-column page. Absent = classic, which is what every store rendered before.
- productLayout?: ProductLayout;
- // What that page SAYS: which of a listing's facts are printed, in what order, inline or in a
- // drawer, and the store's own wording for the back link and the reassurance line. Absent = the
- // page every store rendered before this existed. See storefront-product-page.ts.
- productPage?: ProductPageConfig;
- // Pointer effects, drawn by our own code. See storefront-effects.ts for why this is a catalogue
- // and not a place to paste JavaScript.
- effects?: SiteEffects;
+ productLayout?: "classic" | "rail" | "stacked";
  blocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // section-based home page (storefront-blocks.ts)
  shopBlocks?: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[]; // editable intro content shown ABOVE the product grid on the Shop page
  extraPages?: { slug: string; title: string; blocks: { id: string; type: string; variant?: string; props: Record<string, string>; style?: { bg?: string } }[] }[]; // additional block-based pages
@@ -91,12 +78,6 @@ export type StorefrontTheme = {
  // Footer: the store's social links + a short about blurb, shown site-wide in the footer.
  socials?: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string; pinterest?: string; email?: string };
  footerAbout?: string;
- // The footer's email-signup band. Unset keeps DEFAULT_FOOTER_NEWSLETTER (app/s/StoreChrome.tsx);
- // an empty string is a store that deliberately dropped that line.
- footerNewsletterHeading?: string;
- footerNewsletterText?: string;
- // The shop's own labels ("Sold", "View all"). See storefront-words.ts; unset entries fall back.
- words?: { sold?: string; shopAll?: string; viewAll?: string; empty?: string };
  // Custom links the seller adds to the header and/or footer nav (beyond the auto page/collection links).
  navLinks?: { label: string; href: string; place?: "header" | "footer" | "both" }[];
  // cloned design (from site-clone): the original's name, nav, hero, and pages.
@@ -640,9 +621,13 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
  const host = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
  // The loop lives in collection-membership.ts so it can be tested without a network: it used to stop
  // after 25 collections, which is why ~500 collections across the fleet held nothing at all.
- const read = await readCollectionMembership(slugs, { fetchPage: (slug, page) => collectionPage(host, slug, page) });
+ // A budget the read STOPS at, so the step cannot outlive the invocation running it. Production
+ // caps a function at maxDuration 300s; without this the read simply ran until something killed it
+ // and every collection it had already read was lost with it — 25 minutes and nothing to show, on a
+ // 761-collection store. 150s leaves room for the write pass and the steps after it.
+ const read = await readCollectionMembership(slugs, { fetchPage: (slug, page) => collectionPage(host, slug, page), budgetMs: 150_000 });
  if (read.notAttempted.length) {
-  console.log(`[collections] ${host}: ${read.notAttempted.length} collections past the ceiling were not read`);
+  console.log(`[collections] ${host}: ${read.notAttempted.length} collection(s) not read (past the ceiling, or the read ran out of time) — marked unread, so what we hold for them stands`);
  }
  if (read.throttleHits) console.log(`[collections] ${host}: asked to slow down ${read.throttleHits}\u00d7 — paced accordingly`);
  // A collection bigger than one pass. What we read is used; the shortfall is ours, not the seller's.

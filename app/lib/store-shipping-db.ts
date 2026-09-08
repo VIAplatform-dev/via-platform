@@ -74,6 +74,14 @@ export async function getShippingSettings(storeSlug: string): Promise<ShippingSe
  return { mode, freeThresholdCents: r.free_threshold_cents ?? null, shipFrom, pickup, dutyMode: isDutyMode(r.duty_mode) ? r.duty_mode : DEFAULT_DUTY_MODE, carrierAccountId: r.carrier_account_id ?? null, zones: r.zones ? (typeof r.zones === "string" ? JSON.parse(r.zones) : r.zones) : DEFAULT_ZONES };
 }
 
+/** Has the store saved shipping settings at all? getShippingSettings answers with a default for a
+ *  store that never has, which is right for a quote and wrong for "Set up your store". */
+export async function hasShippingRow(storeSlug: string): Promise<boolean> {
+ await ensureTable();
+ const rows = await db()`SELECT 1 FROM store_shipping WHERE store_slug = ${storeSlug} LIMIT 1`;
+ return rows.length > 0;
+}
+
 export async function setShippingSettings(storeSlug: string, s: ShippingSettings): Promise<void> {
  await ensureTable();
  const mode = MODES.includes(s.mode) ? s.mode : "buyer_pays";

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
  const items = rawItems.filter((it) => it.status !== "removed" && !listedIds.has(it.id)).map((it) => {
  const brand = it.brand || inferBrandFromTitle(it.title) || null;
  const c = crossPostContent(
- { title: it.title, brand, condition: it.condition, size: it.size, category: it.category, priceCents: it.priceCents, description: it.description },
+ { title: it.title, brand, condition: it.condition, size: it.size, category: it.category, priceCents: it.priceCents, description: it.description, flaws: it.flaws, measurementsJson: it.measurementsJson, measurements: it.measurements },
  platform,
  );
  return {

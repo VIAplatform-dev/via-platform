@@ -74,7 +74,29 @@ async function ensureTable() {
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS company_number TEXT`.catch(() => {});
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS vat_number TEXT`.catch(() => {});
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS policies JSONB`.catch(() => {});
+ // Optional "Set up your store" steps she chose to skip (["domain"]). See setup-core.ts.
+ await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS setup_skipped JSONB`.catch(() => {});
  ensured = true;
+}
+
+/** The optional setup steps this store skipped; [] when none (or no row). */
+export async function getSetupSkipped(storeSlug: string): Promise<string[]> {
+ await ensureTable();
+ const rows = (await db()`SELECT setup_skipped FROM store_profiles WHERE store_slug = ${storeSlug} LIMIT 1`.catch(() => [])) as any[];
+ const raw = rows[0]?.setup_skipped;
+ const list = typeof raw === "string" ? JSON.parse(raw) : raw;
+ return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** Replace the skipped list. Touches only that column, so the profile's other fields are left alone. */
+export async function setSetupSkipped(storeSlug: string, ids: string[]): Promise<string[]> {
+ await ensureTable();
+ const next = JSON.stringify(Array.from(new Set(ids)));
+ await db()`
+ INSERT INTO store_profiles (store_slug, setup_skipped, updated_at) VALUES (${storeSlug}, ${next}::jsonb, now())
+ ON CONFLICT (store_slug) DO UPDATE SET setup_skipped = ${next}::jsonb, updated_at = now()
+ `;
+ return getSetupSkipped(storeSlug);
 }
 
 export async function getStoreProfile(storeSlug: string): Promise<StoreProfile> {

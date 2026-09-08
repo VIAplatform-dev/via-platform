@@ -240,6 +240,17 @@ export async function getStorePushTokens(storeSlug: string): Promise<string[]> {
  return rows.map((r) => r.token);
 }
 
+/** Marketplace (app) threads where the customer spoke last and has been waiting more than `hours`. */
+export async function countUnansweredStoreConversations(storeSlug: string, hours = 24): Promise<number> {
+ await ensureMessagingTables();
+ const sql = getSql();
+ const rows = (await sql`
+ SELECT count(*)::int AS n FROM conversations
+ WHERE store_slug = ${storeSlug} AND last_sender = 'customer' AND last_message_at < NOW() - (${hours} * interval '1 hour')
+ `) as Array<{ n: number }>;
+ return Number(rows[0]?.n ?? 0);
+}
+
 /** Total unread messages for a store across all conversations (portal badge). */
 export async function getStoreUnreadTotal(storeSlug: string): Promise<number> {
  await ensureMessagingTables();

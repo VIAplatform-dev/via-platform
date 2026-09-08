@@ -20,6 +20,10 @@ const MARKETPLACE = "EBAY_US";
 const SCOPES = [
  "https://api.ebay.com/oauth/api_scope/sell.inventory",
  "https://api.ebay.com/oauth/api_scope/sell.account",
+ // Orders. getOrders (the hourly sale poll) and the ORDER_CONFIRMATION notification both need it.
+ // Added 2026-09-07: a store connected before then holds a grant without it and must reconnect;
+ // her refresh keeps working because the refresh call no longer names scopes (see accessToken).
+ "https://api.ebay.com/oauth/api_scope/sell.fulfillment",
 ];
 
 export function ebayConfigured(): boolean {
@@ -90,7 +94,9 @@ async function accessToken(storeSlug: string): Promise<string | null> {
  const res = await fetch(OAUTH_BASE, {
  method: "POST",
  headers: { "Content-Type": "application/x-www-form-urlencoded", Authorization: basicAuth() },
- body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: t.refreshToken, scope: SCOPES.join(" ") }),
+ // No `scope`: eBay then re-issues exactly the scopes of the original consent. Naming SCOPES here
+ // would break every store whose consent predates a scope added to that list (it must be a subset).
+ body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: t.refreshToken }),
  }).catch(() => null);
  if (!res || !res.ok) return null;
  const j = await res.json().catch(() => null);
@@ -98,6 +104,11 @@ async function accessToken(storeSlug: string): Promise<string | null> {
  await updateEbayAccessToken(storeSlug, j.access_token, Number(j.expires_in) || 7200);
  return j.access_token;
 }
+
+/** The app's own token (client credentials) — for eBay's app-level endpoints (public keys, notification destinations). */
+export const ebayAppToken = appToken;
+/** A store's valid user token, refreshed if needed — for calls made as her (her notification subscription). */
+export const ebayUserAccessToken = accessToken;
 
 export async function ebayConnected(storeSlug: string): Promise<boolean> {
  return !!(await getEbayTokens(storeSlug));

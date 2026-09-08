@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Send, Check, AlertCircle } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, cn } from "../../../ui";
+import { parseAudience, audienceIsEmpty, describeAudience, type AudienceFilter } from "@/app/lib/customer-audience-core";
 
 // Editing an email, the way the storefront builder edits a page: controls on one side, the real
 // thing on the other, updating as you type.
@@ -57,6 +58,11 @@ function Compose() {
 
  const [html, setHtml] = useState("");
  const [count, setCount] = useState(0);
+ // Who it goes to: everyone, or a tag / spent-over / bought-in slice. Resolved by the SAME filter the
+ // Customers page runs, and the count comes from the server so the button says what will send.
+ const [audience, setAudience] = useState<AudienceFilter>({ tags: [], spentOverCents: null, category: null });
+ const [spentOverText, setSpentOverText] = useState("");
+ const [choices, setChoices] = useState<{ tags: { tag: string; count: number }[]; categories: string[] }>({ tags: [], categories: [] });
  const [allowance, setAllowance] = useState<{ label: string; canSend: boolean; reason: string | null } | null>(null);
  // Empty = send now. A date = leave it for the cron. Scheduling is the difference between "I'll
  // remember to send this on Monday" and it going out on Monday.
@@ -89,11 +95,24 @@ function Compose() {
    setDesign((t.design as Design) || "classic");
    setPieceCount(t.design === "grid" ? 4 : t.design === "photo" ? 2 : 3);
   }).catch(() => {});
+  // Arriving from a filtered Customers page: the same ?tag=&spentOver=&category= lands here.
+  const a = parseAudience({ tag: params.get("tag"), spentOver: params.get("spentOver"), category: params.get("category") });
+  if (!audienceIsEmpty(a)) { setAudience(a); if (a.spentOverCents != null) setSpentOverText(String(a.spentOverCents / 100)); }
   fetch("/api/store/campaign").then((r) => (r.ok ? r.json() : null))
-   .then((d) => { setCount(d?.recipientCount ?? 0); setAllowance(d?.allowance ?? null); }).catch(() => {});
+   .then((d) => { setAllowance(d?.allowance ?? null); setChoices({ tags: d?.tags ?? [], categories: d?.categories ?? [] }); }).catch(() => {});
   fetch("/api/store/campaign/pieces").then((r) => (r.ok ? r.json() : null))
    .then((d) => setPieces(d?.pieces ?? [])).catch(() => {});
  }, [params]);
+
+ // The recipient count follows the audience.
+ useEffect(() => {
+  const qs = new URLSearchParams();
+  if (audience.tags?.length) qs.set("tag", audience.tags.join(","));
+  if (audience.spentOverCents != null) qs.set("spentOver", String(audience.spentOverCents / 100));
+  if (audience.category) qs.set("category", audience.category);
+  fetch(`/api/store/campaign${qs.toString() ? `?${qs}` : ""}`).then((r) => (r.ok ? r.json() : null))
+   .then((d) => setCount(d?.recipientCount ?? 0)).catch(() => {});
+ }, [audience]);
 
  // Re-render as you type, but not on every keystroke — this hits the server.
  const render = useCallback(() => {
@@ -111,7 +130,7 @@ function Compose() {
   const body = [headline, subhead].filter(Boolean).join("\n");
   const r = await fetch("/api/store/campaign", {
    method: "POST", headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ subject, body, link, test, scheduledAt: !test && sendAt ? new Date(sendAt).toISOString() : undefined }),
+   body: JSON.stringify({ subject, body, link, test, audience, scheduledAt: !test && sendAt ? new Date(sendAt).toISOString() : undefined }),
   }).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
   setSending(false);
   setNote(r?.ok
@@ -158,6 +177,40 @@ function Compose() {
       <Field label="Discount code" hint="Optional. Shown under the headline.">
        <input className={input} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="SPRING10" />
       </Field>
+     </TechCard>
+
+     {/* Who it goes to. Everyone subscribed, unless she narrows it — the count on the button follows. */}
+     <TechCard className="flex flex-col gap-3 p-5" data-testid="audience-picker">
+      <Field label="Who gets it" hint={`${describeAudience(audience)} · ${count.toLocaleString()} ${count === 1 ? "person" : "people"}`}>
+       <div className="flex flex-wrap items-center gap-1.5">
+        <button type="button" onClick={() => { setAudience({ tags: [], spentOverCents: null, category: null }); setSpentOverText(""); }}
+         className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", audienceIsEmpty(audience) ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>Everyone</button>
+        {choices.tags.map(({ tag, count: n }) => {
+         const on = (audience.tags || []).includes(tag);
+         return (
+          <button key={tag} type="button" aria-pressed={on} onClick={() => setAudience((a) => ({ ...a, tags: on ? (a.tags || []).filter((t) => t !== tag) : [...(a.tags || []), tag] }))}
+           className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", on ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>Tag: {tag} <span className="opacity-60">{n}</span></button>
+         );
+        })}
+       </div>
+      </Field>
+      <div className="flex flex-wrap items-center gap-3">
+       <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+        <span className="whitespace-nowrap">Spent over $</span>
+        <input type="number" inputMode="decimal" min={0} value={spentOverText} placeholder="0" aria-label="Spent over"
+         onChange={(e) => { const t = e.target.value; setSpentOverText(t); const n = Number(t); setAudience((a) => ({ ...a, spentOverCents: t.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null })); }}
+         className={cn(input, "w-24")} />
+       </label>
+       {choices.categories.length > 0 && (
+        <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+         <span className="whitespace-nowrap">Bought in</span>
+         <select value={audience.category || ""} onChange={(e) => setAudience((a) => ({ ...a, category: e.target.value || null }))} aria-label="Bought in category" className={cn(input, "w-auto")}>
+          <option value="">any category</option>
+          {choices.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+         </select>
+        </label>
+       )}
+      </div>
      </TechCard>
 
      <TechCard className="flex flex-col gap-4 p-5">

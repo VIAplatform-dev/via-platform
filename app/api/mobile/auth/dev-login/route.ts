@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findOrCreateUserByEmail, getUserById, signMobileJwt } from "@/app/lib/mobileAuth";
-import { storeSlugFromEmail } from "@/app/lib/storeAuth";
+import { storeSlugForMobileEmail } from "@/app/lib/storeAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +30,6 @@ export async function POST(request: Request) {
  const userId = await findOrCreateUserByEmail(email);
  const user = await getUserById(userId);
  const token = signMobileJwt(userId, email);
- const storeSlug = storeSlugFromEmail(email);
+ const storeSlug = await storeSlugForMobileEmail(email);
  return NextResponse.json({ token, user, storeSlug });
 }

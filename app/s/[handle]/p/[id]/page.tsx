@@ -1,12 +1,20 @@
 /* eslint-disable @next/next/no-img-element */
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem } from "@/app/lib/db/inventory";
 import { getInboxSettings } from "@/app/lib/storefront-settings-db";
 import { getRefundPolicy, policySummary } from "@/app/lib/store-policy-db";
-import { formatPrice } from "@/app/lib/formatPrice";
+import { formatPrice, formatPriceCents } from "@/app/lib/formatPrice";
+import { getShippingSettings, hasShippingRow } from "@/app/lib/store-shipping-db";
+import { quoteShipping, DEFAULT_ZONES } from "@/app/lib/shipping-zones";
+import { freeShippingFor } from "@/app/lib/checkout-delivery.ts";
+import { shipsToLine } from "@/app/lib/ships-to-core";
+import { sizeLine, formatSizeLine } from "@/app/lib/size-display-core";
+import { formatMeasurement, type Measurement } from "@/app/lib/measurements-core";
+import { isConditionGrade, conditionDefinition } from "@/app/lib/condition-core";
 import AskAboutItem from "@/app/s/AskAboutItem";
 import MakeOffer from "@/app/components/MakeOffer";
 import StorefrontTracker from "@/app/s/StorefrontTracker";
@@ -100,7 +108,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const fams = [sf.theme?.fonts?.heading, sf.theme?.fonts?.body].filter(Boolean).map((f) => `family=${(f as string).replace(/ /g, "+")}:wght@400;500;600;700`).join("&");
  const storeName = sf.theme?.storeName || seller.name || handle.replace(/-/g, " ");
  const images = (item.images || []).filter(Boolean);
- const sold = item.status === "sold" || item.status === "reserved";
+ // A held piece (kept back for a named customer) reads as "On hold", never "Sold" — the shopper who
+ // wanted it should know to ask, not give up.
+ const held = item.status === "reserved";
+ const sold = item.status === "sold" || held;
+ const soldLabel = held ? "On hold" : "Sold";
  const price = formatPrice(item.priceCents / 100, item.currency);
  // Same rule as the storefront: on the store's own origin its pages are the root, so links must
  // not carry VYA's internal /s/{handle} prefix.
@@ -115,6 +127,27 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const inbox = await getInboxSettings(sf.storeSlug).catch(() => null);
  // The store's return/refund policy — shown so a buyer knows before they buy.
  const policy = await getRefundPolicy(sf.storeSlug).catch(() => null);
+ // Where it ships, and from how much — in the piece's own currency, never a hardcoded "$". A store
+ // that has never saved shipping says nothing here (the Buy button carries that); one that has
+ // names its zones (ships-to-core.ts) and its own price for this parcel at home (shipping-zones.ts).
+ const [shippingRow, shipping] = await Promise.all([hasShippingRow(sf.storeSlug).catch(() => false), getShippingSettings(sf.storeSlug).catch(() => null)]);
+ const shipsTo = shippingRow && shipping ? shipsToLine(shipping.zones ?? DEFAULT_ZONES, shipping.shipFrom?.country) : null;
+ const shipFromLine = (() => {
+  if (!shippingRow || !shipping || sold || !buyable) return null;
+  if (freeShippingFor(shipping, item.priceCents)) return "Free shipping";
+  const home = shipping.shipFrom?.country || "US";
+  const q = quoteShipping({ fromCountry: home, toCountry: home, parcel: { weightOz: item.weightOz, lengthIn: item.lengthIn, widthIn: item.widthIn, heightIn: item.heightIn }, zones: shipping.zones });
+  if (!q.ok) return null;
+  const from = `Shipping from ${formatPriceCents(q.amountCents, item.currency)}`;
+  return shipping.mode === "free_over" && shipping.freeThresholdCents ? `${from} · free over ${formatPriceCents(shipping.freeThresholdCents, item.currency)}` : from;
+ })();
+ const shipsToBlock = shipsTo ? (
+  <div data-testid="ships-to" className="mt-6 border-t border-current/10 pt-4">
+   <p className="text-[11px] uppercase tracking-[0.2em] opacity-50">Ships to</p>
+   <p className="mt-1.5 text-sm leading-[1.7] opacity-75">{shipsTo}</p>
+   {shipFromLine && <p data-testid="shipping-from" className="text-[12.5px] leading-[1.7] opacity-60">{shipFromLine}</p>}
+  </div>
+ ) : null;
 
  // ── Store chrome ──
  // This page used to render its own two-link nav and a "Powered by VYA" line, so a shopper who
@@ -143,7 +176,12 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const pageCopy = resolveProductPage(theme.productPage);
  const siteEffects = resolveEffects(theme.effects);
  const storeCode = storefrontScript(theme.customJs, base === "");
- const facts = visibleFields(pageCopy, item);
+ // Structured measurements print as their own block under Size (below); the free-text column only
+ // when there are none, so a page never says the same thing twice.
+ const measurements: Measurement[] = Array.isArray(item.measurementsJson) ? (item.measurementsJson as Measurement[]) : [];
+ // The size line says what the tag means, not just what it says (size-display-core.ts).
+ const sizeText = formatSizeLine(sizeLine({ size: item.size, category: item.category, title: item.title, description: item.description, currency: item.currency }));
+ const facts = visibleFields(pageCopy, { ...item, size: sizeText ?? item.size, measurements: measurements.length ? null : item.measurements });
  // A was-price, struck through. Stored on every listing and never shown until a store asks for it.
  const compareAt = pageCopy.comparePrice && item.compareAtCents && item.compareAtCents > item.priceCents
   ? formatPrice(item.compareAtCents / 100, item.currency)
@@ -166,7 +204,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  "@type": "Offer",
  price: (item.priceCents / 100).toFixed(2),
  priceCurrency: item.currency || "USD",
- availability: sold ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
+ availability: held ? "https://schema.org/LimitedAvailability" : sold ? "https://schema.org/SoldOut" : "https://schema.org/InStock",
  itemCondition: conditionUrl(item.condition),
  url,
  seller: { "@type": "Organization", name: storeName },
@@ -258,17 +296,59 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const slotPrice = (!rentable || sold) ? (
   <p className="flex flex-wrap items-baseline gap-2.5 text-xl" style={{ color: sold ? "inherit" : c.accent, opacity: sold ? 0.5 : 1 }}>
    {compareAt && <span className="text-base line-through opacity-45">{compareAt}</span>}
-   <span>{price}{sold ? " · Sold" : ""}</span>
+   <span>{price}{sold ? ` · ${soldLabel}` : ""}</span>
    {compareAt && !sold && <span className="rounded-full border border-current/30 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em]">Sale</span>}
   </p>
  ) : null;
 
- const slotDetails = facts.length ? <div>{facts.map(fact)}</div> : null;
+ // Flaws, as a list, directly under Condition — the thing a secondhand buyer reads before paying.
+ // Not a configurable field: it prints whenever the piece has any, and nothing when it has none.
+ const flaws = Array.isArray(item.flaws) ? item.flaws.filter((f): f is string => typeof f === "string" && !!f.trim()) : [];
+ const flawsBlock = flaws.length ? (
+  <div key="flaws" data-testid="flaws" className="mt-5 border-t border-current/10 pt-4">
+   <p className="text-[11px] uppercase tracking-[0.2em] opacity-50">Flaws</p>
+   <ul className="mt-1.5 list-disc pl-4 text-sm leading-[1.7] opacity-75">{flaws.map((f, i) => <li key={i}>{f}</li>)}</ul>
+  </div>
+ ) : null;
+ // The grade's one-line meaning and the seller's note, under Condition — only for a piece graded
+ // on the scale; free text saved before it prints as she wrote it (condition-core.ts).
+ const grade = isConditionGrade(item.condition) ? item.condition : null;
+ const conditionExtra = grade || item.conditionNote ? (
+  <div key="condition-extra" data-testid="condition-extra" className="mt-1.5 text-[12.5px] leading-[1.7] opacity-65">
+   {grade && <p data-testid="condition-definition">{conditionDefinition(grade)}</p>}
+   {item.conditionNote && (
+    <div data-testid="condition-note" className="mt-2">
+     <p className="text-[10px] uppercase tracking-[0.2em] opacity-70">Condition note</p>
+     <p className="whitespace-pre-wrap">{item.conditionNote}</p>
+    </div>
+   )}
+  </div>
+ ) : null;
+ const measurementsBlock = measurements.length ? (
+  <div key="measurements" data-testid="measurements" className="mt-6 border-t border-current/10 pt-4">
+   <p className="text-[11px] uppercase tracking-[0.2em] opacity-50">Measurements</p>
+   <ul className="mt-1.5 grid grid-cols-2 gap-x-6 gap-y-1 text-sm leading-[1.7] opacity-75">{measurements.map((m) => <li key={m.key}>{formatMeasurement(m)}</li>)}</ul>
+  </div>
+ ) : null;
+ // Built in the seller's fact order, with the extra blocks hung off their anchors: measurements
+ // under Size, the grade's meaning and the flaws under Condition. A store that hides Condition
+ // still gets its flaws printed (at the end, as before) — a buyer reads those before paying.
+ const nodes: ReactNode[] = [];
+ const hasSize = facts.some((f) => f.key === "size");
+ const hasCondition = facts.some((f) => f.key === "condition");
+ if (measurementsBlock && !hasSize) nodes.push(measurementsBlock);
+ for (const f of facts) {
+  nodes.push(fact(f));
+  if (f.key === "size" && measurementsBlock) nodes.push(measurementsBlock);
+  if (f.key === "condition") { if (conditionExtra) nodes.push(conditionExtra); if (flawsBlock) nodes.push(flawsBlock); }
+ }
+ if (!hasCondition && flawsBlock) nodes.push(flawsBlock);
+ const slotDetails = nodes.length ? <div>{nodes}</div> : null;
 
  const slotBuy = (centered?: boolean) => (
   <div className={centered ? "mx-auto max-w-sm" : "max-w-sm"}>
    {sold ? (
-    <p className="vya-cta border border-current/20 py-4 text-center text-[11px] uppercase tracking-[0.2em] opacity-45">Sold</p>
+    <p className="vya-cta border border-current/20 py-4 text-center text-[11px] uppercase tracking-[0.2em] opacity-45">{soldLabel}</p>
    ) : (
     <>
      {rentable && <RentBox itemId={item.id} accent={c.accent} alsoForSale={buyable} />}
@@ -321,6 +401,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     return body ? <div key={sl.id}>{body}</div> : null;
    })}
   </div>
+  {shipsToBlock}
   {policy && <p className="mt-3 text-[11px] leading-relaxed opacity-60" title={policy.policyText || undefined}>{policySummary(policy)}</p>}
  </div>
  );

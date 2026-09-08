@@ -53,6 +53,17 @@ async function storedOrigin(): Promise<string | null> {
  return rows[0]?.source_url || null;
 }
 
+/** fetch options that switch off the client-side response timeout, when undici is reachable.
+ *  Degrades to today's behaviour rather than failing if it isn't. */
+async function patientDispatcher(): Promise<Record<string, unknown>> {
+ try {
+  const { Agent } = await import("undici");
+  return { dispatcher: new Agent({ headersTimeout: 0, bodyTimeout: 0 }) };
+ } catch {
+  return {};
+ }
+}
+
 async function main() {
  const auth = { Authorization: `Bearer ${pw}`, "Content-Type": "application/json" };
 
@@ -89,7 +100,17 @@ async function main() {
  console.log(`\nRunning… a full crawl takes a few minutes; progress appears in the dev server's own log.\n`);
  const body = RESUME ? { resume: true } : { url: source, replaceBlocks: true };
  const started = Date.now();
- const res = await fetch(`${BASE}/api/store/capture?store=${encodeURIComponent(slug)}`, { method: "POST", headers: auth, body: JSON.stringify(body) });
+ // Node's fetch gives up if response headers take longer than 300s (undici's default
+ // headersTimeout), and the abort travels: the server's work stops with the request. On a large
+ // catalogue the product and membership steps run past that in ONE invocation — only the CRAWL is
+ // time-budgeted (see run-import.ts) — so every resume died at the same wall, re-ran `products`
+ // from the top, and `membership` never started. 2nd Street's shop sat at 5,289 items with zero
+ // collection membership through a dozen resumes because of it.
+ //
+ // Disabling the client's timeout gets a run through here. It does NOT fix the underlying problem:
+ // production caps a function at maxDuration 300, so a catalogue this size still cannot import
+ // there until the later steps carry a budget and a mid-step checkpoint of their own.
+ const res = await fetch(`${BASE}/api/store/capture?store=${encodeURIComponent(slug)}`, { method: "POST", headers: auth, body: JSON.stringify(body), ...(await patientDispatcher()) });
  const out = await res.json().catch(() => ({})) as Record<string, unknown>;
  console.log(`[HTTP ${res.status}] after ${Math.round((Date.now() - started) / 1000)}s`);
  console.log(JSON.stringify(out, null, 1));

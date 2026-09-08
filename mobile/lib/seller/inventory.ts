@@ -35,6 +35,49 @@ export function itemDot(status: string): ItemDot {
   return null;
 }
 
+/**
+ * The state word beside a reserved piece: "on hold" when a PERSON is holding it (it is in the
+ * store's holds list), "reserved" when a buyer is mid-checkout. Null for every other status —
+ * the dot already says live/draft, and "sold" has its own chip. Same rule as the web pill.
+ */
+export function reservedWord(status: string, held: boolean): string | null {
+  if (status !== "reserved") return null;
+  return held ? "on hold" : "reserved";
+}
+
+/**
+ * Home's "Needs you" rows deep-link here with ?missing=…; the rules are the web Inventory's
+ * (app/infrastructure/admin/inventory/page.tsx `lacks`) so the same pieces answer on both.
+ *   photo       — no images
+ *   price       — price is zero or missing
+ *   cost        — no cost on a LIVE piece (a draft has not been costed yet; a sold one is history)
+ *   confidence  — the ids /api/store/attention says intake was unsure about
+ */
+export type MissingFilter = "photo" | "price" | "cost" | "confidence";
+export const MISSING_FILTERS: MissingFilter[] = ["photo", "price", "cost", "confidence"];
+
+export function parseMissing(v: unknown): MissingFilter | null {
+  return typeof v === "string" && (MISSING_FILTERS as string[]).includes(v) ? (v as MissingFilter) : null;
+}
+
+export type MissingItem = { id: string; status: string; images?: string[] | null; priceCents?: number | null; costCents?: number | null };
+
+export function lacks<T extends MissingItem>(items: T[], missing: MissingFilter | null, lowConfidenceIds: Iterable<string> = []): T[] {
+  if (!missing) return items;
+  const low = new Set(lowConfidenceIds);
+  return items.filter((i) => {
+    if (missing === "photo") return !(i.images && i.images.length);
+    if (missing === "price") return !((i.priceCents ?? 0) > 0);
+    if (missing === "cost") return i.costCents == null && i.status === "active";
+    return low.has(i.id);
+  });
+}
+
+/** What the filter is called on the chip row and in the header. */
+export function missingLabel(missing: MissingFilter): string {
+  return missing === "photo" ? "No photo" : missing === "price" ? "No price" : missing === "cost" ? "No cost" : "AI price to check";
+}
+
 /** The line under the title: how much she has, and what has moved. */
 export function inventoryCount(total: number, soldThisWeek: number): string {
   if (total === 0) return "Nothing listed yet";
