@@ -266,7 +266,7 @@ export default function CrossListingSettingsPage() {
  </table>
  </div>
  ) : (
- <p className="mt-2 text-[11px] text-stone-400">No deliveries yet. Setup: <code>curl -X POST -b via_admin_token=… /api/admin/ebay-notifications/setup</code> — see docs/handoff/ebay-notifications.md.</p>
+ <p className="mt-2 text-[11px] text-stone-400">No deliveries yet. Setup: <code>curl -X POST -b via_admin_token=… /api/admin/ebay-notifications/setup</code>; then <code>GET …/status</code> to check.</p>
  )}
  </TechCard>
  )}
