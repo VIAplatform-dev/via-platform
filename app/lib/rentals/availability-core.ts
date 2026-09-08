@@ -168,3 +168,37 @@ export function fromDateRange(range: string | null | undefined): Span | null {
  const end = addDays(m[2], -1);
  return ms(m[1]) <= ms(end) ? { start: m[1], end } : null;
 }
+
+/**
+ * Per-day pricing, in the ladder the rest of the system already speaks.
+ *
+ * Sellers asked for a flat daily rate — the way Pickle prices — rather than naming three or four
+ * lengths and a price for each. Rather than teach the booking engine a second pricing model, a
+ * daily rate becomes one tier per allowed day: `priceForDays` picks the tier where days <= t.days,
+ * so a five-day booking lands on the five-day tier at exactly five times the rate. Same maths,
+ * nothing downstream changes, and a store can switch back to named lengths whenever it likes.
+ */
+export function perDayTiers(rateCents: number, minDays: number, maxDays: number): Tier[] {
+ const rate = Math.round(rateCents);
+ const lo = Math.max(1, Math.round(minDays));
+ const hi = Math.round(maxDays);
+ if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(hi) || hi < lo) return [];
+ const out: Tier[] = [];
+ for (let d = lo; d <= hi; d++) out.push({ days: d, cents: rate * d });
+ return out;
+}
+
+/**
+ * The daily rate a ladder represents, or null if it isn't a per-day ladder. Used to reopen a piece
+ * in the mode its seller actually priced it in, instead of showing her twenty-five rows she never
+ * typed.
+ */
+export function perDayRate(tiers: Tier[], minDays: number, maxDays: number): number | null {
+ const lo = Math.max(1, Math.round(minDays));
+ const hi = Math.round(maxDays);
+ const ladder = (tiers || []).filter((t) => t && t.days > 0).sort((a, b) => a.days - b.days);
+ if (ladder.length < 2 || ladder.length !== hi - lo + 1) return null;
+ const rate = ladder[0].cents / ladder[0].days;
+ if (!Number.isInteger(rate) || rate <= 0) return null;
+ return ladder.every((t, i) => t.days === lo + i && t.cents === rate * t.days) ? rate : null;
+}

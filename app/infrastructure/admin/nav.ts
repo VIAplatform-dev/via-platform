@@ -32,13 +32,15 @@ export const GROUPS: NavGroup[] = [
  {
   label: "Sell",
   items: [
-   // The one action that makes her money, and the one she does forty times in an afternoon —
-   // a top-level row, not a sub-tab she has to open Inventory to find.
-   { href: `${B}/add-listing`, label: "Add a piece", icon: "PlusCircle" },
    {
     href: `${B}/inventory`, label: "Inventory", icon: "Package",
-    match: [`${B}/bulk-upload`], // keep Inventory active/expanded while bulk-uploading
+    // Listing a piece belongs to Inventory rather than beside it. It briefly had a top-level row
+    // of its own — the reasoning being that it's the action that makes money — but two entries
+    // pointing at the same work read as two different features, and "Add a listing" is what the
+    // page it opens is called.
+    match: [`${B}/bulk-upload`, `${B}/add-listing`], // keep Inventory active/expanded while listing
     children: [
+     { href: `${B}/add-listing`, label: "Add a listing" },
      { href: `${B}/bulk-upload`, label: "Bulk upload" },
      { href: `${B}/inventory/collections`, label: "Collections" },
      { href: `${B}/inventory/drafts`, label: "Drafts" },
@@ -97,7 +99,11 @@ export const GROUPS: NavGroup[] = [
     href: `${B}/settings`, label: "Settings", icon: "Settings",
     // Apps & integrations is a setting that lives outside /settings — keep Settings lit there.
     match: [`${B}/apps`],
-    children: SETTINGS_CHILDREN,
+    // No children. Every /settings page renders its own index — grouped into Store, Selling and
+    // Channels — so expanding the same sixteen entries in the sidebar put the identical list on
+    // screen twice, and made the sidebar four times longer than any other section's (Cross-listing
+    // has two children, Consignment three). The grouped index is the better of the two lists;
+    // this was just the one you had to scroll past to reach it.
    },
   ],
  },

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CONDITION_GRADES, CONDITION_DEFINITIONS, normalizeCondition, isConditionGrade, type ConditionGrade } from "@/app/lib/condition-core";
 import { templateFor, measurementLabel, unitFor, type MeasurementKey, type MeasurementUnit, type Measurement } from "@/app/lib/measurements-core";
+import { weightUnitFor, toOz, fromOz, type WeightUnit } from "@/app/lib/weight-units";
 import { tierForWeight, parcelMismatch, describeParcel, defaultParcelFor, type ParcelEstimate } from "@/app/lib/parcel-core";
 import { cn } from "./ui";
 
@@ -75,7 +76,7 @@ export function measurementsToForm(list: Measurement[] | null | undefined): Part
  * looks like (the AI's estimate, or the category's). Editable weight lives here so the row and the
  * warning update together.
  */
-export function ShipsAsRow({ weightOz, onChange, estimate, category, hint }: { weightOz: string; onChange: (v: string) => void; estimate: ParcelEstimate | null | undefined; category: string | null | undefined; hint?: string }) {
+export function ShipsAsRow({ weightOz, onChange, estimate, category, hint, weightUnit = "oz" }: { weightOz: string; onChange: (v: string) => void; estimate: ParcelEstimate | null | undefined; category: string | null | undefined; hint?: string; weightUnit?: WeightUnit }) {
  const typed = weightOz.trim() === "" ? null : Number(weightOz);
  const est = estimate ?? (() => { const d = defaultParcelFor(category); return { ...d, source: "category" as const }; })();
  const tier = tierForWeight(typed) ?? est.tier;
@@ -86,7 +87,15 @@ export function ShipsAsRow({ weightOz, onChange, estimate, category, hint }: { w
    <div className="flex flex-wrap items-center gap-3">
     <span className="text-[13px] text-stone-800">{describeParcel(tier, typed ?? est.weightOz)}</span>
     <span className="flex items-center gap-1 text-[12px] text-stone-500">
-     <input inputMode="numeric" value={weightOz} onChange={(e) => onChange(e.target.value.replace(/[^\d]/g, ""))} placeholder={String(est.weightOz)} aria-label="Weight (oz)" className={cn(inputCls, "w-20")} /> oz
+     {/* Typed in the store's unit, handed back in ounces — one stored unit, her numbers. */}
+     <input
+      inputMode="numeric"
+      value={weightOz ? String(fromOz(weightOz, weightUnit)) : ""}
+      onChange={(e) => { const t = e.target.value.replace(/[^\d]/g, ""); onChange(t ? String(toOz(t, weightUnit)) : ""); }}
+      placeholder={String(fromOz(est.weightOz, weightUnit))}
+      aria-label={`Weight (${weightUnit})`}
+      className={cn(inputCls, "w-20")}
+     /> {weightUnit}
     </span>
     <span className="text-[11px] text-stone-400">{typed == null ? (est.source === "ai" ? "estimated from the photos" : "estimated from the category") : hint ?? ""}</span>
    </div>
@@ -96,13 +105,14 @@ export function ShipsAsRow({ weightOz, onChange, estimate, category, hint }: { w
 }
 
 /** The store's unit and currency, from its shipping settings. `null` until loaded. */
-export function useStoreUnits(withStore: (p: string) => string): { unit: MeasurementUnit; currency: string } {
- const [u, setU] = useState<{ unit: MeasurementUnit; currency: string }>({ unit: "cm", currency: "USD" });
+export function useStoreUnits(withStore: (p: string) => string): { unit: MeasurementUnit; weightUnit: WeightUnit; currency: string } {
+ const [u, setU] = useState<{ unit: MeasurementUnit; weightUnit: WeightUnit; currency: string }>({ unit: "cm", weightUnit: "g", currency: "USD" });
  useEffect(() => {
   let on = true;
   fetch(withStore("/api/store/shipping")).then((r) => (r.ok ? r.json() : null)).then((d) => {
    if (!on || !d) return;
-   setU({ unit: unitFor({ country: d.shipFrom?.country, currency: d.currency }), currency: d.currency || "USD" });
+   const store = { country: d.shipFrom?.country, currency: d.currency };
+   setU({ unit: unitFor(store), weightUnit: weightUnitFor(store), currency: d.currency || "USD" });
   }).catch(() => {});
   return () => { on = false; };
  }, [withStore]);

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarRange, Plus, X } from "lucide-react";
 import { TechButton, Toggle, SectionLabel, cn } from "../ui";
+import { perDayTiers, perDayRate } from "@/app/lib/rentals/availability-core";
 
 // Renting one piece.
 //
@@ -39,6 +40,23 @@ const toCents = (v: string) => {
 /** What a store starts from when it first rents a piece: a short, a week, a month. */
 const STARTER: Tier[] = [{ days: 4, cents: 0 }, { days: 7, cents: 0 }, { days: 28, cents: 0 }];
 
+/**
+ * Opening prices for a piece nobody has priced yet, from what it sells for.
+ *
+ * The starter ladder was three lengths at zero, and saving filters out anything unpriced — so
+ * turning Renting on and pressing Save always failed with "give at least one length a price". The
+ * toggle looked broken because nothing it could save existed yet.
+ *
+ * The proportions are the ordinary shape of rental pricing: a few days is a fraction of retail, a
+ * month is most of the way to it. A starting point to argue with, not a recommendation.
+ */
+export function starterTiers(priceCents: number | null | undefined): Tier[] {
+ const p = Math.round(Number(priceCents) || 0);
+ if (p <= 0) return STARTER;
+ const at = (pct: number) => Math.max(100, Math.round((p * pct) / 100 / 100) * 100); // to the nearest pound/dollar, never zero
+ return [{ days: 4, cents: at(15) }, { days: 7, cents: at(20) }, { days: 28, cents: at(40) }];
+}
+
 export type TermsDraft = { tiers: Tier[]; replacementCents: number | null; fitsSizes: string | null; alsoForSale: boolean };
 
 export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
@@ -51,6 +69,11 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
  const [settings, setSettings] = useState<Settings | null>(null);
  const [on, setOn] = useState(false);
  const [tiers, setTiers] = useState<Tier[]>(STARTER);
+ // "Per day" or named lengths. A daily rate is stored as a tier per allowed day (perDayTiers), so
+ // nothing downstream knows the difference — but a seller who priced per day should reopen the
+ // piece and see her rate, not twenty-five generated rows.
+ const [perDay, setPerDay] = useState(false);
+ const [rate, setRate] = useState("");
  const [fits, setFits] = useState("");
  const [market, setMarket] = useState("");
  const [alsoForSale, setAlsoForSale] = useState(true);
@@ -68,7 +91,9 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
    const t: Terms | null = d?.terms ?? null;
    if (t) {
     setOn(true);
-    setTiers(t.tiers?.length ? t.tiers : STARTER);
+    setTiers(t.tiers?.length ? t.tiers : starterTiers(priceCents));
+    const r = settings ? perDayRate(t.tiers ?? [], settings.minDays, settings.maxDays) : null;
+    if (r) { setPerDay(true); setRate(dollars(r)); }
     setFits(t.fitsSizes ?? "");
     setMarket(dollars(t.replacementCents));
     setAlsoForSale(t.alsoForSale !== false);
@@ -84,15 +109,23 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
 
  // In deferred mode the parent owns persistence, so it needs the current answer at all times —
  // including "not renting this", which is a real answer and not the same as having said nothing.
+ // The ladder this piece is actually priced at, whichever way it was entered. ONE definition —
+ // the draft path and the direct save both read it, because when they each had their own the two
+ // disagreed the moment per-day pricing existed.
+ const pricedTiers = useMemo(() => (
+  perDay
+   ? perDayTiers(toCents(rate), settings?.minDays ?? 1, settings?.maxDays ?? 30)
+   : tiers.filter((t) => t.days > 0 && t.cents > 0).sort((a, b) => a.days - b.days)
+ ), [perDay, rate, settings, tiers]);
+
  useEffect(() => {
   if (!onDraftChange) return;
-  const priced = tiers.filter((t) => t.days > 0 && t.cents > 0).sort((a, b) => a.days - b.days);
   onDraftChange(
-   on && priced.length
-    ? { tiers: priced, replacementCents: market.trim() ? toCents(market) : null, fitsSizes: fits.trim() || null, alsoForSale }
+   on && pricedTiers.length
+    ? { tiers: pricedTiers, replacementCents: market.trim() ? toCents(market) : null, fitsSizes: fits.trim() || null, alsoForSale }
     : null,
   );
- }, [on, tiers, market, fits, alsoForSale, onDraftChange]);
+ }, [on, pricedTiers, market, fits, alsoForSale, onDraftChange]);
  const setTier = (i: number, patch: Partial<Tier>) => {
   dirty();
   setTiers((t) => t.map((x, n) => (n === i ? { ...x, ...patch } : x)));
@@ -100,8 +133,12 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
 
  async function save() {
   setBusy(true); setErr(null); setSaved(false);
-  const priced = tiers.filter((t) => t.days > 0 && t.cents > 0).sort((a, b) => a.days - b.days);
-  if (!priced.length) { setBusy(false); setErr("Give at least one length a price."); return; }
+  const priced = pricedTiers;
+  if (!priced.length) {
+   setBusy(false);
+   setErr(perDay ? "Give it a price per day." : "Give at least one length a price.");
+   return;
+  }
   const r = await fetch(withStore(`/api/store/rentals/terms/${itemId}`), {
    method: "PUT", headers: { "Content-Type": "application/json" },
    body: JSON.stringify({
@@ -147,13 +184,20 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
      <SectionLabel className="mb-0">Renting</SectionLabel>
      <p className="mt-1 max-w-[52ch] text-[12px] leading-relaxed text-stone-500">
       {on
-       ? "Customers can book this piece for a set of dates. It stays yours."
-       : "Rent this piece out instead of selling it once. You keep it and rent it again."}
+       ? "Customers book it for a set of dates and return it. You can rent it out again."
+       : "Rent this piece out instead of selling it once. It comes back, and earns again."}
      </p>
     </div>
     <Toggle
      on={on}
-     onClick={() => { if (on) { void turnOff(); } else { dirty(); setOn(true); } }}
+     onClick={() => {
+      if (on) { void turnOff(); return; }
+      dirty();
+      // Seed the ladder as it's switched on, so there is something to save rather than three
+      // empty boxes and a refusal.
+      setTiers((t) => (t.some((x) => x.cents > 0) ? t : starterTiers(priceCents)));
+      setOn(true);
+     }}
     />
    </div>
 
@@ -164,6 +208,37 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
        What it costs to rent
        {settings && <span className="font-normal text-stone-400"> — your store allows {settings.minDays}–{settings.maxDays} days</span>}
       </label>
+      {/* Two ways to price the same thing. Pickle-style flat rate, or the named lengths a shop
+          that discounts a long booking actually wants. */}
+      <div className="mb-2.5 inline-flex overflow-hidden rounded-lg border border-stone-200">
+       {([[false, "By length"], [true, "Per day"]] as const).map(([v, lbl]) => (
+        <button
+         key={String(v)} type="button"
+         onClick={() => { dirty(); setPerDay(v); }}
+         className={`px-3 py-1.5 text-[12.5px] font-medium transition ${perDay === v ? "bg-stone-900 text-white" : "bg-white text-stone-600 hover:bg-stone-50"}`}
+        >{lbl}</button>
+       ))}
+      </div>
+
+      {perDay ? (
+       <div className="flex items-center gap-2">
+        <span className="text-[13px] text-stone-400">$</span>
+        <input
+         inputMode="decimal"
+         value={rate}
+         onChange={(e) => { dirty(); setRate(e.target.value); }}
+         placeholder="15"
+         className="w-24 rounded-lg border border-stone-200 px-2.5 py-2 text-right text-[13px] tabular-nums outline-none focus:border-stone-400"
+        />
+        <span className="text-[12.5px] text-stone-500">a day</span>
+        {settings && toCents(rate) > 0 && (
+         <span className="ml-2 text-[11.5px] text-stone-400">
+          {settings.minDays} days · ${dollars(toCents(rate) * settings.minDays)} — {settings.maxDays} days · ${dollars(toCents(rate) * settings.maxDays)}
+         </span>
+        )}
+       </div>
+      ) : (
+      <>
       <div className="flex flex-col gap-2">
        {tiers.map((t, i) => (
         <div key={i} className="flex items-center gap-2">
@@ -198,39 +273,13 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
        onClick={() => { dirty(); setTiers((x) => [...x, { days: 0, cents: 0 }]); }}
        className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-stone-600 hover:text-stone-900"
       ><Plus size={13} /> Add another length</button>
+      </>
+      )}
       <p className="mt-2 text-[11.5px] leading-relaxed text-stone-400">
-       A customer pays the cheapest length that covers their dates — five days pays your seven-day price. Longer than your longest length can&rsquo;t be booked.
+       {perDay
+        ? `A customer pays the rate for each day they book. Bookings run ${settings?.minDays ?? 1}–${settings?.maxDays ?? 30} days.`
+        : "A customer pays the cheapest length that covers their dates — five days pays your seven-day price. Longer than your longest length can’t be booked."}
       </p>
-     </div>
-
-     <div className="grid gap-3 sm:grid-cols-2">
-      <div>
-       <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Fits sizes <span className="font-normal text-stone-400">— shown on the listing</span></label>
-       <input
-        value={fits}
-        onChange={(e) => { dirty(); setFits(e.target.value); }}
-        placeholder="2 to 6"
-        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400"
-       />
-      </div>
-      <div>
-       <label className="mb-1.5 block text-[12px] font-medium text-stone-500">
-        Market value
-        <span className="font-normal text-stone-400">
-         {settings?.showMarketValue ? " — shown beside the rental price" : " — hidden on listings"}
-        </span>
-       </label>
-       <div className="flex items-center gap-1.5">
-        <span className="text-[13px] text-stone-400">$</span>
-        <input
-         inputMode="decimal"
-         value={market}
-         onChange={(e) => { dirty(); setMarket(e.target.value); }}
-         placeholder="995"
-         className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] tabular-nums outline-none focus:border-stone-400"
-        />
-       </div>
-      </div>
      </div>
 
      <div className="flex items-start justify-between gap-6 rounded-lg bg-stone-50 px-3.5 py-3">
@@ -238,7 +287,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
        <p className="text-[13px] font-medium text-stone-900">Can also be bought outright</p>
        <p className="mt-0.5 max-w-[48ch] text-[11.5px] leading-relaxed text-stone-500">
         {alsoForSale
-         ? "The listing shows Rent and Buy. Once someone has a booking, buying is blocked so the piece can't be sold out from under them."
+         ? "The listing will be shown as eligible to Rent and Buy. Once an item has been booked to rent, buying will be paused until the rental is returned."
          : "Rental only. The Buy button is hidden on this piece."}
        </p>
       </div>
@@ -247,11 +296,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
 
      {err && <p className="text-[12.5px] text-rose-600" role="alert">{err}</p>}
 
-     {deferred ? (
-      <p className="text-[11.5px] leading-relaxed text-stone-400">
-       Saved with the listing.
-      </p>
-     ) : (
+     {deferred ? null : (
       <div className="flex items-center justify-end gap-3">
        {saved && <span className="text-[12px] text-emerald-700">Rental terms saved</span>}
        <TechButton variant="ghost" onClick={() => { void turnOff(); }} disabled={busy}>Don&rsquo;t rent this</TechButton>

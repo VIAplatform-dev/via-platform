@@ -1144,7 +1144,7 @@ export default function ItemsPage() {
  {/* Status can't be cleared — an item is always in one. */}
  <TagRow options={ITEM_STATUSES} value={editForm.status} onChange={(v) => setEditForm((f) => ({ ...f, status: v ?? f.status }))} labelFor={statusLabel} />
  </Field>
- <ShipsAsRow weightOz={editForm.weightOz} onChange={(v) => setEditForm((f) => ({ ...f, weightOz: v }))} estimate={editing.parcelEstimate ?? null} category={editForm.category ?? editing.category} />
+ <ShipsAsRow weightOz={editForm.weightOz} onChange={(v) => setEditForm((f) => ({ ...f, weightOz: v }))} estimate={editing.parcelEstimate ?? null} category={editForm.category ?? editing.category} weightUnit={units.weightUnit} />
  <div className="grid grid-cols-3 gap-3">
  <Field label="Length (in)"><Input type="number" inputMode="numeric" value={editForm.lengthIn} onChange={(e) => setEditForm((f) => ({ ...f, lengthIn: e.target.value }))} /></Field>
  <Field label="Width (in)"><Input type="number" inputMode="numeric" value={editForm.widthIn} onChange={(e) => setEditForm((f) => ({ ...f, widthIn: e.target.value }))} /></Field>

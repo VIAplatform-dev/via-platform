@@ -79,6 +79,9 @@ const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "
 // Bulk intake: drop many photos, VYA clusters them into items by visual similarity, the seller
 // merges/splits, then "Draft" runs the FULL intake (title, brand, era, material, condition,
 // description, price) per item and fills each card in place — publish or keep as a draft right here.
+// Where a finished batch is parked so pressing Back doesn't look like losing it.
+const RUN_KEY = "vya:bulk-upload:run";
+
 export default function BulkUploadPage() {
  const [busy, setBusy] = useState(false);
  const [busyMsg, setBusyMsg] = useState("");
@@ -126,6 +129,32 @@ export default function BulkUploadPage() {
  useEffect(() => {
   fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  }, []);
+
+ // COMING BACK TO A FINISHED RUN.
+ //
+ // Every drafted piece is saved server-side with an id, so the AI work was never actually lost —
+ // but this screen kept the whole review in memory, so opening Inventory and pressing Back showed
+ // an empty upload box. It reads as "my listings are gone", and the honest instinct after that is
+ // to run the whole batch again: forty more paid AI passes for pieces already drafted.
+ //
+ // So the run is written to sessionStorage as it completes and restored on the way back. Session,
+ // not local: it should follow this tab and not haunt a new one next week.
+ useEffect(() => {
+  try {
+   const raw = sessionStorage.getItem(RUN_KEY);
+   if (!raw) return;
+   const prev = JSON.parse(raw) as { groups?: string[][]; drafted?: Record<number, Slot>; saved?: { drafted: number; failed: number } | null };
+   if (prev?.groups?.length) setGroups(prev.groups);
+   if (prev?.drafted) setDrafted(prev.drafted);
+   if (prev?.saved) setSaved(prev.saved);
+  } catch { /* private mode, or a shape from an older build — start clean rather than crash */ }
+ }, []);
+
+ useEffect(() => {
+  // Only once there's something worth coming back to.
+  if (!saved) return;
+  try { sessionStorage.setItem(RUN_KEY, JSON.stringify({ groups, drafted, saved })); } catch { /* quota or private mode */ }
+ }, [groups, drafted, saved]);
 
  const locked = busy || saved != null; // grouping freezes once drafting starts
 
@@ -542,7 +571,7 @@ export default function BulkUploadPage() {
        <div className="flex shrink-0 items-center gap-3">
         {pendingPublish && <TechButton onClick={publishAll}>Publish all</TechButton>}
         <a href="/admin/inventory/drafts" className="text-[13px] font-medium text-stone-500 hover:text-stone-800">Inventory →</a>
-        <TechButton variant="ghost" onClick={() => { setGroups([]); setDrafted({}); setSaved(null); setProgress({ done: 0, total: 0 }); }}>New batch</TechButton>
+        <TechButton variant="ghost" onClick={() => { setGroups([]); setDrafted({}); setSaved(null); setProgress({ done: 0, total: 0 }); try { sessionStorage.removeItem(RUN_KEY); } catch { /* private mode */ } }}>New batch</TechButton>
        </div>
       ) : (
        <TechButton onClick={draftAll} disabled={busy}>{busy ? `Drafting ${progress.done}/${progress.total}…` : `Draft ${itemCount} item${itemCount === 1 ? "" : "s"}`}</TechButton>
