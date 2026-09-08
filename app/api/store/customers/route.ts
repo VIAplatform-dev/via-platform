@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
-import { listCustomerProfiles, addCustomer } from "@/app/lib/store-customers-db";
+import { listCustomerProfiles, addCustomer, listCustomerTags } from "@/app/lib/store-customers-db";
 import { fireAutomationTrigger } from "@/app/lib/automation-engine";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +11,12 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const customers = await listCustomerProfiles(slug);
+ const [customers, tags] = await Promise.all([listCustomerProfiles(slug), listCustomerTags(slug).catch(() => [])]);
  const buyers = customers.filter((c) => c.orders > 0).length;
  const revenueCents = customers.reduce((s, c) => s + c.spentCents, 0);
- return NextResponse.json({ count: customers.length, buyers, revenueCents, customers });
+ // Every tag in use and every category sold, so the filters offer real choices.
+ const categories = Array.from(new Set(customers.flatMap((c) => c.categories))).sort();
+ return NextResponse.json({ count: customers.length, buyers, revenueCents, customers, tags, categories });
 }
 
 // POST { email, name? } — add one customer by hand.

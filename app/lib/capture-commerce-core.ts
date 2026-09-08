@@ -326,6 +326,97 @@ export function unfileVanished(o: {
 }
 
 
+/** One piece the membership pass will decide collections for. */
+export type MembershipSubject = {
+ itemId: string;
+ /** The source's own id for this piece — the key the collection read is indexed by. */
+ sourceId: string | null;
+ /** The feed's tags, when this run's feed happened to include this piece. Empty otherwise, which
+  *  costs nothing: tags only ever vote on collections we could NOT read (see taggedSlugs). */
+ tags: string[];
+};
+
+/**
+ * Who the membership pass is about: every piece we HOLD, not the ones one feed read returned.
+ *
+ * The pass used to walk `products` — the output of the product step in the same invocation — and
+ * look each one up in the database. On a small store that is invisible, because one read returns
+ * the whole catalogue and the two lists are identical.
+ *
+ * They come apart completely on a large one. 2nd Street's shop holds 5,289 pieces; a feed read
+ * against its rate-limited storefront returned 72. So the pass spent ten minutes reading her
+ * collections from her live site, could file at most those 72, reported success, and left all 761
+ * of her collection pages empty. The work was done and then thrown away for want of a row to hang
+ * it on.
+ *
+ * The collection read is the authority on membership and is keyed by source id, so nothing about it
+ * depends on the feed. Held pieces are the right subjects; the feed is only consulted for tags, and
+ * for the source id of a legacy row imported before source identity existed.
+ *
+ * A piece the seller filed herself is excluded, exactly as the old loop excluded it: she owns that
+ * decision.
+ */
+export function membershipSubjects(
+ items: { id: string; sourceId?: string | null; title: string; origin?: string | null }[],
+ products: { sourceId?: string | null; name?: string; tags?: string[] }[],
+): MembershipSubject[] {
+ const bySourceId = new Map<string, { sourceId?: string | null; tags?: string[] }>();
+ const byTitle = new Map<string, { sourceId?: string | null; tags?: string[] }>();
+ for (const p of products) {
+  if (p.sourceId) bySourceId.set(p.sourceId, p);
+  const t = norm(p.name || "");
+  if (t && !byTitle.has(t)) byTitle.set(t, p);
+ }
+ // A feed row may be claimed by at most one held row, so a title collision cannot attach one
+ // product's tags to two different pieces.
+ const claimed = new Set<{ sourceId?: string | null; tags?: string[] }>();
+ const out: MembershipSubject[] = [];
+ for (const it of items) {
+  if (it.origin === "user") continue;
+  let match = it.sourceId ? bySourceId.get(it.sourceId) : undefined;
+  if (!match) {
+   const byT = byTitle.get(norm(it.title));
+   if (byT && !claimed.has(byT)) match = byT;
+  }
+  if (match) claimed.add(match);
+  out.push({ itemId: it.id, sourceId: it.sourceId || match?.sourceId || null, tags: match?.tags || [] });
+ }
+ return out;
+}
+
+/**
+ * Fill in collections the live pass could not read, from the pages we already downloaded.
+ *
+ * A collection we could not reach — throttled, or past the read ceiling — holds nothing at all.
+ * 461 of 2nd Street's 761 are in that position on every run. But the crawl already stored
+ * /collections/{slug} for many of them, and its own grid says what was in it. Reading membership
+ * off a page we have already paid for costs no outbound requests.
+ *
+ * It is a WORSE source than the live read — page one only, frozen at crawl day — so it never wins:
+ * only collections the caller marks UNREAD are filled. Where we read a collection live, the live
+ * answer stands, including when the live answer is "empty", because she may have cleared it out.
+ * Believing a stale page there would put her archive back, which is the failure the unread and
+ * sold-policy machinery exists to prevent.
+ *
+ * Purely additive, and the caller's map is left alone.
+ */
+export function mergeCapturedMembership(
+ membership: Map<string, string[]>,
+ capturedBySlug: Map<string, string[]>,
+ unread: Set<string>,
+): Map<string, string[]> {
+ const out = new Map<string, string[]>([...membership].map(([k, v]) => [k, [...v]]));
+ for (const [slug, handles] of capturedBySlug) {
+  if (!unread.has(slug)) continue; // read live — that answer stands, empty or not
+  for (const h of handles) {
+   const have = out.get(h) || [];
+   if (!have.includes(slug)) have.push(slug);
+   out.set(h, have);
+  }
+ }
+ return out;
+}
+
 export function membershipToWrite(o: { fromFeed: string[]; held: string[]; unread: string[] }): string[] {
  const unread = new Set(o.unread);
  const preserved = o.held.filter((id) => unread.has(id));

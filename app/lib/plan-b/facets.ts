@@ -113,7 +113,7 @@ export function applyFacets<T extends FacetItem>(
   if (!matchesAny(it.era, eras)) return false;
   if (!matchesAny(it.condition, conditions)) return false;
   if (sizes.length && !matchesAny(it.size, sizes)) return false;
-  if (inStockOnly && it.status === "sold") return false;
+  if (inStockOnly && it.status !== "active") return false; // sold is gone; held is not for sale today
   // An item with no price can't satisfy a price bound, but must survive when none was asked for.
   if (gte != null && (it.priceCents == null || it.priceCents < gte)) return false;
   if (lte != null && (it.priceCents == null || it.priceCents > lte)) return false;

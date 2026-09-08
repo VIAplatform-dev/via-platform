@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getMobilePayload } from "@/app/lib/mobileAuth";
 import { registerPushToken } from "@/app/lib/saved-searches-db";
-import { storeSlugFromEmail } from "@/app/lib/storeAuth";
+import { storeSlugForMobileEmail } from "@/app/lib/storeAuth";
+import { storeSlugForEmail } from "@/app/lib/store-users-db";
 import { registerStorePushToken } from "@/app/lib/messages-db";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +23,15 @@ export async function POST(request: Request) {
 
  await registerPushToken(payload.sub, token, body.platform ?? null);
 
- // If this account is a store partner, also register the token for store
- // notifications so the in-app store dashboard gets banner pushes.
- const storeSlug = storeSlugFromEmail(payload.email);
+ // If this account is a store partner, also register the token for store notifications (a sale,
+ // a buyer message). The static contact map first, then store_users — the self-serve table that
+ // every store onboarded through the wizard lives in and that this route used to ignore, which is
+ // why those stores' phones never got a push.
+ /* allow-swallow: a DB blip must not fail the customer-side registration that already succeeded */
+ const storeSlug = await storeSlugForMobileEmail(payload.email);
  if (storeSlug) {
  await registerStorePushToken(storeSlug, token, body.platform ?? null);
  }
 
- return NextResponse.json({ ok: true });
+ return NextResponse.json({ ok: true, storeSlug: storeSlug ?? null });
 }

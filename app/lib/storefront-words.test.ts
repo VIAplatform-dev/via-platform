@@ -21,3 +21,8 @@ test("a word is trimmed and can't run away with the layout", () => {
  assert.equal(resolveWords({ viewAll: "  See everything  " }).viewAll, "See everything");
  assert.equal(resolveWords({ sold: "x".repeat(80) }).sold.length, 40);
 });
+
+test("a held piece has a word of its own, overridable like the rest", () => {
+ assert.equal(resolveWords(null).held, "On hold");
+ assert.equal(resolveWords({ held: "Spoken for" }).held, "Spoken for");
+});

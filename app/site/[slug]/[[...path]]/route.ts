@@ -26,6 +26,7 @@ import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getCollectionBySlug, listCollectionItems, listCollectionItemsForStorefront, getCollectionWithSyncState } from "@/app/lib/db/collections";
 import { chooseCollectionItems } from "@/app/lib/plan-b/collection-contents";
 import { listStorefrontItems, listStorefrontItemsBySourceIds } from "@/app/lib/db/inventory";
+import { storefrontAvailability } from "@/app/lib/unavailable-label";
 import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
 import { canEditCapture } from "@/app/lib/capture-edit-access";
 import { reviewGate, reviewGateNoticeHtml } from "@/app/lib/capture-review-gate";
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // One live-inventory card shape, shared by the collection grids, the homepage strips and search —
  // so a piece looks and links the same wherever a shopper meets it.
  const card = (it: { id: string; title: string; priceCents: number | null; currency: string | null; images: unknown; sourceId?: string | null; status?: string; unavailableReason?: string | null; compareAtCents?: number | null }) =>
-  ({ id: it.id, title: it.title, priceCents: it.priceCents, currency: it.currency, images: it.images, sourceId: it.sourceId, available: it.status !== "sold", unavailableReason: it.unavailableReason, compareAtCents: it.compareAtCents });
+  ({ id: it.id, title: it.title, priceCents: it.priceCents, currency: it.currency, images: it.images, sourceId: it.sourceId, ...storefrontAvailability(it), compareAtCents: it.compareAtCents });
  // Keep shoppers on the mirrored site: an imported item links to its captured product page (served
  // on demand, with the VYA buy button wired in). Items the seller created here have no source page,
  // so they fall back to VYA's own product route.
@@ -304,7 +305,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    // then correctly refused with a 422 — the shopper clicks, nothing happens, and nothing explains
    // why. One-of-one stores are mostly sold stock, so this is the common case, not the edge.
    const mine = await getItem(itemId).catch(() => null);
-   if (mine?.status === "sold") html = applyCartState(html, { inCart: false, soldOut: true });
+   if (mine && !storefrontAvailability(mine).available) html = applyCartState(html, { inCart: false, soldOut: true, unavailableReason: storefrontAvailability(mine).unavailableReason });
    recordProductView(slug, itemId, req.cookies.get("via_sess")?.value || null).catch(() => {});
   }
  }

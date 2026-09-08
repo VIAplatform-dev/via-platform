@@ -28,7 +28,7 @@ function fmtPrice(price: string): string {
  return /^[£$€¥]/.test(p) ? p : `$${p}`;
 }
 
-type Tile = { key: string; title: string; price: string; image: string; size: string | null; href: string | null; itemId?: string; sold?: boolean };
+type Tile = { key: string; title: string; price: string; image: string; size: string | null; href: string | null; itemId?: string; sold?: boolean; held?: boolean };
 
 /** Build a Google Fonts stylesheet URL from the theme's font families. */
 function googleFontsHref(families: string[]): string | null {
@@ -56,7 +56,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  // on VYA inventory.
  const [products, listings] = await Promise.all([
  loadStoreProducts(sf.storeSlug).catch(() => []),
- getListingsByStore(sf.storeSlug, true).catch(() => []), // active only — sold pieces don't clutter the storefront
+ getListingsByStore(sf.storeSlug, true).catch(() => []), // on the shelf: live + held (badged), no sold pieces cluttering the storefront
  ]);
 
  // Available first, sold last.
@@ -109,7 +109,9 @@ export default async function StorefrontView({ settings, view = "home", preview 
  .filter((l) => (collectionIds ? collectionIds.has(l.id) : true))
  .filter((l) => (catFilters ? matchesCat(l) : true))
  .filter((l) => (q ? l.title.toLowerCase().includes(q) || catFields(l).some((t) => t.toLowerCase().includes(q)) : true));
- const toTile = (l: Listing): Tile => ({ key: `l${l.id}`, title: l.title, price: formatPrice(l.price, l.currency), image: l.images[0] || "", size: l.size, href: null, itemId: l.status !== "sold" ? l.id : undefined, sold: l.status === "sold" });
+ // A held piece keeps its link — the product page says "On hold" and refuses to sell it — so the
+ // customer it is held for can still look at it.
+ const toTile = (l: Listing): Tile => ({ key: `l${l.id}`, title: l.title, price: formatPrice(l.price, l.currency), image: l.images[0] || "", size: l.size, href: null, itemId: l.status !== "sold" ? l.id : undefined, sold: l.status === "sold", held: l.held });
  const items: Tile[] = listings.length
  ? shownListings.map(toTile)
  : products.map((p) => ({ key: p.id, title: p.name, price: fmtPrice(p.price), image: p.image || p.images?.[0] || "", size: p.size ?? null, href: p.externalUrl || null }));
@@ -285,7 +287,8 @@ export default async function StorefrontView({ settings, view = "home", preview 
    products: (await listCollectionItems(c.id).catch(() => []))
     .map((it) => byId.get(it.id))
     .filter(Boolean)
-    .map((t) => ({ key: t!.key, title: t!.title, price: t!.price, image: t!.image, href: t!.itemId ? withPreview(`${base}/p/${t!.itemId}`) : t!.href || undefined })),
+    // sold/held ride along so a curated section badges a held piece the way the Shop grid does.
+    .map((t) => ({ key: t!.key, title: t!.title, price: t!.price, image: t!.image, href: t!.itemId ? withPreview(`${base}/p/${t!.itemId}`) : t!.href || undefined, sold: t!.sold, held: t!.held })),
   })),
  )).filter((c) => c.products.length > 0);
  const hasBlocks = !isShop && (!!pageSlug || homeBlocks.length > 0);
@@ -463,7 +466,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
 
  {hasBlocks && (
- <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
+ <Blocks blocks={blocks} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined, sold: it.sold, held: it.held }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
  )}
 
  {!hasBlocks && !isShop && (
@@ -564,7 +567,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {/* Editable Shop intro — content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
- <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
+ <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined, sold: it.sold, held: it.held }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
  )}
 
  {showGrid && !hasBlocks && (
@@ -591,9 +594,9 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {it.image && (
  <img src={it.image} alt={it.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.045]" />
  )}
- {it.sold && (
+ {(it.sold || it.held) && (
  <div className="absolute inset-0 flex items-start justify-end p-2">
- <span className="bg-black/80 px-2.5 py-1 text-[9px] uppercase tracking-[0.22em] text-white">{words.sold}</span>
+ <span data-vya-held={it.held && !it.sold ? "1" : undefined} className="bg-black/80 px-2.5 py-1 text-[9px] uppercase tracking-[0.22em] text-white">{it.sold ? words.sold : words.held}</span>
  </div>
  )}
  </div>

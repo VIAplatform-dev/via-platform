@@ -27,6 +27,13 @@ type Draft = {
   /** Minor units, as the pricing endpoint returns them. Formatted only at the point of display. */
   priceCents: number | null;
   setPriceCents: (n: number | null) => void;
+  /**
+   * The server-side draft Loading creates the moment pricing returns. It is what makes "you can
+   * leave this; it lands in Drafts" true: from here on the piece exists whether or not she ever
+   * reaches Review, and Review edits that row instead of creating a second one.
+   */
+  itemId: string | null;
+  setItemId: (id: string | null) => void;
   reset: () => void;
 };
 
@@ -39,14 +46,15 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [compsCount, setCompsCount] = useState<number | null>(null);
   const [priceCents, setPriceCents] = useState<number | null>(null);
+  const [itemId, setItemId] = useState<string | null>(null);
 
   const value = useMemo<Draft>(
     () => ({
       photos, setPhotos, typed, setTyped, fields, setFields, imageUrls, setImageUrls, compsCount, setCompsCount,
-      priceCents, setPriceCents,
-      reset: () => { setPhotos([]); setTyped({}); setFields({}); setImageUrls([]); setCompsCount(null); setPriceCents(null); },
+      priceCents, setPriceCents, itemId, setItemId,
+      reset: () => { setPhotos([]); setTyped({}); setFields({}); setImageUrls([]); setCompsCount(null); setPriceCents(null); setItemId(null); },
     }),
-    [photos, typed, fields, imageUrls, compsCount, priceCents],
+    [photos, typed, fields, imageUrls, compsCount, priceCents, itemId],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

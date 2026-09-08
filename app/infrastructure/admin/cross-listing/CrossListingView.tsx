@@ -41,6 +41,10 @@ const STATUS: Record<string, { label: string; tone: "live" | "pending" | "neutra
 };
 
 export default function CrossListingView({ view }: { view: "listings" | "overview" }) {
+ // Listings and the marketplace overview are two tabs of ONE page. The overview used to be a
+ // sidebar child called "Analytics", which made two things in the rail share a name; the route
+ // (./analytics) still exists and simply opens this page on the overview tab.
+ const [tab, setTab] = useState<"listings" | "overview">(view);
  const [platforms, setPlatforms] = useState<Platform[]>([]);
  const [accounts, setAccounts] = useState<Account[]>([]);
  const [ebay, setEbay] = useState<Ebay | null>(null);
@@ -267,6 +271,13 @@ function shortBlock(reason: string): string {
  actions={<>{installBtn}{settingsBtn}</>}
  />
 
+ <div className="mb-5 flex gap-1 rounded-lg border border-stone-200 bg-white p-0.5 text-[12.5px]" role="tablist" aria-label="Cross-listing views">
+ {([["listings", "Listings"], ["overview", "Marketplace overview"]] as const).map(([k, lab]) => (
+ <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+ className={`rounded-md px-3 py-1.5 transition ${tab === k ? "bg-stone-900 font-medium text-white" : "text-stone-500 hover:text-stone-900"}`}>{lab}</button>
+ ))}
+ </div>
+
    {/* Whether the extension is actually talking to this page.
        Depop and Vestiaire are filled by the extension, so if it isn't here NOTHING happens when a
        piece is queued — the board says "queued", the server agrees, and the extension's own queue
@@ -297,7 +308,7 @@ function shortBlock(reason: string): string {
  />
  ) : (
  <>
- {view === "overview" ? (
+ {tab === "overview" ? (
  <>
  {/* KPI strip */}
  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getItem, reserveItem, releaseReservation, currentReservationRef } from "@/app/lib/db/inventory";
+import { settleCrossListedBeforeCharge } from "@/app/lib/market-sync";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { payableAccountId } from "@/app/lib/stripe-mode";
@@ -82,6 +83,11 @@ export async function POST(request: NextRequest) {
  }
  }
 
+ // A piece live on eBay or Depop may have sold there minutes ago and not reached us yet — the
+ // marketplace sync polls hourly. Ask now, before charging, so a one-of-one can't sell twice.
+ // Costs nothing for a VYA-only piece; a flaky feed never blocks the sale (see market-sync).
+ const soldElsewhere = await settleCrossListedBeforeCharge(seller.slug, [itemId]);
+ if (soldElsewhere.length) return NextResponse.json({ error: "This piece just sold on another marketplace." }, { status: 409 });
  const reservation = await reserveItem(itemId, "checkout");
  if (!reservation) return NextResponse.json({ error: "This piece was just reserved by someone else." }, { status: 409 });
 

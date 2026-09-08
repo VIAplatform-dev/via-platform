@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { listDepopConnectedStores } from "@/app/lib/depop-tokens-db";
-import { getRecentDepopSoldSkus, depopConfigured } from "@/app/lib/depop";
-import { getItem, markSold } from "@/app/lib/db/inventory";
-import { delistEverywhere } from "@/app/lib/cross-listing-db";
-import { creditConsignedSale } from "@/app/lib/consignment-db";
+import { depopConfigured } from "@/app/lib/depop";
+import { syncAllStores } from "@/app/lib/market-sync";
 
 // Depop sale-sync — the other half of "sold anywhere → pull everywhere". Polls each connected
 // store's recent Depop sales; when a piece sold on Depop (SKU = our itemId), marks it sold on VYA
@@ -30,31 +27,8 @@ export async function GET(request: Request) {
 
  // Look back 6h so nothing slips between hourly runs; re-seen sales are no-ops (item already sold).
  const since = new Date(Date.now() - 6 * 3600 * 1000).toISOString();
- const stores = await listDepopConnectedStores();
- const status: Record<string, number> = {};
- let checked = 0;
- let pulled = 0;
- const notes: string[] = [];
-
- for (const slug of stores) {
-  const r = await getRecentDepopSoldSkus(slug, since).catch(() => ({ sales: [], status: "error" as const, detail: "threw" }));
-  status[r.status] = (status[r.status] || 0) + 1;
-  // One note per distinct problem, not per store — forty stores with the same unmapped endpoint is
-  // one fact, and repeating it forty times buries anything else in the response.
-  if (r.status !== "ok" && r.detail && !notes.includes(r.detail)) notes.push(r.detail);
-
-  for (const s of r.sales) {
-   checked++;
-   const item = await getItem(s.sku).catch(() => null);
-   if (!item || item.status === "sold") continue;
-   await markSold(s.sku).catch(() => {});
-   await delistEverywhere(s.sku, "depop").catch(() => {});
-   // Consigned? Credit the consignor their split. Payout stays manual for the same reason it does on
-   // eBay: Depop paid the seller directly, so there is no routed VYA balance to transfer from.
-   await creditConsignedSale({ productId: s.sku, orderId: `depop-${s.orderId}`, soldPriceCents: s.soldPriceCents, channel: "depop" }).catch(() => {});
-   pulled++;
-  }
- }
-
- return NextResponse.json({ ok: true, stores: stores.length, checked, pulled, status, notes });
+ // The loop itself lives in lib/market-sync so checkout can run the same sync on demand for one
+ // store — the cron is the backstop, not the only line of defence against a double sale.
+ const r = await syncAllStores("depop", since);
+ return NextResponse.json({ ok: true, stores: r.stores, checked: r.checked, pulled: r.pulled.length, notes: r.notes });
 }

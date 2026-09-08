@@ -14,6 +14,12 @@ type Platform = { key: string; name: string; hasApi: boolean; mode: "api" | "ext
 type Account = { platform: string; handle: string; autoList: boolean };
 type Ebay = { configured: boolean; connected: boolean; user: string | null };
 type EbayReady = { readyToList: boolean; tokenValid: boolean; sellerRegistered?: boolean; hasLocation?: boolean; policies: { fulfillment: boolean; payment: boolean; return: boolean }; reason?: string | null };
+// Instant eBay sale notifications — VYA admin only (the owner runs setup by curl; this just shows it working).
+type NotifyStatus = {
+ summary: string; subscribed: number; verificationTokenSet: boolean; endpoint: string;
+ stores: Array<{ slug: string; status: string; since: string | null; lastError: string | null; lastNotificationAt: string | null; lastOutcome: string | null }>;
+ recent: Array<{ id: number; topic: string; storeSlug: string | null; receivedAt: string; outcome: string; detail: string | null }>;
+};
 
 // Sort order in the list: real API first, extension channels next, coming-soon last.
 const RANK: Record<Platform["mode"], number> = { api: 0, extension: 1, soon: 2 };
@@ -33,6 +39,7 @@ export default function CrossListingSettingsPage() {
  const [extInstalled, setExtInstalled] = useState(false);
  const [importStarted, setImportStarted] = useState(false);
  const [importedAlready, setImportedAlready] = useState(false);
+ const [notify, setNotify] = useState<NotifyStatus | null>(null);
 
  async function load() {
  const r = await fetch("/api/store/cross-listing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
@@ -73,6 +80,17 @@ export default function CrossListingSettingsPage() {
  fetch("/api/store/cross-listing/ebay/status").then((x) => (x.ok ? x.json() : null)).then((r) => { if (active && r?.ok) setEbayReady(r); }).catch(() => {});
  return () => { active = false; };
  }, [ebay?.connected]);
+
+ // Owner only: is the eBay push side on, and when did we last hear from eBay? Sellers never see this
+ // (the status route is admin-gated, and a 401 leaves the block unrendered).
+ useEffect(() => {
+ let active = true;
+ fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).then((d) => {
+ if (!active || d?.admin !== true) return;
+ return fetch("/api/admin/ebay-notifications/status").then((r) => (r.ok ? r.json() : null)).then((n) => { if (active && n?.ok) setNotify(n); });
+ }).catch(() => {});
+ return () => { active = false; };
+ }, []);
 
  // The VYA extension tags the page when installed; the Depop import needs it.
  useEffect(() => {
@@ -218,6 +236,40 @@ export default function CrossListingSettingsPage() {
  </div>
  )}
  </TechCard>
+ {notify && (
+ <TechCard className="mt-5 p-5" data-testid="ebay-notify-block">
+ <div className="flex flex-wrap items-baseline justify-between gap-2">
+ <p className="text-[13px] font-semibold text-stone-900">Instant eBay sale notifications <span className="ml-1.5 rounded bg-stone-100 px-1 text-[10px] font-medium text-stone-500">VYA admin</span></p>
+ <p className={`text-[12px] ${notify.subscribed > 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-amber-600"}`}>{notify.summary}{notify.subscribed > 0 ? ` · ${notify.subscribed} of ${notify.stores.length} store${notify.stores.length === 1 ? "" : "s"}` : ""}</p>
+ </div>
+ {!notify.verificationTokenSet && <p className="mt-1 text-[11px] text-amber-600">EBAY_NOTIFY_VERIFICATION_TOKEN is not set on this server — setup will refuse until it is.</p>}
+ {notify.stores.some((st) => st.lastError) && (
+ <ul className="mt-2 space-y-0.5 text-[11px] text-rose-600">
+ {notify.stores.filter((st) => st.lastError).map((st) => <li key={st.slug}>{st.slug}: {st.lastError}</li>)}
+ </ul>
+ )}
+ {notify.recent.length > 0 ? (
+ <div className="mt-3 overflow-x-auto">
+ <table className="w-full text-[11px]">
+ <thead><tr className="text-left text-stone-400"><th className="py-1 pr-3 font-medium">Received</th><th className="py-1 pr-3 font-medium">Topic</th><th className="py-1 pr-3 font-medium">Store</th><th className="py-1 pr-3 font-medium">Outcome</th><th className="py-1 font-medium">Detail</th></tr></thead>
+ <tbody>
+ {notify.recent.map((r) => (
+ <tr key={r.id} className="border-t border-stone-100 text-stone-600">
+ <td className="whitespace-nowrap py-1 pr-3">{new Date(r.receivedAt).toLocaleString()}</td>
+ <td className="py-1 pr-3">{r.topic}</td>
+ <td className="py-1 pr-3">{r.storeSlug ?? "—"}</td>
+ <td className={`py-1 pr-3 ${r.outcome === "synced" ? "text-[var(--accent-ink,#0b7a5c)]" : r.outcome === "unknown-store" || r.outcome === "sync-error" || r.outcome === "timeout" ? "text-amber-600" : ""}`}>{r.outcome}</td>
+ <td className="max-w-[28rem] truncate py-1 text-stone-400" title={r.detail ?? undefined}>{r.detail ?? ""}</td>
+ </tr>
+ ))}
+ </tbody>
+ </table>
+ </div>
+ ) : (
+ <p className="mt-2 text-[11px] text-stone-400">No deliveries yet. Setup: <code>curl -X POST -b via_admin_token=… /api/admin/ebay-notifications/setup</code>; then <code>GET …/status</code> to check.</p>
+ )}
+ </TechCard>
+ )}
  <p className="mt-3 text-[11px] text-stone-400">eBay connects over its API and auto-posts/auto-removes for real. Depop &amp; Vestiaire post through the VYA browser extension — it fills the listing on your own logged-in session (no credentials leave your browser) and reports likes, offers &amp; views back to your dashboard. More marketplaces are coming soon.</p>
  </AdminPage>
  );

@@ -2,6 +2,7 @@ import { sqlRows, safe, int, meanCents, ratePct, type Row } from "./core";
 import { ensureAnalyticsViews } from "./views";
 import { deltaPct, type ResolvedPeriod, type Window } from "./period";
 import { expenseTotals, applyRecurring, categoryLabel, type CategoryTotal, type ExpenseCategory, type AppliedRecurring } from "../expenses-db";
+import { netProfit, netMarginPct, profitLines, missingCostNote, type ProfitInputs, type ProfitLine } from "./profit-core";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Analytics — profit & margin.
@@ -29,6 +30,20 @@ export type MarginTotals = {
  /** Covered sales with no tax figure recorded, so the caller can caveat rather than imply precision. */
  salesWithoutTax: number;
  costCents: number;
+ /**
+  * The costs that sit between gross and net and that no earlier version subtracted. All over the
+  * covered slice, so the statement describes one consistent set of sales.
+  */
+ /** VYA's application fee, as charged on each order. */
+ feeCents: number;
+ /** Card processing, ESTIMATED at 2.9% + 30¢ per checkout sale — Stripe's actual fee isn't stored. */
+ cardFeeCents: number;
+ /** Shipping labels bought through VYA, as charged. */
+ labelCostCents: number;
+ /** The consignor's share of consigned sales — never the store's money. */
+ consignorCutCents: number;
+ /** Sales that went through checkout (the ones a card fee applies to). */
+ orderSales: number;
  grossProfitCents: number;
  grossMarginPct: number | null;
  /** Profit per dollar of cost — the resale question, "what did my buying return?" */
@@ -75,6 +90,8 @@ export type MarginMetrics = {
  vsPrior: { profitPct: number | null; marginPct: number | null } | null;
  byBrand: MarginRow[];
  byCategory: MarginRow[];
+ /** Profit by where the pieces came from (items.source_name); pieces with none sit under "Unknown". */
+ bySource: MarginRow[];
  bestMargin: MarginItem[];
  worstMargin: MarginItem[];
  /** Live listings with no cost recorded — what to fill in to widen coverage. */
@@ -91,22 +108,26 @@ export type MarginMetrics = {
   */
  netProfitCents: number | null;
  netMarginPct: number | null;
+ /** The statement as lines, plus the honest caveat about what it could not include. */
+ profit: { lines: ProfitLine[]; missingCostNote: string | null };
 };
 
 const ZERO: MarginTotals = {
  coveredSales: 0, totalSales: 0, coveragePct: 0, revenueCents: 0, taxCents: 0, salesWithoutTax: 0, costCents: 0,
+ feeCents: 0, cardFeeCents: 0, labelCostCents: 0, consignorCutCents: 0, orderSales: 0,
  grossProfitCents: 0, grossMarginPct: null, roiPct: null, avgProfitPerSaleCents: 0,
 };
 
 const EMPTY: MarginMetrics = {
  available: false, current: ZERO, prior: null, vsPrior: null,
- byBrand: [], byCategory: [], bestMargin: [], worstMargin: [],
+ byBrand: [], byCategory: [], bySource: [], bestMargin: [], worstMargin: [],
  activeWithoutCost: 0, activeTotal: 0, inventoryCostCents: 0,
  operating: {
   totalCents: 0, byCategory: [], priorTotalCents: null,
   recurring: { perOrder: { rateCents: 0, sales: 0, appliedCents: 0 }, monthly: { rateCents: 0, months: 0, appliedCents: 0 } },
  },
  netProfitCents: null, netMarginPct: null,
+ profit: { lines: [], missingCostNote: null },
 };
 
 // A cost of zero counts as "not recorded" throughout: genuinely free stock is
@@ -114,20 +135,32 @@ const EMPTY: MarginMetrics = {
 // margin on every listing nobody costed.
 
 async function totalsFor(sellerId: string, w: Window): Promise<MarginTotals> {
+ // Per-sale costs join back to the order (sale_id is 'order:<id>' for checkout sales) and to the
+ // consignment record by product. Item-origin sales — marked sold by hand, never through checkout —
+ // have no order and therefore no fee, label or card charge on record, which is true rather than
+ // a gap: nothing was charged.
  const rows = await sqlRows()`
   SELECT
    COUNT(*)::int AS total_sales,
    COUNT(*) FILTER (WHERE i.cost_cents > 0)::int AS covered_sales,
+   COUNT(*) FILTER (WHERE i.cost_cents > 0 AND s.origin = 'order')::int AS order_sales,
    -- Revenue is the sale LESS the tax collected on it. On a tax-inclusive store (UK, EU, AU) the
    -- amount already contains VAT, and that money is the government's, never the seller's: £200 at
    -- 20% is £166.67 of revenue. Counting the gross overstates revenue, margin and ROI at once.
    COALESCE(SUM(s.amount_cents - COALESCE(s.tax_cents, 0)) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS revenue_cents,
    COALESCE(SUM(s.tax_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS tax_cents,
-   -- Sales whose tax we simply don't know (an item marked sold never went through checkout).
+   -- Sales whose tax we simply don't know (an item-status sale never went through checkout).
    -- Reported so the P&L can say the figure may still contain tax, instead of implying precision.
    COUNT(*) FILTER (WHERE i.cost_cents > 0 AND s.tax_cents IS NULL)::int AS sales_without_tax,
-   COALESCE(SUM(i.cost_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS cost_cents
-  FROM vya_store_sales s JOIN items i ON i.id = s.item_id
+   COALESCE(SUM(i.cost_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS cost_cents,
+   COALESCE(SUM(o.fee_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS fee_cents,
+   COALESCE(SUM(o.label_cost_cents) FILTER (WHERE i.cost_cents > 0), 0)::bigint AS label_cost_cents,
+   -- The consignor's cut is a share of the SALE price, the same basis checkout routes it on.
+   COALESCE(SUM(ROUND(s.amount_cents * ci.split_pct / 100.0)) FILTER (WHERE i.cost_cents > 0 AND ci.split_pct IS NOT NULL), 0)::bigint AS consignor_cut_cents
+  FROM vya_store_sales s
+  JOIN items i ON i.id = s.item_id
+  LEFT JOIN orders o ON s.origin = 'order' AND s.sale_id = 'order:' || o.id::text
+  LEFT JOIN consignment_items ci ON ci.product_id = s.item_id::text
   WHERE s.seller_id = ${sellerId}::uuid
    AND s.sold_at >= ${w.startISO} AND s.sold_at < ${w.endISO}
  `;
@@ -136,6 +169,7 @@ async function totalsFor(sellerId: string, w: Window): Promise<MarginTotals> {
  const costCents = int(r.cost_cents);
  const coveredSales = int(r.covered_sales);
  const totalSales = int(r.total_sales);
+ const orderSales = int(r.order_sales);
  const grossProfitCents = revenueCents - costCents;
  return {
   coveredSales,
@@ -145,6 +179,13 @@ async function totalsFor(sellerId: string, w: Window): Promise<MarginTotals> {
   taxCents: int(r.tax_cents),
   salesWithoutTax: int(r.sales_without_tax),
   costCents,
+  feeCents: int(r.fee_cents),
+  // Stripe's real per-charge fee isn't stored anywhere, so this is the published rate applied to
+  // each checkout sale. Labelled as an estimate wherever it is shown.
+  cardFeeCents: orderSales > 0 ? Math.round(revenueCents * 0.029) + 30 * orderSales : 0,
+  labelCostCents: int(r.label_cost_cents),
+  consignorCutCents: int(r.consignor_cut_cents),
+  orderSales,
   grossProfitCents,
   grossMarginPct: revenueCents > 0 ? Math.round((grossProfitCents / revenueCents) * 1000) / 10 : null,
   roiPct: costCents > 0 ? Math.round((grossProfitCents / costCents) * 1000) / 10 : null,
@@ -175,7 +216,7 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
   await ensureAnalyticsViews();
   const sql = sqlRows();
 
-  const [cur, pri, brandRows, catRows, itemRows, activeRows, opex, salesByDay, priorOpex] = await Promise.all([
+  const [cur, pri, brandRows, catRows, sourceRows, itemRows, activeRows, opex, salesByDay, priorOpex] = await Promise.all([
    totalsFor(sellerId, current),
    prior ? totalsFor(sellerId, prior) : Promise.resolve(null),
    sql`
@@ -196,6 +237,17 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
      AND s.sold_at >= ${current.startISO} AND s.sold_at < ${current.endISO}
     GROUP BY 1 ORDER BY (COALESCE(SUM(s.amount_cents), 0) - COALESCE(SUM(i.cost_cents), 0)) DESC LIMIT 8
    `,
+   // Which buying trips pay: the same costed slice, grouped by where she said the piece came from.
+   // Tolerant of a database that predates the column, so the rest of the page still renders.
+   sql`
+    SELECT COALESCE(NULLIF(i.source_name, ''), 'Unknown') AS name, COUNT(*)::int AS sales,
+     COALESCE(SUM(s.amount_cents), 0)::bigint AS revenue_cents,
+     COALESCE(SUM(i.cost_cents), 0)::bigint AS cost_cents
+    FROM vya_store_sales s JOIN items i ON i.id = s.item_id
+    WHERE s.seller_id = ${sellerId}::uuid AND i.cost_cents > 0
+     AND s.sold_at >= ${current.startISO} AND s.sold_at < ${current.endISO}
+    GROUP BY 1 ORDER BY (COALESCE(SUM(s.amount_cents), 0) - COALESCE(SUM(i.cost_cents), 0)) DESC LIMIT 12
+   `.catch(() => [] as Row[]),
    sql`
     SELECT i.id AS item_id, i.title, i.images, s.amount_cents AS price_cents, i.cost_cents, s.sold_at
     FROM vya_store_sales s JOIN items i ON i.id = s.item_id
@@ -273,6 +325,7 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
    } : null,
    byBrand: rowsFrom(brandRows),
    byCategory: rowsFrom(catRows),
+   bySource: rowsFrom(sourceRows),
    bestMargin: byProfit.slice(0, 8),
    // The tail, worst first — pieces that lost money or barely broke even. Excludes
    // anything already shown as a best seller, so a short list can't print twice.
@@ -284,10 +337,21 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
    activeTotal: int(active.active),
    inventoryCostCents: int(active.inventory_cost_cents),
    operating,
-   netProfitCents: cur.coveredSales > 0 ? cur.grossProfitCents - operating.totalCents : null,
-   netMarginPct: cur.coveredSales > 0 && cur.revenueCents > 0
-    ? Math.round(((cur.grossProfitCents - operating.totalCents) / cur.revenueCents) * 1000) / 10
-    : null,
+   // ONE definition of net, shared with Home. Gross minus every cost the store actually bore —
+   // fees, card, labels, the consignor's cut, expenses — and allowed to be negative. Null when
+   // nothing sold has a cost on record, because a net figure with an unknown gross is invented.
+   ...(() => {
+    const inputs: ProfitInputs = {
+     revenueCents: cur.revenueCents, costCents: cur.costCents, feeCents: cur.feeCents, cardFeeCents: cur.cardFeeCents,
+     labelCostCents: cur.labelCostCents, consignorCutCents: cur.consignorCutCents, operatingCents: operating.totalCents,
+     orderSales: cur.orderSales, coveredSales: cur.coveredSales, totalSales: cur.totalSales,
+    };
+    return {
+     netProfitCents: netProfit(inputs),
+     netMarginPct: netMarginPct(inputs),
+     profit: { lines: profitLines(inputs), missingCostNote: missingCostNote(inputs) },
+    };
+   })(),
   };
  }, EMPTY, "margin");
 }

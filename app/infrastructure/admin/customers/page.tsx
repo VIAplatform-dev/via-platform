@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Users } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, TH, TD, cn } from "../ui";
 import { Input, Field, inputCls } from "@/app/store/ui";
+import { filterCustomers, parseAudience, audienceIsEmpty, type AudienceFilter } from "@/app/lib/customer-audience-core";
 
 type Customer = {
  email: string;
@@ -18,6 +19,9 @@ type Customer = {
  spentCents: number;
  lastOrderAt: string | null;
  addedAt: string | null;
+ tags: string[];
+ notes: string | null;
+ categories: string[];
 };
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -25,6 +29,8 @@ const csvCell = (v: string | number) => { const s = String(v); return /[",\n]/.t
 
 export default function CustomersPage() {
  const [customers, setCustomers] = useState<Customer[]>([]);
+ const [allTags, setAllTags] = useState<string[]>([]);
+ const [categories, setCategories] = useState<string[]>([]);
  const [count, setCount] = useState(0);
  const [loading, setLoading] = useState(true);
  const [q, setQ] = useState("");
@@ -46,7 +52,7 @@ export default function CustomersPage() {
  async function load() {
  try {
  const r = await fetch("/api/store/customers");
- if (r.ok) { const d = await r.json(); setCustomers(d.customers || []); setCount(d.count || 0); }
+ if (r.ok) { const d = await r.json(); setCustomers(d.customers || []); setCount(d.count || 0); setAllTags((d.tags || []).map((t: { tag: string }) => t.tag)); setCategories(d.categories || []); }
  } catch {
  /* keep whatever we have */
  }
@@ -54,13 +60,41 @@ export default function CustomersPage() {
  }
  useEffect(() => { (async () => { await load(); })(); }, []);
 
- const buyersOnly = usePathname().endsWith("/buyers");
+ // All · Buyers · Imported. A visible chip row rather than a separate page: "Buyers" used to be
+ // a sidebar child that rendered this same list with one filter baked in, which is a filter, not a
+ // place. /customers/buyers still resolves (it re-exports this page) and ?filter=buyers deep-links.
+ type Filter = "all" | "buyers" | "imported";
+ const pathname = usePathname();
+ const [filter, setFilter] = useState<Filter>(pathname.endsWith("/buyers") ? "buyers" : "all");
+ // Tag (any of), spent over, bought in a category — the same filter the campaign sender runs, so
+ // what this page counts is what an email reaches. ?tag=a,b&spentOver=50&category=bags deep-links.
+ const [audience, setAudience] = useState<AudienceFilter>({ tags: [], spentOverCents: null, category: null });
+ const [spentOverText, setSpentOverText] = useState("");
+ useEffect(() => {
+ const sp = new URLSearchParams(window.location.search);
+ const f = sp.get("filter");
+ const a = parseAudience({ tag: sp.get("tag"), spentOver: sp.get("spentOver"), category: sp.get("category") });
+ void Promise.resolve().then(() => {
+ if (f === "buyers" || f === "imported") setFilter(f);
+ if (!audienceIsEmpty(a)) { setAudience(a); if (a.spentOverCents != null) setSpentOverText(String(a.spentOverCents / 100)); }
+ });
+ }, []);
+ // The URL is READ on arrival (links work) but not rewritten on every change: Next intercepts
+ // history.replaceState as a navigation, and a router refresh per keystroke made the chips lag by
+ // seconds. The "Email these" link below carries the filter across instead.
+ const toggleTag = (t: string) => setAudience((a) => ({ ...a, tags: (a.tags || []).includes(t) ? (a.tags || []).filter((x) => x !== t) : [...(a.tags || []), t] }));
+ const setSpentOver = (text: string) => {
+ setSpentOverText(text);
+ const n = Number(text);
+ setAudience((a) => ({ ...a, spentOverCents: text.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null }));
+ };
  const filtered = useMemo(() => {
  const s = q.trim().toLowerCase();
- let list = buyersOnly ? customers.filter((c) => c.orders > 0) : customers;
- if (s) list = list.filter((c) => (c.name || "").toLowerCase().includes(s) || c.email.toLowerCase().includes(s) || (c.location || "").toLowerCase().includes(s) || (c.phone || "").includes(s));
+ let list = filter === "buyers" ? customers.filter((c) => c.orders > 0) : filter === "imported" ? customers.filter((c) => c.source !== "buyer") : customers;
+ list = filterCustomers(list, audience);
+ if (s) list = list.filter((c) => (c.name || "").toLowerCase().includes(s) || c.email.toLowerCase().includes(s) || (c.location || "").toLowerCase().includes(s) || (c.phone || "").includes(s) || (c.tags || []).some((t) => t.includes(s)));
  return list;
- }, [customers, q, buyersOnly]);
+ }, [customers, q, filter, audience]);
 
  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
  const f = e.target.files?.[0];
@@ -108,9 +142,10 @@ export default function CustomersPage() {
  }
 
  function exportCsv() {
- const head = "email,name,phone,location,orders,amount_spent,subscribed,source";
+ // Her tags and her note travel with the list — the memory is the point of the export.
+ const head = "email,name,phone,location,orders,amount_spent,subscribed,source,tags,notes";
  const lines = customers.map((c) =>
- [c.email, c.name || "", c.phone || "", c.location || "", c.orders, (c.spentCents / 100).toFixed(2), c.subscribed ? "subscribed" : "unsubscribed", c.source].map(csvCell).join(","),
+ [c.email, c.name || "", c.phone || "", c.location || "", c.orders, (c.spentCents / 100).toFixed(2), c.subscribed ? "subscribed" : "unsubscribed", c.source, (c.tags || []).join(" | "), c.notes || ""].map(csvCell).join(","),
  );
  const blob = new Blob([[head, ...lines].join("\n")], { type: "text/csv" });
  const url = URL.createObjectURL(blob);
@@ -179,14 +214,58 @@ export default function CustomersPage() {
  />
  ) : (
  <TechCard className="overflow-hidden">
- <div className="border-b border-stone-100 px-4 py-3">
+ <div className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-3">
+ <div className="flex gap-1.5" role="tablist" aria-label="Customer filter">
+ {([["all", "All"], ["buyers", "Buyers"], ["imported", "Imported"]] as const).map(([k, lab]) => (
+ <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}
+ className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", filter === k ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
+ {lab}
+ </button>
+ ))}
+ </div>
  <input
  value={q}
  onChange={(e) => setQ(e.target.value)}
  placeholder="Search customers…"
- className={cn(inputCls, "h-9 text-[13px]")}
+ className={cn(inputCls, "h-9 min-w-[200px] flex-1 text-[13px]")}
  />
  </div>
+ {(allTags.length > 0 || categories.length > 0 || customers.some((c) => c.spentCents > 0)) && (
+ <div className="flex flex-wrap items-center gap-2 border-b border-stone-100 px-4 py-2.5" data-testid="audience-filters">
+ {allTags.length > 0 && (
+ <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by tag">
+ <span className="text-[11px] uppercase tracking-[0.12em] text-stone-400">Tag</span>
+ {allTags.map((t) => {
+ const on = (audience.tags || []).includes(t);
+ return (
+ <button key={t} type="button" aria-pressed={on} onClick={() => toggleTag(t)}
+ className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", on ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>{t}</button>
+ );
+ })}
+ </div>
+ )}
+ <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+ <span className="whitespace-nowrap">Spent over $</span>
+ <input type="number" inputMode="decimal" min={0} value={spentOverText} onChange={(e) => setSpentOver(e.target.value)} placeholder="0" aria-label="Spent over" className={cn(inputCls, "h-8 w-24 text-[12.5px]")} />
+ </label>
+ {categories.length > 0 && (
+ <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+ <span className="whitespace-nowrap">Bought in</span>
+ <select value={audience.category || ""} onChange={(e) => setAudience((a) => ({ ...a, category: e.target.value || null }))} aria-label="Bought in category" className={cn(inputCls, "h-8 w-auto text-[12.5px]")}>
+ <option value="">any category</option>
+ {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+ </select>
+ </label>
+ )}
+ {!audienceIsEmpty(audience) && (
+ <>
+ <span className="text-[12px] text-stone-500"><b className="text-stone-800">{filtered.length}</b> match</span>
+ <button type="button" onClick={() => { setAudience({ tags: [], spentOverCents: null, category: null }); setSpentOverText(""); }} className="text-[12px] text-stone-500 underline underline-offset-2 hover:text-stone-800">Clear</button>
+ <Link href={`/admin/marketing/campaigns/compose?${new URLSearchParams({ ...(audience.tags?.length ? { tag: audience.tags.join(",") } : {}), ...(audience.spentOverCents != null ? { spentOver: String(audience.spentOverCents / 100) } : {}), ...(audience.category ? { category: audience.category } : {}) }).toString()}`} className="ml-auto text-[12px] font-medium text-[var(--accent-ink,#0b7a5c)] hover:underline">Email these {filtered.length} →</Link>
+ </>
+ )}
+ </div>
+ )}
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
@@ -206,6 +285,11 @@ export default function CustomersPage() {
  <div className="font-medium text-stone-900 group-hover/name:underline">{c.name || c.email}</div>
  {c.name && <div className="text-[12px] text-stone-400">{c.email}</div>}
  </Link>
+ {(c.tags || []).length > 0 && (
+ <div className="mt-1 flex flex-wrap gap-1">
+ {c.tags.map((t) => <button key={t} type="button" onClick={() => toggleTag(t)} className="rounded-full bg-stone-100 px-2 py-0.5 text-[10.5px] text-stone-600 hover:bg-stone-200">{t}</button>)}
+ </div>
+ )}
  </TD>
  <TD className="px-5">
  {c.subscribed
@@ -218,7 +302,7 @@ export default function CustomersPage() {
  </tr>
  ))}
  {filtered.length === 0 && (
- <tr><td colSpan={5} className="px-5 py-10 text-center text-stone-400">No customers match “{q}”.</td></tr>
+ <tr><td colSpan={5} className="px-5 py-10 text-center text-stone-400">{q ? `No customers match “${q}”.` : "No customers match those filters."}</td></tr>
  )}
  </tbody>
  </table>

@@ -5,6 +5,7 @@ import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, spacing, fonts } from "../../lib/theme";
 import { formatMoney, percentDelta } from "../../lib/seller/home";
+import { profitRows, netProfitLine, noProfitPrompt, type MarginSection } from "../../lib/seller/profit";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 
 // An overview, not a report.
@@ -49,9 +50,19 @@ export default function AnalyticsScreen() {
     enabled: !!storeSlug,
   });
 
+  // Profit is the web's one definition (profit-core.ts), read off the suite's margin section. Its
+  // window is the same one Home shows — 30 days — whatever the takings chips say, so the two agree.
+  const profit = useQuery({
+    queryKey: ["store", "suite", "margin", "30d"],
+    queryFn: () => apiGet<{ margin?: MarginSection }>("/api/store/analytics/suite?sections=margin&period=30d"),
+    enabled: !!storeSlug,
+  });
+
   const currency = me.data?.currency ?? "USD";
   const d = q.data;
   const delta = d ? percentDelta(d.revenueCents, d.prior.revenueCents) : null;
+  const rows = profitRows(profit.data?.margin, currency);
+  const net = netProfitLine(profit.data?.margin, currency);
 
   return (
     <SellerScreen title="Analytics" back onRefresh={() => void q.refetch()} refreshing={q.isRefetching}>
@@ -74,6 +85,33 @@ export default function AnalyticsScreen() {
             <Cell label="AVERAGE" value={d ? formatMoney(d.aovCents, currency) : "—"} />
             <Cell label="LIVE" value={d ? String(d.inventory.active) : "—"} />
           </View>
+
+          <Text style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>
+            Profit · 30 days
+          </Text>
+          {profit.isError ? (
+            <Empty>Couldn&apos;t load your profit.</Empty>
+          ) : profit.isPending ? (
+            <Empty> </Empty>
+          ) : net === null ? (
+            <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.lg }}>
+              <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>No cost on record</Text>
+              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2, lineHeight: 18 }}>{noProfitPrompt(profit.data?.margin)}</Text>
+            </View>
+          ) : (
+            <View>
+              {rows.map((r) => (
+                <View key={r.key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                  <Text style={{ flex: 1, fontSize: r.total ? 15 : 14, color: r.total ? colors.text : colors.textMuted, fontWeight: r.total ? "700" : "400" }}>{r.label}</Text>
+                  {/* A loss is in the ink colour, never green, and never clamped to zero. */}
+                  <Text style={{ fontSize: r.total ? 16 : 14, color: !r.negative && r.total ? colors.positive : colors.text, fontWeight: r.total ? "700" : "600", fontVariant: ["tabular-nums"] }}>{r.amount}</Text>
+                </View>
+              ))}
+              {profit.data?.margin?.profit?.missingCostNote ? (
+                <Text style={{ fontSize: 12.5, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 18 }}>{profit.data.margin.profit.missingCostNote}</Text>
+              ) : null}
+            </View>
+          )}
 
           <Text style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>
             Best this period

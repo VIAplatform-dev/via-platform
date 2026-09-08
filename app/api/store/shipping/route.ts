@@ -5,6 +5,8 @@ import { pickupOffered } from "@/app/lib/pickup-core.ts";
 import { isDutyMode, resolveDutyMode, DEFAULT_DUTY_MODE } from "@/app/lib/customs";
 import { normalizeZones, DEFAULT_ZONES } from "@/app/lib/shipping-zones";
 import { SHIPPING_TIERS } from "@/app/lib/shipping-tiers";
+import { validateZoneRates } from "@/app/lib/shipping-prices-core";
+import { stores } from "@/app/lib/stores";
 import { ensureTaxHeadOffice } from "@/app/lib/store-tax-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { payableAccountId } from "@/app/lib/stripe-mode";
@@ -19,7 +21,12 @@ export async function GET(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const s = await getShippingSettings(slug);
  const effective = resolveDutyMode(s.dutyMode ?? DEFAULT_DUTY_MODE, Boolean(s.carrierAccountId));
+ // The store's currency, so the settings page prints "£" for a London store and never a "$" it
+ // doesn't trade in. Every price below is minor units of THIS currency.
+ // Same source publish uses for a listing's currency (intake/publish/route.ts).
+ const currency = stores.find((x) => x.slug === slug)?.currency || "USD";
  return NextResponse.json({
+  currency,
   mode: s.mode,
   freeThresholdUsd: s.freeThresholdCents != null ? s.freeThresholdCents / 100 : null,
   shipFrom: s.shipFrom,
@@ -59,11 +66,19 @@ export async function POST(request: NextRequest) {
  const dutyMode = isDutyMode(body?.dutyMode) ? body.dutyMode : existing?.dutyMode ?? DEFAULT_DUTY_MODE;
  // Zones say both WHERE she ships and what she charges; normalizeZones refuses junk and can never
  // produce a store that ships nowhere.
+ // A negative price is refused with the box named, rather than quietly dropped to the default.
+ if (has("zones")) {
+  const v = validateZoneRates(body?.zones);
+  if (!v.ok) return NextResponse.json({ error: v.error }, { status: 400 });
+ }
  const zones = has("zones") ? normalizeZones(body?.zones) : existing?.zones ?? undefined;
 
+ // An explicit `shipFrom: null` clears the address (back to "not set", country included); an object
+ // replaces it; leaving the key out keeps what is there.
+ const clearShipFrom = has("shipFrom") && body?.shipFrom === null;
  const f = has("shipFrom") ? body?.shipFrom || {} : existing?.shipFrom || {};
  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 120) : null);
- const shipFrom: ShipFrom = {
+ const shipFrom: ShipFrom | null = clearShipFrom ? null : {
  name: str(f.name), street1: str(f.street1), street2: str(f.street2), city: str(f.city),
  state: str(f.state), zip: str(f.zip), country: str(f.country) || "US", phone: str(f.phone),
  };
@@ -94,7 +109,7 @@ export async function POST(request: NextRequest) {
  // their dashboard has no Tax Settings page — so if the platform doesn't set this, nobody can, and
  // the seller meets a Stripe error pointing at a screen she can't open. Best-effort: a shipping save
  // must not fail because Stripe was briefly unhappy.
- if (shipFrom.street1 && shipFrom.city && shipFrom.country) {
+ if (shipFrom?.street1 && shipFrom.city && shipFrom.country) {
   const acct = payableAccountId(await getSellerPayments(slug).catch(() => null));
   if (acct) await ensureTaxHeadOffice(acct, shipFrom).catch(() => null);
  }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getItem, reserveItem, releaseReservation, sweepExpiredReservations } from "@/app/lib/db/inventory";
+import { getItem, reserveItem, releaseReservation, sweepExpiredReservations, currentReservationRef } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { payableAccountId } from "@/app/lib/stripe-mode";
@@ -9,7 +9,9 @@ import { requestBagSellerId } from "@/app/lib/storefront-cart-scope";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { consignorCutToHold } from "@/app/lib/consignment-db";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
-import { flatRateCents } from "@/app/lib/shipping-tiers";
+import { mayReclaimReservation } from "@/app/lib/bag-reclaim-core";
+import { settleCrossListedBeforeCharge } from "@/app/lib/market-sync";
+import { quoteShipping } from "@/app/lib/shipping-zones";
 import { resolveDelivery, deliveryMetadata } from "@/app/lib/checkout-delivery.ts";
 import { getCheckoutMethods } from "@/app/lib/store-checkout-db";
 import { emptyBagMessage } from "@/app/lib/storefront-cart-core";
@@ -51,7 +53,12 @@ export async function POST(request: NextRequest) {
  const gone: string[] = [];
  for (const id of ids) {
  let it = await getItem(id);
- if (it && it.status === "reserved") { await releaseReservation(id).catch(() => {}); it = await getItem(id); }
+ // Only the bag's OWN earlier reservation is reclaimed. A "hold:<name>" (the seller keeping the
+ // piece for someone) or another buyer's claim stays put and the piece is reported as gone.
+ if (it && it.status === "reserved" && mayReclaimReservation(await currentReservationRef(id).catch(() => null), token)) {
+ await releaseReservation(id).catch(() => {});
+ it = await getItem(id);
+ }
  if (it && it.status === "active") { avail.push(it); sellerId = it.sellerId; sellerIds.add(it.sellerId); }
  else if (it) gone.push(it.title);
  }
@@ -67,8 +74,15 @@ export async function POST(request: NextRequest) {
  const acctId = payableAccountId(pay);
  if (!acctId) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
 
+ // Same guard as the single-piece checkout: anything in the bag that is live on a marketplace
+ // with a sale feed is re-checked there before we hold it, so a piece sold on eBay an hour ago
+ // is dropped from the bag rather than charged twice.
+ const soldElsewhere = new Set(await settleCrossListedBeforeCharge(seller.slug, avail.map((it) => it.id)));
+ for (const it of avail) if (soldElsewhere.has(it.id)) gone.push(it.title);
+ const stillAvail = avail.filter((it) => !soldElsewhere.has(it.id));
+ if (!stillAvail.length) return NextResponse.json({ error: emptyBagMessage(ids.length, gone) }, { status: 409 });
  const reserved = [];
- for (const it of avail) { const r = await reserveItem(it.id, token); if (r) reserved.push(it); }
+ for (const it of stillAvail) { const r = await reserveItem(it.id, token); if (r) reserved.push(it); }
  if (!reserved.length) return NextResponse.json({ error: "Your bag items are no longer available." }, { status: 409 });
 
  // Server-authoritative shipping — NEVER trust a client-supplied amount (a buyer could POST 0 and
@@ -81,12 +95,24 @@ export async function POST(request: NextRequest) {
  // Flat-rate by size (Depop/Poshmark-style): the buyer pays one clean, consistent tier price for the
  // bag's combined parcel — same number every time, no per-order variation. VYA buys the real discounted
  // label at fulfillment and keeps the spread; margin is baked into the tier + kept safe by round-up dims.
- const parcelShipCents = flatRateCents({
+ // Priced by ZONE with the store's own tier prices (shipping-zones.ts + shipping-prices-core.ts) —
+ // the same call /cart-shipping made, so the charge matches the quote to the penny.
+ const shipQuote = quoteShipping({
+ fromCountry: shipSettings.shipFrom?.country || "US",
+ toCountry: hasShipAddress ? ship.country || "US" : shipSettings.shipFrom?.country || "US",
+ parcel: {
  weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
  lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),
  widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
  heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
+ },
+ zones: shipSettings.zones,
  });
+ if (hasShipAddress && !shipQuote.ok) {
+ for (const it of reserved) await releaseReservation(it.id).catch(() => {});
+ return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+ }
+ const parcelShipCents = shipQuote.ok ? shipQuote.amountCents : 0;
  const delivery = resolveDelivery({ claimed: claimedDelivery, subtotalCents: subtotalForShip, parcelShipCents, settings: shipSettings });
  const shippingCostCents = delivery.shippingCents;
  // She asked to collect from a store that isn't offering it — so this is a delivery, and it needs

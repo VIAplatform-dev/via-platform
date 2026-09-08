@@ -4,7 +4,7 @@ import {
  findOrCreateUserByEmail,
  signMobileJwt,
 } from "@/app/lib/mobileAuth";
-import { storeSlugFromEmail } from "@/app/lib/storeAuth";
+import { storeSlugForMobileEmail } from "@/app/lib/storeAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
  // storeSlug alongside the token, matching /api/mobile/auth/me. Without it the app only learns a
  // seller is a seller on the NEXT launch — it routes on this, so a fresh sign-in would drop a store
  // owner into the shopper app.
- return NextResponse.json({ token: jwt, user: { id: userId, email }, storeSlug: storeSlugFromEmail(email) });
+ return NextResponse.json({ token: jwt, user: { id: userId, email }, storeSlug: await storeSlugForMobileEmail(email) });
  } catch (err) {
  console.error("[mobile-magic-link verify] error:", err);
  return NextResponse.json({ error: "Internal error" }, { status: 500 });

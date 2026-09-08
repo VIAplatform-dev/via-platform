@@ -147,12 +147,13 @@ export default function MarketHome() {
             </Text>
           ) : null}
 
-          <BigButton icon="camera" label="Find item" />
-          <BigButton icon="plus" label="Quick list" secondary />
+          <BigButton icon="camera" label="Find item" onPress={() => router.push("/market/find")} />
+          <BigButton icon="plus" label="Quick list" secondary onPress={() => router.push("/market/quick")} />
 
           {(q.data?.inProgress ?? []).map((k) => (
             <Pressable
               key={k.id}
+              onPress={() => router.push({ pathname: "/market/checkout/[id]", params: { id: k.id } })}
               style={{
                 flexDirection: "row", alignItems: "center", gap: spacing.md,
                 backgroundColor: "rgba(93,15,23,0.08)", borderRadius: 16,
@@ -166,6 +167,21 @@ export default function MarketHome() {
             </Pressable>
           ))}
         </View>
+
+        <Pressable
+          onPress={() => router.push("/market/sales")}
+          style={{
+            flexDirection: "row", alignItems: "center",
+            marginHorizontal: spacing.lg, marginTop: spacing.lg,
+            backgroundColor: colors.bgCard, borderRadius: 16,
+            borderWidth: 1, borderColor: colors.border,
+            paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+          }}
+        >
+          <Feather name="list" size={16} color={colors.text} />
+          <Text style={{ flex: 1, fontSize: 13.5, color: colors.text, marginLeft: spacing.md }}>Sales today</Text>
+          <Text style={{ fontWeight: "700", color: colors.accent }}>›</Text>
+        </Pressable>
 
         {/* Cards or cash — she needs to know before the first buyer, not at the card reader. */}
         <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700", marginTop: spacing.xl, marginHorizontal: spacing.xl }}>

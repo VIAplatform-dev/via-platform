@@ -7,6 +7,7 @@
 // Blocks renderer (edit mode) + the design API. Every change autosaves; VYA's changes reload it.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { withStore } from "@/app/infrastructure/admin/market/ui";
 import { createPortal } from "react-dom";
 import { useStoreBase } from "../../nav-base";
 import Sidekick from "../../Sidekick";
@@ -267,7 +268,7 @@ function CollectionsEditor({ block, onField, pick, uploading }: { block: Block; 
  const tiles = parseTiles(block.props?.items);
  const cols = block.props?.cols || "3";
  const [available, setAvailable] = useState<string[]>([]);
- useEffect(() => { (async () => { const r = await fetch("/api/store/collections?all=1").then((x) => (x.ok ? x.json() : null)).catch(() => null); setAvailable((r?.collections || []).map((c: { title: string }) => c.title)); })(); }, []);
+ useEffect(() => { (async () => { const r = await fetch(withStore("/api/store/collections?all=1")).then((x) => (x.ok ? x.json() : null)).catch(() => null); setAvailable((r?.collections || []).map((c: { title: string }) => c.title)); })(); }, []);
  const set = (next: Tile[]) => onField("items", serializeTiles(next));
  const used = new Set(tiles.map((t) => t.label.toLowerCase()));
  const suggestions = available.filter((t) => !used.has(t.toLowerCase()));
@@ -737,7 +738,7 @@ export default function StorefrontStudio() {
  setExtraPages(nPages);
  // If anything was out of bounds, persist the corrected geometry once (mirrors the sections autosave).
  if (nBlocks !== baseBlocks || nShop !== baseShop || pagesChanged) {
- fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks: nBlocks, shopBlocks: nShop, extraPages: nPages })) }).catch(() => {});
+ fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks: nBlocks, shopBlocks: nShop, extraPages: nPages })) }).catch(() => {});
  }
  setCustomCss(d.customCss || "");
  setSocials(d.socials || {});
@@ -750,7 +751,7 @@ export default function StorefrontStudio() {
  useEffect(() => {
  (async () => {
  const [sf] = await Promise.all([
- fetch("/api/store/storefront").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+ fetch(withStore("/api/store/storefront")).then((r) => (r.ok ? r.json() : null)).catch(() => null),
  loadDesign(),
  ]);
  if (sf?.settings) setSettings(sf.settings as Settings);
@@ -798,7 +799,7 @@ export default function StorefrontStudio() {
  if (saveTimer.current) clearTimeout(saveTimer.current);
  saveTimer.current = setTimeout(async () => {
  setSave("saving");
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks, shopBlocks, extraPages })) }).catch(() => {});
+ await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks, shopBlocks, extraPages })) }).catch(() => {});
  setSave("saved");
  }, 700);
  return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
@@ -1083,7 +1084,7 @@ export default function StorefrontStudio() {
  setSelBlock(null);
  setShowTemplates(false);
  setTemplateId(t.id);
- await fetch("/api/store/storefront/design", {
+ await fetch(withStore("/api/store/storefront/design"), {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   // applyContent:false — the sections are already in local state and on their way up via autosave.
@@ -1101,7 +1102,7 @@ export default function StorefrontStudio() {
  if (designTimer.current) clearTimeout(designTimer.current);
  setSave("saving");
  designTimer.current = setTimeout(async () => {
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody(patch)) }).catch(() => {});
+ await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody(patch)) }).catch(() => {});
  setSave("saved");
  }, 400);
  }, []);
@@ -1270,7 +1271,7 @@ export default function StorefrontStudio() {
  const existing = collections[0];
  const target = existing
   ? existing
-  : await fetch("/api/store/collections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Featured" }) })
+  : await fetch(withStore("/api/store/collections"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Featured" }) })
      .then((r) => (r.ok ? r.json() : null))
      .then((d) => (d?.collection ? { slug: d.collection.slug as string, title: d.collection.title as string, itemCount: 0, products: [] as Product[] } : null))
      .catch(() => null);
@@ -2051,7 +2052,7 @@ export default function StorefrontStudio() {
  const fd = new FormData(); fd.append("file", file);
  setUploading(true); setUploadErr(null);
  try {
- const r = await fetch("/api/store/assets", { method: "POST", body: fd });
+ const r = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd });
  if (!r.ok) {
   // 413 is the platform rejecting the body before our route runs — it isn't JSON, so read it as text.
   const d = await r.json().catch(() => null);
@@ -2083,7 +2084,7 @@ export default function StorefrontStudio() {
  // POSTs to the same library, so every upload lands here too.
  const loadAssets = useCallback(async () => {
  setAssetsBusy(true);
- const r = await fetch("/api/store/assets").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch(withStore("/api/store/assets")).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  setAssets(r?.assets || []);
  setAssetsBusy(false);
  }, []);
@@ -2127,7 +2128,7 @@ export default function StorefrontStudio() {
  if (!settings) return;
  setPublishing(true); setGateMsg(null);
  try {
- const r = await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, enabled: !settings.enabled }) });
+ const r = await fetch(withStore("/api/store/storefront"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, enabled: !settings.enabled }) });
  const d = await r.json().catch(() => null);
  if (r.ok && d?.settings) setSettings(d.settings as Settings);
  // "Set up but held": going live needs an active plan — surface the prompt instead of failing silently.

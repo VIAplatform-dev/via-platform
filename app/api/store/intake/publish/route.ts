@@ -13,6 +13,10 @@ import { logCorrections, logPredictions, rememberItem } from "@/app/lib/intake-m
 import { recordIntakeExample } from "@/app/lib/training-data-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
+import { normalizeFlaws } from "@/app/lib/flaws-core";
+import { parseAcquiredAt } from "@/app/lib/lot-core";
+import { resolveParcelAtPublish } from "@/app/lib/parcel-core";
+import { normalizeMeasurements, unitFor } from "@/app/lib/measurements-core";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +44,8 @@ export async function POST(request: NextRequest) {
  // Anything that will be publicly live — now OR on a schedule — must be shippable: without a
  // ship-from we can't floor the buyer's shipping (VYA could lose money) or buy the label. A plain
  // draft is fine (stage now, add the address before it goes live).
- if (goLiveNow || scheduled) {
  const shipping = await getShippingSettings(slug);
+ if (goLiveNow || scheduled) {
  if (!hasShipFrom(shipping)) {
   const gaps = describeMissing(missingShipFrom(shipping.shipFrom));
   return NextResponse.json({ error: `Your ship-from address is missing its ${gaps}. Add it in Settings → Locations, then publish.` }, { status: 400 });
@@ -56,8 +60,14 @@ export async function POST(request: NextRequest) {
  const s = (typeof v === "string" ? v : "").trim();
  return s ? s.slice(0, n) : null;
  };
- // Parcel dims round UP (never down) — a declared parcel smaller than reality risks a carrier re-weigh charge.
- const dimUp = (v: unknown, d: number) => { const n = Math.ceil(Number(v)); return Number.isFinite(n) && n > 0 ? n : d; };
+ // The parcel: what she typed, else the AI's estimate, else the category default — never the old
+ // "16 oz mailer" fallback that quoted every unweighed coat as a small parcel (parcel-core.ts).
+ // Dims round UP (never down): a declared parcel smaller than reality risks a carrier re-weigh charge.
+ const aiParcel = body.parcel ?? (body.aiDraft && typeof body.aiDraft === "object" ? (body.aiDraft as { parcel?: unknown }).parcel : null) ?? null;
+ const { parcel, estimate: parcelEstimate } = resolveParcelAtPublish({ typed: { weightOz: body.weightOz, lengthIn: body.lengthIn, widthIn: body.widthIn, heightIn: body.heightIn }, aiParcel, category: typeof body.category === "string" ? body.category : null });
+ // Measurements as structure when the form sent a list; the free-text column keeps imported prose.
+ const unit = unitFor({ country: shipping.shipFrom?.country, currency: store?.currency });
+ const measurementsJson = Array.isArray(body.measurements) ? normalizeMeasurements(body.measurements, unit) : Array.isArray(body.measurementsJson) ? normalizeMeasurements(body.measurementsJson, unit) : null;
  const price = Math.max(0, Math.min(1_000_000, Number(body.price) || 0));
  const hasCost = body.cost !== undefined && body.cost !== null && body.cost !== "";
  const cost = Math.max(0, Math.min(1_000_000, Number(body.cost) || 0));
@@ -76,13 +86,25 @@ export async function POST(request: NextRequest) {
  material: str(body.material, 120),
  colour: str(body.colour, 60),
  condition: str(body.condition, 80),
+ conditionNote: str(body.conditionNote, 400),
  size: str(body.size, 40),
- measurements: str(body.measurements, 300),
+ measurements: typeof body.measurements === "string" ? str(body.measurements, 300) : null,
+ measurementsJson,
  category: str(body.category, 60),
- weightOz: dimUp(body.weightOz, 16),
- lengthIn: dimUp(body.lengthIn, 12),
- widthIn: dimUp(body.widthIn, 9),
- heightIn: dimUp(body.heightIn, 3),
+ // The AI's flaws list (or the seller's own), kept as a list so the product page can print it
+ // under Condition rather than losing it in the description.
+ flaws: normalizeFlaws(body.flaws, str(body.condition, 80)),
+ // Where it came from and when — batch-level on the phone's Add many, per piece on the web. The
+ // phone mints one lot id per batch and sends it on every row, so a batch listed there is a lot
+ // exactly as a web "Set source / lot" makes one.
+ sourceName: str(body.sourceName, 80),
+ acquiredAt: parseAcquiredAt(body.acquiredAt),
+ lotId: typeof body.lotId === "string" && /^lot_[a-z0-9]{6,32}$/.test(body.lotId) ? body.lotId : null,
+ weightOz: parcel.weightOz,
+ lengthIn: parcel.lengthIn,
+ widthIn: parcel.widthIn,
+ heightIn: parcel.heightIn,
+ parcelEstimate,
  source: "ai" as const,
  // Stores doing a drop stage pieces as drafts, then publish the batch at once. A scheduled
  // listing stays a draft (invisible) with publish_at set — the cron flips it live at that time.
@@ -195,6 +217,7 @@ export async function POST(request: NextRequest) {
  marketCents: typeof body.marketCents === "number" ? Math.round(body.marketCents) : null,
  priceCents: price > 0 ? Math.round(price * 100) : null,
  confidence: typeof body.aiConfidence === "number" ? body.aiConfidence : null,
+ itemId: String(item.id),
  }).catch(() => {});
 
  // Golden training record: photo + AI guess + seller's final answer + trust/version,
