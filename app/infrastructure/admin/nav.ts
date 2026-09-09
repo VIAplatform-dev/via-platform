@@ -118,6 +118,9 @@ export const GROUPS: NavGroup[] = [
   { href: `${B}/trends`, label: "Trends", icon: "TrendingUp" },
   { href: `${B}/ai`, label: "AI accuracy", icon: "Target" },
   { href: `${B}/golden-review`, label: "Golden set", icon: "Gem" },
+  // Owner-only, like the three above it: where stores stall on the way to their first sale.
+  // Lost in a merge — the comment at the top of this file promised it and the route exists.
+  { href: `${B}/setup-funnel`, label: "Where stores get stuck", icon: "Filter" },
  ] },
 ];
 
