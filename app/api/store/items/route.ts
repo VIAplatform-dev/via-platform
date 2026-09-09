@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { listSellerItems, deleteAllItems, publishItems, removeItems, setItemCosts, priceWeights } from "@/app/lib/db/inventory";
+import { listSellerItems, deleteAllItems, publishItems, removeItems, setItemCosts, priceWeights, updateItem, getItem } from "@/app/lib/db/inventory";
+import { findBelowFloor, describeBelowFloor, floorFor } from "@/app/lib/price-floor-core";
+import { getMinMarkupBps } from "@/app/lib/store-pricing-db";
 import { getCollectionTitlesForItems, addItemsToCollection, deleteAllCollections } from "@/app/lib/db/collections";
 import { splitCostAcross } from "@/app/lib/cost-split";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, items: withCols, isAdmin: isOwner(request, slug) });
 }
 
-// POST { action: "publish" | "remove" | "addToCollection" | "cost", ids: string[] } — bulk
+// POST { action: "publish" | "remove" | "addToCollection" | "cost" | "raiseToFloor", ids: string[] } — bulk
 // action on the acting store's items, e.g. push a whole drop of drafts live at once. Scoped to the
 // seller, so passing another store's ids is a no-op.
 //
@@ -66,7 +68,36 @@ export async function POST(request: NextRequest) {
  const owned = ids.filter((id: string) => id in weights);
  const costs = each != null ? Object.fromEntries(owned.map((id: string) => [id, each])) : splitCostAcross(total as number, owned, weights);
  count = await setItemCosts(seller.id, owned, costs);
- return NextResponse.json({ ok: true, count, costs });
+ // THE FIRST MOMENT THE FLOOR CAN BE CHECKED AT ALL.
+ //
+ // A lot is priced before its cost is known — she buys "these twenty for £340" and the cost is split
+ // across them in proportion to their prices, so a per-piece cost does not exist until now. Until it
+ // does, nothing can tell whether a price clears her minimum markup. So the check runs the instant
+ // the cost lands, and the answer goes back with it rather than waiting to be asked for.
+ const minMarkupBps = await getMinMarkupBps(slug).catch(() => 3000);
+ const below = findBelowFloor(owned, weights, costs, minMarkupBps);
+ return NextResponse.json({
+ ok: true, count, costs, minMarkupBps,
+ belowFloor: below,
+ belowFloorNote: describeBelowFloor(below, minMarkupBps),
+ });
+ } else if (action === "raiseToFloor") {
+ // Lift the named pieces to cost plus her markup. Only ever upward, and only where a cost is
+ // actually recorded — this exists to undo a price that was set before the cost was known, never to
+ // move a price she chose herself.
+ const minMarkupBps = await getMinMarkupBps(slug).catch(() => 3000);
+ let raised = 0;
+ for (const id of ids) {
+  const item = await getItem(id).catch(() => null);
+  if (!item || item.sellerId !== seller.id) continue;
+  const cost = Number(item.costCents) || 0;
+  if (cost <= 0) continue;
+  const floor = floorFor(cost, minMarkupBps);
+  if ((Number(item.priceCents) || 0) >= floor) continue;
+  await updateItem(id, { priceCents: floor }).catch(() => null);
+  raised++;
+ }
+ return NextResponse.json({ ok: true, count: raised });
  } else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 
  return NextResponse.json({ ok: true, count });

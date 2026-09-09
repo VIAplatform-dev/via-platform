@@ -44,6 +44,13 @@ export async function POST(request: NextRequest) {
  if (!item || !owner) return NextResponse.json({ error: "This piece is no longer available." }, { status: 409 });
 
  const { settings } = await rentalContext(booking.itemId, owner.storeSlug);
+ // Renting off means OFF. The storefront hides the Rent button when a store turns renting off,
+ // but this route never checked — so a booking already in flight, or anyone holding the URL,
+ // could still pay for a rental the store had stopped offering. The button is a courtesy; this
+ // is the gate.
+ if (!settings.enabled) {
+  return NextResponse.json({ error: "This store isn’t renting pieces out right now." }, { status: 409 });
+ }
  // Posting it out needs somewhere to post it to; collecting in person does not.
  const collecting = settings.fulfilment === "pickup" || body?.delivery === "pickup";
  if (!collecting && (!ship.line1 || !ship.city || !ship.state || !ship.zip)) {

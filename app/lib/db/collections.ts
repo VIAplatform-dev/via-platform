@@ -17,6 +17,20 @@ function ensureOrderColumn(): Promise<void> {
  return orderReady;
 }
 
+/**
+ * `image_url` and `position` on `collections` — the cover photo and the seller's own order. Added
+ * the same lazy, idempotent way as `position` on item_collections above, for the same reason: a
+ * deploy must never land code that reads a column the database doesn't have yet.
+ */
+let displayReady: Promise<void> | null = null;
+export function ensureCollectionDisplayColumns(): Promise<void> {
+ displayReady ??= getDb()
+  .execute(dsql`ALTER TABLE collections ADD COLUMN IF NOT EXISTS image_url TEXT, ADD COLUMN IF NOT EXISTS position INTEGER`)
+  .then(() => undefined)
+  .catch(() => undefined); // read-only replica or a race: photos and order degrade, nothing breaks
+ return displayReady;
+}
+
 function slugify(s: string): string {
  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "collection";
 }
@@ -60,6 +74,7 @@ export async function getOrCreateCollection(sellerId: string, title: string): Pr
  * actually hold items are returned — so imported-but-empty collections and ones whose inventory was
  * removed don't clutter the picker or the storefront nav (pass includeEmpty for management views). */
 export async function listCollections(sellerId: string, includeEmpty = false): Promise<(Collection & { itemCount: number })[]> {
+ await ensureCollectionDisplayColumns();
  const db = getDb();
  const rows = await db
  .select({
@@ -67,6 +82,8 @@ export async function listCollections(sellerId: string, includeEmpty = false): P
  sellerId: collections.sellerId,
  title: collections.title,
  slug: collections.slug,
+ imageUrl: collections.imageUrl,
+ position: collections.position,
  createdAt: collections.createdAt,
  itemCount: dsql<number>`count(${itemCollections.itemId})::int`,
  })
@@ -74,7 +91,8 @@ export async function listCollections(sellerId: string, includeEmpty = false): P
  .leftJoin(itemCollections, eq(itemCollections.collectionId, collections.id))
  .where(eq(collections.sellerId, sellerId))
  .groupBy(collections.id)
- .orderBy(collections.title);
+ // The seller's own order first; anything she hasn't placed falls in behind it, alphabetically.
+ .orderBy(dsql`${collections.position} NULLS LAST`, collections.title);
  const all = rows as (Collection & { itemCount: number })[];
  return includeEmpty ? all : all.filter((r) => r.itemCount > 0);
 }
@@ -153,6 +171,38 @@ export async function renameCollection(sellerId: string, id: string, title: stri
 
 /** Delete ALL of a seller's collections (memberships cascade). Used when the owner clears the store's
  * whole inventory — the empty collections shouldn't linger behind. Returns how many were removed. */
+/** Set (or clear, with null) a collection's cover photo. Scoped to the seller so an id from
+ *  another store can't be written to. */
+export async function setCollectionImage(sellerId: string, id: string, imageUrl: string | null): Promise<Collection | null> {
+ await ensureCollectionDisplayColumns();
+ const db = getDb();
+ const [row] = await db
+  .update(collections)
+  .set({ imageUrl: imageUrl && imageUrl.trim() ? imageUrl.trim().slice(0, 2000) : null })
+  .where(and(eq(collections.sellerId, sellerId), eq(collections.id, id)))
+  .returning();
+ return row ?? null;
+}
+
+/**
+ * Put the seller's collections in the order she dragged them into.
+ *
+ * Ids that aren't hers are ignored rather than rejected, so a stale tab can't renumber someone
+ * else's store; ones she owns but didn't send keep a null position and sort in behind the rest.
+ */
+export async function reorderCollections(sellerId: string, orderedIds: string[]): Promise<void> {
+ if (!orderedIds.length) return;
+ await ensureCollectionDisplayColumns();
+ const db = getDb();
+ const mine = await db.select({ id: collections.id }).from(collections).where(eq(collections.sellerId, sellerId));
+ const owned = new Set(mine.map((r) => r.id));
+ let n = 0;
+ for (const id of orderedIds) {
+  if (!owned.has(id)) continue;
+  await db.update(collections).set({ position: n++ }).where(and(eq(collections.sellerId, sellerId), eq(collections.id, id)));
+ }
+}
+
 export async function deleteAllCollections(sellerId: string): Promise<number> {
  const db = getDb();
  const res = await db.delete(collections).where(eq(collections.sellerId, sellerId)).returning({ id: collections.id });

@@ -58,6 +58,13 @@ type Flag = { level: string; message: string; marketUsd: number; pct?: number };
 
 // Client mirror of the server's computePriceFlag (works in whole dollars) — lets the flag update
 // instantly as the seller edits the price, once we know the item's market value. No server call.
+//
+// It must be given the RAW market value, never the suggestion. The suggestion is market × the store's
+// pricing stance (and now × the cost floor), so a premium store comparing against its own suggestion
+// was told "right at market" while sitting 25% above it — the store's own premium cancelled out its
+// own warning, and the two halves of the app disagreed by exactly the multiplier. The low/high band
+// is built from raw market too, so this is also the only reading where the band and the midpoint
+// describe the same thing.
 function flagFor(priceUsd: number, marketUsd: number | null, lowUsd: number | null, highUsd: number | null): Flag | null {
  if (!marketUsd || priceUsd <= 0) return null;
  const lo = lowUsd ?? Math.round(marketUsd * 0.85);
@@ -171,6 +178,11 @@ export default function IntakePage() {
  const [priceLow, setPriceLow] = useState<number | null>(null);
  const [priceHigh, setPriceHigh] = useState<number | null>(null);
  const [priceFlag, setPriceFlag] = useState<Flag | null>(null);
+ // Her own floor, in whole dollars: cost plus the markup she set in Settings. Derived rather than
+ // stored, so it follows the cost field as she types it.
+ const [belowFloor, setBelowFloor] = useState(false);
+ // Cost plus the markup she set. Derived, so it follows the cost field as she types.
+ const floorUsd = markupPct != null && form.cost.trim() ? Math.round(Number(form.cost) * (1 + markupPct / 100)) || null : null;
  const [lowConf, setLowConf] = useState(false); // too few comps to flag over/under — show a rough range, not a verdict
  const [consigned, setConsigned] = useState(false);
  // Rental terms decided while the piece is being written. There's no item to attach them to yet,
@@ -279,6 +291,7 @@ export default function IntakePage() {
  if (Number.isFinite(c) && c > 0) {
  const floor = markupPct != null ? Math.round(c * (1 + markupPct / 100)) : 0;
  const best = Math.max(marketPrice ?? 0, floor);
+ setBelowFloor(false); // the fill lands on or above the floor by construction
  if (best > 0) next.price = String(best);
  }
  return next;
@@ -421,6 +434,9 @@ export default function IntakePage() {
  condition: filled.condition || dr?.condition?.value || "",
  conditionGrade: filled.condition || dr?.conditionGrade || dr?.condition?.value || "",
  price: filled.price || "",
+ // What she paid, so the server can hold the suggestion at her minimum markup over it. The floor was
+ // computed in this file alone before; sending the cost is what makes it real everywhere.
+ cost: filled.cost || "",
  runway: (d.runway ?? dr?.runway) || "",
  celebrity: d.celebrity || "",
  };
@@ -805,15 +821,26 @@ export default function IntakePage() {
  {!Object.values(measurements).some((v) => v && v.trim()) && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on — listings with measurements sell faster. Add the key ones.</p>}
  </div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, marketPrice, priceLow, priceHigh)); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
+ <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, Math.round(rawMarketCents / 100), priceLow, priceHigh)); if (floorUsd) setBelowFloor((Number(v) || 0) > 0 && (Number(v) || 0) < floorUsd); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
  <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
  </div>
+ {/* Raw market, not the suggestion — the band either side of it is built from raw market, so a
+     suggestion marker inside it drew the store's own premium as if it were the market itself. */}
  {priceLow != null && priceHigh != null && priceHigh > priceLow && (
- <PriceScale low={priceLow} high={priceHigh} market={marketPrice} value={Number(form.price) || 0} />
+ <PriceScale low={priceLow} high={priceHigh} market={rawMarketCents != null ? Math.round(rawMarketCents / 100) : marketPrice} value={Number(form.price) || 0} />
  )}
  {priceFlag && !lowConf && (
  <div className={`mt-2 rounded-lg px-3 py-2 text-[11px] font-medium ${priceFlag.level === "under" ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200" : priceFlag.level === "over" ? "bg-rose-50 text-rose-800 ring-1 ring-rose-200" : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"}`}>
  {priceFlag.level === "under" ? "🔽 " : priceFlag.level === "over" ? "🔼 " : "✅ "}{priceFlag.message}
+ </div>
+ )}
+ {/* Her own rule, broken by her own hand. The market flag above is about what buyers will pay; this
+     is about what she paid — a price under cost plus her markup is a loss, whatever the comps say.
+     Said, never silently corrected: the price she typed is hers. */}
+ {belowFloor && floorUsd != null && (
+ <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-800 ring-1 ring-rose-200">
+  ⚠️ Below your pricing floor — your {markupPct}% minimum over the ${Number(form.cost)} you paid works out at ${floorUsd}.{" "}
+  <button type="button" onClick={() => { set("price", String(floorUsd)); setBelowFloor(false); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(floorUsd, Math.round(rawMarketCents / 100), priceLow, priceHigh)); }} className="underline underline-offset-2 hover:opacity-70">Use ${floorUsd}</button>
  </div>
  )}
  {lowConf && rawMarketCents != null && (

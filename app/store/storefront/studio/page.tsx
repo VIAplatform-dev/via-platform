@@ -18,6 +18,7 @@ import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
 import { pickTargetSection, type Rect, type SectionRect } from "@/app/lib/storefront-target-section";
 import { IMG_RADIUS, BTN_RADIUS } from "@/app/lib/storefront-chrome-css";
+import { ProductFieldsEditor } from "../ProductFieldsEditor";
 import { resolveProductPage, reorderFields, visibleFields, canChip, FIELD_CATALOGUE, DEFAULT_ASSURANCE, DEFAULT_BACK_LABEL, DEFAULT_BUTTONS, BUTTON_RADII, SLOT_CATALOGUE, ADDABLE_SLOTS, isBuiltinSlot, REQUIRED_SLOT, type ProductPageConfig, type FieldMode, type ButtonStyle, type ProductSlot, type SlotKind } from "@/app/lib/storefront-product-page";
 import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, isTemplatePageSlug, PRODUCT_LAYOUTS, type StorefrontTemplate, type ProductLayout } from "@/app/lib/storefront-templates";
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
@@ -3337,57 +3338,7 @@ export default function StorefrontStudio() {
   shows — so an empty heading can&rsquo;t appear, and switching one on changes nothing until the listing
   carries it.{sampleProduct ? <> Previewing <span className="text-stone-500">{sampleProduct.title}</span>.</> : null}
  </p>
- <div className="space-y-1.5">
- {productPage.fields.map((f, i) => {
- const cat = FIELD_CATALOGUE.find((c) => c.key === f.key);
- return (
- <div
-  key={f.key}
-  draggable
-  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
-  onDragOver={(e) => e.preventDefault()}
-  onDrop={(e) => { e.preventDefault(); const from = Number(e.dataTransfer.getData("text/plain")); if (Number.isFinite(from)) moveField(from, i); }}
-  className={cn("rounded-lg border px-2.5 py-2 transition", f.show ? "border-black/10 bg-white" : "border-black/[0.06] bg-stone-50")}
- >
-  <div className="flex items-center gap-2">
-   <GripVertical size={13} className="shrink-0 cursor-grab text-stone-300" />
-   <button type="button" onClick={() => setField(f.key, { show: !f.show })} className="min-w-0 flex-1 text-left">
-    <span className={cn("block truncate text-[12.5px] font-medium", f.show ? "text-stone-700" : "text-stone-400")}>{cat?.name || f.key}</span>
-    {/* The answer to "I switched it on and nothing happened" — given where the switch is. */}
-    {f.show && sampleProduct && !(sampleProduct.facts?.[f.key] || "").trim() && (
-     <span className="mt-0.5 block truncate text-[10.5px] text-amber-700">Empty on this listing — add it in Inventory</span>
-    )}
-   </button>
-   <button type="button" role="switch" aria-checked={f.show} aria-label={`Show ${cat?.name || f.key}`} onClick={() => setField(f.key, { show: !f.show })}
-    className="relative h-[18px] w-8 shrink-0 rounded-full transition" style={{ background: f.show ? "#5D0F17" : "#d6d3d1" }}>
-    <span className={cn("absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all", f.show ? "left-[16px]" : "left-[2px]")} />
-   </button>
-  </div>
-  {f.show && (
-   <div className="mt-2 flex items-center gap-1.5 pl-[21px]">
-    {/* Description is the piece's own writing — inline it needs no heading, so a label would
-        only ever apply to the drawer. Every other field is labelled either way. */}
-    {/* Chip is offered only where the value is short — see LONG_FIELDS. */}
-    {(["inline", "drawer", "chip"] as FieldMode[]).filter((m) => m !== "chip" || canChip(f.key)).map((m) => (
-     <button key={m} type="button" onClick={() => setField(f.key, { mode: m })}
-      className={cn("rounded-md border px-2 py-0.5 text-[11px] transition", f.mode === m ? "border-[#5D0F17] text-[#5D0F17]" : "border-black/10 text-stone-400 hover:border-black/25")}>
-      {m === "inline" ? "On the page" : m === "drawer" ? "In a drawer" : "As a chip"}
-     </button>
-    ))}
-    {(f.mode !== "inline" || f.key !== "description") && (
-     <input
-      value={f.label ?? ""}
-      onChange={(e) => setField(f.key, { label: e.target.value })}
-      placeholder={cat?.label || ""}
-      className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
-     />
-    )}
-   </div>
-  )}
- </div>
- );
- })}
- </div>
+ <ProductFieldsEditor fields={productPage.fields} onSet={setField} onMove={moveField} sample={sampleProduct} />
 
  <label className="mt-3 flex items-start gap-2.5 rounded-lg border border-black/10 bg-white px-2.5 py-2">
  <input type="checkbox" checked={productPage.comparePrice} onChange={(e) => editProductPage({ comparePrice: e.target.checked })} className="mt-0.5 accent-[#5D0F17]" />

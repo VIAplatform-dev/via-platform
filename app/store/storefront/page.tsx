@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useInSiteDialog } from "@/app/components/InSiteDialog";
 import { withStore } from "@/app/infrastructure/admin/market/ui";
 import { applyPageOrder, movePage } from "@/app/lib/page-order";
@@ -14,6 +14,10 @@ import { parseDesign, buildDesignCss, type DesignSettings, type Radius } from "@
 import { STOREFRONT_PALETTES } from "@/app/lib/storefront-templates";
 import { ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
+import { resolveLinkTarget } from "@/app/lib/link-target";
+import { ProductFieldsEditor } from "./ProductFieldsEditor";
+import { resolveProductPage, reorderFields, type ProductPageConfig, type ProductFieldKey, type ProductField } from "@/app/lib/storefront-product-page";
+import { orderFieldsForPanel, splitFocusedFields } from "@/app/lib/panel-field-order";
 
 type Template = { id: string; name: string; description: string; colors: { bg: string; text: string; accent: string }; fonts: { heading: string; body: string }; heroStyle: string };
 type Colors = { bg: string; text: string; accent: string };
@@ -65,6 +69,28 @@ export default function StorefrontEditor() {
  const [templates, setTemplates] = useState<Template[]>([]);
  const [headingFonts, setHeadingFonts] = useState<string[]>([]);
  const [bodyFonts, setBodyFonts] = useState<string[]>([]);
+ // The faces her OWN imported site is set in (app/lib/plan-b/font-detect.ts). The picker used to
+ // offer a curated Google list and nothing else, so the one font she certainly wanted — the one her
+ // shop is already in — was the one it did not have.
+ const [siteFonts, setSiteFonts] = useState<{ family: string; face: boolean }[]>([]);
+ // WHAT EACH PIECE'S PAGE SAYS. The same theme.productPage the block builder edits — one setting, and
+ // until now only reachable from an editor a seller with her own site never opens. It governs the
+ // pages VYA renders for pieces she adds here (a piece with no Shopify handle of its own); her
+ // imported products keep their captured page, whose design is the Product page in the page list.
+ const [productPage, setProductPage] = useState<ProductPageConfig>(() => resolveProductPage(null));
+ const [productPageSaved, setProductPageSaved] = useState(true);
+ const saveProductPage = useCallback(async (next: ProductPageConfig) => {
+  setProductPage(next); setProductPageSaved(false);
+  const r = await fetch(withStore("/api/store/storefront/design"), {
+   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productPage: next }),
+  }).catch(() => null);
+  setProductPageSaved(!!r?.ok);
+ }, []);
+ const setProductField = (key: ProductFieldKey, patch: Partial<ProductField>) =>
+  void saveProductPage({ ...productPage, fields: productPage.fields.map((f) => (f.key === key ? { ...f, ...patch } : f)) });
+ const moveProductField = (from: number, to: number) =>
+  void saveProductPage({ ...productPage, fields: reorderFields(productPage.fields, from, to) });
+
  const [template, setTemplate] = useState<string | null>(null);
  const [colors, setColors] = useState<Colors>({ bg: "#FFFDF8", text: "#1a1a1a", accent: "#5D0F17" });
  const [fonts, setFonts] = useState<Fonts>({ heading: "Playfair Display", body: "Inter" });
@@ -113,7 +139,7 @@ export default function StorefrontEditor() {
  const [err, setErr] = useState<string | null>(null);
 
  // Captured site (a seller who brought their own site over): they edit THAT, not blocks.
- const [captured, setCaptured] = useState<{ count: number; url: string | null; slug: string | null; origin: string | null; pages: string[]; unlinked: string[] } | null>(null);
+ const [captured, setCaptured] = useState<{ count: number; url: string | null; slug: string | null; origin: string | null; pages: string[]; unlinked: string[]; productTemplate: string | null; productCount: number } | null>(null);
  // The pages strip opens as one scrolling row (fine for a five-page site, useless for eighty-two).
  // Expanded, it becomes a wrapping grid — the same "see everything at once" the block Studio has.
  const [pagesOpen, setPagesOpen] = useState(false);
@@ -126,6 +152,23 @@ export default function StorefrontEditor() {
  // the section's — there used to be a second bar drawn inside the page, sitting on top of the very
  // words you were editing.
  const [txtSel, setTxtSel] = useState<{ eid: number; color: string; align: string; top: number } | null>(null);
+ // The element last clicked ON THE PAGE. It does two jobs: the panel opens on that element's
+ // fields rather than the whole section, and the field is scrolled to and focused once.
+ const [focusEid, setFocusEid] = useState<number | null>(null);
+ const [scrollEid, setScrollEid] = useState<number | null>(null);
+ // Everything in this section, not just the clicked element — opened on demand.
+ const [showAllFields, setShowAllFields] = useState(false);
+ // A text box / image / button she added INSIDE a section. While one is selected the section panel's
+ // Duplicate and Delete act on it, not on the whole band — deleting a text box used to take the
+ // section it sat in with it.
+ const [inlineKind, setInlineKind] = useState<string | null>(null);
+ // Which PICTURE she clicked. A collection tile is a photograph, so without this the panel answered
+ // one click with every image in the row.
+ const [focusImg, setFocusImg] = useState<number | null>(null);
+ // The inventory piece the clicked text belongs to, when it belongs to one. A product card
+ // regenerates its name, price and photo from Inventory on every page load, so a text box over them
+ // is a box that lies — she gets the piece instead. See plan-b/product-card-identity.ts.
+ const [focusItem, setFocusItem] = useState<{ id: string; title: string } | null>(null);
  // Her own arrangement of the strip. Housekeeping — it moves thumbnails in HER editor and nothing
  // on her site — so it saves immediately with no draft or publish step attached.
  const [pageOrder, setPageOrder] = useState<string[] | null>(null);
@@ -145,13 +188,11 @@ export default function StorefrontEditor() {
  const [panelSaving, setPanelSaving] = useState(false);
  const editIframe = useRef<HTMLIFrameElement>(null);
  // Click an image on the captured site → select it here, then swap it from the asset library (Canva-style).
- const [selImg, setSelImg] = useState<{ id: number; src: string } | null>(null);
+ const [selImg, setSelImg] = useState<{ id: number; src: string; linkId: number | null; href: string; linkLabel: string; tile: boolean } | null>(null);
  const [assetsBusy, setAssetsBusy] = useState(false);
  const [capStatus, setCapStatus] = useState<"saved" | "unsaved" | "saving">("saved"); // captured-editor save state (from the iframe)
  const [secStyle, setSecStyle] = useState<{ bg?: string; color?: string; align?: string }>({}); // selected captured section's style
  const [secRect, setSecRect] = useState<{ top: number; cx: number } | null>(null); // selected section position (iframe coords) → floating bar
- const capturedRef = useRef<typeof captured>(null);
- capturedRef.current = captured; // live ref for the (deps:[]) postMessage handler
 
  // Global design for a captured site: accent + fonts, layered over the theme via custom CSS.
  const [design, setDesign] = useState<DesignSettings>({ accent: null, heading: null, body: null, bg: null, text: null, radius: null });
@@ -176,7 +217,7 @@ export default function StorefrontEditor() {
  fetch(withStore("/api/store/capture/css")),
  ]);
  if (cancelled) return;
- if (capR.ok) { const c = await capR.json(); setIsAdmin(!!c.isAdmin); if (c.captured > 0) setCaptured({ count: c.captured, url: c.url, slug: c.slug || null, origin: c.origin, pages: c.pages || [], unlinked: c.unlinked || [] }); }
+ if (capR.ok) { const c = await capR.json(); setIsAdmin(!!c.isAdmin); if (c.captured > 0) setCaptured({ count: c.captured, url: c.url, slug: c.slug || null, origin: c.origin, pages: c.pages || [], unlinked: c.unlinked || [], productTemplate: c.productTemplate || null, productCount: c.productCount || 0 }); }
    fetch(withStore("/api/store/storefront/page-order")).then((r) => (r.ok ? r.json() : null)).then((d) => setPageOrder(Array.isArray(d?.order) ? d.order : [])).catch(() => setPageOrder([]));
  if (cssR.ok) { const { css } = await cssR.json(); const { settings, rest } = parseDesign(css || ""); setDesign(settings); setDesignRest(rest); }
  setDesignLoaded(true);
@@ -190,7 +231,7 @@ export default function StorefrontEditor() {
  }
  if (dsR.ok) {
  const d = await dsR.json();
- setTemplates(d.templates || []); setHeadingFonts(d.headingFonts || []); setBodyFonts(d.bodyFonts || []);
+ setTemplates(d.templates || []); setHeadingFonts(d.headingFonts || []); setBodyFonts(d.bodyFonts || []); setSiteFonts(d.siteFonts || []); setProductPage(resolveProductPage(d.productPage));
  setTemplate(d.template); setColors(d.colors); setFonts(d.fonts); setProducts(d.products || []);
  setBlocks(d.blocks || []); setShopBlocks(d.shopBlocks || []); setExtraPages(d.extraPages || []); setBlockTypes(d.blockTypes || []); setCustomCss(d.customCss || "");
  const fams = [...new Set([...(d.headingFonts || []), ...(d.bodyFonts || [])])].map((f: string) => `family=${f.replace(/ /g, "+")}:wght@400;500;600;700`).join("&");
@@ -342,15 +383,29 @@ export default function StorefrontEditor() {
  else if (d.vya === "textsel") {
   const t = d as unknown as { eid: number; color?: string; align?: string; top?: number };
   setTxtSel(t.eid >= 0 ? { eid: t.eid, color: t.color || "", align: t.align || "", top: t.top ?? 0 } : null);
+  // …and take the panel to that field. The canvas has always reported which element was clicked;
+  // the panel just never used it, so finding the words you'd tapped meant scrolling a list where
+  // every link is labelled the same. Clicking "Make an appointment here." on the page now puts
+  // the cursor in its box — and its address is the next box down (panel-field-order.ts).
+  if (t.eid >= 0) { setFocusEid(t.eid); setScrollEid(t.eid); setShowAllFields(false); setFocusImg(null); }
+  else setFocusEid(null);
+  const it = d as { item?: unknown; itemTitle?: unknown };
+  setFocusItem(typeof it.item === "string" && it.item ? { id: it.item, title: typeof it.itemTitle === "string" ? it.itemTitle : "" } : null);
  }
- else if (d.vya === "imgsel" && typeof d.id === "number") { setSelImg({ id: d.id, src: d.src || "" }); setPanel(null); }
- else if (d.vya === "navigate" && typeof d.path === "string") {
- // Clicked an internal link on the site → switch the editor to that page.
- const pages = capturedRef.current?.pages || [];
- const p = d.path;
- const match = pages.find((x) => x === p || x.replace(/\/$/, "") === p.replace(/\/$/, "")) || (p === "/" ? "/" : null);
- if (match) { setSelPath(match); setPanel(null); setSelImg(null); setPreviewKey((k) => k + 1); }
+ else if (d.vya === "imgsel" && typeof d.id === "number") {
+  const lk = d as { linkId?: unknown; href?: unknown; linkLabel?: unknown };
+  setSelImg({
+   id: d.id, src: d.src || "",
+   linkId: typeof lk.linkId === "number" ? lk.linkId : null,
+   href: typeof lk.href === "string" ? lk.href : "",
+   linkLabel: typeof lk.linkLabel === "string" ? lk.linkLabel : "",
+   tile: (d as { tile?: unknown }).tile === true,
+  });
+  setPanel(null); setFocusImg(d.id); setShowAllFields(false);
+  const im = d as { item?: unknown; itemTitle?: unknown };
+  setFocusItem(typeof im.item === "string" && im.item ? { id: im.item, title: typeof im.itemTitle === "string" ? im.itemTitle : "" } : null);
  }
+ else if (d.vya === "inline") { const k = (d as { kind?: unknown }).kind; setInlineKind(typeof k === "string" ? k : null); }
  else if (d.vya === "unsaved") { setPanelDirty(true); setCapStatus("unsaved"); }
  else if (d.vya === "saved") { setPanelDirty(false); setPanelSaving(false); setCapStatus("saved"); }
  else if (d.vya === "status") { const s = (d as { text?: string }).text; setCapStatus(s === "Saving…" ? "saving" : s === "Unsaved changes" ? "unsaved" : "saved"); }
@@ -358,6 +413,62 @@ export default function StorefrontEditor() {
  window.addEventListener("message", onMsg);
  return () => window.removeEventListener("message", onMsg);
  }, []);
+
+ // Switch the editor to another captured page. Same move the canvas makes when she clicks an
+ // internal link, so the panel's "go to this page" button and the click land in the same place.
+ // THE PIECE BEHIND A PRODUCT CARD.
+ //
+ // A card in the editor is captured markup, but a shopper's page rebuilds it from Inventory every
+ // time it loads — so the name and price shown here are a photograph of something that has moved on,
+ // and typing over them would be thrown away. The panel asks Inventory what the piece says now and
+ // writes her changes back there, which is the only place an edit to a product can actually live.
+ const [itemDraft, setItemDraft] = useState<{ id: string; title: string; price: string; images: string[] } | null>(null);
+ const [itemState, setItemState] = useState<"idle" | "loading" | "saving" | "saved">("idle");
+ useEffect(() => {
+  const id = focusItem?.id;
+  if (!id) { setItemDraft(null); setItemState("idle"); return; }
+  let live = true;
+  setItemState("loading");
+  fetch(withStore(`/api/store/items/${encodeURIComponent(id)}`))
+   .then((r) => (r.ok ? r.json() : null))
+   .then((d) => {
+    if (!live) return;
+    const it = d?.item;
+    if (!it) { setItemDraft(null); setItemState("idle"); return; }
+    setItemDraft({ id: it.id, title: it.title || "", price: ((it.priceCents ?? 0) / 100).toFixed(2), images: it.images || [] });
+    setItemState("idle");
+   })
+   .catch(() => { if (live) setItemState("idle"); });
+  return () => { live = false; };
+ }, [focusItem?.id]);
+
+ // Saved on blur rather than on every keystroke: this writes to her real inventory, and a request
+ // per character would be a request per character.
+ async function saveItem(patch: Record<string, unknown>) {
+  const id = itemDraft?.id;
+  if (!id) return;
+  setItemState("saving");
+  const r = await fetch(withStore(`/api/store/items/${encodeURIComponent(id)}`), {
+   method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+  }).catch(() => null);
+  setItemState(r?.ok ? "saved" : "idle");
+ }
+
+ async function replaceItemPhoto(file: File) {
+  if (!itemDraft) return;
+  setItemState("saving");
+  const fd = new FormData();
+  fd.append("file", file);
+  const up = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!up?.url) { setItemState("idle"); return; }
+  // The first photo is the one every card shows, so a replacement takes that place and the rest
+  // stay behind it — she is changing the piece's cover, not deleting its other angles.
+  const images = [up.url, ...itemDraft.images.slice(1)];
+  setItemDraft({ ...itemDraft, images });
+  await saveItem({ images });
+ }
+
+ const goToPage = (path: string) => { setSelPath(path); setPanel(null); setSelImg(null); setFocusEid(null); setPreviewKey((k) => k + 1); };
 
  const postToPreview = (msg: unknown) => editIframe.current?.contentWindow?.postMessage(msg, "*");
  // Asset library (Canva-style uploads) — the store's own photos, reusable across the whole site.
@@ -410,6 +521,7 @@ export default function StorefrontEditor() {
  try { const r = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd }); if (r.ok) { const { url } = await r.json(); updatePanelField(i, { src: url }); postToPreview({ vya: "set", kind: "image", id: f.id, src: url }); } } catch { /* ignore */ }
  }
  function savePanel() { setPanelSaving(true); postToPreview({ vya: "save" }); }
+
  const fieldLabel = (tag: string): string => (({ h1: "Heading", h2: "Heading", h3: "Heading", h4: "Subheading", h5: "Subheading", h6: "Subheading", p: "Text", li: "List item", a: "Link text", button: "Button", blockquote: "Quote", label: "Label", span: "Text" }) as Record<string, string>)[tag] || "Text";
 
  // The sections being edited belong to the active page (home or an extra page).
@@ -601,6 +713,70 @@ export default function StorefrontEditor() {
  // Edit preview must be SAME-ORIGIN so it loads the captured pages on whatever host the editor is on
  // (localhost, getvya.ai). captured.url is an absolute public URL (prod / custom domain) — wrong for the
  // iframe. Build a relative /site/{slug} path from the slug (falling back to the url's pathname).
+ // One editor for "the piece behind what I clicked", shown whether she clicked its photo, its name
+ // or its price. Everything here writes to Inventory, because that is where a product's name, price
+ // and photos actually live — the card on the page is rebuilt from them on every load.
+ // Where a link goes, said in words, with the way there. Built once because a link is a link whether
+ // she reached it by clicking its text or by clicking the picture it wraps — a collection tile is the
+ // second kind, and used to offer neither.
+ const linkDestination = (href: string, label: string) => {
+  const t = resolveLinkTarget(href, label, captured.pages, { slug: captured.slug, origin: captured.origin });
+  if (t.kind === "page") return (
+   <button
+    type="button"
+    onClick={() => goToPage(t.path)}
+    title={t.matched === "name" ? `This link has no address, but you have a page called “${t.label}”` : `Goes to ${t.path}`}
+    className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-[#5D0F17] underline underline-offset-2 hover:opacity-70"
+   >
+    {t.matched === "name" ? `Open your “${t.label}” page` : `Go to ${t.label}`} →
+   </button>
+  );
+  if (t.kind === "external") return <p className="mt-1.5 text-[11.5px] text-stone-400">Leaves your site — {t.host}</p>;
+  if (t.kind === "missing") return <p className="mt-1.5 text-[11.5px] text-stone-400">Points at {t.path}, which isn’t one of your pages.</p>;
+  return <p className="mt-1.5 text-[11.5px] text-stone-400">Doesn’t go anywhere yet.</p>;
+ };
+
+ const piecePanel = focusItem && itemDraft ? (
+  <div className="mb-4 rounded-xl border border-[#5D0F17]/15 bg-[#5D0F17]/[0.04] p-3.5">
+   <div className="mb-2.5 flex items-start justify-between gap-2">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5D0F17]">From your inventory</p>
+    <span className="shrink-0 text-[11px] text-stone-400">
+     {itemState === "saving" ? "Saving…" : itemState === "saved" ? "Saved ✓" : itemState === "loading" ? "…" : ""}
+    </span>
+   </div>
+   <div className="flex gap-2.5">
+    <label title="Replace this piece's photo" className="relative grid h-16 w-16 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-lg border border-black/10 bg-white">
+     {itemDraft.images[0]
+      // eslint-disable-next-line @next/next/no-img-element
+      ? <img src={itemDraft.images[0]} alt="" className="h-full w-full object-cover" />
+      : <ImageIcon size={16} className="text-stone-300" />}
+     <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void replaceItemPhoto(f); }} />
+    </label>
+    <div className="min-w-0 flex-1 space-y-1.5">
+     <input
+      value={itemDraft.title}
+      onChange={(e) => setItemDraft({ ...itemDraft, title: e.target.value })}
+      onBlur={() => { if (itemDraft.title.trim()) void saveItem({ title: itemDraft.title.trim() }); }}
+      className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[13px] outline-none focus:border-[#5D0F17]/50"
+     />
+     <input
+      value={itemDraft.price}
+      inputMode="decimal"
+      onChange={(e) => setItemDraft({ ...itemDraft, price: e.target.value })}
+      onBlur={() => { const n = Number(itemDraft.price); if (Number.isFinite(n) && n >= 0) void saveItem({ price: n }); }}
+      className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-[13px] tabular-nums outline-none focus:border-[#5D0F17]/50"
+     />
+    </div>
+   </div>
+   <p className="mt-2 text-[11.5px] leading-relaxed text-stone-500">
+    Changing it here changes the piece itself, everywhere it appears — your site, the marketplace, your inventory.
+   </p>
+   <a href={withStore(`/admin/inventory?item=${encodeURIComponent(itemDraft.id)}`)} className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-[#5D0F17] underline underline-offset-2 hover:opacity-70">
+    Everything else about this piece →
+   </a>
+  </div>
+ ) : null;
+
  const sitePath = captured.slug ? `/site/${captured.slug}` : (() => { try { return new URL(captured.url || "").pathname; } catch { return ""; } })();
  const editSrc = `${sitePath}${selPath === "/" ? "" : selPath}?edit=1`;
  // The address her hosted store is ACTUALLY served on — the same one /api/store/capture hands
@@ -677,9 +853,40 @@ export default function StorefrontEditor() {
  {selImg ? (
  <>
  <div className="mb-3 flex items-center justify-between">
- <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Replace image</p>
- <button onClick={() => setSelImg(null)} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
+ <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">{piecePanel ? "This piece" : "Replace image"}</p>
+ <button onClick={() => { setSelImg(null); setFocusItem(null); }} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
  </div>
+ {piecePanel}
+ {/* WHERE THIS PICTURE GOES. A collection tile is a photo wrapped in a link, so clicking it used to
+     offer "replace this image" and nothing else — no address, no way through to the collection. A
+     link made of words always showed both; this is the same link, reached by its picture. */}
+ {selImg.linkId !== null && (
+ <div className="mb-4">
+  <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{selImg.linkLabel ? ` — “${selImg.linkLabel}”` : ""}</label>
+  <input
+   value={selImg.href}
+   onChange={(e) => { const href = e.target.value; setSelImg({ ...selImg, href }); postToPreview({ vya: "set", kind: "link", id: selImg.linkId, href }); }}
+   placeholder="https://…  or  /page"
+   className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50"
+  />
+  {linkDestination(selImg.href, selImg.linkLabel)}
+ </div>
+ )}
+ {/* Taking one collection off a page. Not "delete the collection" — it stays in your Collections and
+     on every other page that shows it; this is the box, off this page. */}
+ {selImg.tile && (
+ <button
+  type="button"
+  onClick={() => { postToPreview({ vya: "deltile" }); setSelImg(null); setFocusItem(null); }}
+  className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+ >
+  <Trash2 size={13} /> Remove this from the page
+ </button>
+ )}
+ {/* A product photo belongs to the piece, and the grid is rebuilt from Inventory on every load — so
+     swapping the captured <img> here would be undone the moment a shopper opened the page. Above is
+     the control that actually changes it. */}
+ {!piecePanel && <>
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={selImg.src} alt="" className="mb-3 aspect-[4/3] w-full rounded-lg border border-black/10 object-cover" />
  <label className="mb-3 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#5D0F17] px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">
@@ -697,6 +904,7 @@ export default function StorefrontEditor() {
  ))}
  </div>
  )}
+ </>}
  </>
  ) : panel ? (
  <>
@@ -707,13 +915,59 @@ export default function StorefrontEditor() {
      it" was. */}
  <button onClick={() => { postToPreview({ vya: "deselect" }); setPanel(null); setSecRect(null); }} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
  </div>
+ {/* What "Delete" means depends on what she has hold of. With a box selected it is the box; the
+     whole band is still one click away, by clicking the band. */}
+ {inlineKind && <p className="mb-1.5 text-[11px] text-stone-400">This {inlineKind === "image" ? "image" : inlineKind === "button" ? "button" : "text box"} is selected — use the arrows on it to move it.</p>}
  <div className="mb-4 flex gap-2">
- <button onClick={() => postToPreview({ vya: "dupsec" })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Copy size={13} /> Duplicate</button>
- <button onClick={() => { postToPreview({ vya: "delsec" }); setPanel(null); }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Delete</button>
+ <button onClick={() => postToPreview({ vya: inlineKind ? "dupinline" : "dupsec" })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Copy size={13} /> Duplicate{inlineKind ? " this" : ""}</button>
+ <button onClick={() => { if (inlineKind) { postToPreview({ vya: "delinline" }); setInlineKind(null); } else { postToPreview({ vya: "delsec" }); setPanel(null); } }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Delete{inlineKind ? " this" : " section"}</button>
+ </div>
+ {/* Adding INTO the section she has open. The left rail's Text tab can only add a new band, because
+     reaching that tab means dismissing this panel — and dismissing it deselects the section, so by
+     the time she clicks "Paragraph" there is no "here" left to put anything in. Here there is. */}
+ <div className="mb-4">
+ <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add to this section</p>
+ <div className="flex gap-2">
+ {([["text", "Text", Type], ["image", "Image", ImageIcon], ["button", "Button", MousePointerClick]] as const).map(([type, label, Icon]) => (
+ <button key={type} type="button" onClick={() => postToPreview({ vya: "addblock", type, inside: true })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-2 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">
+ <Icon size={13} /> {label}
+ </button>
+ ))}
+ </div>
  </div>
  {panel.fields.length === 0 && <p className="text-[12px] leading-relaxed text-stone-400">This section has no editable text or images — move, duplicate, or delete it, or ask VYA.</p>}
  <div className="space-y-4">
- {panel.fields.map((f, i) => (
+ {/* A link's WORDS and where it GOES, together.
+     The panel listed every text field first and every href far below it, so checking where "Make
+     an appointment here." pointed meant scrolling past twenty boxes all labelled "Link text" and
+     matching them up by eye. The link field already knows the text it belongs to (`label`), so
+     each destination is rendered directly beneath the words that carry it. Order is display-only —
+     the underlying indices are untouched, because they address the real element in the page. */}
+ {(() => {
+ const ordered = orderFieldsForPanel(panel.fields);
+ const { focused, rest } = splitFocusedFields(ordered, focusEid, focusImg);
+ const shown = focused.length && !showAllFields ? focused : ordered;
+ // She clicked something belonging to a piece in her inventory — a product's name, its price, its
+ // photo. Those are not editable here in any meaningful sense: every shopper's page rebuilds them
+ // from Inventory, so whatever she types is gone on the next load. Give her the piece.
+ const inInventory = focusItem && !showAllFields ? focusItem : null;
+ return (<>
+ {inInventory && (<>
+  {piecePanel}
+  <button type="button" onClick={() => setShowAllFields(true)} className="text-[11px] text-stone-400 underline underline-offset-2 hover:text-stone-600">
+   Edit this section&rsquo;s markup anyway
+  </button>
+ </>)}
+ {!inInventory && (<>
+ {focused.length > 0 && !showAllFields && (
+  <p className="text-[11.5px] leading-snug text-stone-400">
+   Editing what you clicked.{" "}
+   <button type="button" onClick={() => setShowAllFields(true)} className="underline underline-offset-2 hover:text-[#5D0F17]">
+    Show all {ordered.length} fields in this section
+   </button>
+  </p>
+ )}
+ {shown.map(({ f, i }) => (
  /* Touching a field scrolls the preview to the section it belongs to.
     The captured page is one long document and the panel is a separate column, so after any
     scrolling — or a jump to a new page — you end up typing into a box with no idea which part of
@@ -726,8 +980,24 @@ export default function StorefrontEditor() {
  >
  {f.kind === "text" && (
  <>
- <label className="mb-1 block text-[12px] font-medium text-stone-600">{fieldLabel(f.tag)}</label>
- <textarea value={f.value} onChange={(e) => { updatePanelField(i, { value: e.target.value }); postToPreview({ vya: "set", kind: "text", eid: f.eid, value: e.target.value }); }} className="min-h-[42px] w-full resize-y rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50" />
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">
+ {fieldLabel(f.tag)}
+ {/* Twenty fields all called "Link text" are twenty fields you have to open to tell apart. */}
+ {f.tag === "a" && f.value.trim() ? <span className="font-normal text-stone-400"> — “{f.value.trim().slice(0, 40)}”</span> : null}
+ </label>
+ <textarea
+ ref={(el) => {
+  // The field for the element just clicked on the page: bring it into view and put the cursor
+  // in it. Guarded on focusEid so this only fires for the one field, once per click.
+  if (!el || scrollEid === null || f.eid !== scrollEid) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  el.focus();
+  setScrollEid(null);
+ }}
+ value={f.value}
+ onChange={(e) => { updatePanelField(i, { value: e.target.value }); postToPreview({ vya: "set", kind: "text", eid: f.eid, value: e.target.value }); }}
+ className={`min-h-[42px] w-full resize-y rounded-lg border bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50 ${f.eid === focusEid ? "border-[#5D0F17]/60" : "border-black/10"}`}
+ />
  </>
  )}
  {f.kind === "image" && (
@@ -744,10 +1014,24 @@ export default function StorefrontEditor() {
  <>
  <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{f.label ? ` — “${f.label}”` : ""}</label>
  <input value={f.href} onChange={(e) => { updatePanelField(i, { href: e.target.value }); postToPreview({ vya: "set", kind: "link", id: f.id, href: e.target.value }); }} placeholder="https://…  or  /page" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50" />
+ {/* A URL is the one thing a seller can't read. Say where this link goes — and when it goes to
+  a page of hers, hand her the way there, instead of eighty thumbnails to hunt through. */}
+ {(() => {
+  return linkDestination(f.href, f.label || "");
+ })()}
  </>
  )}
  </div>
  ))}
+ </>)}
+ {/* A way back to the one field, once she's opened the whole section. */}
+ {focused.length > 0 && showAllFields && (
+  <button type="button" onClick={() => setShowAllFields(false)} className="text-[11.5px] text-stone-400 underline underline-offset-2 hover:text-[#5D0F17]">
+   Just the part I clicked
+  </button>
+ )}
+ </>);
+ })()}
  </div>
  <div className="mt-5 border-t border-black/10 pt-4">
  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Section style</p>
@@ -821,7 +1105,7 @@ export default function StorefrontEditor() {
  /* ── Elements — small building blocks dropped onto the page ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
- <p className="mb-3 text-[12px] leading-snug text-stone-400">Adds a block at the bottom of the page — then click it to edit, or drag it into place.</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Goes inside the section you have selected. With nothing selected it becomes a new band of its own, near the middle of the screen.</p>
  <div className="grid grid-cols-3 gap-2">
  {([["image", "Image", ImageIcon], ["button", "Button", MousePointerClick], ["divider", "Line", Minus]] as const).map(([type, label, Icon]) => (
  <button key={type} type="button" onClick={() => postToPreview({ vya: "addblock", type })} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">
@@ -835,7 +1119,7 @@ export default function StorefrontEditor() {
  /* ── Text — drop a text block onto the page ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Text</p>
- <p className="mb-3 text-[12px] leading-snug text-stone-400">Adds a text block to the page — click it to edit, and use the floating toolbar to size, colour, and align it.</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Select a section first and the text lands inside it. Click it to edit; the floating toolbar sizes, colours and aligns it.</p>
  <div className="flex flex-col gap-2">
  {([["Heading", "text-[20px] font-semibold"], ["Paragraph", "text-[13px]"]] as const).map(([label, cls]) => (
  <button key={label} type="button" onClick={() => postToPreview({ vya: "addblock", type: "text" })} className="flex items-center justify-between rounded-lg border border-black/10 bg-white px-3.5 py-3 text-stone-700 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">
@@ -903,6 +1187,57 @@ export default function StorefrontEditor() {
  </div>
  {(design.heading || design.body) && <button onClick={() => setDesignField({ heading: null, body: null })} className="mt-2 text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Keep original fonts</button>}
 
+ {/* Pick the two ends separately — and pick from HER faces, not only ours. A font read off her own
+     stylesheet renders in the real thing on her own pages, because the @font-face that defines it
+     came over with the capture. */}
+ <p className="mb-1.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Or choose each</p>
+ {siteFonts.length > 0 && <p className="mb-2 text-[11px] leading-snug text-stone-400">Your site&rsquo;s own fonts came over with it — they&rsquo;re at the top of each list.</p>}
+ <div className="space-y-1.5">
+ {([["heading", "Headings"], ["body", "Body text"]] as const).map(([key, label]) => (
+ <div key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
+  <span className="flex-1 text-[13px] text-stone-700">{label}</span>
+  <select
+   value={design[key] || ""}
+   onChange={(e) => setDesignField({ [key]: e.target.value || null })}
+   className="max-w-[150px] cursor-pointer rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
+  >
+   <option value="">Keep original</option>
+   {siteFonts.length > 0 && (
+    <optgroup label="From your site">
+     {siteFonts.map((f) => <option key={f.family} value={f.family}>{f.family}{f.face ? "" : " (name only)"}</option>)}
+    </optgroup>
+   )}
+   <optgroup label="VYA library">
+    {(key === "heading" ? headingFonts : bodyFonts).map((f) => <option key={f} value={f}>{f}</option>)}
+   </optgroup>
+  </select>
+ </div>
+ ))}
+ </div>
+
+ {/* ── What a product page says ────────────────────────────────────────────────────────────────
+     One template for every piece, and the same setting the block builder edits. Which products it
+     governs is worth saying plainly: a piece you add in VYA gets a page VYA renders, so this is its
+     design. A product you imported keeps the page that came over with it — that one's design is the
+     "Product page" entry in the page list above the preview, where an edit reaches all of them. */}
+ <div className="mb-1.5 mt-6 flex items-center justify-between">
+ <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">What a product page says</p>
+ <span className="text-[11px] text-stone-400">{productPageSaved ? "Saved ✓" : "Saving…"}</span>
+ </div>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">
+  For pieces you add in VYA. Drag to reorder. A field a listing hasn&rsquo;t filled in never shows, so
+  switching one on changes nothing until the piece carries it.
+  {captured.productTemplate ? <> Your imported products use the <b className="font-semibold text-stone-500">Product page</b> in the list above the preview.</> : null}
+ </p>
+ <ProductFieldsEditor fields={productPage.fields} onSet={setProductField} onMove={moveProductField} sample={null} />
+ <label className="mt-2.5 flex items-start gap-2.5 rounded-lg border border-black/10 bg-white px-2.5 py-2">
+ <input type="checkbox" checked={productPage.comparePrice} onChange={(e) => void saveProductPage({ ...productPage, comparePrice: e.target.checked })} className="mt-0.5 accent-[#5D0F17]" />
+ <span className="min-w-0">
+  <span className="block text-[12.5px] font-medium text-stone-700">Show the was-price</span>
+  <span className="mt-0.5 block text-[11px] leading-snug text-stone-400">Where you set a compare-at price, it prints struck through with a Sale mark.</span>
+ </span>
+ </label>
+
  <p className="mt-4 text-[11px] text-stone-400">{designSaved ? "All changes saved ✓ — live on your site" : "Changes apply live as you edit."}</p>
 
  <details className="mt-4">
@@ -940,10 +1275,21 @@ export default function StorefrontEditor() {
  <div className="relative shrink-0">
  <HomeIcon size={13} strokeWidth={2} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
  <select value={selPath} onChange={(e) => { setSelPath(e.target.value); setPanel(null); setPreviewKey((k) => k + 1); }} className="cursor-pointer appearance-none rounded-lg border border-black/10 bg-white py-1.5 pl-8 pr-7 text-[12.5px] font-medium text-stone-700 transition hover:border-stone-300 focus:outline-none">
- {captured.pages.map((p) => <option key={p} value={p}>{pageLabel(p)}</option>)}
+ {captured.pages.filter((p) => !/^\/products\//.test(p)).map((p) => <option key={p} value={p}>{pageLabel(p)}</option>)}
+ {/* One entry for the product page, not one per product. A store has hundreds of captured product
+     pages and they are all the same design; this opens one of them as that design, and a save
+     carries the change to the rest. */}
+ {captured.productTemplate && <option value={captured.productTemplate}>Product page (all {captured.productCount})</option>}
  </select>
  <ChevronDown size={13} strokeWidth={2.25} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-stone-400" />
  </div>
+ {/* Editing the product page is editing every product page. Saying so here is the difference between
+     a design change and a seller wondering why her other 300 products look wrong. */}
+ {captured.productTemplate && selPath === captured.productTemplate && (
+ <span className="shrink-0 rounded-lg bg-[#5D0F17]/[0.07] px-2.5 py-1 text-[11.5px] font-medium text-[#5D0F17]" title="Wording, links and images you change here are matched by their old value and carried across. Each piece's own name, price and description are unique, so they stay themselves.">
+  One design · saving updates all {captured.productCount}
+ </span>
+ )}
  <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-black/10 bg-stone-50 px-2.5 py-1.5">
  <Globe size={12} strokeWidth={2} className="shrink-0 text-stone-400" />
  <span className="truncate text-[12px] text-stone-500">{siteHost}{selPath === "/" ? "" : selPath}</span>
@@ -1038,7 +1384,9 @@ export default function StorefrontEditor() {
   const unlinked = new Set(captured.unlinked || []);
   // Default: not-live pages last. Once she has dragged anything, HER order wins outright — the
   // whole point is that the four pages she actually opens sit at the front.
-  const byDefault = [...captured.pages].sort((a, b) => Number(unlinked.has(a)) - Number(unlinked.has(b)));
+  // Product pages are one design with a copy per piece; the strip shows the design once, at the end.
+ const listable = captured.pages.filter((p) => !/^\/products\//.test(p));
+ const byDefault = [...listable, ...(captured.productTemplate ? [captured.productTemplate] : [])].sort((a, b) => Number(unlinked.has(a)) - Number(unlinked.has(b)));
   const ordered = pageOrder && pageOrder.length ? applyPageOrder(pageOrder, byDefault) : byDefault;
   const hiddenCount = unlinked.size;
 
@@ -1087,7 +1435,7 @@ export default function StorefrontEditor() {
    <div className="shrink-0 border-t border-black/10 bg-white">
     <div className="flex items-center gap-3 px-4 pt-2 text-[11px] text-stone-500">
      <button type="button" onClick={() => setPagesOpen((o) => !o)} className="rounded-md px-2 py-1 font-semibold text-stone-600 transition hover:bg-stone-100">
-      {pagesOpen ? "Collapse" : `All ${captured.pages.length} pages`}
+      {pagesOpen ? "Collapse" : `All ${byDefault.length} pages`}
      </button>
      <span className="hidden text-stone-400 sm:inline">Drag to reorder — just for you, your site doesn’t change</span>
      {pageOrder && pageOrder.length > 0 && (

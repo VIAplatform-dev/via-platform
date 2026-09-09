@@ -25,6 +25,9 @@ import { matchItemId } from "@/app/lib/capture-commerce";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getCollectionBySlug, listCollectionItems, listCollectionItemsForStorefront, getCollectionWithSyncState } from "@/app/lib/db/collections";
 import { chooseCollectionItems } from "@/app/lib/plan-b/collection-contents";
+import { injectCollectionTiles } from "@/app/lib/plan-b/collection-tiles";
+import { stampProductCards } from "@/app/lib/plan-b/product-card-identity";
+import { listCollections } from "@/app/lib/db/collections";
 import { listStorefrontItems, listStorefrontItemsBySourceIds } from "@/app/lib/db/inventory";
 import { storefrontAvailability } from "@/app/lib/unavailable-label";
 import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
@@ -84,44 +87,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
  if (!html && !isSearchPath) return new Response("Page not found.", { status: 404, headers: { "Content-Type": "text/plain" } });
 
- // Edit mode (?edit=1): the seller's own click-to-edit view — no cart, just the visual editor.
- //
- // THIS IS A PUBLIC ROUTE. "/site" is in the middleware's PUBLIC_ROUTES because shoppers browse
- // hosted stores, so this handler is the only thing standing between a visitor and edit mode — and
- // until this check existed there was nothing: anyone who added ?edit=1 to any hosted storefront
- // (VYA path or the seller's own domain) got the seller's editing toolbar over her live shop. The
- // save endpoint was auth-gated, so nothing could be written, but a shopper meeting an "editing
- // your site" bar on a store she is trying to buy from reads it as broken or defaced.
- //
- // Denial is not an error: fall through and serve the ordinary page, so a link someone pasted with
- // ?edit=1 still shows the shop.
- if (html && req.nextUrl.searchParams.get("edit") === "1") {
-  const admin = isAdminRequest(req);
-  const actingSlug = await resolveStoreSlugAny(req).catch(() => null); /* allow-swallow: an auth blip must show the public page, never the editor */
-  if (canEditCapture(slug, { slug: actingSlug, isAdmin: admin }).allowed) {
-   // LOOK BEFORE YOU EDIT. She may only edit pages of a capture she has already compared with her
-   // own site, side by side, in the Hosted Store tab — see app/lib/capture-review-gate.ts for the
-   // rule and why it is this one. Enforced HERE, not only on the button, or it is decorative: the
-   // edit URL is a plain link she could keep. Admins (us, debugging a store) are exempt.
-   const gate = admin
-    ? { passed: true as const, reason: "reviewed" as const }
-    : reviewGate(await getReviewState(slug).catch(() => null)); /* allow-swallow: fails OPEN on purpose — this is a workflow step, not the security control (that is canEditCapture above), and a health-table blip must not lock every seller out of her own editor */
-   if (gate.passed) {
-    return new Response(prepareEditMode(html, slug, pathname), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
-   }
-   // She IS the owner and simply hasn't reviewed yet. Falling silently through to the public page
-   // is right for a shopper and wrong for her — she clicked Edit (or the storefront studio loaded
-   // this URL in its iframe) and got a page that won't edit, with nothing saying why. Her copy of
-   // the page carries one line naming the step. No shopper reaches this branch.
-   ownerNotice = reviewGateNoticeHtml(gate);
-  }
- }
-
  // Search tracking: captured sites route their search box to a ?q=/query=/s= URL —
  // log the query for the store's analytics.
  const sp = req.nextUrl.searchParams;
+ // Edit mode now runs further down, on the fully-rendered page, so these counters are reached while
+ // she is editing. Her own editing session is not a visit — without this, opening a product page in
+ // the editor recorded a product view against her own store.
+ const isEditRequest = sp.get("edit") === "1";
  const query = (sp.get("q") || sp.get("query") || sp.get("s") || "").trim();
- if (query && (pathname.includes("search") || sp.has("q") || sp.has("query"))) {
+ if (query && !isEditRequest && (pathname.includes("search") || sp.has("q") || sp.has("query"))) {
  recordSearch(slug, query, req.cookies.get("via_sess")?.value || null).catch(() => {});
  }
 
@@ -306,7 +280,94 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    // why. One-of-one stores are mostly sold stock, so this is the common case, not the edge.
    const mine = await getItem(itemId).catch(() => null);
    if (mine && !storefrontAvailability(mine).available) html = applyCartState(html, { inCart: false, soldOut: true, unavailableReason: storefrontAvailability(mine).unavailableReason });
-   recordProductView(slug, itemId, req.cookies.get("via_sess")?.value || null).catch(() => {});
+   if (!isEditRequest) recordProductView(slug, itemId, req.cookies.get("via_sess")?.value || null).catch(() => {});
+  }
+ }
+
+ // The "shop by collection" tiles, from the seller's OWN collections rather than the row her old
+ // site happened to carry on crawl day. Runs on every page type, not just the two above: such a row
+ // turns up on a homepage, in a "browse by category" band halfway down a landing page, and on the
+ // /collections index — which matches neither `coll` (it has no handle) nor `isHome`, and so was
+ // never touched at all. A page with no such row is returned unchanged, so this is cheap everywhere
+ // else. See app/lib/plan-b/collection-tiles.ts.
+ {
+  const owner = await getSellerBySlug(slug).catch(() => null);
+  if (owner) {
+   const cols = await listCollections(owner.id).catch(() => []);
+   if (cols.length) {
+    html = injectCollectionTiles(
+     html,
+     cols.map((c) => ({ title: c.title, slug: c.slug, imageUrl: c.imageUrl ?? null })),
+     // The index exists to list them all; a row anywhere else keeps the tile count the theme chose.
+     { base: onStoreOrigin ? "" : `/site/${slug}`, uncapped: /^\/collections\/?$/.test(pathname) },
+    );
+   }
+  }
+ }
+
+ // ── EDIT MODE (?edit=1) ─────────────────────────────────────────────────────────────────────────
+ // Placed HERE, after the live grids and the collection tiles — not up before all of them, where it
+ // used to sit and return the CAPTURED page. That gave the editor crawl-day products at crawl-day
+ // prices while every shopper got the same page rebuilt from live inventory: two different pages,
+ // and the seller was editing the one nobody sees. A price she clicked was a photograph of a number
+ // that had since changed, under a link to a product route the app does not serve.
+ //
+ // It still stops short of the cart, the checkout wiring and the theme-script shims further down —
+ // those are a shopper's machinery, not hers.
+ // Edit mode (?edit=1): the seller's own click-to-edit view — no cart, just the visual editor.
+ //
+ // THIS IS A PUBLIC ROUTE. "/site" is in the middleware's PUBLIC_ROUTES because shoppers browse
+ // hosted stores, so this handler is the only thing standing between a visitor and edit mode — and
+ // until this check existed there was nothing: anyone who added ?edit=1 to any hosted storefront
+ // (VYA path or the seller's own domain) got the seller's editing toolbar over her live shop. The
+ // save endpoint was auth-gated, so nothing could be written, but a shopper meeting an "editing
+ // your site" bar on a store she is trying to buy from reads it as broken or defaced.
+ //
+ // Denial is not an error: fall through and serve the ordinary page, so a link someone pasted with
+ // ?edit=1 still shows the shop.
+ if (html && req.nextUrl.searchParams.get("edit") === "1") {
+  const admin = isAdminRequest(req);
+  const actingSlug = await resolveStoreSlugAny(req).catch(() => null); /* allow-swallow: an auth blip must show the public page, never the editor */
+  if (canEditCapture(slug, { slug: actingSlug, isAdmin: admin }).allowed) {
+   // LOOK BEFORE YOU EDIT. She may only edit pages of a capture she has already compared with her
+   // own site, side by side, in the Hosted Store tab — see app/lib/capture-review-gate.ts for the
+   // rule and why it is this one. Enforced HERE, not only on the button, or it is decorative: the
+   // edit URL is a plain link she could keep. Admins (us, debugging a store) are exempt.
+   const gate = admin
+    ? { passed: true as const, reason: "reviewed" as const }
+    : reviewGate(await getReviewState(slug).catch(() => null)); /* allow-swallow: fails OPEN on purpose — this is a workflow step, not the security control (that is canEditCapture above), and a health-table blip must not lock every seller out of her own editor */
+   if (gate.passed) {
+    // The editor serves the CAPTURED page, deliberately — a seller edits her own markup, not our
+    // render of it. But two things on that page are not hers to type, and until they said so she
+    // was handed a text box for each:
+    //
+    //  · a product's name and price, which every shopper's page regenerates from Inventory, so an
+    //    edit here is thrown away on the next load. Stamped with the piece they belong to, which is
+    //    what lets the panel offer her the piece in Inventory instead of a box that lies.
+    //  · the "shop by collection" tiles, which are her collections — hers to add to, remove from,
+    //    rename and photograph in the Collections manager. Filled in live so the editor shows the
+    //    row her shoppers actually get.
+    //
+    // Best-effort, every step: a database blip must still open her editor, on the captured page.
+    let editHtml = html;
+    try {
+     const owner = await getSellerBySlug(slug);
+     if (owner) {
+      // The collection tiles are already live: the pass above ran on this same html. What is left
+      // is the one thing only the editor needs — tying each product card back to the piece it shows,
+      // so clicking its name or price opens the piece rather than a text box that can't be saved.
+      const inv = await listStorefrontItems(owner.id).catch(() => []);
+      const bySource = new Map(inv.filter((i) => i.sourceId).map((i) => [String(i.sourceId), { id: i.id, title: i.title }]));
+      editHtml = stampProductCards(editHtml, (h) => bySource.get(h) ?? null);
+     }
+    } catch { /* allow-swallow: the editor opens on the captured page regardless */ }
+    return new Response(prepareEditMode(editHtml, slug, pathname), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+   }
+   // She IS the owner and simply hasn't reviewed yet. Falling silently through to the public page
+   // is right for a shopper and wrong for her — she clicked Edit (or the storefront studio loaded
+   // this URL in its iframe) and got a page that won't edit, with nothing saying why. Her copy of
+   // the page carries one line naming the step. No shopper reaches this branch.
+   ownerNotice = reviewGateNoticeHtml(gate);
   }
  }
 

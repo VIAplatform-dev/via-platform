@@ -32,11 +32,17 @@ export default function InstagramPage() {
  const [testId, setTestId] = useState("");
  const [testMsg, setTestMsg] = useState("");
  const [showToken, setShowToken] = useState(false);
+ // NOT LIVE YET. Auto-posting is built but nothing posts, so a seller who connected an account would
+ // be handing VYA a token in exchange for silence. The page stays reachable for a platform admin to
+ // finish and test; everyone else gets told where it stands. `null` = still asking.
+ const [isPlatformAdmin, setIsPlatformAdmin] = useState<boolean | null>(null);
 
  useEffect(() => {
  (async () => {
  const d = await fetch("/api/store/instagram").then((r) => (r.ok ? r.json() : null)).catch(() => null);
  if (d) setS(d);
+ const sf = await fetch("/api/store/storefront").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+ setIsPlatformAdmin(!!sf?.admin);
  const q = new URLSearchParams(window.location.search).get("ig");
  if (q && NOTICE[q]) setNotice(NOTICE[q]);
  if (q) window.history.replaceState({}, "", window.location.pathname);
@@ -107,6 +113,22 @@ export default function InstagramPage() {
  <AdminPage className="max-w-3xl">
  <AdminHeader eyebrow="Marketing · Instagram" title="Instagram" subtitle="Post every new piece to your Instagram Story automatically." />
 
+ {isPlatformAdmin === false && (
+ <TechCard className="p-6">
+  <p className="text-[13px] font-semibold text-stone-800">Not switched on yet</p>
+  <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-stone-500">
+   Automatic Instagram posting is built but not live, so there is nothing to connect an account to
+   yet. When it ships you&rsquo;ll be able to choose whether each piece posts on its own or waits as a
+   draft for you to look at first — nothing will ever post without that choice being yours.
+  </p>
+  <p className="mt-3 text-[12px] text-stone-400">Meanwhile, <a href="/admin/marketing/share-links" className="underline underline-offset-2 hover:text-stone-600">Share links</a> gives you a tagged link to put in your Instagram bio today.</p>
+ </TechCard>
+ )}
+ {isPlatformAdmin === null && <TechCard className="p-6 text-[13px] text-stone-400">Loading…</TechCard>}
+ {isPlatformAdmin && (<>
+ <div className="mb-4 rounded-lg bg-amber-50 px-4 py-2.5 text-[12.5px] font-medium text-amber-900 ring-1 ring-amber-200">
+  Platform admin only — this is hidden from sellers until auto-posting actually posts.
+ </div>
  {notice && <div className="mb-4 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-4 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">{notice}</div>}
 
  {/* How it works */}
@@ -162,6 +184,7 @@ export default function InstagramPage() {
  </TechCard>
 
  <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Instagram must be a Business or Creator account. VYA only posts the pieces you publish — it never reads your DMs or posts anything else.</p>
+ </>)}
  </AdminPage>
  );
 }

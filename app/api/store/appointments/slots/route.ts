@@ -72,6 +72,10 @@ export async function POST(request: NextRequest) {
 
  const ctx = await publicContext({ storeSlug, itemId, request });
  if (!ctx) return notFound("This store isn't taking appointments.");
+ // Appointments off means OFF. The section disappears from the storefront when a store turns
+ // them off, but this route booked anyway — so a page left open, or a stale link, still put a
+ // stranger in her diary. Same gate the rental intent needs, for the same reason.
+ if (!ctx.settings.enabled) return notFound("This store isn't taking appointments.");
 
  const now = new Date();
  const booked = await bookedSlots(ctx.sellerId, day, day);

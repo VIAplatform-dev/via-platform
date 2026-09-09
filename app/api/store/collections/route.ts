@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
  if (!seller) return NextResponse.json({ collections: [] });
  const includeEmpty = new URL(request.url).searchParams.get("all") === "1";
  const cols = await listCollections(seller.id, includeEmpty);
- return NextResponse.json({ collections: cols.map((c) => ({ id: c.id, title: c.title, slug: c.slug, itemCount: c.itemCount })) });
+ return NextResponse.json({ collections: cols.map((c) => ({ id: c.id, title: c.title, slug: c.slug, itemCount: c.itemCount, imageUrl: c.imageUrl ?? null })) });
 }
 
 // POST { title } — create a new (empty) collection. Idempotent by slug.

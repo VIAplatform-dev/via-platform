@@ -10,6 +10,8 @@ import { resolveEffects, type SiteEffects } from "@/app/lib/storefront-effects";
 import { getListingsByStore } from "@/app/lib/listings-db";
 import { listStorefrontItems } from "@/app/lib/db/inventory";
 import { loadStoreProducts } from "@/app/lib/loadStoreProducts";
+import { detectSiteFonts } from "@/app/lib/plan-b/font-detect";
+import { getSiteCss } from "@/app/lib/site-capture-db";
 import { formatPrice } from "@/app/lib/formatPrice";
 import { defaultStarterTheme } from "@/app/lib/storefront-default";
 import { stores } from "@/app/lib/stores";
@@ -164,6 +166,12 @@ export async function GET(request: NextRequest) {
  blockTypes: BLOCK_TYPES,
  headingFonts: HEADING_FONTS,
  bodyFonts: BODY_FONTS,
+ // The faces her OWN site is set in, read back out of the CSS we captured. The picker's curated
+ // Google list never contained the one font she actually wanted. `face: true` means the stylesheet
+ // ships the file too, so choosing it renders in the real thing rather than a fallback — which is
+ // why these are offered to the store they came from and not pooled across stores (a webfont
+ // licence is per-domain). Empty for a store that never imported a site.
+ siteFonts: await getSiteCss(slug).then((css) => detectSiteFonts(css || "")).catch(() => []),
  products,
  collections,
  });

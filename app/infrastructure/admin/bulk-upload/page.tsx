@@ -125,6 +125,11 @@ export default function BulkUploadPage() {
  // (cost-split.ts) the Inventory bulk `cost` action uses.
  const [batch, setBatch] = useState({ cost: "" });
  const [lotNote, setLotNote] = useState<string | null>(null);
+ // Pieces the batch cost turned out not to support, and whether we are lifting them. A lot is priced
+ // before its cost is known — the cost is split in proportion to the prices — so this is the first
+ // moment anything can say whether the prices clear her minimum markup.
+ const [belowFloor, setBelowFloor] = useState<{ ids: string[]; note: string } | null>(null);
+ const [raising, setRaising] = useState(false);
 
  useEffect(() => {
   fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
@@ -375,6 +380,20 @@ export default function BulkUploadPage() {
   }).then((x) => x.json()).catch(() => null);
   if (!r?.ok) { setLotNote(r?.error || "Couldn’t write the cost onto the batch — set it from Inventory (Set cost)."); return; }
   setLotNote(`${(totalCents / 100).toFixed(2)} split across ${r.count} pieces`);
+  const misses: { id: string }[] = Array.isArray(r.belowFloor) ? r.belowFloor : [];
+  setBelowFloor(misses.length ? { ids: misses.map((m) => m.id), note: String(r.belowFloorNote || "") } : null);
+ }
+
+ /** Lift the pieces the lot cost didn't support up to cost plus her markup. */
+ async function raiseToFloor() {
+  if (!belowFloor?.ids.length) return;
+  setRaising(true);
+  const r = await fetch(withStore("/api/store/items"), {
+   method: "POST", headers: { "Content-Type": "application/json" },
+   body: JSON.stringify({ action: "raiseToFloor", ids: belowFloor.ids }),
+  }).then((x) => x.json()).catch(() => null);
+  setRaising(false);
+  if (r?.ok) { setBelowFloor(null); setLotNote(`Raised ${r.count} piece${r.count === 1 ? "" : "s"} to your pricing floor.`); }
  }
 
  // ── Edit a drafted item in place — open the popup, save straight back to the draft. ──
@@ -549,6 +568,17 @@ export default function BulkUploadPage() {
      <div className="grid grid-cols-1 gap-3">
       <Field label={`These ${itemCount} cost (USD)`} hint="in total — split across the pieces by price"><Input type="number" inputMode="decimal" value={batch.cost} onChange={(e) => setBatch((b) => ({ ...b, cost: e.target.value }))} placeholder="optional, e.g. 340" disabled={locked} /></Field>
      </div>
+     {/* THE PRICES ABOVE DO NOT KNOW WHAT SHE PAID YET.
+         One at a time, the cost is typed before the price and the floor simply holds the price up.
+         A lot cannot work that way: the cost is split across the pieces IN PROPORTION TO THEIR
+         PRICES, so a per-piece cost does not exist until they are priced. Rather than let that be
+         silent, say it — and check the moment the number lands. */}
+     {batch.cost.trim() === "" && (
+      <p className="mt-2.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] leading-relaxed text-amber-800 ring-1 ring-amber-200">
+       ⚠️ These prices come from the market only — they don&rsquo;t know what you paid. Add what the batch
+       cost and we&rsquo;ll check every piece against your minimum markup, and offer to raise any that fall short.
+      </p>
+     )}
     </div>
    )}
 
@@ -564,6 +594,7 @@ export default function BulkUploadPage() {
       ) : (
        <p className="text-sm font-medium text-stone-700">{itemCount} item{itemCount === 1 ? "" : "s"} — drag a photo to regroup, or split it out</p>
       )}
+
       {saved ? (
        <div className="flex shrink-0 items-center gap-3">
         {pendingPublish && <TechButton onClick={publishAll}>Publish all</TechButton>}
@@ -574,6 +605,18 @@ export default function BulkUploadPage() {
        <TechButton onClick={draftAll} disabled={busy}>{busy ? `Drafting ${progress.done}/${progress.total}…` : `Draft ${itemCount} item${itemCount === 1 ? "" : "s"}`}</TechButton>
       )}
      </div>
+
+     {/* What the lot cost turned out not to support. Hers to accept or fix — never rewritten
+         silently, because a price she has seen is a decision. */}
+     {belowFloor && (
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900 ring-1 ring-amber-200">
+       <span className="min-w-0 flex-1">⚠️ {belowFloor.note} That lot cost more than these prices support.</span>
+       <button type="button" onClick={raiseToFloor} disabled={raising} className="shrink-0 rounded-md bg-amber-800 px-2.5 py-1 text-[11.5px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50">
+        {raising ? "Raising…" : "Raise them to my floor"}
+       </button>
+       <button type="button" onClick={() => setBelowFloor(null)} className="shrink-0 text-[11.5px] underline underline-offset-2 hover:opacity-70">Leave them</button>
+      </div>
+     )}
 
      <style>{".vya-indet{animation:vya-indet 1.15s ease-in-out infinite}@keyframes vya-indet{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}@media(prefers-reduced-motion:reduce){.vya-indet{animation:none;width:100%;opacity:.35}}"}</style>
 

@@ -129,6 +129,8 @@ export default function AppointmentSettingsPage() {
   setBusy(false);
   if (!r?.ok) { setErr(r?.d?.error || "Couldn't save that."); return; }
   setS(r.d.settings); setWarnings(r.d.warnings ?? []); setNotifyTo(r.d.notifyTo ?? null); setSaved(true);
+ // See the rentals page: the sidebar reads this switch on mount and needs telling it changed.
+ window.dispatchEvent(new Event("vya:store-updated"));
  }
 
  if (!s) {

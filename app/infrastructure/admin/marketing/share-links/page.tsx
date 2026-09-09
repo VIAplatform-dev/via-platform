@@ -19,7 +19,10 @@ const PLATFORMS: { key: string; label: string }[] = [
 export default function ShareLinksPage() {
  const [handle, setHandle] = useState<string | null>(null);
  const [customDomain, setCustomDomain] = useState<string | null>(null);
- const [campaign, setCampaign] = useState<"bio" | "post">("bio");
+ // The address her store actually answers on — {slug}.vyasites.com, or her own domain. The API has
+ // resolved this since storePublicOrigin existed; this page was still assembling
+ // "vyaplatform.com/s/{handle}" out of a handle, which is a VYA path, not her shop.
+ const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
  // Sharing one piece is the most common social post there is — a Story with a
  // single item — so the picker below points the same tagged links at that item.
  const [items, setItems] = useState<Item[]>([]);
@@ -31,6 +34,7 @@ export default function ShareLinksPage() {
  fetch("/api/store/storefront").then((r) => (r.ok ? r.json() : null)).then((d) => {
   if (d?.settings?.handle) setHandle(d.settings.handle);
   if (d?.settings?.customDomain) setCustomDomain(d.settings.customDomain);
+  if (d?.publicOrigin) setPublicOrigin(d.publicOrigin);
  }).catch(() => {});
  fetch("/api/store/items").then((r) => (r.ok ? r.json() : null)).then((d) => {
   const live = (d?.items || []).filter((i: { status: string }) => i.status === "active");
@@ -45,12 +49,14 @@ export default function ShareLinksPage() {
  // instagram-publish.ts already builds a shareable item URL.
  const baseUrl = customDomain
  ? `https://${customDomain}`
- : handle
-  ? `https://vyaplatform.com/s/${handle}`
-  : "https://vyaplatform.com";
+ : publicOrigin
+  ? publicOrigin
+  : handle
+   ? `https://vyaplatform.com/s/${handle}`
+   : "https://vyaplatform.com";
  // Product pages live at /p/<id> under whichever base the store publishes on.
  const target = itemId ? `${baseUrl}/p/${itemId}` : baseUrl;
- const linkFor = (src: string) => `${target}?utm_source=${src}&utm_medium=social&utm_campaign=${itemId ? "product" : campaign}`;
+ const linkFor = (src: string) => `${target}?utm_source=${src}&utm_medium=social&utm_campaign=${itemId ? "product" : "bio"}`;
  const chosen = items.find((i) => i.id === itemId) ?? null;
  const matches = query.trim()
  ? items.filter((i) => i.title.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8)
@@ -62,15 +68,20 @@ export default function ShareLinksPage() {
 
  return (
  <AdminPage className="max-w-2xl">
- <AdminHeader eyebrow="Store · Marketing · Share links" title="Share links" subtitle="Links to post on social media. Each one is tagged, so you can see how many people clicked it and what they bought." />
+ <AdminHeader
+ eyebrow="Store · Marketing · Share links"
+ title="Share links"
+ subtitle="One link to your own shop, written out once per platform. They all open the same page — the tag on the end is what tells you which post someone came from."
+ />
+ <p className="mb-4 text-[12px] leading-relaxed text-stone-500">
+  These aren&rsquo;t links to your Instagram or Pinterest — they&rsquo;re links <b>to your store</b>, for you to
+  paste <i>into</i> those places. Put the Instagram one in your Instagram bio, the TikTok one in your
+  TikTok bio, and so on. Then{" "}
+  <a href="/admin/analytics" className="font-medium text-stone-700 underline underline-offset-2 hover:text-stone-900">Analytics</a>{" "}
+  shows how many people each one brought, and what they bought.
+ </p>
 
- <div className={`mb-4 inline-flex rounded-full border border-stone-200 bg-white p-[3px] text-[12px] ${itemId ? "hidden" : ""}`}>
- {(["bio", "post"] as const).map((c) => (
- <button key={c} onClick={() => setCampaign(c)} className={`rounded-full px-3 py-1 transition ${campaign === c ? "bg-stone-900 text-white" : "text-stone-500 hover:text-stone-800"}`}>
- {c === "bio" ? "Bio / profile link" : "Post / caption link"}
- </button>
- ))}
- </div>
+
 
  <TechCard className="mb-4 p-4">
  <p className="mb-1 text-[13px] font-medium text-stone-700">What are you linking to?</p>
@@ -95,12 +106,12 @@ export default function ShareLinksPage() {
  <input
  value={query}
  onChange={(e) => setQuery(e.target.value)}
- placeholder="…or search a piece to link to"
+ placeholder="…or type a piece's name to link straight to it"
  className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-700 outline-none placeholder:text-stone-400 focus:border-stone-400"
  />
  {query.trim() && (
  <div className="mt-2 divide-y divide-stone-100 overflow-hidden rounded-lg border border-stone-200">
- {matches.length === 0 && <p className="px-3 py-2.5 text-[12px] text-stone-400">Nothing live matches that.</p>}
+ {matches.length === 0 && <p className="px-3 py-2.5 text-[12px] text-stone-400">No live piece by that name. This searches your own listings — it isn&rsquo;t a place to paste a link.</p>}
  {matches.map((i) => (
  <button key={i.id} onClick={() => { setItemId(i.id); setQuery(""); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition hover:bg-stone-50">
  <span className="h-7 w-7 shrink-0 overflow-hidden rounded bg-stone-100">{i.image && <img src={i.image} alt="" className="h-full w-full object-cover" />}</span>
@@ -136,7 +147,7 @@ export default function ShareLinksPage() {
  : handle
   ? <>Links point to your storefront <span className="font-mono">/s/{handle}</span>.</>
   : "Set your storefront handle to point these at your store; for now they point to VYA."}
- {" "}Paste the <b>bio link</b> in your profile, and a <b>post link</b> when you drop something in a caption.
+ {" "}Clicks and sales for each one are in <a href="/admin/analytics" className="underline underline-offset-2 hover:text-stone-600">Analytics</a>.
  </p>
  </AdminPage>
  );

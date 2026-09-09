@@ -17,6 +17,25 @@ type Ctx = { params: Promise<{ id: string }> };
 
 // POST { action: "sold" | "remove" | "publish" | "hold" | "release" } — run a lifecycle transition
 // on one of the acting store's items (ownership-scoped). `hold` takes { name?, days? | until? }.
+// GET — one piece, for anywhere that needs to show it without loading the whole inventory. The
+// storefront editor uses it: a product card there is captured markup, so the panel has to ask what
+// the piece actually says right now.
+export async function GET(request: NextRequest, { params }: Ctx) {
+ const slug = await resolveStoreSlugAny(request);
+ if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ const { id } = await params;
+ const seller = await getSellerBySlug(slug);
+ if (!seller) return NextResponse.json({ error: "Not found" }, { status: 404 });
+ const item = await getItem(id);
+ if (!item || item.sellerId !== seller.id) return NextResponse.json({ error: "Not found" }, { status: 404 });
+ return NextResponse.json({
+  item: {
+   id: item.id, title: item.title, priceCents: item.priceCents, currency: item.currency,
+   images: Array.isArray(item.images) ? item.images : [], status: item.status,
+  },
+ });
+}
+
 export async function POST(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

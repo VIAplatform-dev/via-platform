@@ -29,19 +29,28 @@ async function ensureTable() {
  ensured = true;
 }
 
-export type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean };
+/** `ends_at` — when a code stops working on its own. Added lazily and idempotently, like the other
+ *  additive columns here, so a deploy never lands code that reads a column the database lacks. */
+let endsAtReady = false;
+async function ensureEndsAt() {
+ if (endsAtReady) return;
+ await db()`ALTER TABLE store_discounts ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ`.catch(() => {});
+ endsAtReady = true;
+}
 
-type Row = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; auto_apply: boolean };
-const map = (r: Row): Discount => ({ id: Number(r.id), code: r.code, label: r.label, kind: r.kind, value: r.value == null ? null : Number(r.value), active: !!r.active, autoApply: !!r.auto_apply });
+export type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean; endsAt: string | null };
+
+type Row = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; auto_apply: boolean; ends_at?: string | Date | null };
+const map = (r: Row): Discount => ({ id: Number(r.id), code: r.code, label: r.label, kind: r.kind, value: r.value == null ? null : Number(r.value), active: !!r.active, autoApply: !!r.auto_apply, endsAt: r.ends_at ? new Date(r.ends_at).toISOString() : null });
 
 export async function listDiscounts(storeSlug: string): Promise<Discount[]> {
- await ensureTable();
- const rows = await db()`SELECT id, code, label, kind, value, active, auto_apply FROM store_discounts WHERE store_slug = ${storeSlug} ORDER BY created_at DESC`;
+ await ensureTable(); await ensureEndsAt();
+ const rows = await db()`SELECT id, code, label, kind, value, active, auto_apply, ends_at FROM store_discounts WHERE store_slug = ${storeSlug} ORDER BY created_at DESC`;
  return (rows as Row[]).map(map);
 }
 
-export async function addDiscount(storeSlug: string, d: { code: string; label?: string; kind?: string; value?: number | null }): Promise<Discount | null> {
- await ensureTable();
+export async function addDiscount(storeSlug: string, d: { code: string; label?: string; kind?: string; value?: number | null; endsAt?: string | null }): Promise<Discount | null> {
+ await ensureTable(); await ensureEndsAt();
  const code = (d.code || "").trim().toUpperCase().slice(0, 64);
  if (!code) return null;
  const kind = ["percent", "fixed", "free_shipping", "other"].includes(d.kind || "") ? d.kind! : "percent";
@@ -49,14 +58,41 @@ export async function addDiscount(storeSlug: string, d: { code: string; label?: 
  // First discount for the store becomes the auto-apply by default.
  const existing = await db()`SELECT COUNT(*)::int AS n FROM store_discounts WHERE store_slug = ${storeSlug}`;
  const isFirst = Number((existing[0] as { n: number }).n) === 0;
- const rows = await db()`INSERT INTO store_discounts (store_slug, code, label, kind, value, auto_apply)
- VALUES (${storeSlug}, ${code}, ${d.label?.trim() || null}, ${kind}, ${value}, ${isFirst})
- RETURNING id, code, label, kind, value, active, auto_apply`;
+ const endsAt = d.endsAt && !Number.isNaN(Date.parse(d.endsAt)) ? new Date(d.endsAt).toISOString() : null;
+ const rows = await db()`INSERT INTO store_discounts (store_slug, code, label, kind, value, auto_apply, ends_at)
+ VALUES (${storeSlug}, ${code}, ${d.label?.trim() || null}, ${kind}, ${value}, ${isFirst}, ${endsAt})
+ RETURNING id, code, label, kind, value, active, auto_apply, ends_at`;
  return map(rows[0] as Row);
 }
 
-export async function updateDiscount(storeSlug: string, id: number, patch: { active?: boolean; autoApply?: boolean }): Promise<void> {
- await ensureTable();
+/**
+ * Change a code. Everything about it, not only whether it is switched on.
+ *
+ * This used to take `active` and `autoApply` and nothing else, so a code created with the wrong
+ * number — a WELCOME10 saved before the "10" was typed, which is how it was reported — could only be
+ * deleted and made again. The percentage, the code itself, its label and when it stops are all
+ * editable now; only fields actually present in the patch are written.
+ */
+export async function updateDiscount(storeSlug: string, id: number, patch: { active?: boolean; autoApply?: boolean; code?: string; label?: string | null; kind?: string; value?: number | null; endsAt?: string | null }): Promise<void> {
+ await ensureTable(); await ensureEndsAt();
+ if (typeof patch.code === "string") {
+  const code = patch.code.trim().toUpperCase().slice(0, 64);
+  if (code) await db()`UPDATE store_discounts SET code = ${code} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (patch.label !== undefined) {
+  await db()`UPDATE store_discounts SET label = ${patch.label?.trim() || null} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (typeof patch.kind === "string" && ["percent", "fixed", "free_shipping", "other"].includes(patch.kind)) {
+  await db()`UPDATE store_discounts SET kind = ${patch.kind} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (patch.value !== undefined) {
+  const v = patch.value == null || Number.isNaN(Number(patch.value)) ? null : Number(patch.value);
+  await db()`UPDATE store_discounts SET value = ${v} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (patch.endsAt !== undefined) {
+  const e = patch.endsAt && !Number.isNaN(Date.parse(patch.endsAt)) ? new Date(patch.endsAt).toISOString() : null;
+  await db()`UPDATE store_discounts SET ends_at = ${e} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
  if (patch.autoApply === true) {
  // only one auto-apply per store
  await db()`UPDATE store_discounts SET auto_apply = false WHERE store_slug = ${storeSlug}`;
@@ -96,9 +132,13 @@ export async function validateDiscount(storeSlug: string, codeRaw: string): Prom
  await ensureTable();
  const code = (codeRaw || "").trim().toUpperCase();
  if (!code) return null;
+ await ensureEndsAt();
+ // An expiry that isn't enforced here is decoration: this is the one gate every checkout path goes
+ // through, so "15% off for 24 hours only" has to mean the code stops working when the day is up.
  const rows = await db()`
  SELECT id, code, label, kind, value FROM store_discounts
  WHERE store_slug = ${storeSlug} AND active = true AND UPPER(code) = ${code}
+   AND (ends_at IS NULL OR ends_at > now())
  LIMIT 1`;
  if (!rows[0]) return null;
  const r = rows[0] as { id: number; code: string; label: string | null; kind: string; value: number | null };

@@ -203,6 +203,13 @@ export const collections = pgTable(
  sellerId: uuid("seller_id").notNull().references(() => sellers.id, { onDelete: "cascade" }),
  title: text("title").notNull(),
  slug: text("slug").notNull(),
+ // The cover photo a shopper sees on a "shop by collection" tile. Added lazily by
+ // ensureCollectionDisplayColumns() rather than through a migration, like `position` on
+ // item_collections — a deploy must never land code that reads a column the database lacks.
+ imageUrl: text("image_url"),
+ // Where this collection sits in the seller's own order. A storefront row only has space for a few
+ // tiles, so which ones appear IS this number; null sorts last, then by title.
+ position: integer("position"),
  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
  },
  (t) => [uniqueIndex("collections_seller_slug_idx").on(t.sellerId, t.slug)],

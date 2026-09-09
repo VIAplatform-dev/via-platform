@@ -44,7 +44,6 @@ const PAGES: Hit[] = [
  { id: "p-emaildesign", label: "Email design", sub: "logo, colours and fonts for your emails", href: `${B}/marketing/design` },
  { id: "p-automations", label: "Automations", sub: "emails that send on their own", href: `${B}/marketing/automations` },
  { id: "p-sharelinks", label: "Share links", sub: "links for social media", href: `${B}/marketing/share-links` },
- { id: "p-instagram", label: "Instagram", href: `${B}/marketing/instagram` },
  { id: "p-esp", label: "Klaviyo & Mailchimp", sub: "connect your email tool", href: `${B}/apps/email` },
  { id: "p-recovery", label: "Cart recovery", sub: "people who didn't finish checkout", href: `${B}/customers/recovery` },
  { id: "p-marketplaces", label: "Marketplaces", sub: "depop, ebay, vestiaire cross-listing", href: `${B}/cross-listing/settings` },

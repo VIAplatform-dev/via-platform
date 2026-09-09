@@ -78,7 +78,9 @@ export const GROUPS: NavGroup[] = [
      { href: `${B}/marketing/campaigns`, label: "Campaigns" },
      { href: `${B}/marketing/design`, label: "Email design" },
      { href: `${B}/marketing/share-links`, label: "Share links" },
-     { href: `${B}/marketing/instagram`, label: "Instagram" },
+     // Instagram auto-posting is built but NOT live — no seller should be able to connect an account
+     // to something that will not post. Restore this line when it ships; the page itself still opens
+     // for a platform admin so it can be finished and tested.
      { href: `${B}/marketing/automations`, label: "Automations" },
     ],
    },

@@ -85,6 +85,13 @@ export async function GET(request: NextRequest) {
   captured: paths.length,
   url: paths.length ? await siteViewUrl(slug) : null,
   slug, origin, pages: paths,
+  // ONE product page, as the template for all of them. A captured store has hundreds — one per
+  // piece — and describeHostedStore() keeps every one of them out of the page list, correctly: a
+  // strip of 300 product thumbnails is not a page list. But that left the product page as the one
+  // page of her site she could not open at all. This is the page she edits to change the design of
+  // all of them; a save on it propagates by old-value match (see /api/store/capture/edit).
+  productTemplate: paths.find((x) => /^\/products\//.test(x)) ?? null,
+  productCount: paths.filter((x) => /^\/products\//.test(x)).length,
   // Pages nothing on the site links to. Still reachable by URL — see app/lib/capture-links.ts for
   // why the editor says "Not linked" rather than "Archived".
   unlinked,

@@ -137,6 +137,9 @@ export default function RentalSettingsPage() {
   setBusy(false);
   if (!r?.ok) { setErr(r?.d?.error || "Couldn't save that."); return; }
   setS(r.d.settings); setWarnings(r.d.warnings ?? []); setSaved(true);
+ // Tell the sidebar. It reads this switch on mount, so without this the Rentals row stayed
+ // (or stayed missing) until a hard reload and the toggle looked like it hadn't saved.
+ window.dispatchEvent(new Event("vya:store-updated"));
  }
 
  if (!s) {

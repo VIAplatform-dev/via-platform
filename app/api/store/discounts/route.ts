@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => null);
  if (!body || !String(body.code || "").trim()) return NextResponse.json({ error: "Add a code." }, { status: 400 });
- const d = await addDiscount(slug, { code: body.code, label: body.label, kind: body.kind, value: body.value });
+ const d = await addDiscount(slug, { code: body.code, label: body.label, kind: body.kind, value: body.value, endsAt: body.endsAt });
  if (!d) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
  const discounts = await withUsage(slug);
  return NextResponse.json({ ok: true, discounts });
@@ -38,7 +38,15 @@ export async function PATCH(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => null);
  if (!body || !body.id) return NextResponse.json({ error: "Missing id." }, { status: 400 });
- await updateDiscount(slug, Number(body.id), { active: body.active, autoApply: body.autoApply }).catch(() => {});
+ // Only the fields actually sent are written, so switching a code off never blanks its percentage.
+ await updateDiscount(slug, Number(body.id), {
+ active: body.active, autoApply: body.autoApply,
+ ...("code" in body ? { code: String(body.code ?? "") } : {}),
+ ...("label" in body ? { label: body.label == null ? null : String(body.label) } : {}),
+ ...("kind" in body ? { kind: String(body.kind ?? "") } : {}),
+ ...("value" in body ? { value: body.value === "" || body.value == null ? null : Number(body.value) } : {}),
+ ...("endsAt" in body ? { endsAt: body.endsAt ? String(body.endsAt) : null } : {}),
+ }).catch(() => {});
  const discounts = await withUsage(slug);
  return NextResponse.json({ ok: true, discounts });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, type LucideIcon } from "lucide-react";
@@ -80,14 +80,28 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  setStoreSlug(data?.slug || null);
  setOk(true);
  fetch(withPreview("/api/store/market/mode")).then((m) => (m.ok ? m.json() : null)).then((m) => setMarketMode(Boolean(m?.enabled))).catch(() => setMarketMode(false));
- fetch(withPreview("/api/store/rentals/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setRentalsOn(Boolean(m?.settings?.enabled))).catch(() => setRentalsOn(false));
- fetch(withPreview("/api/store/appointments/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setApptsOn(Boolean(m?.settings?.enabled))).catch(() => setApptsOn(false));
+ readFeatureSwitches();
  fetch(withPreview("/api/store/inbox-settings")).then((m) => (m.ok ? m.json() : null))
   .then((m) => setInboxOff(m?.settings ? !m.settings.messagingEnabled && !m.settings.offersEnabled : false))
   .catch(() => {});
  })
  .catch(() => setOk(false));
  }, [isOnboarding, router]);
+
+ // Rentals and Appointments are switches a seller flips in Settings, and this sidebar read them
+ // exactly once on mount. Turning Rentals off left the row sitting there until a hard reload, and
+ // turning it on did nothing visible — so the switch looked broken when it had in fact saved.
+ // `vya:store-updated` is the convention the storefront editor and Sidekick already use.
+ const readFeatureSwitches = useCallback(() => {
+  fetch(withPreview("/api/store/rentals/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setRentalsOn(Boolean(m?.settings?.enabled))).catch(() => setRentalsOn(false));
+  fetch(withPreview("/api/store/appointments/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setApptsOn(Boolean(m?.settings?.enabled))).catch(() => setApptsOn(false));
+ }, []);
+
+ useEffect(() => {
+  const onUpdated = () => readFeatureSwitches();
+  window.addEventListener("vya:store-updated", onUpdated);
+  return () => window.removeEventListener("vya:store-updated", onUpdated);
+ }, [readFeatureSwitches]);
 
  // "Bring your site" is a step INSIDE onboarding, not a place in the workspace. It used to linger
  // in the sidebar until a status endpoint said the store was set up — which meant a seller who had

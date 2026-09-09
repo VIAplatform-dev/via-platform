@@ -3,11 +3,11 @@
 // Collections manager — stores create collections, add/remove items, and move pieces between them.
 // An item can live in as many collections as you like (adding to one never removes it from another).
 import { useEffect, useState } from "react";
-import { FolderPlus, Trash2, Pencil, X, Plus, Search, Package, Check } from "lucide-react";
+import { FolderPlus, Trash2, Pencil, X, Plus, Search, Package, Check, ImagePlus, GripVertical } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, SectionLabel, cn } from "../../ui";
 import { inputCls } from "@/app/store/ui";
 
-type Col = { id: string; title: string; slug: string; itemCount: number };
+type Col = { id: string; title: string; slug: string; itemCount: number; imageUrl: string | null };
 type ColItem = { id: string; title: string; priceCents: number; currency: string; image: string | null; status: string };
 type InvItem = { id: string; title: string; images: string[]; status: string; priceCents: number; currency: string };
 
@@ -58,6 +58,44 @@ export default function CollectionsPage() {
  await fetch(`/api/store/collections/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) }).catch(() => {});
  loadCols();
  }
+ // ── the cover photo, and the order ──────────────────────────────────────────────────────────────
+ // Both are storefront decisions, which is why they live here rather than in the site editor: the
+ // "shop by collection" row on her site is built from THIS list, in THIS order, with THESE photos.
+ const [coverBusy, setCoverBusy] = useState<string | null>(null);
+ async function setCover(id: string, file: File) {
+ setCoverBusy(id);
+ const fd = new FormData();
+ fd.append("file", file);
+ const up = await fetch("/api/store/assets", { method: "POST", body: fd }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+ if (up?.url) {
+  // Paint it immediately; the reload behind it is only to stay honest about what the server holds.
+  setCols((prev) => prev.map((c) => (c.id === id ? { ...c, imageUrl: up.url } : c)));
+  await fetch(`/api/store/collections/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: up.url }) }).catch(() => {});
+  await loadCols();
+ }
+ setCoverBusy(null);
+ }
+ async function clearCover(id: string) {
+ setCols((prev) => prev.map((c) => (c.id === id ? { ...c, imageUrl: null } : c)));
+ await fetch(`/api/store/collections/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageUrl: null }) }).catch(() => {});
+ loadCols();
+ }
+ // Same shape as the item reorder below: the list follows the cursor in local state, and the order
+ // is written once on drop rather than on every hover.
+ const [colDragIdx, setColDragIdx] = useState<number | null>(null);
+ function dragOverCol(i: number) {
+ setColDragIdx((from) => {
+  if (from === null || from === i) return from;
+  setCols((prev) => { const next = [...prev]; const [moved] = next.splice(from, 1); next.splice(i, 0, moved); return next; });
+  return i;
+ });
+ }
+ function dropCols() {
+ setColDragIdx(null);
+ const order = cols.map((c) => c.id);
+ fetch("/api/store/collections/reorder", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order }) }).catch(() => {});
+ }
+
  async function removeCollection(id: string, title: string) {
  if (!confirm(`Delete the "${title}" collection? Your items stay — they're just no longer grouped here.`)) return;
  await fetch(`/api/store/collections/${id}`, { method: "DELETE" }).catch(() => {});
@@ -107,12 +145,34 @@ export default function CollectionsPage() {
  <p className="px-1 py-4 text-[13px] text-stone-400">Loading…</p>
  ) : cols.length === 0 ? (
  <p className="px-1 py-4 text-[13px] text-stone-400">No collections yet — create one above.</p>
- ) : cols.map((c) => (
- <div key={c.id} className={cn("group flex items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition", selId === c.id ? "bg-stone-100 text-stone-900" : "text-stone-600 hover:bg-stone-50")}>
+ ) : cols.map((c, i) => (
+ <div
+ key={c.id}
+ draggable={renameId !== c.id}
+ onDragStart={() => setColDragIdx(i)}
+ onDragOver={(e) => { e.preventDefault(); dragOverCol(i); }}
+ onDragEnd={dropCols}
+ onDrop={dropCols}
+ className={cn("group flex items-center gap-2 rounded-lg px-2 py-2 text-[13px] transition", colDragIdx === i && "opacity-50", selId === c.id ? "bg-stone-100 text-stone-900" : "text-stone-600 hover:bg-stone-50")}
+ >
+ <GripVertical size={13} className="shrink-0 cursor-grab text-stone-300 opacity-0 transition group-hover:opacity-100" />
+ {/* The cover photo shoppers see on this collection's tile. A collection with none falls back to
+     whatever picture the theme captured, which is the same picture for every one of them — so an
+     empty frame here is a real gap, not decoration. */}
+ <label
+ title={c.imageUrl ? `Change the cover photo for ${c.title}` : `Add a cover photo for ${c.title}`}
+ className="relative grid h-8 w-8 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-md border border-stone-200 bg-stone-100"
+ >
+ {c.imageUrl
+  ? <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
+  : <ImagePlus size={13} className="text-stone-400" />}
+ {coverBusy === c.id && <span className="absolute inset-0 grid place-items-center bg-white/70 text-[9px] font-medium text-stone-500">…</span>}
+ <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void setCover(c.id, f); e.target.value = ""; }} />
+ </label>
  {renameId === c.id ? (
  <input autoFocus value={renameVal} onChange={(e) => setRenameVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") doRename(c.id); if (e.key === "Escape") setRenameId(null); }} onBlur={() => doRename(c.id)} className={cn(inputCls, "h-7 flex-1 text-[13px]")} />
  ) : (
- <button type="button" onClick={() => setSelId(c.id)} className="flex flex-1 items-center gap-2 truncate text-left">
+ <button type="button" onClick={() => setSelId(c.id)} className="flex min-w-0 flex-1 items-center gap-2 truncate text-left">
  <span className="truncate font-medium">{c.title}</span>
  <span className="ml-auto shrink-0 rounded-full bg-stone-200/70 px-1.5 text-[11px] tabular-nums text-stone-500">{c.itemCount}</span>
  </button>
@@ -120,12 +180,19 @@ export default function CollectionsPage() {
  {renameId !== c.id && (
  <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
  <button type="button" title="Rename" onClick={() => { setRenameId(c.id); setRenameVal(c.title); }} className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"><Pencil size={12} /></button>
+ {c.imageUrl && <button type="button" title="Remove the cover photo" onClick={() => clearCover(c.id)} className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"><X size={12} /></button>}
  <button type="button" title="Delete" onClick={() => removeCollection(c.id, c.title)} className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={12} /></button>
  </span>
  )}
  </div>
  ))}
  </div>
+ {cols.length > 1 && (
+ <p className="mt-2.5 px-1 text-[11px] leading-relaxed text-stone-400">
+  Drag to reorder. This is the order your collections appear in on your site — and where a row only
+  has space for a few, these are the ones that get it.
+ </p>
+ )}
  </TechCard>
 
  {/* Selected collection's items */}

@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
  conditionGrade: str("conditionGrade") || undefined,
  searchQuery: typeof body?.searchQuery === "string" ? body.searchQuery : null,
  price: str("price") || null,
+  // What she paid. The floor over it is applied server-side now, so this is the number that keeps a
+  // suggestion from landing under her own minimum markup.
+  cost: str("cost") || null,
  imageUrls,
  mainUrl: imageUrls[0],
  extraComps: reverseComps,
@@ -45,5 +48,5 @@ export async function POST(request: NextRequest) {
  draftRanFull: body?.draftRanFull === true,
  });
 
- return NextResponse.json({ ok: true, estimate: pr.estimate, priceFlag: pr.priceFlag, runway: pr.runway, celebrity: pr.celebrity });
+ return NextResponse.json({ ok: true, estimate: pr.estimate, priceFlag: pr.priceFlag, floorFlag: pr.floorFlag, runway: pr.runway, celebrity: pr.celebrity });
 }

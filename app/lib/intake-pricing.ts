@@ -93,6 +93,11 @@ export async function computeListingPricing(opts: {
  conditionGrade?: string; // canonical grade (Phase 4) → explicit price-band multiplier
  searchQuery?: string | null; // AI's tight "brand + specific model + era" comp phrase
  price: string | null; // seller's typed price in dollars; null/"" → suggest one
+ // What she PAID, in dollars, as typed. The store's minimum markup is a floor over this, and until
+ // now it was the one number that never made the trip: price-engine.ts computes the floor correctly
+ // but had no cost to compute it from, so on every server path the floor was null and the market
+ // estimate stood alone — a piece could be suggested below cost.
+ cost?: string | number | null;
  imageUrls: string[];
  mainUrl: string;
  extraComps: Comp[]; // reverse-image comps for the valuation
@@ -108,7 +113,12 @@ export async function computeListingPricing(opts: {
  recalledPriceCents?: number | null;
  recalledMarketCents?: number | null;
  recallAgeDays?: number | null;
-}): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; runway: string | null; celebrity: string | null }> {
+}): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; floorFlag: { floorUsd: number; sellerUsd: number; message: string } | null; runway: string | null; celebrity: string | null }> {
+ // Cents, or null when she hasn't said what she paid — a floor over an unknown cost is not a floor.
+ const costCents = (() => {
+  const n = typeof opts.cost === "number" ? opts.cost : parseFloat(String(opts.cost ?? "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+ })();
  const brandVal = opts.brand.trim();
  const baseTitle = opts.title || [opts.era, opts.material, opts.category].filter(Boolean).join(" ");
  const brandTitle = brandVal && !baseTitle.toLowerCase().includes(brandVal.toLowerCase()) ? `${brandVal} ${baseTitle}` : baseTitle;
@@ -165,6 +175,11 @@ export async function computeListingPricing(opts: {
  if (c) celebrity = c.context ? `${c.name} (${c.context})` : c.name;
  }
 
+ // The store's minimum markup over cost. Read once: it now applies to EVERY branch — a suggested
+ // price, a recalled price, and a price she typed herself — not only the one that asks for a
+ // valuation. "The markup is always in effect even if the market says otherwise."
+ const minMarkupBps = await getMinMarkupBps(opts.slug).catch(() => 3000);
+ const floorCents = costCents ? Math.round(costCents * (1 + minMarkupBps / 10000)) : null;
  let estimate: PriceEstimate | null = null;
  let priceFlag: PriceFlag | null = null;
  // Near-duplicate recall: the SAME item this store priced before, still fresh → reuse that price
@@ -187,13 +202,13 @@ export async function computeListingPricing(opts: {
  };
  } else if (needPrice) {
  // No price typed → full valuation to SUGGEST a price (accurate, slower path).
- const minMarkupBps = await getMinMarkupBps(opts.slug).catch(() => 3000);
  const trendQuery = brandVal ? (opts.category ? `${brandVal} ${opts.category}` : brandVal) : "";
  const trend = trendQuery ? await fetchResaleTrend(trendQuery).catch(() => null) : null;
  estimate = await AI_GATE().run(() => estimatePrice({
  query,
  photoUrl: opts.mainUrl,
  minMarkupBps,
+ costCents,
  knowledgeHintCents: opts.knowledgeHintCents,
  extraComps: comps,
  context: { brand: brandVal || null, era: opts.era || null, material: opts.material || null, condition: opts.condition || null, conditionGrade: opts.conditionGrade || opts.condition || null, runway: opts.runwaySoFar, celebrity, trend: trend?.trending ? `${brandVal} has rising demand across the resale market (${trend.note})` : null },
@@ -251,5 +266,36 @@ export async function computeListingPricing(opts: {
  void rememberRunwayLook(runway, opts.imageUrls[0]).catch(() => {});
  }
 
- return { estimate, priceFlag, runway, celebrity };
+ // ── THE FLOOR, APPLIED LAST ────────────────────────────────────────────────────────────────────
+ // Every branch above produces a price from the market: comps, the stance multiplier, or a recall of
+ // what this store charged last time. None of them knows what she paid. Her floor is cost plus the
+ // markup she set, and it outranks all of them — a suggestion below it would be telling her to sell
+ // at a loss because strangers on eBay did.
+ //
+ // It is a FLOOR, not a target: where the market sits above it, the market wins and she earns more.
+ let floorFlag: { floorUsd: number; sellerUsd: number; message: string } | null = null;
+ if (floorCents) {
+ if (estimate) {
+  estimate.floorCents = floorCents;
+  if ((estimate.suggestedCents ?? 0) < floorCents) {
+  estimate.suggestedCents = floorCents;
+  estimate.source = "floor";
+  estimate.rationale += ` · Held at your ${Math.round(minMarkupBps / 100)}% minimum over the $${Math.round(costCents! / 100)} you paid.`;
+  }
+ }
+ // She typed a price of her own. Hers stands — this is her shop — but a price under her own floor is
+ // something she asked to be told about, so it is said plainly rather than silently corrected.
+ if (!needPrice) {
+  const sellerCents = Math.round(parseFloat(opts.price as string) * 100);
+  if (sellerCents > 0 && sellerCents < floorCents) {
+  floorFlag = {
+   floorUsd: Math.round(floorCents / 100),
+   sellerUsd: Math.round(sellerCents / 100),
+   message: `Below your pricing floor — your ${Math.round(minMarkupBps / 100)}% minimum over the $${Math.round(costCents! / 100)} you paid works out at $${Math.round(floorCents / 100)}.`,
+  };
+  }
+ }
+ }
+
+ return { estimate, priceFlag, floorFlag, runway, celebrity };
 }
