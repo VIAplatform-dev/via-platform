@@ -22,6 +22,7 @@ import { sendBuyerTrackingEmail } from "@/app/lib/email";
 import { customsForOrder } from "@/app/lib/order-customs";
 import { listParcelOrders, markTrackingEmailSentMany } from "@/app/lib/db/orders";
 import { notifyParcelPosted } from "@/app/lib/parcel-notify";
+import { parcelForLabel } from "@/app/lib/parcel-core";
 
 export const dynamic = "force-dynamic";
 
@@ -198,7 +199,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // USPS requires a sender email or phone — fall back to the seller's email.
  const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: seller.email };
  const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
- const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+ // The same parcel the label will actually be bought at, so this preview can't promise a price
+ // the purchase won't honour.
+ const parcel = parcelForLabel({
+  item: { weightOz: order.itemWeightOz, lengthIn: order.itemLengthIn, widthIn: order.itemWidthIn, heightIn: order.itemHeightIn },
+  shippingPaidCents: order.shippingPaidCents,
+ });
 
  const shipAcct = await getOrCreateShipAccount(slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
  // See order-customs.ts: an international parcel needs a declaration to get rates at all, and the

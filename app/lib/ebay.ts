@@ -8,6 +8,7 @@ import { getEbayTokens, saveEbayTokens, updateEbayAccessToken } from "./ebay-tok
 // a piece, withdraw the offer. All env-gated: with no eBay app configured, callers no-op.
 
 import { adaptForEbay, missingSizeMessage } from "./ebay-adapt";
+import { isoCountry } from "./ship-from-core";
 
 const OAUTH_BASE = "https://api.ebay.com/identity/v1/oauth2/token";
 const AUTHORIZE_BASE = "https://auth.ebay.com/oauth2/authorize";
@@ -238,7 +239,9 @@ async function ensureLocationKey(token: string, from?: { city?: string | null; s
   body: JSON.stringify({
    location: {
     address: {
-     country: (from?.country || "US").toUpperCase().slice(0, 2),
+     // NOT slice(0,2) — that turned the "United States" two stores had saved into "UN", which is
+     // not a country, and eBay took the listing location on faith. isoCountry maps the name.
+     country: isoCountry(from?.country),
      // eBay requires a postcode for US locations and accepts one everywhere else.
      postalCode: from?.zip || process.env.EBAY_DEFAULT_POSTAL || "10001",
      ...(from?.city ? { city: from.city } : {}),

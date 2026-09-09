@@ -6,6 +6,8 @@ import { getSellerById } from "@/app/lib/db/sellers";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { emptyBagMessage } from "@/app/lib/storefront-cart-core";
 import { assignTier } from "@/app/lib/shipping-tiers";
+import { combineParcels } from "@/app/lib/parcel-core";
+import { isoCountry } from "@/app/lib/ship-from-core";
 import { quoteShipping } from "@/app/lib/shipping-zones";
 import { resolveDelivery } from "@/app/lib/checkout-delivery.ts";
 
@@ -46,18 +48,16 @@ export async function POST(request: NextRequest) {
  // Flat-rate pricing: the buyer pays one clean tier price by parcel size (auto-detected from the
  // items' captured weight/dimensions). VYA buys the real discounted label at fulfillment and keeps
  // the spread. Combine the bag into one parcel: sum weights + heights, take the largest L/W.
- const parcel = {
- weightOz: items.reduce((s, it) => s + (it.weightOz || 16), 0),
- lengthIn: Math.max(...items.map((it) => it.lengthIn || 12)),
- widthIn: Math.max(...items.map((it) => it.widthIn || 9)),
- heightIn: items.reduce((s, it) => s + (it.heightIn || 3), 0),
- };
+ // The SAME combination the label is bought from (combineParcels) — this was a second copy of it,
+ // with its own "or call it 16oz" default, so the price a buyer was quoted and the parcel we later
+ // purchased could disagree about what was in the box.
+ const parcel = combineParcels(items, { shippingPaidCents: null });
  const tier = assignTier(parcel);
  // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
  // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
  // (shipping-zones.ts + shipping-prices-core.ts). A collection needs no zone, so a country she
  // doesn't post to is only refused once we know this is a delivery.
- const quote = hasAddress ? quoteShipping({ fromCountry: shipping.shipFrom?.country || "US", toCountry: to.country || "US", parcel, zones: shipping.zones }) : null;
+ const quote = hasAddress ? quoteShipping({ fromCountry: isoCountry(shipping.shipFrom?.country), toCountry: isoCountry(to.country), parcel, zones: shipping.zones }) : null;
  const charge = quote?.ok ? quote.amountCents : 0;
 
  // The one place the choice is priced: what she claimed, checked against what this store offers.

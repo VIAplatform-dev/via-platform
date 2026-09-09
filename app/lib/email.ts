@@ -305,7 +305,11 @@ function minifyHtml(html: string): string {
 
 function viaShell(subtitle: string, content: string, unsubscribeUrl?: string, heroImage?: string, logoWidth = 140): string {
  const year = new Date().getFullYear();
- const unsubUrl = unsubscribeUrl || `${BASE_URL}/account`;
+ // Falls back to the unsubscribe PAGE, not /account. Seventeen of the twenty-three emails built
+ // on this shell pass no URL, so their "Unsubscribe here" link led to an account page behind a
+ // login — which for anyone who never made a password is not an unsubscribe at all. The page asks
+ // for the address when the link doesn't carry one.
+ const unsubUrl = unsubscribeUrl || `${BASE_URL}/unsubscribe`;
  // Top navigation — spaced-caps links to the main VYA sections, like a site header.
  const navLink = (label: string, path: string) =>
  `<a href="${BASE_URL}${path}" style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#5D0F17;text-decoration:none;font-family:Georgia,'Times New Roman',serif;">${label}</a>`;
@@ -415,7 +419,11 @@ u + .body .email-inner { background-color: #FFFDF8 !important; }
  */
 function insiderShell(content: string, unsubscribeUrl?: string): string {
  const year = new Date().getFullYear();
- const unsubUrl = unsubscribeUrl || `${BASE_URL}/account`;
+ // Falls back to the unsubscribe PAGE, not /account. Seventeen of the twenty-three emails built
+ // on this shell pass no URL, so their "Unsubscribe here" link led to an account page behind a
+ // login — which for anyone who never made a password is not an unsubscribe at all. The page asks
+ // for the address when the link doesn't carry one.
+ const unsubUrl = unsubscribeUrl || `${BASE_URL}/unsubscribe`;
  const BG = "#FFFDF8";
  const TEXT = "#5D0F17";
  const BODY_FONT = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";

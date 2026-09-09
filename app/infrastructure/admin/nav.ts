@@ -32,6 +32,9 @@ export const GROUPS: NavGroup[] = [
   items: [
    {
     href: `${B}/inventory`, label: "Inventory", icon: "Package",
+    // Listing a piece belongs to Inventory rather than beside it. It briefly had a top-level row
+    // of its own — the reasoning being that it's the action that makes money — but two entries
+    // pointing at the same work read as two different features.
     match: [`${B}/add-listing`, `${B}/bulk-upload`], // keep Inventory active/expanded while adding listings
     children: [
      { href: `${B}/add-listing`, label: "Add listing" },
@@ -98,6 +101,9 @@ export const GROUPS: NavGroup[] = [
    { href: `${B}/dashboard`, label: "Analytics", icon: "BarChart3" },
    {
     href: `${B}/settings`, label: "Settings", icon: "Settings",
+    // Five sections, not the sixteen the audit expanded to. `match` on /apps is deliberately NOT
+    // here: main added it while Settings was the only home for Apps & integrations, and this
+    // restores Apps as its own group above — lighting both for one page is worse than neither.
     children: [
      { href: `${B}/settings/general`, label: "General" },
      { href: `${B}/settings/plan`, label: "Plan & billing" },

@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import CardGallery from "./CardGallery";
@@ -8,7 +9,7 @@ import { colors, spacing } from "../lib/theme";
 // One piece in the grid. Swipe the photograph, tap it to open, tap the heart to save — three
 // different gestures on the same card, which is why none of them may wrap the others.
 
-export default function ProductCard({
+function ProductCard({
   product, width, favorited, onToggleFavorite,
 }: {
   product: Product;
@@ -16,7 +17,11 @@ export default function ProductCard({
   favorited?: boolean;
   onToggleFavorite?: (p: Product) => void;
 }) {
-  const images = product.images?.length ? product.images : product.image ? [product.image] : [];
+  // A fresh array every render otherwise, which defeats the gallery's memo on every parent render.
+  const images = useMemo(
+    () => (product.images?.length ? product.images : product.image ? [product.image] : []),
+    [product.images, product.image],
+  );
   const height = width / 0.82;
   const open = () => router.push(`/product/${product.id}`);
 
@@ -46,3 +51,11 @@ export default function ProductCard({
     </View>
   );
 }
+
+// Memoized on the things that actually change what's drawn. Without it, one favourite tap
+// re-rendered every card on screen — and each of those re-rendered a gallery.
+export default memo(ProductCard, (a, b) =>
+  a.product.id === b.product.id &&
+  a.width === b.width &&
+  a.favorited === b.favorited &&
+  a.onToggleFavorite === b.onToggleFavorite);

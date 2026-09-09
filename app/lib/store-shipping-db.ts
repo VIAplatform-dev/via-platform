@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { isShipFromComplete } from "./ship-from-core";
+import { isShipFromComplete, isoCountry } from "./ship-from-core";
 import type { PickupSettings } from "./pickup-core";
 
 // Per-store shipping policy: where they ship from, and who pays.
@@ -86,7 +86,11 @@ export async function setShippingSettings(storeSlug: string, s: ShippingSettings
  await ensureTable();
  const mode = MODES.includes(s.mode) ? s.mode : "buyer_pays";
  const threshold = mode === "free_over" && s.freeThresholdCents && s.freeThresholdCents > 0 ? Math.round(s.freeThresholdCents) : null;
- const shipFromJson = s.shipFrom ? JSON.stringify(s.shipFrom) : null;
+ // The country is stored as the carriers need it, at the point of writing. The settings form takes
+ // free text, and two stores had "United States" saved — which Shippo and EasyPost both reject, so
+ // no rate ever came back and no label could be bought. Normalising here means it can't recur; the
+ // carrier-side calls normalise too, for rows written before this existed.
+ const shipFromJson = s.shipFrom ? JSON.stringify({ ...s.shipFrom, country: isoCountry(s.shipFrom.country) }) : null;
  const pickupJson = s.pickup ? JSON.stringify(s.pickup) : null;
  const dutyMode = isDutyMode(s.dutyMode) ? s.dutyMode : DEFAULT_DUTY_MODE;
  const carrierAccountId = s.carrierAccountId ? String(s.carrierAccountId).trim().slice(0, 60) : null;

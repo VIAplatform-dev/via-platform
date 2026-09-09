@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 
-const REASONS = [
- "Too many emails",
- "Not relevant to me",
- "I didn't sign up for this",
- "I found what I was looking for",
- "Other",
-] as const;
-
 export async function POST(request: NextRequest) {
  const body = await request.json().catch(() => ({}));
  const email = typeof body.email === "string" ? body.email.toLowerCase().trim() : null;
  const reason = typeof body.reason === "string" ? body.reason.trim() : null;
  const detail = typeof body.detail === "string" ? body.detail.trim().slice(0, 500) : null;
 
- if (!email) {
- return NextResponse.json({ error: "Email is required" }, { status: 400 });
+ if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+  return NextResponse.json({ error: "Enter the email address you want unsubscribed." }, { status: 400 });
  }
 
  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -37,7 +29,29 @@ export async function POST(request: NextRequest) {
  unsubscribe_reason = ${reason},
  unsubscribe_detail = ${detail},
  unsubscribed_at = NOW()
- WHERE email = ${email}
+ WHERE LOWER(email) = ${email}
+ `;
+
+ // The flag that actually stops the mail.
+ //
+ // `pilot_access.email_unsubscribed` above is read by exactly ONE query — the new-arrivals blast.
+ // Every other send (favourites, trending, winback, last chance, viewed item, price drops, the
+ // store digest, the Insider newsletter) filters on `users.notification_emails_enabled`, and
+ // unsubscribing never touched it. So someone clicked Unsubscribe, was told they'd hear nothing
+ // more, and kept receiving nine other kinds of email. Both flags get set now, and this is the one
+ // that carries.
+ await sql`
+ UPDATE users SET notification_emails_enabled = FALSE, updated_at = NOW()
+ WHERE LOWER(email) = ${email}
+ `;
+
+ // Someone who is on no list at all still deserves a record of having asked, so a later import or
+ // signup can't quietly resubscribe them. An INSERT only when nothing matched — never overwriting
+ // an existing row's status.
+ await sql`
+ INSERT INTO pilot_access (email, status, email_unsubscribed, unsubscribe_reason, unsubscribe_detail, unsubscribed_at)
+ SELECT ${email}, 'pending', TRUE, ${reason}, ${detail}, NOW()
+ WHERE NOT EXISTS (SELECT 1 FROM pilot_access WHERE LOWER(email) = ${email})
  `;
 
  return NextResponse.json({ ok: true });
