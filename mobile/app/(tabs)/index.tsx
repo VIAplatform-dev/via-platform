@@ -73,7 +73,15 @@ export default function HomeScreen() {
   // seller group once we redirect, so it keeps re-rendering — and a bare <Redirect> fires on every
   // render, navigating again and again. That is a visible loop: the app appears to refresh and
   // swipe forever. Only the focused screen is allowed to redirect.
-  if (storeSlug && isFocused) return <Redirect href="/(seller)" />;
+  // NO redirect to the seller side from here.
+  //
+  // A seller is also a shopper. Sending her to the seller hub the moment she opens the marketplace
+  // meant she could never browse it at all — signing in to shop landed her on her own dashboard
+  // and every attempt to leave bounced straight back. That's a cage, not a default.
+  //
+  // Where sign-in LANDS you is still role-based, and that's the right place for it: the login
+  // screen already redirects a store owner to /(seller). This screen only has to let her be here
+  // when she's chosen to be.
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

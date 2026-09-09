@@ -182,6 +182,15 @@ export default function SellerHome() {
             {me.data?.storeName ?? storeSlug}
           </Text>
         </View>
+        {/* The way back to the marketplace. A seller is also a shopper, and until this existed the
+            only route between the two sides was signing out. */}
+        <Pressable
+          onPress={() => router.push("/(tabs)")}
+          accessibilityLabel="Browse the marketplace"
+          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}
+        >
+          <Feather name="shopping-bag" size={17} color={colors.text} />
+        </Pressable>
         <Pressable onPress={() => router.push("/(seller)/notifications")} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
           <Feather name="bell" size={17} color={colors.text} />
         </Pressable>

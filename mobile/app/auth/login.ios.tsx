@@ -7,6 +7,7 @@ import {
  TextInput,
  useWindowDimensions,
  View,
+ KeyboardAvoidingView,
 } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -219,6 +220,11 @@ export default function LoginScreen() {
     style={{ position: "absolute", top: 0, left: 0, right: 0, height: wallHeight }}
    />
 
+   {/* The form is anchored to the bottom, which is precisely where the keyboard
+       appears — so the email field was hidden behind it the moment you tapped in and
+       you typed blind. "padding" is the iOS-correct behaviour; the wrapper keeps
+       flex:1 so the layout is unchanged with the keyboard down. */}
+   <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
    <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl + spacing.md }}>
     <Text
      onLayout={measureWordmark}
@@ -303,6 +309,7 @@ export default function LoginScreen() {
       : "We'll email you a link. No password to remember."}
     </Text>
    </View>
+   </KeyboardAvoidingView>
   </View>
  );
 }
