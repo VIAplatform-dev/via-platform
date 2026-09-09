@@ -71,8 +71,8 @@ export default function RecoveryPage() {
  return (
  <AdminPage>
  <AdminHeader
- eyebrow="Customers · Abandoned carts"
- title="Abandoned carts"
+ eyebrow="Customers · Cart recovery"
+ title="Cart recovery"
  subtitle="People who started checkout and didn’t pay. You can email them to finish, or leave it."
  />
 
