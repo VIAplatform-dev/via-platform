@@ -72,7 +72,7 @@ export default function BillingPage() {
  <AdminHeader
  eyebrow="Business · Billing"
  title="Plans & billing"
- subtitle="Your VYA subscription — 30-day free trial, cancel anytime."
+ subtitle="Your VYA subscription. Free for 30 days, and you can cancel at any time."
  actions={entitled ? <TechButton variant="secondary" onClick={manage} disabled={busy === "portal"}>Manage subscription</TechButton> : undefined}
  />
 

@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 // Editorial sections — blog (the journal row) and spotlight (one hero piece).
-import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item, panBgImg } from "./kit";
+import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item, panBgImg, ArrangeHandle, splitRatioOf } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 const S = ITEM_SCHEMAS.blog;
@@ -104,15 +104,19 @@ function SpotlightBody({ kit }: { kit: EditKit }) {
    {p.heading && <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading text-3xl @xl:text-4xl leading-tight" style={{ fontFamily: ctx.head }} />}
    {p.price && <FreeField b={b} ctx={ctx} fieldKey="price" tag="p" value={p.price} className="mt-2 text-xl" style={{ color: ctx.colors.accent }} />}
    {p.subtext && <p {...txtPlain(p.subtext, "subtext")} className="vya-body mt-4 whitespace-pre-wrap text-sm leading-[1.8] opacity-75 @xl:text-[15px]" />}
-   {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={ctx.shopHref} className="vya-cta mt-7 inline-block px-8 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: ctx.colors.accent, color: "#fff" }} />}
+   {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || ctx.shopHref} className="vya-cta mt-7 inline-block px-8 py-3 text-[11px] uppercase tracking-[0.2em] transition hover:opacity-85" style={{ background: ctx.colors.accent, color: "#fff" }} />}
   </>
  );
 }
 const pickImage = (kit: EditKit) => (url: string) => kit.ctx.onEditField?.(kit.b.id, "image", url);
 
 function SpotlightHalf({ kit }: { kit: EditKit }) {
+ const ratio = splitRatioOf(kit.p);
  return (
-  <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:grid-cols-2 @lg:gap-14">
+  <section className={`vya-arrange-box relative mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:gap-14 ${kit.p.splitRatio ? "@lg:grid-cols-[var(--vya-split)]" : "@lg:grid-cols-2"}`} style={kit.p.splitRatio ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}>
+   {/* This layout has advertised a draggable split since it shipped and never read the prop, so the
+       control moved a number that changed nothing. Wide layout only — the columns stack below @lg. */}
+   <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>
    <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={kit.p.imageZoom} ratio="aspect-square" rounded="vya-img" />
    <div className="vya-free-canvas relative"><SpotlightBody kit={kit} /></div>
   </section>

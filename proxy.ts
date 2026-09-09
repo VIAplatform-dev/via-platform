@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
+import { storePublicOrigin, storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
 import type { NextRequest } from "next/server";
 import { verifyRecipientTokenEdge } from "@/app/lib/recipientToken-edge";
-import { capturedSlugForDomain } from "@/app/lib/domain-routing-edge";
+import { capturedSlugForDomain, storeHasCapture } from "@/app/lib/domain-routing-edge";
 
 // Routes accessible without any authentication or approval
 const PUBLIC_ROUTES = [
@@ -38,6 +38,13 @@ const PUBLIC_ROUTES = [
   "/api/admin/set-password",
   "/terms",
   "/privacy",
+  // Unsubscribing must never require signing in. The footer link in every VYA email landed here
+  // and this gate bounced it to /login — and someone who joined from the waitlist has no password
+  // to sign in WITH, so the only way off the list was to email us and ask. Both the page and the
+  // route it posts to are public for the same reason /api/flyer-join is: gating the form would let
+  // the page render and then refuse.
+  "/unsubscribe",
+  "/api/unsubscribe",
   // The consignor portal signs people in on its own terms: a magic link sets a
   // consignor_session cookie, which is NOT an Auth.js session — so the catch-all
   // gate below would bounce a legitimately signed-in consignor to /login, a
@@ -91,20 +98,28 @@ const PUBLIC_ROUTES = [
   "/api/store/policy",
   "/api/store/intake",
   "/api/store/items",
+  "/api/store/holds",
+  "/api/store/attention",
+  "/api/store/notification-prefs",
+  "/api/store/search",
   "/api/store/inventory",
   "/api/store/instagram",
   "/api/store/orders",
+  "/api/store/orders/parcel",
   "/api/store/inbox",
   // Consignment enforces its own auth with resolveStoreSlugAny, exactly like orders and inbox
   // above. Without it here the mobile app's bearer token never reaches the route — the gate
   // answers 307 to /login first, which the app can only read as a failed request.
   "/api/store/consignment",
   "/api/store/customers",
+  // Klaviyo/Mailchimp. Enforces its own auth with resolveStoreSlugAny like the rest here — and the
+  // OAuth CALLBACK has to reach the route too: Mailchimp sends the seller back to a fixed URL, and
+  // a 307 to /login there loses the authorisation code entirely.
+  "/api/store/marketing",
   // The rest of what the mobile seller app calls. Each enforces its own auth with
   // resolveStoreSlugAny; listed here only so the bearer token reaches the route at all.
-  // Market Mode. app/lib/market/auth.ts resolves the acting seller from a web session, an admin
-  // preview or the mobile JWT — it was built for this — but the gate answered 307 before the
-  // request ever reached it.
+  // Market Mode's app/lib/market/auth.ts resolves the acting seller from a web session, an admin
+  // preview or the mobile JWT — it was built for this, but the gate answered 307 first.
   "/api/store/market",
   "/api/store/profile",
   "/api/store/discounts",
@@ -121,6 +136,15 @@ const PUBLIC_ROUTES = [
   // here cross-domain), and connect/status/setup enforce their own auth (resolveStoreSlugAny).
   // Without this, eBay's redirect to the callback hits the login wall and no token is ever stored.
   "/api/store/cross-listing",
+  // Rentals: a shopper checking dates, pricing them, holding them for checkout or
+  // applying to rent has no session and never will. The seller-facing rental routes
+  // (settings, terms, bookings, the request inbox) are deliberately NOT here — this
+  // list matches on path, not method, so public and seller paths are kept apart.
+  "/api/store/rentals/availability",
+  "/api/store/rentals/quote",
+  "/api/store/rentals/hold",
+  "/api/store/rentals/apply",
+  "/api/store/appointments/slots",
   "/api/checkout",
   "/api/storefront",
   "/checkout",
@@ -334,9 +358,14 @@ export async function proxy(request: NextRequest) {
     // their internal links to /site/{slug}/…, and prefixing those again would 404 every link on the
     // page. (New Plan B captures keep links root-relative — see CrawlOpts.linkBase.)
     if (pathname.startsWith("/site/")) return NextResponse.next();
+    // A storefront BUILT from sections has no captured pages to serve — it lives at /s/{slug}. Both
+    // kinds belong on this origin: it's the store's own address, and the only one where its own code
+    // could ever safely run (see isRefusedOnStoreHost above for what this origin refuses).
+    if (pathname.startsWith("/s/")) return NextResponse.next();
     if (!pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
       const url = request.nextUrl.clone();
-      url.pathname = `/site/${planBSlug}${pathname === "/" ? "" : pathname}`;
+      const base = (await storeHasCapture(planBSlug)) ? `/site/${planBSlug}` : `/s/${planBSlug}`;
+      url.pathname = `${base}${pathname === "/" ? "" : pathname}`;
       return NextResponse.rewrite(url);
     }
     return NextResponse.next();
@@ -347,6 +376,24 @@ export async function proxy(request: NextRequest) {
     host === "www.vyaplatform.com" ||
     host === "localhost" ||
     host.endsWith(".vercel.app");
+
+  // ── One public address per store ───────────────────────────────────────────
+  // A storefront is the seller's, and it has ONE address: {slug}.vyasites.com. /s/{slug} is how VYA
+  // renders it internally and how the editor previews a store that isn't published yet — it is not
+  // a URL to hand anyone. Left reachable, it's a second copy of every shop competing with the real
+  // one in search and turning up in shared links.
+  //
+  // `?preview=` is exempt: that IS the editor's preview, and a draft store has nothing to redirect
+  // to yet. Everything else moves, permanently, keeping the rest of the path.
+  if (pathname.startsWith("/s/") && !request.nextUrl.searchParams.has("preview")) {
+    const rest = pathname.slice("/s/".length);
+    const slug = rest.split("/")[0];
+    const origin = storePublicOrigin(slug);
+    if (origin) {
+      const tail = rest.slice(slug.length); // "" | "/shop" | "/p/{id}" | …
+      return NextResponse.redirect(`${origin}${tail}${request.nextUrl.search}`, 308);
+    }
+  }
 
   // ── getvya.ai — the operating-system product ────────────────────────────────
   // getvya.ai serves the seller OS on its own host: the marketing site at the root

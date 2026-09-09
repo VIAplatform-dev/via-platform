@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 // Media sections — image, gallery, video. The picture is the content, so the layouts differ mainly
 // in how much of the page it's allowed to take and how it's framed.
-import { ImageSlot, emptyHint, type EditKit } from "./kit";
+import { ImageSlot, emptyHint, type EditKit, ArrangeHandle } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
 // "Fill" — edge to edge, no margin around the photo.
@@ -79,7 +79,8 @@ function GalleryGrid({ kit }: { kit: EditKit }) {
  if (!shots.length && !ctx.edit) return null;
  const cols = p.cols === "2" ? "@lg:grid-cols-2" : p.cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3";
  return (
-  <div className={`grid grid-cols-2 gap-1 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+  <div className={`relative grid grid-cols-2 gap-1 ${cols}`} style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+   <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
    {slots.map((s, i) => <ImageSlot key={i} kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio="aspect-square" />)}
   </div>
  );
@@ -87,12 +88,13 @@ function GalleryGrid({ kit }: { kit: EditKit }) {
 
 // Airy: fewer per row, real gutters, page margins. The same photos given room to be looked at.
 function GalleryLoose({ kit }: { kit: EditKit }) {
- const { ctx } = kit;
+ const { ctx, p } = kit;
  const { shots, slots, pick, setPos } = galleryOps(kit);
  if (!shots.length && !ctx.edit) return null;
  return (
   <section className="mx-auto max-w-6xl px-5 py-10 @lg:py-16 @xl:px-8 @xl:py-24">
-   <div className="grid grid-cols-2 gap-4 @lg:grid-cols-3 @xl:gap-6">
+   <div className="relative grid grid-cols-2 gap-4 @lg:grid-cols-3 @xl:gap-6" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+    <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
     {slots.map((s, i) => <ImageSlot key={i} kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio="aspect-[4/5]" />)}
    </div>
   </section>
@@ -102,12 +104,13 @@ function GalleryLoose({ kit }: { kit: EditKit }) {
 // An uneven rhythm — every third photo runs tall. Stops a set of similar shots reading as a
 // spreadsheet, without needing the merchant to crop anything.
 function GalleryMosaic({ kit }: { kit: EditKit }) {
- const { ctx } = kit;
+ const { ctx, p } = kit;
  const { shots, slots, pick, setPos } = galleryOps(kit);
  if (!shots.length && !ctx.edit) return null;
  return (
   <section className="mx-auto max-w-6xl px-5 py-10 @lg:py-16 @xl:px-8 @xl:py-24">
-   <div className="grid grid-cols-2 gap-3 @lg:grid-cols-4 @xl:gap-4">
+   <div className="relative grid grid-cols-2 gap-3 @lg:grid-cols-4 @xl:gap-4" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
+    <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
     {slots.map((s, i) => (
      <div key={i} className={i % 3 === 0 ? "row-span-2" : ""}>
       <ImageSlot kit={kit} src={s.src} onPick={pick(i)} pos={s.pos} onPos={(v) => setPos(i, v)} ratio={i % 3 === 0 ? "aspect-[3/4]" : "aspect-square"} />

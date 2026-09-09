@@ -414,7 +414,7 @@ export default function SettingsPage() {
   {/* Returns / refund policy — buyer-facing, per store */}
   {tab === "policy" && (
   <Card className="mb-5">
-  <CardHeader title="Returns & refunds" subtitle="What buyers see on your storefront before they buy. You can always issue a refund manually from an order, whatever this says." />
+  <CardHeader title="Returns & refunds" subtitle="Your returns policy, shown on your storefront before someone buys." />
   <div className="space-y-5 px-5 py-4">
    <div className="flex items-center justify-between gap-4">
    <div>
@@ -532,7 +532,7 @@ export default function SettingsPage() {
   </div>
   )}
 
-  <p className="mt-4 text-xs text-stone-400">You can also just tell the VYA agent — e.g. “price my archival pieces higher” or “free shipping over $150” — and it’ll set these for you.</p>
+  <p className="mt-4 text-xs text-stone-400">You can change any of this by asking VYA instead — say something like &ldquo;price my archival pieces higher&rdquo; or &ldquo;free shipping over $150&rdquo; and it will set it for you.</p>
  </div>
  );
 }

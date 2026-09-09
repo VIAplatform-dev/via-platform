@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, Text, useWindowDimensions, View } from "react-native";
 import ProductCard from "./ProductCard";
 import type { Product } from "../lib/types";
@@ -36,19 +37,34 @@ export default function ProductGrid({
     );
   }
 
+  // Hoisted out of the JSX: an inline renderItem is a new function on every render, so FlatList
+  // treats every cell as changed and ProductCard's memo never gets a chance to work.
+  const renderItem = useCallback(
+    ({ item }: { item: Product }) => (
+      <ProductCard
+        product={item}
+        width={cardWidth}
+        favorited={favorited?.(item)}
+        onToggleFavorite={onToggleFavorite}
+      />
+    ),
+    [cardWidth, favorited, onToggleFavorite],
+  );
+  const keyExtractor = useCallback((p: Product) => String(p.id), []);
+
   return (
     <FlatList
       data={products}
-      keyExtractor={(p) => String(p.id)}
+      keyExtractor={keyExtractor}
       numColumns={2}
-      renderItem={({ item }) => (
-        <ProductCard
-          product={item}
-          width={cardWidth}
-          favorited={favorited?.(item)}
-          onToggleFavorite={onToggleFavorite}
-        />
-      )}
+      // Windowing. The defaults render ten screens' worth ahead, which on a grid of photographs is
+      // a lot of image views mounted for something nobody is looking at yet.
+      initialNumToRender={6}
+      maxToRenderPerBatch={6}
+      updateCellsBatchingPeriod={60}
+      windowSize={5}
+      removeClippedSubviews
+      renderItem={renderItem}
       columnWrapperStyle={{ gap: GUTTER, paddingHorizontal: EDGE }}
       contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.xxl, flexGrow: 1 }}
       style={{ backgroundColor: colors.bg }}

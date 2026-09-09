@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalisePermissions } from "@/app/lib/store-permissions";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
-import { listStoreUsers, addStoreUser, removeStoreUser } from "@/app/lib/store-users-db";
+import { listStoreUsers, addStoreUser, removeStoreUser, setStoreUserPermissions } from "@/app/lib/store-users-db";
 import { getStoreTier } from "@/app/lib/store-plans-db";
 import { canAddSeat, seatsForTier } from "@/app/lib/plans";
 
@@ -80,4 +81,31 @@ export async function DELETE(request: NextRequest) {
  const after = await listStoreUsers(slug);
  const tier = await getStoreTier(slug);
  return NextResponse.json({ ok: true, users: after, seats: { used: after.length, limit: seatsForTier(tier), remaining: Math.max(0, seatsForTier(tier) - after.length) } });
+}
+
+/**
+ * PATCH { email, permissions } — what one staff member can reach.
+ *
+ * Owner-only, like every other change on this page. An owner's own permissions are not editable:
+ * they have everything by definition, and a form that let you take an area off an owner would be
+ * describing something the system doesn't do.
+ */
+export async function PATCH(request: NextRequest) {
+ const slug = await resolveStoreSlugAny(request);
+ if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ if (!isOwner(request, slug)) return NextResponse.json({ error: "Only the store owner can change what people can do." }, { status: 403 });
+
+ const body = await request.json().catch(() => null);
+ const email = String(body?.email || "").trim().toLowerCase();
+ if (!EMAIL.test(email)) return NextResponse.json({ error: "Which person?" }, { status: 400 });
+
+ const users = await listStoreUsers(slug);
+ const target = users.find((u) => u.email.toLowerCase() === email);
+ if (!target) return NextResponse.json({ error: "They’re not on this store." }, { status: 404 });
+ if (target.role === "owner") {
+  return NextResponse.json({ error: "Owners can do everything. Make them staff first if you want to limit them." }, { status: 400 });
+ }
+
+ await setStoreUserPermissions(slug, email, normalisePermissions(body?.permissions));
+ return NextResponse.json({ ok: true, users: await listStoreUsers(slug) });
 }

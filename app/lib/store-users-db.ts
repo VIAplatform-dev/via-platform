@@ -24,6 +24,9 @@ async function ensureTable() {
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (store_slug, email)
  )`;
+ // Which areas a staff member can reach. NULL means "never chosen" and falls back to the default
+ // set, so existing staff keep exactly the access they had. See store-permissions.ts.
+ await sql`ALTER TABLE store_users ADD COLUMN IF NOT EXISTS permissions JSONB`;
  await sql`CREATE INDEX IF NOT EXISTS idx_store_users_email ON store_users (email)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_store_users_store ON store_users (store_slug)`;
  ensured = true;
@@ -33,8 +36,9 @@ function normEmail(email: string): string {
  return (email || "").trim().toLowerCase();
 }
 
-export type StoreRole = "owner" | "staff";
-export type StoreUser = { storeSlug: string; email: string; role: StoreRole; createdAt: string };
+export type { StoreRole } from "./store-permissions";
+import type { Area, StoreRole } from "./store-permissions";
+export type StoreUser = { storeSlug: string; email: string; role: StoreRole; permissions: Area[] | null; createdAt: string };
 
 /** Grant an email access to a store (idempotent). First user of a store is its owner. */
 export async function addStoreUser(storeSlug: string, email: string, role: StoreRole = "owner"): Promise<void> {
@@ -46,6 +50,33 @@ export async function addStoreUser(storeSlug: string, email: string, role: Store
   ON CONFLICT (store_slug, email) DO UPDATE SET role = ${role}`;
 }
 
+function userRow(r: Record<string, unknown>): StoreUser {
+ const raw = typeof r.permissions === "string" ? JSON.parse(r.permissions as string) : r.permissions;
+ return {
+  storeSlug: r.store_slug as string,
+  email: r.email as string,
+  role: ((r.role as StoreRole) || "staff"),
+  // null, not [], when nothing was ever chosen — the two mean different things.
+  permissions: Array.isArray(raw) ? (raw as Area[]) : null,
+  createdAt: String(r.created_at),
+ };
+}
+
+/** What one person on this store may reach. Owners ignore it; staff are held to it. */
+export async function setStoreUserPermissions(storeSlug: string, email: string, permissions: Area[] | null): Promise<void> {
+ await ensureTable();
+ await db()`UPDATE store_users SET permissions = ${permissions === null ? null : JSON.stringify(permissions)}
+  WHERE store_slug = ${storeSlug} AND email = ${normEmail(email)}`;
+}
+
+/** One person, for an access check. */
+export async function getStoreUser(storeSlug: string, email: string): Promise<StoreUser | null> {
+ await ensureTable();
+ const rows = await db()`SELECT store_slug, email, role, permissions, created_at FROM store_users
+  WHERE store_slug = ${storeSlug} AND email = ${normEmail(email)} LIMIT 1` as Array<Record<string, unknown>>;
+ return rows[0] ? userRow(rows[0]) : null;
+}
+
 /** Revoke an email's access to a store. */
 export async function removeStoreUser(storeSlug: string, email: string): Promise<void> {
  await ensureTable();
@@ -55,10 +86,10 @@ export async function removeStoreUser(storeSlug: string, email: string): Promise
 /** Everyone with access to a store (owner first, then by join date). */
 export async function listStoreUsers(storeSlug: string): Promise<StoreUser[]> {
  await ensureTable();
- const rows = await db()`SELECT store_slug, email, role, created_at FROM store_users
+ const rows = await db()`SELECT store_slug, email, role, permissions, created_at FROM store_users
   WHERE store_slug = ${storeSlug}
   ORDER BY (role = 'owner') DESC, created_at ASC` as Array<Record<string, unknown>>;
- return rows.map((r) => ({ storeSlug: r.store_slug as string, email: r.email as string, role: (r.role as StoreRole) || "staff", createdAt: String(r.created_at) }));
+ return rows.map(userRow);
 }
 
 /**

@@ -43,7 +43,13 @@ test("a complete storefront comes back, not an empty shell", () => {
  const t = storefrontFromBrand(brand());
  assert.ok((t.blocks?.length ?? 0) >= 4, "a real homepage");
  assert.ok(t.blocks?.some((b) => b.type === "featured"), "somewhere for products to render");
- assert.deepEqual(t.extraPages?.map((p) => p.slug).sort(), ["about", "faq", "shipping-returns"]);
+ // Asserted as "real pages, each with content" rather than an exact list: the starter set grows
+ // (it's at authenticity / condition-scale / contact / faq / philosophy / shipping today), and a
+ // hard-coded list turns every addition into a failing test about nothing.
+ const pages = t.extraPages ?? [];
+ assert.ok(pages.length >= 3, "a real set of pages");
+ assert.ok(pages.every((p) => p.slug && p.title && p.blocks.length > 0), "no page arrives empty");
+ assert.ok(pages.some((p) => p.slug === "faq"), "the one every shop needs");
 });
 
 test("their own words lead the hero, and their tagline reaches the footer", () => {

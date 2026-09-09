@@ -1,3 +1,4 @@
+import { placeholderProps } from "./storefront-placeholder-copy.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -147,4 +148,26 @@ test("an unknown template id yields nothing rather than throwing", () => {
  assert.deepEqual(templateShopBlocks("nope"), []);
  assert.deepEqual(templatePages("nope"), []);
  assert.equal(templateTheme("nope"), null);
+});
+
+test("placeholder copy follows the page it's on", () => {
+ // A text block was headed "About us" on every page, because copy was keyed by block type alone.
+ // On Shipping or Condition Scale that isn't a mild mismatch, it's simply wrong.
+ // A field is only replaced where the template wrote something — an omitted subtext stays omitted.
+ const shipping = placeholderProps("text", { heading: "x", body: "y" }, 0, "shipping");
+ assert.match(String(shipping?.heading), /Shipping/i);
+ assert.doesNotMatch(String(shipping?.heading), /About us/i);
+
+ const condition = placeholderProps("text", { heading: "x" }, 0, "condition-scale");
+ assert.match(String(condition?.heading), /condition/i);
+
+ const consign = placeholderProps("text", { heading: "x" }, 0, "sell-to-us");
+ assert.match(String(consign?.heading), /Sell with us/i);
+});
+
+test("an about page still says about, and an unknown page keeps the generic wording", () => {
+ assert.match(String(placeholderProps("text", { heading: "x" }, 0, "about")?.heading), /About us/i);
+ // Unmatched pages fall back to what they did before, so adding a page can't break its copy.
+ assert.match(String(placeholderProps("text", { heading: "x" }, 0, "something-new")?.heading), /About us/i);
+ assert.match(String(placeholderProps("text", { heading: "x" }, 0)?.heading), /About us/i);
 });

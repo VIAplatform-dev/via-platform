@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Truck, Globe, Check, Plug } from "lucide-react";
 import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
+import { currencySymbol, formatPriceCents } from "@/app/lib/formatPrice";
 
 // Shipping: who pays for postage, and who pays customs duty.
 //
@@ -17,6 +18,8 @@ type DutyMode = "absorbed" | "collected" | "buyer_pays";
 type ShipMode = "buyer_pays" | "store_pays" | "free_over";
 
 type State = {
+ /** The store's currency. Every price on this page is in it — a London store never sees a "$". */
+ currency: string;
  mode: ShipMode;
  freeThresholdUsd: number | null;
  dutyMode: DutyMode;
@@ -76,6 +79,7 @@ export default function ShippingSettingsPage() {
    if (!active) return;
    if (ship) {
     setS({
+     currency: ship.currency || "USD",
      mode: ship.mode, freeThresholdUsd: ship.freeThresholdUsd,
      dutyMode: ship.dutyMode, effectiveDutyMode: ship.effectiveDutyMode,
      dutyDowngraded: Boolean(ship.dutyDowngraded), carrierConnected: Boolean(ship.carrierConnected),
@@ -133,7 +137,7 @@ export default function ShippingSettingsPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Shipping & duties" subtitle="Who pays to get the piece there, and who pays customs when it crosses a border." />
+   <AdminHeader eyebrow="Settings" title="Shipping & duties" subtitle="Who pays for postage, and who pays customs charges on orders going abroad." />
 
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
    {msg && <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-700">{msg}</div>}
@@ -157,7 +161,7 @@ export default function ShippingSettingsPage() {
           <span className="block text-[12px] leading-relaxed text-stone-500">{m.blurb}</span>
           {m.key === "free_over" && s.mode === "free_over" && (
            <span className="mt-2 flex items-center gap-2">
-            <span className="text-[12px] text-stone-500">Free at $</span>
+            <span className="text-[12px] text-stone-500">Free at {currencySymbol(s.currency)}</span>
             <input
              value={threshold}
              onChange={(e) => setThreshold(e.target.value.replace(/[^\d.]/g, ""))}
@@ -204,38 +208,77 @@ export default function ShippingSettingsPage() {
            </span>
           </label>
 
-          {(cfg.enabled || locked) && tiers.length > 0 && (
-           <div className="mt-3 flex flex-wrap gap-3 pl-7">
-            {tiers.map((t) => (
-             <label key={t.id} className="text-[11px] text-stone-500">
-              <span className="mb-1 block">{t.label}</span>
-              <span className="flex items-center gap-1">
-               <span className="text-stone-400">$</span>
-               <input
-                value={cfg.rates?.[t.id] != null ? String((cfg.rates[t.id] as number) / 100) : ""}
-                placeholder={String(t.priceCents / 100)}
-                onChange={(e) => {
-                 const v = e.target.value.replace(/[^\d.]/g, "");
-                 const next = { ...(cfg.rates || {}) };
-                 if (v === "") delete next[t.id]; else next[t.id] = Math.round(Number(v) * 100);
-                 setS({ ...s, zones: { ...s.zones, [z.id]: { ...cfg, enabled: true, rates: next } } });
-                }}
-                onBlur={() => save({})}
-                inputMode="decimal"
-                className="w-16 rounded border border-stone-300 px-1.5 py-1 text-[12px] tabular-nums outline-none focus:border-stone-500"
-               />
-              </span>
-             </label>
-            ))}
-           </div>
-          )}
          </div>
         );
        })}
       </div>
       <p className="border-t border-stone-100 px-5 py-3 text-[11.5px] leading-relaxed text-stone-400">
-       Blank uses the standard price for that parcel size. A region you leave off isn’t priced at zero —
-       shoppers there are told you don’t ship to them, rather than being sold something you can’t post.
+       A region you leave off isn’t priced at zero — shoppers there are told you don’t ship to them, rather
+       than being sold something you can’t post.
+      </p>
+     </TechCard>
+
+     {/* ── her prices ─────────────────────────────────────────────── */}
+     <TechCard className="mb-5 overflow-hidden" data-testid="tier-prices">
+      <div className="flex items-center gap-2 border-b border-stone-100 px-5 py-3">
+       <Truck size={15} className="text-stone-400" />
+       <h2 className="text-[13px] font-semibold text-stone-800">Your prices</h2>
+       <span className="text-[11px] text-stone-400">in {s.currency}</span>
+      </div>
+      <div className="overflow-x-auto">
+       <table className="w-full text-[12.5px]">
+        <thead>
+         <tr className="border-b border-stone-100 text-left text-[11px] uppercase tracking-[0.06em] text-stone-400">
+          <th className="px-5 py-2.5 font-medium">Region</th>
+          {tiers.map((t) => <th key={t.id} className="px-3 py-2.5 font-medium">{t.label}</th>)}
+          <th className="px-3 py-2.5" />
+         </tr>
+        </thead>
+        <tbody className="divide-y divide-stone-100">
+         {ZONES.filter((z) => z.id === "domestic" || s.zones[z.id]?.enabled).map((z) => {
+          const cfg = s.zones[z.id] || { enabled: true };
+          const rates = cfg.rates || {};
+          const anyOwn = tiers.some((t) => rates[t.id] != null);
+          return (
+           <tr key={z.id} data-testid={`tier-prices-${z.id}`}>
+            <td className="px-5 py-2.5 text-stone-700">{z.label}</td>
+            {tiers.map((t) => (
+             <td key={t.id} className="px-3 py-2">
+              <label className="flex items-center gap-1">
+               <span className="text-stone-400">{currencySymbol(s.currency)}</span>
+               <input
+                aria-label={`${z.label} ${t.label} price`}
+                value={rates[t.id] != null ? String((rates[t.id] as number) / 100) : ""}
+                placeholder={String(t.priceCents / 100)}
+                onChange={(e) => {
+                 const v = e.target.value.replace(/[^\d.]/g, "");
+                 const next = { ...rates };
+                 if (v === "") delete next[t.id]; else next[t.id] = Math.round(Number(v) * 100);
+                 setS({ ...s, zones: { ...s.zones, [z.id]: { ...cfg, enabled: true, rates: next } } });
+                }}
+                onBlur={() => save({})}
+                inputMode="decimal"
+                className="w-20 rounded border border-stone-300 px-1.5 py-1 text-[12.5px] tabular-nums outline-none placeholder:text-stone-300 focus:border-stone-500"
+               />
+              </label>
+             </td>
+            ))}
+            <td className="px-3 py-2 text-right">
+             {anyOwn && (
+              <button type="button" onClick={() => save({ zones: { ...s.zones, [z.id]: { enabled: cfg.enabled } } })} disabled={busy} className="whitespace-nowrap text-[11.5px] text-stone-400 hover:text-stone-700">
+               Reset to VYA’s
+              </button>
+             )}
+            </td>
+           </tr>
+          );
+         })}
+        </tbody>
+       </table>
+      </div>
+      <p className="border-t border-stone-100 px-5 py-3 text-[11.5px] leading-relaxed text-stone-400">
+       Greyed numbers are VYA’s standard prices — leave a box blank to charge those. Type your own to charge that
+       instead; {formatPriceCents(0, s.currency)} is free shipping on that parcel size. Every price is in {s.currency}, what your buyers pay.
       </p>
      </TechCard>
 

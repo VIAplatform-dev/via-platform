@@ -113,7 +113,7 @@ function QuickInner() {
 
  const input = "min-h-[48px] w-full rounded-xl border border-stone-200 bg-white px-3 text-[15px] outline-none focus:border-stone-400";
  return (
- <MarketPage title={adding ? "Add a new item to this sale" : "Quick list"} back={adding ? `${B}/find?add=1` : B}>
+ <MarketPage title={adding ? "Add a new item to cart" : "Quick list"} back={adding ? `${B}/find?add=1` : B}>
  <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { onPhoto(e.target.files); e.target.value = ""; }} />
  {err && <div className="mb-3"><Notice tone="danger">{err}</Notice></div>}
 

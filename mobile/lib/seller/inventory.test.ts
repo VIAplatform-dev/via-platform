@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { filterItems, itemDot, inventoryCount, type InventoryFilter } from "./inventory.ts";
+import { filterItems, itemDot, inventoryCount, reservedWord, lacks, parseMissing, missingLabel, type InventoryFilter } from "./inventory.ts";
 
 const items = [
   { id: "1", title: "Prada bag", status: "active" },
@@ -51,4 +51,36 @@ test("an empty inventory says so instead of counting to zero", () => {
 test("every filter is a known key", () => {
   const keys: InventoryFilter[] = ["all", "live", "drafts", "sold"];
   for (const k of keys) assert.equal(Array.isArray(filterItems(items, k)), true);
+});
+
+test("a reserved piece says on hold only when a person is holding it; a buyer mid-checkout is reserved", () => {
+  assert.equal(reservedWord("reserved", true), "on hold");
+  assert.equal(reservedWord("reserved", false), "reserved");
+  assert.equal(reservedWord("active", true), null);
+  assert.equal(reservedWord("sold", false), null);
+});
+
+const rows = [
+  { id: "a", status: "active", images: [], priceCents: 1200, costCents: null },
+  { id: "b", status: "active", images: ["x.jpg"], priceCents: 0, costCents: 300 },
+  { id: "c", status: "draft", images: ["y.jpg"], priceCents: 900, costCents: null },
+  { id: "d", status: "sold", images: null, priceCents: 900, costCents: null },
+  { id: "e", status: "active", images: ["z.jpg"], priceCents: 4000, costCents: 800 },
+];
+
+test("?missing= answers with the same pieces the web Inventory would", () => {
+  assert.deepEqual(lacks(rows, "photo").map((r) => r.id), ["a", "d"]);
+  assert.deepEqual(lacks(rows, "price").map((r) => r.id), ["b"]);
+  // Only a LIVE piece is missing its cost: a draft is not costed yet and a sold one is history.
+  assert.deepEqual(lacks(rows, "cost").map((r) => r.id), ["a"]);
+  assert.deepEqual(lacks(rows, "confidence", ["e", "zzz"]).map((r) => r.id), ["e"]);
+  assert.deepEqual(lacks(rows, null).length, rows.length);
+});
+
+test("only a known filter is honoured from the URL, and each has a name", () => {
+  assert.equal(parseMissing("photo"), "photo");
+  assert.equal(parseMissing("details"), null);
+  assert.equal(parseMissing(undefined), null);
+  assert.equal(missingLabel("cost"), "No cost");
+  assert.equal(missingLabel("confidence"), "AI price to check");
 });

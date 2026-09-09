@@ -20,7 +20,7 @@ export default async function FlyersPage() {
 
  return (
   <AdminPage>
-   <AdminHeader eyebrow="Campaigns" title="Flyers" subtitle="Scans and signups per printed QR code" />
+   <AdminHeader eyebrow="Campaigns" title="Flyers" subtitle="How many people scanned each printed QR code, and how many signed up" />
 
    <div className="grid grid-cols-3 gap-3">
     <TechCard className="p-4">

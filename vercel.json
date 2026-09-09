@@ -209,6 +209,14 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/rentals",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/appointments",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/flyer-welcome",
       "schedule": "0 16 * * *"
     }

@@ -143,7 +143,7 @@ export default function ConsignorsPage() {
  className="mt-6"
  icon={<Users size={28} strokeWidth={1.5} />}
  title="No consignors yet"
- body="Add your first consignor above to start tracking splits and payouts."
+ body="Add your first consignor above to start tracking what they’re owed."
  />
  ) : (
  <TechCard className="mt-6 overflow-hidden">

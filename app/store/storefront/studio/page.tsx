@@ -6,27 +6,32 @@
 // which page you're editing — all on the same canvas the assistant edits. Reuses the existing
 // Blocks renderer (edit mode) + the design API. Every change autosaves; VYA's changes reload it.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { withStore } from "@/app/infrastructure/admin/market/ui";
 import { createPortal } from "react-dom";
 import { useStoreBase } from "../../nav-base";
 import Sidekick from "../../Sidekick";
 import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
-import { StoreHeader, StoreFooter, HEADER_LAYOUTS, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
+import { StoreHeader, StoreFooter, HEADER_LAYOUTS, DEFAULT_FOOTER_NEWSLETTER, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
 import { pickTargetSection, type Rect, type SectionRect } from "@/app/lib/storefront-target-section";
-import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, isTemplatePageSlug, type StorefrontTemplate } from "@/app/lib/storefront-templates";
+import { IMG_RADIUS, BTN_RADIUS } from "@/app/lib/storefront-chrome-css";
+import { resolveProductPage, reorderFields, visibleFields, canChip, FIELD_CATALOGUE, DEFAULT_ASSURANCE, DEFAULT_BACK_LABEL, DEFAULT_BUTTONS, BUTTON_RADII, SLOT_CATALOGUE, ADDABLE_SLOTS, isBuiltinSlot, REQUIRED_SLOT, type ProductPageConfig, type FieldMode, type ButtonStyle, type ProductSlot, type SlotKind } from "@/app/lib/storefront-product-page";
+import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, isTemplatePageSlug, PRODUCT_LAYOUTS, type StorefrontTemplate, type ProductLayout } from "@/app/lib/storefront-templates";
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
 import ItemsEditor from "@/app/store/storefront/ItemsEditor";
-import { variantsFor, resolveVariant, variantDefaults, normalizeVariant, SECTION_CATEGORIES, VARIANTS, type SectionCategory } from "@/app/lib/storefront-variants";
+import { variantsFor, resolveVariant, variantDefaults, normalizeVariant, arrangeControls, SECTION_CATEGORIES, VARIANTS, type SectionCategory } from "@/app/lib/storefront-variants";
 import { applyVariant, switchNotes } from "@/app/lib/storefront-variant-switch";
-import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
+import { ITEM_SCHEMAS, writeItems } from "@/app/lib/storefront-items";
+import { CONTACT_FIELD_TYPES, DEFAULT_CONTACT_FIELDS } from "@/app/lib/contact-fields";
+import { DEFAULT_WORDS, WORD_LABELS, resolveWords, type StorefrontWords } from "@/app/lib/storefront-words";
 // The skin PICKER is gone (templates replaced it), but skin state is still read and passed
 // through to <Blocks> so stores that already chose one keep rendering as they do today.
 import { isSkin, type SkinId } from "@/app/lib/storefront-skins";
 import type { ResizeHandle } from "@/app/s/blocks/kit";
-import { ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, Film, Link as LinkIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search, Undo2, Redo2, RotateCcw, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, Shapes, Upload as UploadIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, ExternalLink, ChevronDown, ChevronUp, Plus, X, Check, LayoutTemplate, Palette, Layers, Sparkles, Type, Image as ImageIcon, Film, Link as LinkIcon, MousePointerClick, Trash2, Copy, Square, Circle, Minus, BringToFront, SendToBack, Search, Undo2, Redo2, RotateCcw, AlignStartVertical, AlignCenterVertical, AlignEndVertical, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, Shapes, Upload as UploadIcon, AlignLeft, AlignCenter, AlignRight, GripVertical } from "lucide-react";
 
 type Colors = { bg: string; text: string; accent: string };
 type Fonts = { heading: string; body: string };
@@ -140,7 +145,50 @@ const OVL_POSITION_OPTIONS = ["front", "back"] as const;
 type RailTab = "design" | "sections" | "elements" | "text" | "uploads" | "assist";
 // `price` arrives from /api/store/storefront/design already formatted — the same string the live
 // storefront renders. Formatting it a second time here is how the editor and the shop drift apart.
+// A diagram of each arrangement. "Rail" and "mirror" mean nothing as words — a seller picks
+// these by recognising the shape, the same way they pick a template.
+function ProductLayoutThumb({ id }: { id: ProductLayout }) {
+ const photo = "rounded-[1px] bg-stone-400";
+ const line = "rounded-[1px] bg-stone-300";
+ const copy = (
+  <span className="flex flex-1 flex-col gap-[3px]">
+   <span className={cn(line, "h-[3px] w-4/5")} /><span className={cn(line, "h-[3px] w-3/5")} />
+   <span className={cn(line, "mt-[2px] h-[6px] w-full")} />
+  </span>
+ );
+ return (
+  <span className="flex h-[52px] w-full items-stretch gap-[4px] bg-stone-100 p-[6px]" aria-hidden>
+   {id === "classic" && (<><span className={cn(photo, "w-1/2")} />{copy}</>)}
+   {id === "mirror" && (<>{copy}<span className={cn(photo, "w-1/2")} /></>)}
+   {id === "rail" && (
+    <><span className="flex w-3/5 flex-col gap-[3px]"><span className={cn(photo, "flex-1")} /><span className={cn(photo, "flex-1")} /></span>{copy}</>
+   )}
+   {id === "gallery" && (
+    <><span className="grid w-3/5 grid-cols-2 gap-[3px]">{[0, 1, 2, 3].map((i) => <span key={i} className={photo} />)}</span>{copy}</>
+   )}
+   {id === "slideshow" && (
+    <><span className="flex w-1/2 flex-col gap-[3px]">
+      <span className={cn(photo, "flex-1")} />
+      <span className="flex h-[8px] gap-[3px]">{[0, 1, 2].map((i) => <span key={i} className={cn(photo, "w-1/3 opacity-50")} />)}</span>
+     </span>{copy}</>
+   )}
+   {id === "stacked" && (
+    <span className="flex w-full flex-col items-center gap-[4px]">
+     <span className={cn(photo, "h-1/2 w-full")} />
+     <span className={cn(line, "h-[3px] w-1/2")} /><span className={cn(line, "h-[6px] w-2/3")} />
+    </span>
+   )}
+  </span>
+ );
+}
+
 type Product = { title: string; price: string; image: string };
+// One of the store's own listings, for the Product preview — the facts it actually carries, so an
+// empty field shows as empty rather than as something we made up.
+type SampleProduct = {
+ id: string; title: string; price: string; comparePrice: string | null; images: string[];
+ facts: Record<string, string | null>;
+};
 type StoreCollection = { slug: string; title: string; itemCount: number; products: Product[] };
 type Device = "desktop" | "tablet" | "phone";
 type Settings = { handle: string; enabled: boolean; tagline: string | null; accentColor: string | null; heroImage: string | null; about: string | null };
@@ -221,7 +269,7 @@ function CollectionsEditor({ block, onField, pick, uploading }: { block: Block; 
  const tiles = parseTiles(block.props?.items);
  const cols = block.props?.cols || "3";
  const [available, setAvailable] = useState<string[]>([]);
- useEffect(() => { (async () => { const r = await fetch("/api/store/collections?all=1").then((x) => (x.ok ? x.json() : null)).catch(() => null); setAvailable((r?.collections || []).map((c: { title: string }) => c.title)); })(); }, []);
+ useEffect(() => { (async () => { const r = await fetch(withStore("/api/store/collections?all=1")).then((x) => (x.ok ? x.json() : null)).catch(() => null); setAvailable((r?.collections || []).map((c: { title: string }) => c.title)); })(); }, []);
  const set = (next: Tile[]) => onField("items", serializeTiles(next));
  const used = new Set(tiles.map((t) => t.label.toLowerCase()));
  const suggestions = available.filter((t) => !used.has(t.toLowerCase()));
@@ -467,6 +515,14 @@ export default function StorefrontStudio() {
  const [collections, setCollections] = useState<StoreCollection[]>([]);
  const [logo, setLogo] = useState<string>("");
  const [headerLayout, setHeaderLayout] = useState<HeaderLayout>("inline");
+ // How a single piece is presented. Three arrangements, all of which the product page already
+ // renders — until now a store was stuck with whichever one its template shipped with.
+ const [productLayout, setProductLayout] = useState<ProductLayout>("classic");
+ // What that page says — the fields, their order, and the store's own wording.
+ const [productPage, setProductPage] = useState<ProductPageConfig>(() => resolveProductPage(null));
+ // A real listing of theirs, with the facts a product page can print. Null until loaded, or when the
+ // store has nothing listed yet.
+ const [sampleProduct, setSampleProduct] = useState<SampleProduct | null>(null);
  // Which layout categories are expanded. Hero opens by default — nine categories of thumbnails all
  // at once is the thing that made this panel hard to scan; one open group gives it a starting point
  // without hiding that the rest are there.
@@ -486,6 +542,10 @@ export default function StorefrontStudio() {
  const [customCss, setCustomCss] = useState("");
  const [socials, setSocials] = useState<Record<string, string>>({}); // footer social links
  const [footerAbout, setFooterAbout] = useState("");
+ // undefined = never touched, so the footer keeps its default wording; "" = deliberately blank.
+ const [footerNews, setFooterNews] = useState<{ heading?: string; text?: string }>({});
+ // The shop's own labels ("Sold", "View all"). Blank entries fall back — see storefront-words.ts.
+ const [words, setWords] = useState<Partial<StorefrontWords>>({});
  type NavLink = { label: string; href: string; place: "header" | "footer" | "both" };
  const [navLinks, setNavLinks] = useState<NavLink[]>([]); // custom links the seller adds to header/footer
  const [activeSlug, setActiveSlug] = useState("home");
@@ -545,6 +605,7 @@ export default function StorefrontStudio() {
  // Which template this store is currently on, so the Design panel can mark it as
  // selected. Read from the design GET, which has always persisted it.
  const [templateId, setTemplateId] = useState<string>("");
+ const [addingPage, setAddingPage] = useState(false);
  // Section picker: a search box and a category filter, because the library is ~30 layouts today and
  // heading for ~75. A flat wall of cards stops being browsable well before that.
  const [secQuery, setSecQuery] = useState("");
@@ -659,6 +720,9 @@ export default function StorefrontStudio() {
  setCollections(d.collections || []);
  setLogo(typeof d.logo === "string" ? d.logo : "");
  setHeaderLayout((["inline","center","split","stacked"].includes(d.headerLayout) ? d.headerLayout : "inline") as HeaderLayout);
+ setProductLayout((["classic","rail","stacked"].includes(d.productLayout) ? d.productLayout : "classic") as ProductLayout);
+ setProductPage(resolveProductPage(d.productPage));
+ setSampleProduct(d.sampleProduct ?? null);
  // Pull any already-saved overlay that overflows its section back inside (legacy elements placed
  // before the in-bounds clamps existed). Idempotent: a second load finds nothing to fix.
  const baseBlocks: Block[] = d.blocks || [], baseShop: Block[] = d.shopBlocks || [], basePages: StorePage[] = d.extraPages || [];
@@ -675,18 +739,20 @@ export default function StorefrontStudio() {
  setExtraPages(nPages);
  // If anything was out of bounds, persist the corrected geometry once (mirrors the sections autosave).
  if (nBlocks !== baseBlocks || nShop !== baseShop || pagesChanged) {
- fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks: nBlocks, shopBlocks: nShop, extraPages: nPages })) }).catch(() => {});
+ fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks: nBlocks, shopBlocks: nShop, extraPages: nPages })) }).catch(() => {});
  }
  setCustomCss(d.customCss || "");
  setSocials(d.socials || {});
  setFooterAbout(d.footerAbout || "");
+ setFooterNews({ heading: d.footerNewsletterHeading, text: d.footerNewsletterText });
+ setWords(d.words || {});
  setNavLinks(Array.isArray(d.navLinks) ? d.navLinks : []);
  }, []);
 
  useEffect(() => {
  (async () => {
  const [sf] = await Promise.all([
- fetch("/api/store/storefront").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+ fetch(withStore("/api/store/storefront")).then((r) => (r.ok ? r.json() : null)).catch(() => null),
  loadDesign(),
  ]);
  if (sf?.settings) setSettings(sf.settings as Settings);
@@ -734,7 +800,7 @@ export default function StorefrontStudio() {
  if (saveTimer.current) clearTimeout(saveTimer.current);
  saveTimer.current = setTimeout(async () => {
  setSave("saving");
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks, shopBlocks, extraPages })) }).catch(() => {});
+ await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody({ blocks, shopBlocks, extraPages })) }).catch(() => {});
  setSave("saved");
  }, 700);
  return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
@@ -839,15 +905,120 @@ export default function StorefrontStudio() {
  onDrop: (i: number) => { reorderTo(i); setCanvasOver(null); },
  onMove: (i: number, dir: "up" | "down") => updateCur((bs) => { const j = dir === "up" ? i - 1 : i + 1; if (j < 0 || j >= bs.length) return bs; const n = [...bs]; [n[i], n[j]] = [n[j], n[i]]; return n; }),
  };
+ // One writer for the product page's copy: set state and save, so no caller can update the panel
+ // without saving it or save something the panel isn't showing.
+ function editProductPage(patch: Partial<ProductPageConfig>) {
+ setProductPage((cur) => { const next = { ...cur, ...patch }; pushDesign({ productPage: next }); return next; });
+ }
+ function setSlot(id: string, patch: Partial<ProductSlot>) {
+ setProductPage((cur) => {
+  const next = { ...cur, slots: cur.slots.map((sl) => (sl.id === id ? { ...sl, ...patch } : sl)) };
+  pushDesign({ productPage: next }); return next;
+ });
+ }
+ function moveSlot(from: number, to: number) {
+ setProductPage((cur) => {
+  if (from === to || from < 0 || to < 0 || from >= cur.slots.length || to >= cur.slots.length) return cur;
+  const slots = cur.slots.slice();
+  const [m] = slots.splice(from, 1); slots.splice(to, 0, m);
+  const next = { ...cur, slots };
+  pushDesign({ productPage: next }); return next;
+ });
+ }
+ function addSlot(kind: SlotKind) {
+ setProductPage((cur) => {
+  const id = `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+  const blank: ProductSlot = kind === "divider" ? { id, kind, show: true }
+   : kind === "link" ? { id, kind, show: true, text: "Size guide", href: "/" }
+   : { id, kind, show: true, text: "Something worth saying about every piece." };
+  // Above the buy box, which is where a note about a piece actually helps someone decide.
+  const at = Math.max(0, cur.slots.findIndex((sl) => sl.kind === "buy"));
+  const slots = [...cur.slots.slice(0, at), blank, ...cur.slots.slice(at)];
+  const next = { ...cur, slots };
+  pushDesign({ productPage: next }); return next;
+ });
+ }
+ function removeSlot(id: string) {
+ setProductPage((cur) => {
+  const next = { ...cur, slots: cur.slots.filter((sl) => sl.id !== id) };
+  pushDesign({ productPage: next }); return next;
+ });
+ }
+
+ function setButtons(patch: Partial<ButtonStyle>) {
+ setProductPage((cur) => {
+  const next = { ...cur, buttons: { ...cur.buttons, ...patch } };
+  pushDesign({ productPage: next });
+  return next;
+ });
+ }
+ function setField(key: string, patch: { show?: boolean; mode?: FieldMode; label?: string }) {
+ setProductPage((cur) => {
+  const next = { ...cur, fields: cur.fields.map((f) => (f.key === key ? { ...f, ...patch } : f)) };
+  pushDesign({ productPage: next });
+  return next;
+ });
+ }
+ function moveField(from: number, to: number) {
+ setProductPage((cur) => {
+  const fields = reorderFields(cur.fields, from, to);
+  if (fields === cur.fields) return cur;
+  const next = { ...cur, fields };
+  pushDesign({ productPage: next });
+  return next;
+ });
+ }
+
  function switchPage(slug: string) { setActiveSlug(slug); setSelBlock(null); setSelOverlay(null); setTextFocus(null); setFmtBar(null); setDdOpen(false); }
+
+ // A page can stop existing while you're standing on it — you delete it, or a build removes one the
+ // editor used to offer. `curBlocks` then resolves to nothing and the canvas says "This page is
+ // empty" over a store that is nothing of the sort, with no way back except guessing which tile to
+ // click. So an active slug that no longer names a page sends you home.
+ useEffect(() => {
+ if (loading) return;
+ if (activeSlug === "home" || activeSlug === "shop" || activeSlug === "product") return;
+ if (extraPages.some((p) => p.slug === activeSlug)) return;
+ void Promise.resolve().then(() => switchPage("home"));
+ }, [loading, activeSlug, extraPages]);
+ /**
+  * Pages from this store's template that it hasn't got.
+  *
+  * Onboarding lets a seller tick only the pages she wants, and there was no way back: choosing four
+  * of seven meant the other three were gone, and "Add page" gave a blank sheet with one empty text
+  * block on it. The template's authored Authentication page is worth considerably more than an
+  * empty page called Authentication.
+  */
+ const missingTemplatePages = useMemo(() => {
+  if (!templateId) return [];
+  const have = new Set(extraPages.map((p) => p.slug));
+  return templatePages(templateId).filter((p) => !have.has(p.slug));
+ }, [templateId, extraPages]);
+
+ function addTemplatePage(slug: string) {
+  const page = missingTemplatePages.find((p) => p.slug === slug);
+  if (!page) return;
+  setExtraPages((ps) => [...ps, { slug: page.slug, title: page.title, blocks: page.blocks }]);
+  setAddingPage(false);
+  switchPage(page.slug);
+ }
+
+ function addBlankPage() {
+  const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
+  if (!title || !title.trim()) return;
+  let slug = pageSlugify(title);
+  const taken = new Set(["home", "shop", "product", ...extraPages.map((p) => p.slug)]);
+  if (taken.has(slug)) slug = `${slug}-${extraPages.length + 1}`;
+  setExtraPages((ps) => [...ps, { slug, title: title.trim().slice(0, 60), blocks: [makeBlock("text")] }]);
+  setAddingPage(false);
+  switchPage(slug);
+ }
+
  function addPage() {
- const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
- if (!title || !title.trim()) return;
- let slug = pageSlugify(title);
- const taken = new Set(["home", "shop", ...extraPages.map((p) => p.slug)]);
- if (taken.has(slug)) slug = `${slug}-${extraPages.length + 1}`;
- setExtraPages((ps) => [...ps, { slug, title: title.trim().slice(0, 60), blocks: [makeBlock("text")] }]);
- switchPage(slug);
+  // Straight to a blank page when the template has nothing left to offer — a menu of one option is
+  // a step for nothing.
+  if (missingTemplatePages.length === 0) { addBlankPage(); return; }
+  setAddingPage(true);
  }
  function deletePage(slug: string) {
  if (!window.confirm("Delete this page?")) return;
@@ -902,6 +1073,7 @@ export default function StorefrontStudio() {
  setFonts(t.fonts);
  setRadius(t.radius);
  setHeaderLayout(t.headerLayout);
+ setProductLayout(t.productLayout);
  // The autosave effect persists blocks / shopBlocks / extraPages; the design POST below carries the
  // tokens and the grid, which don't ride that effect.
  setBlocks(templateBlocks(t.id));
@@ -913,7 +1085,7 @@ export default function StorefrontStudio() {
  setSelBlock(null);
  setShowTemplates(false);
  setTemplateId(t.id);
- await fetch("/api/store/storefront/design", {
+ await fetch(withStore("/api/store/storefront/design"), {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   // applyContent:false — the sections are already in local state and on their way up via autosave.
@@ -927,11 +1099,11 @@ export default function StorefrontStudio() {
  // blocks autosave effect only handles sections). Colour pickers fire rapidly while dragging, hence the
  // debounce; palette / font / corner clicks are discrete but ride the same path.
  const designTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
- const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; skin?: string; preSkin?: { colors: Colors; fonts: Fonts } | null; customCss?: string; socials?: Record<string, string>; footerAbout?: string; navLinks?: NavLink[]; logo?: string; headerLayout?: HeaderLayout }) => {
+ const pushDesign = useCallback((patch: { colors?: Colors; fonts?: Fonts; radius?: Radius; skin?: string; preSkin?: { colors: Colors; fonts: Fonts } | null; customCss?: string; socials?: Record<string, string>; footerAbout?: string; footerNewsletterHeading?: string; footerNewsletterText?: string; words?: Partial<StorefrontWords>; navLinks?: NavLink[]; logo?: string; headerLayout?: HeaderLayout; productLayout?: ProductLayout; productPage?: ProductPageConfig }) => {
  if (designTimer.current) clearTimeout(designTimer.current);
  setSave("saving");
  designTimer.current = setTimeout(async () => {
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody(patch)) }).catch(() => {});
+ await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(versionBody(patch)) }).catch(() => {});
  setSave("saved");
  }, 400);
  }, []);
@@ -960,7 +1132,7 @@ export default function StorefrontStudio() {
  const clipboardRef = useRef<{ kind: "overlay"; data: Overlay } | { kind: "block"; data: Block } | null>(null);
  useEffect(() => {
  if (loading) return;
- const json = JSON.stringify({ blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout });
+ const json = JSON.stringify({ blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, footerNews, words });
  if (lastSnapRef.current === "") { lastSnapRef.current = json; return; } // seed on first settled state
  if (applyingRef.current) { applyingRef.current = false; lastSnapRef.current = json; return; } // this change WAS an undo/redo
  // A DRAG is ONE edit. Every gesture — resizing a photo, moving a heading, dragging a section's
@@ -979,15 +1151,15 @@ export default function StorefrontStudio() {
  futureRef.current = [];
  lastSnapRef.current = json;
  setHist({ u: pastRef.current.length, r: 0 });
- }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, loading, ovlDragging]);
+ }, [blocks, shopBlocks, extraPages, colors, fonts, radius, customCss, socials, footerAbout, footerNews, words, loading, ovlDragging]);
  const restoreSnap = useCallback((json: string) => {
  const s = JSON.parse(json);
  applyingRef.current = true;
  setBlocks(s.blocks || []); setShopBlocks(s.shopBlocks || []); setExtraPages(s.extraPages || []);
  setColors(s.colors); setBaseColors(s.colors); setFonts(s.fonts); setRadius(s.radius); setCustomCss(s.customCss || "");
- setSocials(s.socials || {}); setFooterAbout(s.footerAbout || "");
+ setSocials(s.socials || {}); setFooterAbout(s.footerAbout || ""); setFooterNews({ heading: s.footerNewsletterHeading, text: s.footerNewsletterText }); setWords(s.words || {});
  setSelBlock(null); setSelOverlay(null); setTextFocus(null); setEditingId(null);
- pushDesign({ colors: s.colors, fonts: s.fonts, radius: s.radius, customCss: s.customCss || "", socials: s.socials || {}, footerAbout: s.footerAbout || "" });
+ pushDesign({ colors: s.colors, fonts: s.fonts, radius: s.radius, customCss: s.customCss || "", socials: s.socials || {}, footerAbout: s.footerAbout || "", footerNewsletterHeading: s.footerNewsletterHeading, footerNewsletterText: s.footerNewsletterText, words: s.words });
  }, [pushDesign]);
  const undo = useCallback(() => {
  if (!pastRef.current.length) return;
@@ -1100,7 +1272,7 @@ export default function StorefrontStudio() {
  const existing = collections[0];
  const target = existing
   ? existing
-  : await fetch("/api/store/collections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Featured" }) })
+  : await fetch(withStore("/api/store/collections"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: "Featured" }) })
      .then((r) => (r.ok ? r.json() : null))
      .then((d) => (d?.collection ? { slug: d.collection.slug as string, title: d.collection.title as string, itemCount: 0, products: [] as Product[] } : null))
      .catch(() => null);
@@ -1164,6 +1336,46 @@ export default function StorefrontStudio() {
  // (The percentage-based drags elsewhere divide by a measured rect, so they're already scale-free.)
  const h = Math.round(Math.max(floor, Math.min(ceiling, (startH + dir * (ev.clientY - sy)) / zoomRef.current)));
  setBlockStyle(blockId, "minH", String(h));
+ };
+ const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); };
+ window.addEventListener("pointermove", move);
+ window.addEventListener("pointerup", up);
+ }
+ /**
+  * Drag an arrangement handle on the canvas — the gutter between items, a rail card's width, the
+  * seam of a split hero. The panel sliders (arrangeControls) stay the precise surface; this is the
+  * one you reach for when the grid in front of you looks wrong.
+  *
+  * A percentage control measures against its own container, which is why the renderer marks that
+  * container `vya-arrange-box` — 30% has to mean 30% of the rail, not of the viewport. A pixel
+  * control (the gutter) divides the screen delta by the zoom, the same correction the section
+  * height handles make, so a drag at 50% zoom moves the value by what it looks like it moved.
+  */
+ function onArrangeStart(blockId: string, prop: string, e: React.PointerEvent) {
+ const block = curBlocksRef.current.find((b) => b.id === blockId);
+ if (!block) return;
+ const control = arrangeControls(block.type, block.variant).find((a) => a.prop === prop);
+ if (!control) return;
+ const handleEl = e.currentTarget as HTMLElement;
+ const box = (handleEl.closest(".vya-arrange-box") as HTMLElement | null)?.getBoundingClientRect();
+ const start = block.props?.[prop] ? Number(block.props[prop]) : control.fallback;
+ const sx = e.clientX;
+ setSelBlock(blockId); setSelOverlay(null); setTextFocus(null); setOvlDragging(true);
+ handleEl.setPointerCapture?.(e.pointerId);
+ const move = (ev: PointerEvent) => {
+  const dx = ev.clientX - sx;
+  // A percentage against the box it belongs to; pixels against the zoom. Without a box to measure,
+  // a percentage drag has no meaningful scale — leave the value alone rather than guess.
+  // A percentage divides by the box it belongs to; rem and px divide by the zoom (rem again by the
+  // root font size, since that's the unit the rails are actually written in). Without a box to
+  // measure, a percentage drag has no meaningful scale — leave the value alone rather than guess.
+  const delta = control.unit === "percent"
+   ? (box && box.width ? (dx / box.width) * 100 : 0)
+   : control.unit === "rem"
+    ? dx / zoomRef.current / 16
+    : dx / zoomRef.current;
+  const next = Math.round(Math.max(control.min, Math.min(control.max, start + delta)));
+  editField(blockId, prop, String(next));
  };
  const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); setOvlDragging(false); };
  window.addEventListener("pointermove", move);
@@ -1819,7 +2031,7 @@ export default function StorefrontStudio() {
  const fd = new FormData(); fd.append("file", file);
  setUploading(true); setUploadErr(null);
  try {
- const r = await fetch("/api/store/assets", { method: "POST", body: fd });
+ const r = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd });
  if (!r.ok) {
   // 413 is the platform rejecting the body before our route runs — it isn't JSON, so read it as text.
   const d = await r.json().catch(() => null);
@@ -1851,7 +2063,7 @@ export default function StorefrontStudio() {
  // POSTs to the same library, so every upload lands here too.
  const loadAssets = useCallback(async () => {
  setAssetsBusy(true);
- const r = await fetch("/api/store/assets").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch(withStore("/api/store/assets")).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  setAssets(r?.assets || []);
  setAssetsBusy(false);
  }, []);
@@ -1895,7 +2107,7 @@ export default function StorefrontStudio() {
  if (!settings) return;
  setPublishing(true); setGateMsg(null);
  try {
- const r = await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, enabled: !settings.enabled }) });
+ const r = await fetch(withStore("/api/store/storefront"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...settings, enabled: !settings.enabled }) });
  const d = await r.json().catch(() => null);
  if (r.ok && d?.settings) setSettings(d.settings as Settings);
  // "Set up but held": going live needs an active plan — surface the prompt instead of failing silently.
@@ -1909,7 +2121,7 @@ export default function StorefrontStudio() {
  // The page is as tall as the workspace at 100% — so at 100% it reads exactly like a browser window,
  // and zooming out pulls that whole window back rather than revealing a differently-shaped page.
  const baseH = Math.max(320, avail.h || 720);
- const pageList = [{ slug: "home", title: "Home", n: blocks.length }, { slug: "shop", title: "Shop", n: shopBlocks.length }, ...extraPages.map((p) => ({ slug: p.slug, title: p.title, n: p.blocks.length }))];
+ const pageList = [{ slug: "home", title: "Home", n: blocks.length }, { slug: "shop", title: "Shop", n: shopBlocks.length }, ...extraPages.map((p) => ({ slug: p.slug, title: p.title, n: p.blocks.length })), { slug: "product", title: "Product", n: 0 }];
  const activeTitle = pageList.find((p) => p.slug === activeSlug)?.title || "Home";
  // Every page of the site, in order — the whole document, so zooming out shows the shape of the
  // store rather than one page of it.
@@ -1917,6 +2129,9 @@ export default function StorefrontStudio() {
  { slug: "home", title: "Home", blocks },
  { slug: "shop", title: "Shop", blocks: shopBlocks },
  ...extraPages.map((p) => ({ slug: p.slug, title: p.title, blocks: p.blocks })),
+ // Last, and never in the nav: it's the template every product is drawn with, not somewhere a
+ // shopper can go.
+ { slug: "product", title: "Product", blocks: [] },
  ];
  const activeIdx = Math.max(0, allPages.findIndex((p) => p.slug === activeSlug));
  // The Shop page's real content isn't sections — it's the live inventory, listed automatically. Held
@@ -1942,6 +2157,166 @@ export default function StorefrontStudio() {
   )}
  </section>
  );
+
+
+ // ── The Product page ────────────────────────────────────────────────────────────────────────────
+ // A TEMPLATE, not a page: one stage standing in for every piece the store sells, so a change here
+ // is a change to all of them. It is deliberately kept OUT of `chromeNav` — it has no URL of its
+ // own, and listing it in the site nav put a "Product" link in the header of a storefront that has
+ // no such page.
+ //
+ // Everything it draws comes from a real listing (sampleProduct). A field the listing doesn't carry
+ // is drawn as empty, in the seller's own words — because that is exactly what the live page will
+ // do, and a preview that fills the gap with invented copy sends a seller to their storefront
+ // expecting a page it can't produce.
+ const sampleImgs = sampleProduct?.images?.length ? sampleProduct.images : products[0]?.image ? [products[0].image] : [];
+ const pImgRadius = IMG_RADIUS[radius] ?? 0;
+ const pBtnRadius = BTN_RADIUS[radius] ?? 0;
+ const stageFields = visibleFields(productPage, (sampleProduct?.facts ?? {}) as Record<string, string | null>);
+ // The same resolution buttonCss() does, as inline style — one place decides what a button looks
+ // like and the stage shows that, rather than a second opinion drifting from the storefront's.
+ const btnFill = productPage.buttons.bg || colors.accent;
+ const btnStyle: React.CSSProperties = {
+  borderRadius: productPage.buttons.radius ?? pBtnRadius,
+  border: `1px solid ${btnFill}`,
+  background: productPage.buttons.fill === "outline" ? "transparent" : btnFill,
+  color: productPage.buttons.fill === "outline" ? btnFill : (productPage.buttons.text || "#ffffff"),
+  textTransform: productPage.buttons.uppercase ? "uppercase" : "none",
+  letterSpacing: `${(productPage.buttons.tracking / 100).toFixed(2)}em`,
+ };
+ const productStage = (() => {
+  const photo = (className: string, style?: React.CSSProperties, key?: number, src?: string) => {
+   const url = src ?? sampleImgs[0];
+   return <div key={key} className={className} style={{ background: url ? `url("${url.replace(/"/g, "%22")}") center/cover` : "rgba(0,0,0,0.06)", borderRadius: pImgRadius, ...style }} />;
+  };
+  const at = (i: number) => sampleImgs[i % Math.max(1, sampleImgs.length)];
+  // The details column, in the seller's order — the same slot list the storefront renders from, so
+  // the stage can't drift from the page. Each part is its own click target: clicking the price or a
+  // detail row opens the control that governs it, which is the difference between a page that is
+  // structured and one that just feels locked.
+  const part = (key: string, group: string, body: React.ReactNode) => (
+   <div
+    key={key}
+    onClick={(e) => { e.stopPropagation(); setRailTab("design"); setPanelOpen(true); setOpenDesign((o) => new Set([...o, group])); }}
+    className="cursor-pointer rounded-sm ring-offset-2 transition hover:ring-2 hover:ring-[#5D0F17]/35"
+   >{body}</div>
+  );
+  const copy = (centered?: boolean) => (
+   <div className={cn("flex flex-col gap-5", centered && "mx-auto max-w-xl text-center")}>
+    {productPage.backLabel && <p className="text-[10px] uppercase tracking-[0.25em] opacity-40">{productPage.backLabel}</p>}
+    {productPage.slots.filter((sl) => sl.show).map((sl) => {
+     if (sl.kind === "title") return part(sl.id, "Product page", (
+      <p className="text-[26px] leading-[1.1]" style={{ fontFamily: ff(fonts.heading) }}>{sampleProduct?.title || products[0]?.title || "Your piece"}</p>
+     ));
+     if (sl.kind === "price") return part(sl.id, "Product details", (
+      <p className="flex flex-wrap items-baseline gap-2.5 text-[17px]" style={{ color: colors.accent }}>
+       {productPage.comparePrice && sampleProduct?.comparePrice && <span className="text-[14px] line-through opacity-45">{sampleProduct.comparePrice}</span>}
+       <span>{sampleProduct?.price || products[0]?.price || "$—"}</span>
+       {productPage.comparePrice && sampleProduct?.comparePrice && <span className="rounded-full border border-current/30 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em]">Sale</span>}
+      </p>
+     ));
+     if (sl.kind === "details") {
+      if (!stageFields.length) return null;
+      return part(sl.id, "Product details", (
+       <div>
+        {stageFields.map((f) => {
+         if (f.mode === "drawer") {
+          return (
+           <div key={f.key} className="mt-4 flex items-center justify-between border-t border-current/10 pt-3 text-[10px] uppercase tracking-[0.2em] opacity-55">
+            <span>{f.label}</span><span className="opacity-60">+</span>
+           </div>
+          );
+         }
+         if (f.mode === "chip") {
+          return (
+           <div key={f.key} className="mt-5">
+            <p className="text-[10px] uppercase tracking-[0.2em] opacity-50">{f.label}</p>
+            <span className="mt-2 inline-flex items-center rounded-full px-4 py-1.5 text-[12.5px] text-white" style={{ background: colors.accent }}>{f.value}</span>
+           </div>
+          );
+         }
+         if (f.key === "description") return <p key={f.key} className="mt-6 text-[13px] leading-[1.9] opacity-70">{f.value}</p>;
+         return (
+          <div key={f.key} className="mt-4 border-t border-current/10 pt-3">
+           <p className="text-[10px] uppercase tracking-[0.2em] opacity-50">{f.label}</p>
+           <p className="mt-1 text-[12.5px] leading-[1.7] opacity-70">{f.value}</p>
+          </div>
+         );
+        })}
+       </div>
+      ));
+     }
+     if (sl.kind === "buy") return part(sl.id, "Product page", (
+      <div className={cn("max-w-sm", centered && "mx-auto")}>
+       <div className="py-3.5 text-center text-[11px]" style={btnStyle}>Buy now</div>
+      </div>
+     ));
+     if (sl.kind === "assurance") return productPage.assurance
+      ? part(sl.id, "Product page", <p className="text-[10px] leading-relaxed opacity-50">{productPage.assurance}</p>)
+      : null;
+     if (sl.kind === "divider") return part(sl.id, "Product page", <hr className="border-0 border-t border-current/15" />);
+     if (sl.kind === "link") return part(sl.id, "Product page", (
+      <span className="text-[11.5px] underline underline-offset-4 opacity-70">{sl.text}</span>
+     ));
+     return part(sl.id, "Product page", <p className="text-[12px] leading-relaxed opacity-70">{sl.text}</p>);
+    })}
+   </div>
+  );
+  // Each arrangement drawn the way the real page draws it (app/s/[handle]/p/[id]/page.tsx).
+  if (productLayout === "stacked") {
+   return (
+    <section className="pb-4">
+     <div className="mx-auto max-w-4xl px-6 pt-8 sm:px-8">{photo("aspect-[4/5] w-full")}</div>
+     <div className="mx-auto max-w-2xl px-6 py-12 sm:px-8">{copy(true)}</div>
+    </section>
+   );
+  }
+  if (productLayout === "rail") {
+   return (
+    <section className="mx-auto grid max-w-5xl gap-10 px-6 py-12 sm:px-8 md:grid-cols-[1.45fr_1fr] md:gap-14">
+     <div className="space-y-4">{photo("aspect-[4/5] w-full", undefined, 0, at(0))}{photo("aspect-[4/5] w-full", undefined, 1, at(1))}</div>
+     <div className="md:sticky md:top-6 md:self-start">{copy()}</div>
+    </section>
+   );
+  }
+  if (productLayout === "gallery") {
+   return (
+    <section className="mx-auto grid max-w-5xl gap-10 px-6 py-12 sm:px-8 md:grid-cols-[1.6fr_1fr] md:gap-12">
+     <div className="grid grid-cols-2 gap-3">{[0, 1, 2, 3].map((i) => photo("aspect-[4/5] w-full", undefined, i, at(i)))}</div>
+     <div className="md:sticky md:top-6 md:self-start">{copy()}</div>
+    </section>
+   );
+  }
+  if (productLayout === "slideshow") {
+   return (
+    <section className="mx-auto grid max-w-5xl gap-10 px-6 py-12 sm:px-8 md:grid-cols-2 md:gap-14">
+     <div className="space-y-3">
+      {photo("aspect-[4/5] w-full")}
+      <div className="flex gap-2">{[0, 1, 2, 3].map((i) => photo("h-14 w-14 shrink-0", { opacity: i === 0 ? 1 : 0.45 }, i, at(i)))}</div>
+     </div>
+     <div className="md:pt-2">{copy()}</div>
+    </section>
+   );
+  }
+  if (productLayout === "mirror") {
+   return (
+    <section className="mx-auto grid max-w-5xl gap-10 px-6 py-12 sm:px-8 md:grid-cols-2 md:gap-14">
+     <div className="md:order-2">{photo("aspect-[4/5] w-full")}</div>
+     <div className="md:order-1 md:pt-2">{copy()}</div>
+    </section>
+   );
+  }
+  return (
+   <section className="mx-auto grid max-w-5xl gap-10 px-6 py-12 sm:px-8 md:grid-cols-2 md:gap-14">
+    <div className="space-y-3">
+     {photo("aspect-[4/5] w-full")}
+     <div className="grid grid-cols-4 gap-3">{[0, 1, 2, 3].map((i) => photo("aspect-square w-full", { opacity: 0.55 }, i, at(i + 1)))}</div>
+    </div>
+    <div className="md:pt-2">{copy()}</div>
+   </section>
+  );
+ })();
+
  // A non-active page renders as a true-to-life PREVIEW, not an editor: no selection outlines, no
  // handles, nothing to click into by accident. Editing writes through `activeSlug`, so letting two
  // pages be editable at once would quietly send your edits to the wrong one. Click to switch.
@@ -1950,7 +2325,7 @@ export default function StorefrontStudio() {
   <div className="flex h-9 shrink-0 items-center gap-2 border-b border-black/[0.07] bg-[#f4f1ec] px-3">
    <div className="flex gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /></div>
    <span className="rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] font-semibold text-stone-600">{pg.title}</span>
-   <span className="ml-auto text-[11px] text-stone-400"><span className="text-stone-500">{publicHost || `${handle || "your-store"}.vyasites.com`}</span>{pg.slug !== "home" ? `/${pg.slug}` : ""}</span>
+   <span className="ml-auto text-[11px] text-stone-400"><span className="text-stone-500">{publicHost || `${handle || "your-store"}.vyasites.com`}</span>{pg.slug === "product" ? "/p/…" : pg.slug !== "home" ? `/${pg.slug}` : ""}</span>
   </div>
   {/* `overflow-hidden`, not a scrollbar: a preview you can't click into shouldn't offer to scroll. */}
   <div className="min-h-0 flex-1 overflow-hidden" style={{ background: colors.bg }}>
@@ -1962,14 +2337,15 @@ export default function StorefrontStudio() {
      <StoreHeader layout={headerLayout} storeName={storeName} logo={logo || null} nav={headerChromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} search={<Search size={16} strokeWidth={1.8} />} />
     </div>
     {pg.blocks.length > 0 && (
-     <Blocks blocks={pg.blocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} skin={skin || undefined} />
+     <Blocks blocks={pg.blocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} words={resolveWords(words)} skin={skin || undefined} />
     )}
     {pg.slug === "shop" && shopGrid}
-    {pg.blocks.length === 0 && pg.slug !== "shop" && (
+    {pg.slug === "product" && productStage}
+    {pg.blocks.length === 0 && pg.slug !== "shop" && pg.slug !== "product" && (
      <div className="flex min-h-[200px] items-center justify-center px-8 py-16 text-center text-[13px] text-stone-400">This page is empty.</div>
     )}
     <div className="relative z-20" onClick={(e) => e.stopPropagation()}>
-     <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
+     <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletterHeading={footerNews.heading} newsletterText={footerNews.text} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
     </div>
    </div>
   </div>
@@ -1978,18 +2354,35 @@ export default function StorefrontStudio() {
   <div className="absolute inset-0 z-10 transition group-hover/pv:bg-[#5D0F17]/[0.04] group-hover/pv:ring-2 group-hover/pv:ring-inset group-hover/pv:ring-[#5D0F17]/30" />
  </div>
  );
- // The site nav shown in the persistent header/footer — one entry per page, current page marked active,
- // PLUS the store's collections between Shop and the extra pages. The live header lists those
- // (StorefrontView's blockNav does); the editor listed pages only, so a store with two collections saw
- // a five-item menu while editing and a seven-item one on its own site. Collections aren't editable
- // pages — they're generated from inventory — so an entry opens the real page in a new tab instead of
- // switching the canvas to something that can't be edited.
- const pageNav: ChromeNav[] = pageList.map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
- const collectionNav: ChromeNav[] = settings?.handle
- ? collections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: `/s/${settings.handle}/collections/${c.slug}?preview=1` }))
+ // The site's own nav — the pages a SHOPPER can reach, current page marked active. The product
+ // template is edited here but has no URL, so listing it put a dead "Product" link in the header of
+ // every storefront.
+ const pageNav: ChromeNav[] = pageList.filter((p) => p.slug !== "product").map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
+ // Plus the store's collections, between Shop and the extra pages. The live header lists those
+ // (StorefrontView's blockNav does); the editor listed pages only, so a store with two collections
+ // saw a five-item menu while editing and a seven-item one on its own site. Collections aren't
+ // editable pages — they're generated from inventory — so an entry opens the real page in a new tab
+ // rather than switching the canvas to something that can't be edited.
+ const collectionNav: ChromeNav[] = handle
+ ? collections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: `/s/${handle}/collections/${c.slug}?preview=1` }))
  : [];
- // pageList is built as [Home, Shop, ...extraPages], so index 2 is where the collections go.
+ // pageNav is [Home, Shop, ...extraPages] once the product template is dropped, so index 2 is where
+ // the collections go.
  const chromeNav: ChromeNav[] = [...pageNav.slice(0, 2), ...collectionNav, ...pageNav.slice(2)];
+ // "View" means "show me THIS, live" — it used to always open the home page, so checking a change to
+ // the shop or a product meant landing on the home page and navigating back to where you already
+ // were. The product template has no URL of its own, so it opens the real listing it's drawn from.
+ const viewPath = activeSlug === "home" ? ""
+  : activeSlug === "shop" ? "/shop"
+  : activeSlug === "product" ? (sampleProduct ? `/p/${sampleProduct.id}` : "/shop")
+  : `/${activeSlug}`;
+ // A LIVE store's real address is its own — that's the URL to check, to share, and the one Google
+ // indexes. The /s/ path is the preview: it renders a store that isn't published yet, which its own
+ // address (correctly) will not. Sending a seller to /s/ for a live store meant the editor handed
+ // out a link to the copy rather than to their shop.
+ const viewHref = !handle ? "#"
+  : settings?.enabled && publicHost ? `https://${publicHost}${viewPath}`
+  : `/s/${handle}${viewPath}?preview=1`;
  const headerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: l.href }))];
  const footerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: l.href }))];
 
@@ -2027,7 +2420,7 @@ export default function StorefrontStudio() {
 
  <div className="flex items-center gap-2">
  <button type="button" onClick={() => setShowTemplates(true)} className="flex items-center gap-1.5 rounded-lg border border-black/15 px-3 py-1.5 text-[13px] font-medium text-stone-700 transition hover:bg-stone-100"><LayoutTemplate size={13} /> <span className="hidden sm:inline">Templates</span></button>
- {handle && <a href={`/s/${handle}?preview=1`} target="_blank" rel="noopener noreferrer" className="hidden items-center gap-1.5 rounded-lg border border-black/15 px-3 py-1.5 text-[13px] font-medium text-stone-700 transition hover:bg-stone-100 sm:flex"><ExternalLink size={13} /> View</a>}
+ {handle && <a href={viewHref} target="_blank" rel="noopener noreferrer" className="hidden items-center gap-1.5 rounded-lg border border-black/15 px-3 py-1.5 text-[13px] font-medium text-stone-700 transition hover:bg-stone-100 sm:flex"><ExternalLink size={13} /> View</a>}
  <button type="button" onClick={togglePublish} disabled={publishing || !settings} className="rounded-lg bg-[#5D0F17] px-4 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{publishing ? "Saving…" : enabled ? "Published ✓" : "Publish"}</button>
  </div>
  </div>
@@ -2110,6 +2503,26 @@ export default function StorefrontStudio() {
  <textarea value={footerAbout} onChange={(e) => { setFooterAbout(e.target.value); pushDesign({ footerAbout: e.target.value }); }} rows={2} placeholder="A short line about your store (footer)" className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50" />
  </div>
 
+ {/* The signup band at the top of the footer. Its two lines were hardcoded, so every VYA store
+     ended every page with the same sentence. Blank means "keep the standard wording". */}
+ <p className="mb-1 mt-7 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Email signup</p>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">What the signup band above your footer says. Leave blank for the standard wording.</p>
+ <div className="space-y-2">
+ <input
+  value={footerNews.heading ?? ""}
+  onChange={(e) => { const v = e.target.value; setFooterNews((n) => ({ ...n, heading: v })); pushDesign({ footerNewsletterHeading: v }); }}
+  placeholder={DEFAULT_FOOTER_NEWSLETTER.heading}
+  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
+ />
+ <textarea
+  value={footerNews.text ?? ""}
+  onChange={(e) => { const v = e.target.value; setFooterNews((n) => ({ ...n, text: v })); pushDesign({ footerNewsletterText: v }); }}
+  rows={2}
+  placeholder={DEFAULT_FOOTER_NEWSLETTER.text}
+  className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50"
+ />
+ </div>
+
  </>)}
 
  {/* Links belong to both, but a link carries WHERE it shows — so each panel lists the ones that
@@ -2172,7 +2585,26 @@ export default function StorefrontStudio() {
  {/* This one isn't decoration: it's how a seller tells two forms apart in the inbox. */}
  <p className="mt-1 text-[11px] leading-snug text-stone-400">What these messages are labelled as in your inbox. Leave blank to use the heading.</p>
  </div>
- <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">The name, email and message fields are always shown. On your live storefront the form really sends; here it stays inert so you cannot message yourself while arranging the page.</p>
+ <div className="mt-4 border-t border-black/[0.06] pt-3.5">
+ <p className="mb-2 text-[12px] font-medium text-stone-600">Questions</p>
+ <ItemsEditor
+  key={overlayId}
+  props={{ ...p, fields: p.fields || writeItems(DEFAULT_CONTACT_FIELDS.map((f) => ({ label: f.label, type: f.type, required: f.required ? "yes" : "" })), ITEM_SCHEMAS.contactFields) }}
+  schema={ITEM_SCHEMAS.contactFields}
+  onChange={(key, value) => patch({ [key]: value })}
+  pick={pickAndUpload}
+  uploading={uploading}
+  addLabel="Add a question"
+  singular="Question"
+  controls={{
+   type: { kind: "select", options: CONTACT_FIELD_TYPES },
+   required: { kind: "toggle", on: "yes", off: "", hint: "They have to answer this" },
+  }}
+  hide={(f, it) => f === "options" && it.type !== "choice"}
+  seed={{ label: "Your question", type: "text", required: "", options: "" }}
+ />
+ </div>
+ <p className="mt-4 border-t border-black/[0.06] pt-3 text-[11px] leading-relaxed text-stone-400">On your live storefront the form really sends; here it stays inert so you cannot message yourself while arranging the page.</p>
  </div>
  );
  })()
@@ -2289,12 +2721,12 @@ export default function StorefrontStudio() {
  </StyleGroup>
  <StyleGroup label="Style">
  <StyleRow label="Style"><Seg options={[["fill", "Fill"], ["outline", "No fill"]] as const} value={st.ctaOutline ? "outline" : "fill"} onPick={(v) => one("ctaOutline", v === "outline" ? "1" : undefined)} className="w-32" /></StyleRow>
- <StyleRow label={st.ctaOutline ? "Outline" : "Fill"}><ColorSwatch value={st.ctaOutline ? (st.ctaBorderColor || st.ctaBg || "#5D0F17") : (st.ctaBg || "#5D0F17")} onChange={(v) => one(st.ctaOutline ? "ctaBorderColor" : "ctaBg", v)} /></StyleRow>
+ <StyleRow label={st.ctaOutline ? "Outline" : "Fill"}><ColorSwatch value={st.ctaOutline ? (st.ctaBorderColor || st.ctaBg || colors.accent) : (st.ctaBg || colors.accent)} onChange={(v) => one(st.ctaOutline ? "ctaBorderColor" : "ctaBg", v)} /></StyleRow>
  <StyleRow label="Text"><ColorSwatch value={st.ctaColor || "#ffffff"} onChange={(v) => one("ctaColor", v)} /></StyleRow>
  <StyleRow label="Border"><StyleSlider value={st.ctaBorder != null && st.ctaBorder !== "" ? Number(st.ctaBorder) : (st.ctaOutline ? 2 : 0)} min={0} max={8} suffix="px" onChange={(x) => one("ctaBorder", String(x))} onClear={() => one("ctaBorder", "")} /></StyleRow>
  </StyleGroup>
  <StyleGroup label="Hover">
- <StyleRow label="Fill"><ColorSwatch value={st.ctaHoverBg || st.ctaBg || "#5D0F17"} onChange={(v) => one("ctaHoverBg", v)} /></StyleRow>
+ <StyleRow label="Fill"><ColorSwatch value={st.ctaHoverBg || st.ctaBg || colors.accent} onChange={(v) => one("ctaHoverBg", v)} /></StyleRow>
  <StyleRow label="Text"><ColorSwatch value={st.ctaHoverColor || st.ctaColor || "#ffffff"} onChange={(v) => one("ctaHoverColor", v)} /></StyleRow>
  </StyleGroup>
  <StyleGroup label="Position">
@@ -2375,6 +2807,7 @@ export default function StorefrontStudio() {
  const vDef = resolveVariant(selBlockObj.type, selBlockObj.variant);
  const layouts = variantsFor(selBlockObj.type);
  const itemsName = vDef?.supports?.items;
+ const arrange = arrangeControls(selBlockObj.type, selBlockObj.variant);
  const itemSchema = itemsName ? ITEM_SCHEMAS[itemsName] : undefined;
  // Repeated content gets the structured row editor instead of a raw field — except single-field
  // lists (marquee names, gallery URLs), where a plain textarea is genuinely faster to fill.
@@ -2429,18 +2862,58 @@ export default function StorefrontStudio() {
  </div>
  )}
 
+ {/* How this layout ARRANGES what's in it. Sits under the layout picker because that's the
+     decision it follows from — you choose a carousel, then you say how wide its cards are. */}
+ {arrange.length > 0 && (
+ <div className="mb-5">
+ <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Arrangement</p>
+ <div className="space-y-3">
+ {arrange.map((a) => {
+ const raw = bp[a.prop];
+ const cur = raw != null && raw !== "" ? Number(raw) : undefined;
+ return (
+ <div key={a.prop}>
+ <StyleRow label={a.label}>
+ <StyleSlider
+ value={cur ?? a.fallback}
+ min={a.min}
+ max={a.max}
+ step={a.step}
+ suffix={a.suffix}
+ onChange={(v) => editField(selBlockObj.id, a.prop, String(v))}
+ // Clearing puts the layout back on its own default rather than on the number the
+ // slider happened to be showing.
+ onClear={cur == null ? undefined : () => editField(selBlockObj.id, a.prop, "")}
+ />
+ </StyleRow>
+ <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{a.hint}</p>
+ </div>
+ );
+ })}
+ </div>
+ </div>
+ )}
+
  {useItemsEditor && itemSchema ? (
  <ItemsEditor
  // Keyed by section: the editor tracks which row is expanded by position, so a fresh section
  // must start fresh rather than inherit "row 3 is open" from the one you were just editing.
  key={selBlockObj.id}
- props={bp}
+ props={itemsName === "contactFields" ? { ...bp, fields: bp.fields || writeItems(DEFAULT_CONTACT_FIELDS.map((f) => ({ label: f.label, type: f.type, required: f.required ? "yes" : "" })), itemSchema) } : bp}
  schema={itemSchema}
  onChange={(key, value) => editField(selBlockObj.id, key, value)}
  pick={pickAndUpload}
  uploading={uploading}
- addLabel={itemsName === "slides" ? "Add slide" : "Add item"}
- singular={itemsName === "slides" ? "Slide" : "Item"}
+ addLabel={itemsName === "slides" ? "Add slide" : itemsName === "contactFields" ? "Add a question" : "Add item"}
+ singular={itemsName === "slides" ? "Slide" : itemsName === "contactFields" ? "Question" : "Item"}
+ // A contact form's answer type is one of five and "required" is a yes or no — neither is
+ // something to type. Options only exist on a question that offers a list.
+ controls={itemsName === "contactFields" ? {
+ type: { kind: "select", options: CONTACT_FIELD_TYPES },
+ required: { kind: "toggle", on: "yes", off: "", hint: "They have to answer this" },
+ } : undefined}
+ hide={itemsName === "contactFields" ? (f, it) => f === "options" && it.type !== "choice" : undefined}
+ seed={itemsName === "contactFields" ? { label: "Your question", type: "text", required: "", options: "" } : undefined}
  />
  ) : null}
 
@@ -2528,6 +3001,32 @@ export default function StorefrontStudio() {
  </div>
  );
  }) : <p className="text-[13px] leading-relaxed text-stone-400">This section has no text fields — its content comes from your products.</p>}
+
+ {/* The Q&A pairs. They live in `defaults` as q0/a0…, never in `fields`, so selecting an FAQ
+     section showed only its heading and intro — the questions themselves were canvas-only. */}
+ {selBlockObj.type === "faq" && (
+ <div className="mb-3.5">
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Questions</label>
+ <div className="flex flex-col gap-1.5">
+ {readFaqPairs(bp).map((pair, i) => (
+ <div key={i} className="rounded-lg border border-black/10 bg-white p-2">
+ <div className="mb-1.5 flex items-center gap-1">
+ <span className="text-[11px] font-medium text-stone-400">{i + 1}.</span>
+ <span className="flex-1" />
+ <button type="button" title="Move up" disabled={i === 0} onClick={() => moveFaqRow(selBlockObj.id, i, selBlockObj.id, i - 1)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronUp size={13} /></button>
+ <button type="button" title="Move down" disabled={i === readFaqPairs(bp).length - 1} onClick={() => moveFaqRow(selBlockObj.id, i, selBlockObj.id, i + 2)} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition enabled:hover:bg-stone-100 enabled:hover:text-stone-700 disabled:opacity-25"><ChevronDown size={13} /></button>
+ <button type="button" title="Remove question" onClick={() => faqOp(selBlockObj.id, { remove: i })} className="grid h-6 w-6 place-items-center rounded text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={12} /></button>
+ </div>
+ {/* Uncontrolled + commit on blur, the same discipline the canvas and ItemsEditor use, so a
+     re-render can't jump the caret mid-keystroke. */}
+ <input defaultValue={pair.q} key={`q${i}-${pair.q}`} onBlur={(e) => { if (e.target.value !== pair.q) editField(selBlockObj.id, `q${i}`, e.target.value); }} placeholder="Question" className={`${inp} mb-1.5`} />
+ <textarea defaultValue={pair.a} key={`a${i}-${pair.a}`} onBlur={(e) => { if (e.target.value !== pair.a) editField(selBlockObj.id, `a${i}`, e.target.value); }} rows={2} placeholder="Answer" className={`${inp} resize-y leading-relaxed`} />
+ </div>
+ ))}
+ </div>
+ <button type="button" onClick={() => faqOp(selBlockObj.id, "add")} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-black/20 py-2 text-[12px] font-medium text-stone-500 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Plus size={13} /> Add a question</button>
+ </div>
+ )}
 
  {selBlockObj.type === "columns" && (
  <div className="mb-3.5">
@@ -2619,6 +3118,29 @@ export default function StorefrontStudio() {
  })}
  </div>
  </>)}
+ {/* The four words the shop says for itself. They were literals in the renderer, so every VYA
+     storefront said them identically — a store with its own voice couldn't change one. */}
+ <button type="button" onClick={() => toggleDesign("Wording")} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
+ <ChevronDown size={12} className={`transition ${openDesign.has("Wording") ? "" : "-rotate-90"}`} /> <span className="flex-1">Wording</span>
+ </button>
+ {openDesign.has("Wording") && (<>
+ <p className="mb-2.5 text-[12px] leading-snug text-stone-400">What your shop calls things. Leave blank for the standard wording.</p>
+ <div className="space-y-2.5">
+ {WORD_LABELS.map((w) => (
+ <div key={w.key}>
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">{w.label}</label>
+ <input
+  value={words[w.key] ?? ""}
+  onChange={(e) => { const next = { ...words, [w.key]: e.target.value }; setWords(next); pushDesign({ words: next }); }}
+  placeholder={DEFAULT_WORDS[w.key]}
+  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
+ />
+ <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{w.hint}</p>
+ </div>
+ ))}
+ </div>
+ </>)}
+
  <button type="button" onClick={() => toggleDesign("Colour palette")} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
  <ChevronDown size={12} className={`transition ${openDesign.has("Colour palette") ? "" : "-rotate-90"}`} /> <span className="flex-1">Colour palette</span>
  </button>
@@ -2703,7 +3225,220 @@ export default function StorefrontStudio() {
 
  </>)}
 
-{/* Only offered once something has actually changed — a revert button that is always there invites
+{/* Opening either product group brings its stage up, so a change has somewhere to be seen the
+     moment it's made — that's the whole reason the stage exists. */}
+ <button type="button" onClick={() => { if (!openDesign.has("Product page")) switchPage("product"); toggleDesign("Product page"); }} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
+ <ChevronDown size={12} className={`transition ${openDesign.has("Product page") ? "" : "-rotate-90"}`} /> <span className="flex-1">Product page</span>
+ </button>
+ {openDesign.has("Product page") && (<>
+ <p className="mb-2.5 mt-2 text-[12px] leading-snug text-stone-400">One template for every product you sell — rentals too. The <button type="button" onClick={() => switchPage("product")} className="font-semibold text-[#5D0F17] underline">Product</button> page below shows it on a real listing of yours.</p>
+ <div className="grid grid-cols-2 gap-2">
+ {PRODUCT_LAYOUTS.map((pl) => {
+ const active = productLayout === pl.id;
+ return (
+ <button key={pl.id} type="button" title={pl.description}
+  onClick={() => { setProductLayout(pl.id); pushDesign({ productLayout: pl.id }); }}
+  className={cn("overflow-hidden rounded-lg border text-left transition", active ? "border-[#5D0F17] ring-1 ring-[#5D0F17]" : "border-black/10 hover:border-[#5D0F17]/40")}>
+  <ProductLayoutThumb id={pl.id} />
+  <span className="block px-2 py-1.5">
+   <span className={cn("block truncate text-[12px] font-semibold", active ? "text-[#5D0F17]" : "text-stone-700")}>{pl.label}</span>
+  </span>
+ </button>
+ );
+ })}
+ </div>
+ </>)}
+
+ <p className="mb-1.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Page order</p>
+ <p className="mb-2 text-[12px] leading-snug text-stone-400">Drag to reorder the column beside the photos. Add a line of your own anywhere in it.</p>
+ <div className="space-y-1.5">
+ {productPage.slots.map((sl, i) => {
+ const cat = SLOT_CATALOGUE.find((c) => c.kind === sl.kind);
+ const builtin = isBuiltinSlot(sl.kind);
+ const required = sl.kind === REQUIRED_SLOT;
+ const name = cat?.name || (sl.kind === "divider" ? "Divider" : sl.kind === "link" ? "Link" : "Text");
+ return (
+ <div
+  key={sl.id}
+  draggable
+  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
+  onDragOver={(e) => e.preventDefault()}
+  onDrop={(e) => { e.preventDefault(); const from = Number(e.dataTransfer.getData("text/plain")); if (Number.isFinite(from)) moveSlot(from, i); }}
+  className={cn("rounded-lg border px-2.5 py-2 transition", sl.show ? "border-black/10 bg-white" : "border-black/[0.06] bg-stone-50")}
+ >
+  <div className="flex items-center gap-2">
+   <GripVertical size={13} className="shrink-0 cursor-grab text-stone-300" />
+   <span className={cn("min-w-0 flex-1 truncate text-[12.5px] font-medium", sl.show ? "text-stone-700" : "text-stone-400")}>{name}</span>
+   {required ? (
+    // Not a toggle at all: a product page with no way to buy is the one mistake here that costs
+    // a seller money without ever looking broken.
+    <span className="shrink-0 text-[10px] text-stone-400">always on</span>
+   ) : (
+    <button type="button" role="switch" aria-checked={sl.show} aria-label={`Show ${name}`} onClick={() => setSlot(sl.id, { show: !sl.show })}
+     className="relative h-[18px] w-8 shrink-0 rounded-full transition" style={{ background: sl.show ? "#5D0F17" : "#d6d3d1" }}>
+     <span className={cn("absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all", sl.show ? "left-[16px]" : "left-[2px]")} />
+    </button>
+   )}
+   {!builtin && (
+    <button type="button" onClick={() => removeSlot(sl.id)} title="Remove" className="shrink-0 text-stone-300 transition hover:text-red-600"><X size={12} /></button>
+   )}
+  </div>
+  {!builtin && sl.kind !== "divider" && (
+   <div className="mt-2 space-y-1.5 pl-[21px]">
+    <input value={sl.text ?? ""} onChange={(e) => setSlot(sl.id, { text: e.target.value })} placeholder="What it says"
+     className="w-full rounded-md border border-black/10 bg-white px-2 py-1 text-[11.5px] text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+    {sl.kind === "link" && (
+     <input value={sl.href ?? ""} onChange={(e) => setSlot(sl.id, { href: e.target.value })} placeholder="/pages/sizing"
+      className="w-full rounded-md border border-black/10 bg-white px-2 py-1 text-[11.5px] text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+    )}
+   </div>
+  )}
+ </div>
+ );
+ })}
+ </div>
+ <div className="mt-2 flex gap-1.5">
+ {ADDABLE_SLOTS.map((a) => (
+  <button key={a.kind} type="button" onClick={() => { switchPage("product"); addSlot(a.kind); }}
+   className="flex-1 rounded-lg border border-dashed border-black/20 px-1 py-1.5 text-[11px] text-stone-500 transition hover:border-[#5D0F17] hover:text-[#5D0F17]">
+   + {a.kind === "text" ? "Text" : a.kind === "link" ? "Link" : "Divider"}
+  </button>
+ ))}
+ </div>
+
+ <button type="button" onClick={() => { if (!openDesign.has("Product details")) switchPage("product"); toggleDesign("Product details"); }} className="mb-2 mt-6 flex w-full items-center gap-1.5 border-b border-black/[0.07] py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500 transition hover:text-stone-800">
+ <ChevronDown size={12} className={`transition ${openDesign.has("Product details") ? "" : "-rotate-90"}`} /> <span className="flex-1">Product details</span>
+ </button>
+ {openDesign.has("Product details") && (<>
+ <p className="mb-2.5 mt-2 text-[12px] leading-snug text-stone-400">
+  What each piece says, and in what order. Drag to reorder. A field a listing hasn&rsquo;t filled in never
+  shows — so an empty heading can&rsquo;t appear, and switching one on changes nothing until the listing
+  carries it.{sampleProduct ? <> Previewing <span className="text-stone-500">{sampleProduct.title}</span>.</> : null}
+ </p>
+ <div className="space-y-1.5">
+ {productPage.fields.map((f, i) => {
+ const cat = FIELD_CATALOGUE.find((c) => c.key === f.key);
+ return (
+ <div
+  key={f.key}
+  draggable
+  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(i)); }}
+  onDragOver={(e) => e.preventDefault()}
+  onDrop={(e) => { e.preventDefault(); const from = Number(e.dataTransfer.getData("text/plain")); if (Number.isFinite(from)) moveField(from, i); }}
+  className={cn("rounded-lg border px-2.5 py-2 transition", f.show ? "border-black/10 bg-white" : "border-black/[0.06] bg-stone-50")}
+ >
+  <div className="flex items-center gap-2">
+   <GripVertical size={13} className="shrink-0 cursor-grab text-stone-300" />
+   <button type="button" onClick={() => setField(f.key, { show: !f.show })} className="min-w-0 flex-1 text-left">
+    <span className={cn("block truncate text-[12.5px] font-medium", f.show ? "text-stone-700" : "text-stone-400")}>{cat?.name || f.key}</span>
+    {/* The answer to "I switched it on and nothing happened" — given where the switch is. */}
+    {f.show && sampleProduct && !(sampleProduct.facts?.[f.key] || "").trim() && (
+     <span className="mt-0.5 block truncate text-[10.5px] text-amber-700">Empty on this listing — add it in Inventory</span>
+    )}
+   </button>
+   <button type="button" role="switch" aria-checked={f.show} aria-label={`Show ${cat?.name || f.key}`} onClick={() => setField(f.key, { show: !f.show })}
+    className="relative h-[18px] w-8 shrink-0 rounded-full transition" style={{ background: f.show ? "#5D0F17" : "#d6d3d1" }}>
+    <span className={cn("absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all", f.show ? "left-[16px]" : "left-[2px]")} />
+   </button>
+  </div>
+  {f.show && (
+   <div className="mt-2 flex items-center gap-1.5 pl-[21px]">
+    {/* Description is the piece's own writing — inline it needs no heading, so a label would
+        only ever apply to the drawer. Every other field is labelled either way. */}
+    {/* Chip is offered only where the value is short — see LONG_FIELDS. */}
+    {(["inline", "drawer", "chip"] as FieldMode[]).filter((m) => m !== "chip" || canChip(f.key)).map((m) => (
+     <button key={m} type="button" onClick={() => setField(f.key, { mode: m })}
+      className={cn("rounded-md border px-2 py-0.5 text-[11px] transition", f.mode === m ? "border-[#5D0F17] text-[#5D0F17]" : "border-black/10 text-stone-400 hover:border-black/25")}>
+      {m === "inline" ? "On the page" : m === "drawer" ? "In a drawer" : "As a chip"}
+     </button>
+    ))}
+    {(f.mode !== "inline" || f.key !== "description") && (
+     <input
+      value={f.label ?? ""}
+      onChange={(e) => setField(f.key, { label: e.target.value })}
+      placeholder={cat?.label || ""}
+      className="min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 py-0.5 text-[11px] text-stone-700 outline-none focus:border-[#5D0F17]/50"
+     />
+    )}
+   </div>
+  )}
+ </div>
+ );
+ })}
+ </div>
+
+ <label className="mt-3 flex items-start gap-2.5 rounded-lg border border-black/10 bg-white px-2.5 py-2">
+ <input type="checkbox" checked={productPage.comparePrice} onChange={(e) => editProductPage({ comparePrice: e.target.checked })} className="mt-0.5 accent-[#5D0F17]" />
+ <span className="min-w-0">
+  <span className="block text-[12.5px] font-medium text-stone-700">Show the was-price</span>
+  <span className="mt-0.5 block text-[11px] leading-snug text-stone-400">Where you set a compare-at price, it prints struck through with a Sale mark.</span>
+ </span>
+ </label>
+
+ <p className="mb-1.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Buttons</p>
+ <p className="mb-2 text-[12px] leading-snug text-stone-400">Buy, Rent and Book, on every product page. Corners follow your store&rsquo;s corner style.</p>
+ <div className="flex gap-1.5">
+ {(["solid", "outline"] as const).map((f) => (
+  <button key={f} type="button" onClick={() => setButtons({ fill: f })}
+   className={cn("flex-1 rounded-lg border px-2 py-2 text-[12px] transition", productPage.buttons.fill === f ? "border-[#5D0F17] text-[#5D0F17]" : "border-black/10 text-stone-500 hover:border-black/25")}>
+   {f === "solid" ? "Filled" : "Outline"}
+  </button>
+ ))}
+ </div>
+ <div className="mt-2 grid grid-cols-2 gap-2">
+ {([["bg", "Button"], ["text", "Text"]] as const).map(([k, label]) => (
+  <label key={k} className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-2 py-1.5">
+   {/* Empty means "follow the accent" — the swatch shows what that resolves to right now. */}
+   <input type="color" value={productPage.buttons[k] || (k === "bg" ? colors.accent : "#ffffff")}
+    onChange={(e) => setButtons({ [k]: e.target.value } as Partial<ButtonStyle>)}
+    className="h-6 w-6 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0" />
+   <span className="min-w-0 flex-1 truncate text-[11.5px] text-stone-500">{label}</span>
+   {productPage.buttons[k] && (
+    <button type="button" onClick={() => setButtons({ [k]: null } as Partial<ButtonStyle>)} title="Back to your accent" className="text-[10px] text-stone-400 underline hover:text-stone-700">reset</button>
+   )}
+  </label>
+ ))}
+ </div>
+ <div className="mt-2 flex gap-1.5">
+ {BUTTON_RADII.map((r) => {
+  const active = productPage.buttons.radius === r.value;
+  return (
+   <button key={r.label} type="button" onClick={() => setButtons({ radius: r.value })} title={r.label}
+    className={cn("flex flex-1 flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition", active ? "border-[#5D0F17] text-[#5D0F17]" : "border-black/10 text-stone-400 hover:border-black/25")}>
+    {/* The shape itself — "soft" and "round" only mean something once you see them. */}
+    <span className="h-3 w-8 border border-current" style={{ borderRadius: r.value === null ? (BTN_RADIUS[radius] ?? 0) : r.value }} />
+    <span className="text-[9.5px] leading-none">{r.label}</span>
+   </button>
+  );
+ })}
+ </div>
+ <div className="mt-2 flex items-center gap-2">
+ <button type="button" onClick={() => setButtons({ uppercase: !productPage.buttons.uppercase })}
+  className={cn("rounded-lg border px-2.5 py-1.5 text-[11.5px] transition", productPage.buttons.uppercase ? "border-[#5D0F17] text-[#5D0F17]" : "border-black/10 text-stone-500 hover:border-black/25")}>
+  {productPage.buttons.uppercase ? "UPPERCASE" : "Sentence case"}
+ </button>
+ <label className="flex flex-1 items-center gap-2">
+  <span className="shrink-0 text-[11px] text-stone-400">Spacing</span>
+  <input type="range" min={0} max={40} step={2} value={productPage.buttons.tracking}
+   onChange={(e) => setButtons({ tracking: Number(e.target.value) })}
+   aria-label="Letter spacing" className="h-1 w-full cursor-pointer accent-[#5D0F17]" />
+ </label>
+ </div>
+ {JSON.stringify(productPage.buttons) !== JSON.stringify(DEFAULT_BUTTONS) && (
+ <button type="button" onClick={() => setButtons(DEFAULT_BUTTONS)} className="mt-2 w-full rounded-lg border border-black/10 py-1.5 text-[11.5px] text-stone-500 transition hover:border-black/25">Back to the default button</button>
+ )}
+
+ <p className="mb-1.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Your words</p>
+ <p className="mb-2 text-[12px] leading-snug text-stone-400">These two lines appear on every piece. Clear either one to drop it.</p>
+ <div className="space-y-1.5">
+ <input value={productPage.backLabel} onChange={(e) => editProductPage({ backLabel: e.target.value })} placeholder={DEFAULT_BACK_LABEL}
+  className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-[13px] text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ <textarea value={productPage.assurance} onChange={(e) => editProductPage({ assurance: e.target.value })} rows={2} placeholder={DEFAULT_ASSURANCE}
+  className="w-full resize-y rounded-lg border border-black/10 bg-white px-3 py-2 text-[12.5px] leading-relaxed text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ </div>
+ </>)}
+
+ {/* Only offered once something has actually changed — a revert button that is always there invites
      the worry that something might have drifted. Reverts colours and fonts together, because a
      palette and the type it was chosen with are one decision. */}
  {lookChanged && (
@@ -2715,6 +3450,21 @@ export default function StorefrontStudio() {
  <p className="mt-2 text-center text-[11px] leading-snug text-stone-400">Change anything here, or switch to <button type="button" onClick={() => setRailTab("assist")} className="font-semibold text-[#5D0F17] underline">Assist</button> and just describe it.</p>
  </div>
  ) : railTab === "sections" ? (
+ activeSlug === "product" ? (
+ // Sections write through updateCur, which has nowhere to put them here — so rather than let a
+ // seller click a layout and watch nothing happen, say what this stage is.
+ <div className="h-full overflow-y-auto px-4 py-4">
+ <p className="mb-1 text-[17px] font-semibold tracking-tight text-stone-800">The product template</p>
+ <p className="mb-4 text-[12px] leading-relaxed text-stone-400">
+  Not built from sections — it&rsquo;s the one page every piece you sell is drawn with, so a new listing
+  is never a page you have to build. Its arrangement and what it says live in Design.
+ </p>
+ <button type="button" onClick={() => { setRailTab("design"); setOpenDesign((o) => new Set([...o, "Product page"])); }}
+  className="w-full rounded-lg border border-black/15 py-2.5 text-[12px] font-semibold text-stone-600 transition hover:bg-stone-100">
+  Open its settings
+ </button>
+ </div>
+ ) : (
  <div className="h-full overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[17px] font-semibold tracking-tight text-stone-800">Add a layout</p>
  <p className="mb-3 text-[12px] leading-snug text-stone-400">Click a layout to drop it at the bottom of {activeTitle}. You can change its layout later without losing the content.</p>
@@ -2810,6 +3560,7 @@ export default function StorefrontStudio() {
  })()}
  <button type="button" onClick={() => setShowTemplates(true)} className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-black/15 py-2.5 text-[12px] font-semibold text-stone-600 transition hover:bg-stone-100"><LayoutTemplate size={13} /> Start from a full template</button>
  </div>
+ )
  ) : railTab === "elements" ? (
  <div className="h-full overflow-y-auto px-4 py-4">
  <p className="mb-2.5 text-[12px] leading-snug text-stone-400">Drop onto {selBlock ? "the selected section" : "the last section"}, then drag it anywhere. It scales with the layout and stacks neatly on mobile.</p>
@@ -2941,9 +3692,9 @@ export default function StorefrontStudio() {
  <button type="button" onClick={() => switchPage(p.slug)} className={`flex flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-stone-100 ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-700"}`}>
  <Check size={13} className={p.slug === activeSlug ? "text-[#5D0F17]" : "invisible"} />
  <span className="flex-1 truncate">{p.title}</span>
- <span className="text-[10px] text-stone-400">{p.n}</span>
+ <span className="text-[10px] text-stone-400">{p.slug === "product" ? "template" : p.n}</span>
  </button>
- {p.slug !== "home" && p.slug !== "shop" && (
+ {p.slug !== "home" && p.slug !== "shop" && p.slug !== "product" && (
  <button type="button" onClick={() => deletePage(p.slug)} title="Delete page" className="mr-1 hidden h-6 w-6 place-items-center rounded-md text-stone-400 hover:bg-red-50 hover:text-red-600 group-hover/pg:grid"><X size={13} /></button>
  )}
  </div>
@@ -2954,7 +3705,7 @@ export default function StorefrontStudio() {
  </>
  )}
  </div>
- <div className="ml-auto flex h-5 items-center rounded-md bg-white px-2 text-[11px] text-stone-400"><span className="text-stone-600">{publicHost || `${handle || "your-store"}.vyasites.com`}</span>{activeSlug !== "home" ? `/${activeSlug}` : ""}</div>
+ <div className="ml-auto flex h-5 items-center rounded-md bg-white px-2 text-[11px] text-stone-400"><span className="text-stone-600">{publicHost || `${handle || "your-store"}.vyasites.com`}</span>{activeSlug === "product" ? "/p/…" : activeSlug !== "home" ? `/${activeSlug}` : ""}</div>
  </div>
 
  {/* editable canvas */}
@@ -2978,8 +3729,8 @@ export default function StorefrontStudio() {
  <StoreHeader layout={headerLayout} storeName={storeName} logo={logo || null} nav={headerChromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} search={<Search size={16} strokeWidth={1.8} />} />
  </div>
  {curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setTextFocus(null); setSelFree(null); setFreeEditing(null); setSelChrome(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} freeEdit={freeEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} onFieldFocus={(blockId, key) => { setSelBlock(blockId); setSelOverlay(null); setTextFocus({ blockId, key }); setPanelOpen(true); }} onResizeSectionStart={onSectionResizeStart} onPickImage={pickAndUpload} onDropImage={dropAndUpload} skin={skin || undefined} />
- ) : activeSlug === "shop" ? null : (
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} words={resolveWords(words)} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setTextFocus(null); setSelFree(null); setFreeEditing(null); setSelChrome(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} freeEdit={freeEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} onFieldFocus={(blockId, key) => { setSelBlock(blockId); setSelOverlay(null); setTextFocus({ blockId, key }); setPanelOpen(true); }} onResizeSectionStart={onSectionResizeStart} onArrangeStart={onArrangeStart} onPickImage={pickAndUpload} onDropImage={dropAndUpload} skin={skin || undefined} />
+ ) : activeSlug === "shop" || activeSlug === "product" ? null : (
  <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-8 py-20 text-center">
  <p className="text-[14px] text-stone-400" style={{ fontFamily: ff(fonts.body) }}>This page is empty.</p>
  <p className="text-[13px] text-stone-400">Add one from the <button type="button" onClick={() => setRailTab("sections")} className="font-semibold text-[#5D0F17] underline">Layout</button> panel, or ask VYA to build it.</p>
@@ -2987,13 +3738,19 @@ export default function StorefrontStudio() {
  )}
  {/* Shop page: the product grid auto-lists your live inventory (same as the storefront) — shown here so the page reads true. */}
  {activeSlug === "shop" && shopGrid}
+ {activeSlug === "product" && (
+ <div
+  onClick={() => { setRailTab("design"); setPanelOpen(true); setOpenDesign((o) => new Set([...o, "Product page"])); setSelBlock(null); setSelOverlay(null); setSelChrome(null); }}
+  className="cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"
+ >{productStage}</div>
+ )}
  {/* Clicking the chrome selects it — the same gesture as clicking a section. A click that landed on
      a nav link or button is left alone, so navigating never doubles as selecting. */}
  <div
   onClick={(e) => { if ((e.target as HTMLElement).closest("button,a,input")) return; setSelChrome("footer"); setSelBlock(null); setSelOverlay(null); setPanelOpen(true); }}
   className={`relative cursor-pointer transition-shadow ${selChrome === "footer" ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}`}
  >
- <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
+ <StoreFooter storeName={storeName} logo={logo || null} nav={footerChromeNav} tagline={settings?.tagline ?? null} colors={colors} headingFontFamily={ff(fonts.heading)} year={new Date().getFullYear()} socials={socials} footerAbout={footerAbout} newsletterHeading={footerNews.heading} newsletterText={footerNews.text} newsletter={<FooterEmailPreview accent={colors.accent} />} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} />
  </div>
  </div>
  </div>
@@ -3020,16 +3777,46 @@ export default function StorefrontStudio() {
  <div className="mt-auto h-2 w-full rounded-sm bg-stone-100" />
  </div>
  </button>
- {p.slug !== "home" && p.slug !== "shop" && (
+ {p.slug !== "home" && p.slug !== "shop" && p.slug !== "product" && (
  <button type="button" onClick={(e) => { e.stopPropagation(); deletePage(p.slug); }} title="Delete page" className="absolute -right-1 -top-1 z-10 hidden h-4 w-4 place-items-center rounded-full bg-white text-stone-400 shadow ring-1 ring-black/10 hover:text-red-600 group-hover/pt:grid"><X size={10} /></button>
  )}
  </div>
- <span className={`max-w-[52px] truncate text-[9px] ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-500"}`}>{p.n}. {p.title}</span>
+ <span className={`max-w-[52px] truncate text-[9px] ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-500"}`}>{p.slug === "product" ? p.title : `${p.n}. ${p.title}`}</span>
  </div>
  ))}
  <div className="flex shrink-0 flex-col items-center gap-1.5">
  <button type="button" onClick={addPage} title="Add page" className="grid h-[46px] w-[36px] place-items-center rounded-md border border-dashed border-black/20 text-stone-400 transition hover:border-[#5D0F17] hover:text-[#5D0F17]"><Plus size={16} /></button>
  <span className="text-[9px] text-stone-400">Add page</span>
+
+ {/* The pages her template came with that she doesn't have — authored, not blank. Skipping a page
+     during setup used to be permanent, because "Add page" only ever made an empty one. */}
+ {addingPage && (
+  <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/30 p-4 sm:items-center" onClick={() => setAddingPage(false)}>
+   <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="border-b border-stone-100 px-5 py-3.5">
+     <p className="text-[13.5px] font-medium text-stone-900">Add a page</p>
+     <p className="mt-0.5 text-[12px] text-stone-500">These came with your template, written and laid out. Add one and change the words.</p>
+    </div>
+    <div className="max-h-[50vh] overflow-y-auto p-2">
+     {missingTemplatePages.map((pg) => (
+      <button
+       key={pg.slug}
+       type="button"
+       onClick={() => addTemplatePage(pg.slug)}
+       className="flex w-full items-baseline justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition hover:bg-stone-50"
+      >
+       <span className="text-[13.5px] text-stone-800">{pg.title}</span>
+       <span className="text-[11.5px] text-stone-400">{pg.blocks.length} section{pg.blocks.length === 1 ? "" : "s"}</span>
+      </button>
+     ))}
+    </div>
+    <div className="flex items-center justify-between gap-3 border-t border-stone-100 px-5 py-3">
+     <button type="button" onClick={addBlankPage} className="text-[12.5px] text-stone-500 underline underline-offset-2 hover:text-stone-900">Start a blank page instead</button>
+     <button type="button" onClick={() => setAddingPage(false)} className="text-[12.5px] text-stone-400 hover:text-stone-700">Cancel</button>
+    </div>
+   </div>
+  </div>
+ )}
  </div>
  </div>
  {/* Clicking the percentage clears the manual zoom, dropping back to the size that fits. */}
@@ -3274,7 +4061,7 @@ export default function StorefrontStudio() {
  // opened automatically when this field is focused.
  return wrap("Button", (
  <>
- <ColorDot value={st.ctaOutline ? (st.ctaBorderColor || st.ctaBg || "#5D0F17") : (st.ctaBg || "#5D0F17")} onChange={(v) => setBlockStyle(bid, st.ctaOutline ? "ctaBorderColor" : "ctaBg", v)} title={st.ctaOutline ? "Outline colour" : "Fill"} />
+ <ColorDot value={st.ctaOutline ? (st.ctaBorderColor || st.ctaBg || colors.accent) : (st.ctaBg || colors.accent)} onChange={(v) => setBlockStyle(bid, st.ctaOutline ? "ctaBorderColor" : "ctaBg", v)} title={st.ctaOutline ? "Outline colour" : "Fill"} />
  <ColorDot value={st.ctaColor || "#ffffff"} onChange={(v) => setBlockStyle(bid, "ctaColor", v)} title="Text colour" />
  <ToolbarDropdown key={`${bid}-cta-size`} label="Size" options={OVL_BTN_SIZE_OPTIONS} labels={OVL_BTN_SIZE_LABEL} value={st.ctaSize || "md"} onChange={(s) => setBlockStyle(bid, "ctaSize", s)} width="w-32" />
  {!st.ctaFullWidth && <ToolbarDropdown key={`${bid}-cta-align`} label="Align" options={ALIGN_OPTIONS} labels={ALIGN_LABEL} value={st.ctaAlign} onChange={(a) => setBlockStyle(bid, "ctaAlign", st.ctaAlign === a ? undefined : a)} width="w-28" />}
@@ -3467,7 +4254,9 @@ export default function StorefrontStudio() {
  <p className="text-[13px] font-semibold text-stone-900">{t.name}</p>
  <p className="mt-0.5 line-clamp-2 text-[11px] text-stone-500">{t.bestFor}</p>
  <p className="mt-1.5 text-[10px] uppercase tracking-[0.1em] text-stone-400">
- {t.grid.cols}-up · {t.layout.length} sections · {t.pages.length} pages
+ {/* "4-UP" is print jargon — it means four products to a row, and nobody outside a studio
+    reads it that way. The number of pages is what a seller is actually choosing between. */}
+{t.pages.length} page{t.pages.length === 1 ? "" : "s"} · {t.grid.cols} products a row
  </p>
  <span className="mt-2 inline-block text-[11px] font-semibold text-[#5D0F17] opacity-0 transition group-hover:opacity-100">Use this template →</span>
  </div>

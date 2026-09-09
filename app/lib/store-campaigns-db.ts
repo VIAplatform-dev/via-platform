@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { sendStoreCampaign, getStoreEmailBrand } from "./email";
 import { resolveStoreSender } from "./email-settings-db";
 import { listSubscribers, listCustomerProfiles } from "./store-customers-db";
+import { audienceIsEmpty, type AudienceFilter } from "./customer-audience-core";
 
 // Campaign history + scheduling. Sends used to be fire-and-forget (no record); this
 // table gives every store a sent-log AND a way to schedule a send for later, which a
@@ -12,7 +13,10 @@ function db() {
  return neon(url);
 }
 
-export type CampaignStatus = "scheduled" | "sending" | "sent" | "failed" | "canceled";
+// "draft" is a campaign PREPARED for the seller but not committed to — new arrivals gathers her
+// pieces and leaves one here rather than sending behind her back. She opens it, changes it, and
+// decides. Nothing schedules or sends a draft on its own.
+export type CampaignStatus = "draft" | "scheduled" | "sending" | "sent" | "failed" | "canceled";
 export type Campaign = {
  id: number;
  subject: string;
@@ -111,8 +115,27 @@ export async function recordSentCampaign(storeSlug: string, c: { subject: string
 }
 
 // ── Delivery — the single path both the Sidekick and the cron use ──────────────
-/** Resolve who a campaign reaches: a tagged segment, or all subscribers. */
+/** The audience an email is aimed at, stored in `segment` as JSON. Empty = everyone → null. */
+export function encodeAudience(a: AudienceFilter | null | undefined): string | null {
+ if (!a || audienceIsEmpty(a)) return null;
+ return JSON.stringify({ tags: a.tags ?? [], spentOverCents: a.spentOverCents ?? null, category: a.category ?? null });
+}
+
+export function decodeAudience(segment: string | null | undefined): AudienceFilter | null {
+ if (!segment || !segment.trim().startsWith("{")) return null;
+ try {
+ const a = JSON.parse(segment) as AudienceFilter;
+ return { tags: Array.isArray(a.tags) ? a.tags.map(String) : [], spentOverCents: typeof a.spentOverCents === "number" ? a.spentOverCents : null, category: typeof a.category === "string" ? a.category : null };
+ } catch { return null; }
+}
+
+/** Resolve who a campaign reaches: a JSON audience, a bare tag (the Sidekick's segment), or all subscribers. */
 export async function resolveRecipients(storeSlug: string, segment?: string | null): Promise<string[]> {
+ const audience = decodeAudience(segment);
+ if (audience) {
+ const subs = await listSubscribers(storeSlug, audience).catch(() => []);
+ return Array.from(new Set(subs.map((s) => s.email.toLowerCase()).filter(Boolean)));
+ }
  if (segment) {
  const tag = String(segment).toLowerCase().trim();
  const profiles = await listCustomerProfiles(storeSlug).catch(() => []);
@@ -160,4 +183,18 @@ export async function sendDueCampaigns(now: Date): Promise<{ sent: number; recip
  }
  }
  return { sent, recipients, failed };
+}
+
+/**
+ * Campaigns actually SENT since a date.
+ *
+ * Counted from what went out, never from drafts — otherwise deleting a draft would buy another
+ * send. Scheduled-but-unsent ones are excluded for the same reason: nothing has reached anyone yet.
+ */
+export async function countCampaignsSent(storeSlug: string, since: Date): Promise<number> {
+ await ensureTable();
+ const rows = (await db()`SELECT count(*)::int AS n FROM store_campaigns
+  WHERE store_slug = ${storeSlug} AND status = 'sent'
+  AND COALESCE(sent_at, created_at) >= ${since.toISOString()}`.catch(() => [{ n: 0 }])) as Array<{ n: number }>;
+ return rows[0]?.n ?? 0;
 }

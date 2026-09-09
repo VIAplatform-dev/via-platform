@@ -110,8 +110,14 @@ export default function OnboardingPage() {
  <div className="border border-green-700/25 bg-green-700/5 p-6">
  <p className="font-serif text-xl text-green-800 mb-1">Your site is live on VYA.</p>
  <p className="text-sm text-[#5D0F17]/60"><b>{result.pages}</b> {result.pages === 1 ? "page" : "pages"} captured{result.items ? ` · ${result.items} ${result.items === 1 ? "product" : "products"} imported` : ""}.</p>
+ {/* Same handoff as the admin onboarding: the builder opens in captured mode on what was just
+     brought over. Without this button the only ways out were the public site and the dashboard,
+     and the seller had to find the builder on her own. */}
  <div className="mt-5 flex flex-wrap gap-3">
-  <a href={result.url} target="_blank" rel="noopener noreferrer" className="bg-[#5D0F17] text-[#FFFDF8] px-5 py-2.5 text-xs uppercase tracking-[0.15em] hover:bg-[#5D0F17]/85 transition">View your site ↗</a>
+ <button onClick={() => router.push("/admin/storefront?welcome=import")} className="bg-[#5D0F17] text-[#FFFDF8] px-5 py-2.5 text-xs uppercase tracking-[0.15em] hover:bg-[#5D0F17]/85 transition">
+ Open it in the storefront builder
+ </button>
+  <a href={result.url} target="_blank" rel="noopener noreferrer" className="border border-[#5D0F17]/25 px-5 py-2.5 text-xs uppercase tracking-[0.15em] hover:border-[#5D0F17]/60 transition">View your site ↗</a>
  <button onClick={() => router.push("/store/dashboard")} className="px-5 py-2.5 text-xs uppercase tracking-[0.15em] text-[#5D0F17]/55 hover:text-[#5D0F17] transition">
  Go to dashboard
  </button>

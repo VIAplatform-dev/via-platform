@@ -6,6 +6,7 @@ import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
 import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
 import { resolveVariant } from "@/app/lib/storefront-variants";
 import { skinCss } from "@/app/lib/storefront-skins";
+import { radiusCss } from "@/app/lib/storefront-chrome-css";
 import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import SandboxEmbed from "./SandboxEmbed";
 // The shared editing kit + the per-family layout files. See blocks/kit.tsx for why the editing
@@ -15,6 +16,8 @@ import { PLACEHOLDER_MARK } from "@/app/lib/storefront-placeholder-image";
 import { renderHero } from "./blocks/hero";
 import { renderFeatured } from "./blocks/featured";
 import ContactForm from "./ContactForm";
+import { readContactFields } from "@/app/lib/contact-fields";
+import type { StorefrontWords } from "@/app/lib/storefront-words";
 import { renderCollections } from "./blocks/collections";
 import { renderTestimonials } from "./blocks/testimonials";
 import { renderColumns } from "./blocks/columns";
@@ -23,6 +26,7 @@ import { renderAnnouncement, renderText, renderStatement, renderMarquee } from "
 import { renderImage, renderGallery, renderVideo } from "./blocks/media";
 import { renderCountdown, renderNewsletter, renderContact } from "./blocks/marketing";
 import { renderBlog, renderSpotlight } from "./blocks/editorial";
+import { renderAppointments } from "./blocks/appointments";
 import { renderFaq } from "./blocks/faq";
 
 export type { BlockProduct };
@@ -32,8 +36,7 @@ export type Radius = "sharp" | "soft" | "round";
 
 // Corner style ("shapes") → CSS radius, in px. Images/cards get a moderate curve; buttons go fully
 // pill on "round". A single scoped <style> drives it so it's one control, applied everywhere at once.
-const IMG_RADIUS: Record<Radius, number> = { sharp: 0, soft: 14, round: 26 };
-const BTN_RADIUS: Record<Radius, number> = { sharp: 0, soft: 8, round: 999 };
+
 
 // ── Free-form overlay elements (a button / text / image dragged onto a section) ──
 // Rendered both live (interactive: real anchors/images) and in the editor (inert content, the wrapper
@@ -103,13 +106,17 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  <div className="w-full rounded-md p-4" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 10px 30px -12px rgba(0,0,0,0.35)" }}>
   <p className="mb-1 text-[13px] font-semibold text-stone-800">{title}</p>
   {p.note && <p className="mb-2 text-[11px] leading-snug text-stone-500">{p.note}</p>}
+  {/* A form element asks whatever the seller wants, exactly like the contact section — a wholesale
+      enquiry and a sourcing request don't need the same three boxes. */}
   {live && storeSlug
-   ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} compact />
+   ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} fields={readContactFields(p)} compact />
    : (
    <div className="flex flex-col gap-2 opacity-70">
-    <input disabled placeholder="Name" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
-    <input disabled placeholder="Email" className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
-    <textarea disabled placeholder="Message" rows={3} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    {readContactFields(p).map((f, i) => (
+     f.type === "long"
+      ? <textarea key={i} disabled placeholder={f.label} rows={3} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+      : <input key={i} disabled placeholder={f.label} className="vya-field border border-current/20 bg-current/[0.03] px-2.5 py-1.5 text-[12px]" />
+    ))}
     <span className="mt-0.5 self-start rounded px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white" style={{ background: accent }}>{p.cta || "Send"}</span>
    </div>
    )}
@@ -447,6 +454,7 @@ function blockBody(b: Block, ctx: Ctx) {
  case "contact": return renderContact(kit, variant);
 
  case "faq": return renderFaq(kit, variant);
+ case "appointments": return renderAppointments(kit, variant);
 
  case "custom": {
  // Interactive components (js present, or mode "sandbox") run in an isolated sandboxed iframe —
@@ -487,9 +495,11 @@ export default function Blocks({
  onFaqOp,
  faqDnd,
  storeSlug,
+ words,
  collectionHrefs,
  onFieldFocus,
  onResizeSectionStart,
+ onArrangeStart,
  onPickImage,
  onDropImage,
  skin,
@@ -536,6 +546,8 @@ export default function Blocks({
  faqDnd?: FaqDnd;
  // Live-site only: the store handle, so a contact section can submit to the right store.
  storeSlug?: string;
+ // The store's own labels for the shop UI ("Sold", an empty grid). See storefront-words.ts.
+ words?: StorefrontWords;
  // Live-site only: lowercased collection title -> its page href, so shop-by-category tiles
  // deep-link the collection they name instead of all landing on the bare shop page.
  collectionHrefs?: Record<string, string>;
@@ -544,14 +556,15 @@ export default function Blocks({
  onFieldFocus?: (blockId: string, key: string) => void;
  // Editor-only: drag a section's top/bottom resize handle to set its height explicitly.
  onResizeSectionStart?: (blockId: string, edge: "top" | "bottom", e: React.PointerEvent) => void;
+ // Editor-only: drag a layout's spacing / card width / split seam directly on the canvas.
+ onArrangeStart?: (blockId: string, prop: string, e: React.PointerEvent) => void;
  // Editor-only: open the file picker for an image slot clicked directly on the canvas.
  onPickImage?: (apply: (url: string) => void) => void;
  onDropImage?: (file: File, apply: (url: string) => void) => void;
 }) {
  const head = ff(fonts.heading);
  const body = ff(fonts.body);
- const ir = IMG_RADIUS[radius] ?? 0;
- const br = BTN_RADIUS[radius] ?? 0;
+
  // Corner style, scoped to this storefront's sections. `.vya-round` marks the image/card frames that
  // should curve; the full-bleed hero, announcement bar, and marquee deliberately stay square.
  // Always emitted, including for "sharp" where both values are 0. Skipping it when there is nothing
@@ -559,7 +572,7 @@ export default function Blocks({
  // rounding (the contact form's `rounded-md` CTA) had nothing to override it, so a template set to
  // sharp corners still drew a rounded button. The token has to be authoritative, not conditional.
  // `.vya-field` keeps form inputs on the same curve as the images rather than a fixed 6px.
- const radiusCss = `.vya-round,.vya-img{border-radius:${ir}px;overflow:hidden}.vya-cta{border-radius:${br}px}.vya-field{border-radius:${ir}px}`;
+ const radiusRules = radiusCss(radius);
  // Overlay elements are absolutely placed (% coords) on wide layouts; on a narrow container they stack
  // into normal flow — centred, padded — so a button dragged over the hero never overlaps or runs off a
  // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.
@@ -629,11 +642,11 @@ export default function Blocks({
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
  <div className={`@container${skinRules ? ` vya-skin-${skin}` : ""}`} style={{ fontFamily: body, color: colors.text }}>
- <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusCss + photoLayerCss + freePosCss + overlayCss + skinRules + placeholderCss }} />
+ <style dangerouslySetInnerHTML={{ __html: ".vya-marquee-track{animation:vya-marq 30s linear infinite}@keyframes vya-marq{to{transform:translateX(-50%)}}@media(prefers-reduced-motion:reduce){.vya-marquee-track{animation:none}}.vya-faq summary{list-style:none}.vya-faq summary::-webkit-details-marker{display:none}.vya-faq-chev{transition:transform .2s ease}.vya-faq details[open]>summary .vya-faq-chev{transform:rotate(180deg)}" + radiusRules + photoLayerCss + freePosCss + overlayCss + skinRules + placeholderCss }} />
  {blocks.map((b, i) => {
  const { fg } = bgFor(b.style?.bg, colors);
  const background = b.style ? sectionBg(b.style, colors) : undefined; // solid or gradient
- const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, collectionHrefs, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
+ const inner = blockBody(b, { colors, head, body, products, collections, shopHref, fg, edit, onEditField, selectedId, onContentDragStart, onFaqOp, faqDnd, storeSlug, words, onArrangeStart, collectionHrefs, onFieldFocus, bgMedia: b.style?.bgMedia, freeEdit, onPickImage, onDropImage });
  const editable = typeof onSelect === "function";
  // Stable, targetable classes so custom CSS (AI- or hand-written) can hook any section
  // and element: e.g. `.vya-hero .vya-heading { ... }` or `.vya-b-<id> { ... }`.

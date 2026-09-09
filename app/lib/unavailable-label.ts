@@ -15,11 +15,14 @@
  * imported sold-out ones happened not to, which is an accident, not a design.
  */
 
-export type UnavailableReason = "sold_out" | "vanished" | null | undefined;
+export type UnavailableReason = "sold_out" | "vanished" | "on_hold" | null | undefined;
 
 const LABEL: Record<string, string> = {
  sold_out: "Sold out",
  vanished: "No longer available",
+ // Kept back for a named customer (holds-core.ts). Not sold — it comes back on sale by itself when
+ // the hold lapses — so the badge must not say so. Never stored: computed from `status`.
+ on_hold: "On hold",
 };
 
 /**
@@ -40,4 +43,18 @@ export function reasonFromImport(available: boolean | undefined): "sold_out" | n
 /** What the sweep concluded when a piece stopped appearing in the feed. An inference, labelled so. */
 export function reasonForVanished(): "vanished" {
  return "vanished";
+}
+
+/**
+ * What the storefront should say about a piece's availability, from the row itself.
+ *
+ * `reserved` covers two things the shopper cannot tell apart and should not be able to buy: a
+ * buyer mid-checkout (gone in ten minutes, one way or the other) and a hold for a named customer
+ * (gone for days). Both read "On hold" on the shelf — a piece that vanished from the grid the
+ * moment someone was holding it looked, to the seller, like a piece that had been deleted.
+ */
+export function storefrontAvailability(it: { status?: string | null; unavailableReason?: string | null }): { available: boolean; unavailableReason: string | null } {
+ if (it.status === "reserved") return { available: false, unavailableReason: "on_hold" };
+ if (it.status === "sold") return { available: false, unavailableReason: it.unavailableReason ?? null };
+ return { available: true, unavailableReason: null };
 }

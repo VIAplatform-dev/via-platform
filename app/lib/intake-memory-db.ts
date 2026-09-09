@@ -171,6 +171,7 @@ async function ensureItemsTable() {
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS price_cents INTEGER`;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS title TEXT`; // the confirmed descriptor — carries the specific model, so retrieval can teach it
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS confidence NUMERIC`; // the AI's pricing confidence at intake — lets us CALIBRATE it against how far the seller re-priced
+ await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS item_id TEXT`; // the published items.id, so a memory row can be joined back to the live piece (see listLowConfidenceItemIds)
  await db()`CREATE INDEX IF NOT EXISTS idx_intake_mem_store ON intake_memory_items (store_slug, created_at DESC)`;
  itemsEnsured = true;
 }
@@ -183,6 +184,7 @@ export type MemoryItem = {
  marketCents?: number | null; // comp market value at intake (raw, before store adjustment)
  priceCents?: number | null;  // the seller's final list price
  confidence?: number | null;  // the AI's pricing confidence (0..1) — for confidence calibration
+ itemId?: string | null;      // the published items.id — joins this memory row back to the live piece
 };
 
 /**
@@ -193,11 +195,36 @@ export type MemoryItem = {
 export async function rememberItem(storeSlug: string, item: MemoryItem): Promise<void> {
  await ensureItemsTable();
  await db()`
-  INSERT INTO intake_memory_items (store_slug, image_url, embedding, brand, era, material, condition, category, market_cents, price_cents, title, confidence)
+  INSERT INTO intake_memory_items (store_slug, image_url, embedding, brand, era, material, condition, category, market_cents, price_cents, title, confidence, item_id)
   VALUES (${storeSlug}, ${item.imageUrl ?? null}, ${JSON.stringify(item.embedding ?? [])},
    ${item.brand ?? null}, ${item.era ?? null}, ${item.material ?? null}, ${item.condition ?? null}, ${item.category ?? null},
-   ${item.marketCents ?? null}, ${item.priceCents ?? null}, ${item.title ?? null}, ${item.confidence ?? null})
+   ${item.marketCents ?? null}, ${item.priceCents ?? null}, ${item.title ?? null}, ${item.confidence ?? null}, ${item.itemId ?? null})
  `.catch(() => {});
+}
+
+/**
+ * Live pieces whose AI price the seller should look at: intake confidence under `threshold`, and
+ * the price unchanged since — a piece she has re-priced no longer needs checking.
+ *
+ * Joined on item_id where the memory row has one. Rows written before item_id existed are matched
+ * by their first photo (items.images->>0 = image_url), which is how the memory has always been
+ * looked up visually; a piece whose photos were reordered since is the one case that falls through.
+ */
+export async function listLowConfidenceItemIds(storeSlug: string, threshold: number): Promise<string[]> {
+ await ensureItemsTable();
+ const rows = (await db()`
+  SELECT DISTINCT i.id::text AS id
+  FROM intake_memory_items m
+  JOIN items i ON (m.item_id IS NOT NULL AND i.id::text = m.item_id)
+   OR (m.item_id IS NULL AND m.image_url IS NOT NULL AND i.images->>0 = m.image_url)
+  JOIN sellers s ON s.id = i.seller_id
+  WHERE m.store_slug = ${storeSlug}
+   AND s.slug = ${storeSlug}
+   AND i.status = 'active'
+   AND m.confidence IS NOT NULL AND m.confidence < ${threshold}
+   AND m.price_cents IS NOT NULL AND i.price_cents = m.price_cents
+ `.catch(() => [])) as { id: string }[];
+ return rows.map((r) => String(r.id));
 }
 
 export type PriceConfidenceBucket = { bucket: string; n: number; repricedPct: number | null; medianAbsErrorPct: number | null };

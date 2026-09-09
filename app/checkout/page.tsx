@@ -50,12 +50,17 @@ function CheckoutInner() {
  const itemId = sp.get("item") || "";
  const offerToken = sp.get("offer") || ""; // accepted binding offer → checkout at the agreed price
  const isCart = sp.get("cart") === "1";
+ // A rental pays for DATES, not for the piece. The booking already holds them; this page only has
+ // to collect who's paying and take the money, so it reuses the whole address/card flow below.
+ const rentalId = sp.get("rental") || "";
+ const isRental = Boolean(rentalId);
  // WHICH store's bag is being checked out. On a hosted storefront this page is served from the
  // seller's own domain and the host answers it; on VYA's domain every store shares one address, so
  // the page that sent the shopper here names the store (see storefront-cart-scope).
  const storeSlug = sp.get("store") || "";
  const storeQ = storeSlug ? `?store=${encodeURIComponent(storeSlug)}` : "";
  const [info, setInfo] = useState<Info | null>(null);
+ const [rental, setRental] = useState<{ id: string; rented: { start: string; end: string } | null; days: number; rentCents: number; waiverCents: number; totalCents: number; depositCents: number | null; fulfilment: string; termsText: string | null } | null>(null);
  const [loadErr, setLoadErr] = useState<string | null>(null);
  const [email, setEmail] = useState("");
  const [a, setA] = useState({ name: "", line1: "", line2: "", city: "", state: "", zip: "", country: "US", phone: "" });
@@ -78,21 +83,28 @@ function CheckoutInner() {
  const [dcBusy, setDcBusy] = useState(false);
 
  useEffect(() => {
- if (!itemId && !isCart) return;
+ if (!itemId && !isCart && !isRental) return;
  let cancelled = false;
  (async () => {
  try {
- const r = await fetch(isCart ? `/api/storefront/cart-checkout-info${storeQ}` : `/api/storefront/checkout-info?item=${itemId}${offerToken ? `&offer=${offerToken}` : ""}`);
+ const r = await fetch(
+ isRental ? `/api/storefront/rental-checkout-info?rental=${encodeURIComponent(rentalId)}`
+ : isCart ? `/api/storefront/cart-checkout-info${storeQ}`
+ : `/api/storefront/checkout-info?item=${itemId}${offerToken ? `&offer=${offerToken}` : ""}`);
  const d = await r.json();
  if (cancelled) return;
  if (!r.ok) { setLoadErr(d.error || "Couldn’t load this checkout."); return; }
- setInfo(isCart ? d : { items: [d.item], storeName: d.storeName, freeShipping: d.freeShipping, subtotalCents: d.item.priceCents, publishableKey: d.publishableKey });
+ if (isRental) {
+ setRental(d.rental);
+ // The rental line IS the subtotal — the piece's own price isn't being charged.
+ setInfo({ items: [d.item], storeName: d.storeName, freeShipping: false, subtotalCents: d.rental.totalCents, publishableKey: d.publishableKey });
+ } else setInfo(isCart ? d : { items: [d.item], storeName: d.storeName, freeShipping: d.freeShipping, subtotalCents: d.item.priceCents, publishableKey: d.publishableKey });
  } catch {
  if (!cancelled) setLoadErr("Couldn’t load this checkout.");
  }
  })();
  return () => { cancelled = true; };
- }, [itemId, isCart, offerToken, storeQ]);
+ }, [itemId, isCart, isRental, rentalId, offerToken, storeQ]);
 
  const cur = info?.items[0]?.currency || "USD";
  const money = (c: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: cur }).format((c || 0) / 100);
@@ -134,11 +146,16 @@ function CheckoutInner() {
  // (single item used to redirect to Stripe-hosted Checkout — now it's embedded like the cart).
  const buyer = { email, name: a.name, phone: a.phone };
  const shipAddr = { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country };
- const r2 = await fetch(isCart ? `/api/storefront/cart-intent${storeQ}` : "/api/storefront/item-intent", {
+ const r2 = await fetch(
+ isRental ? "/api/storefront/rental-intent"
+ : isCart ? `/api/storefront/cart-intent${storeQ}`
+ : "/api/storefront/item-intent", {
  method: "POST",
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify(
- isCart
+ isRental
+ ? { rentalId, buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship" }
+ : isCart
  ? { buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship" }
  : { itemId, offer: offerToken || undefined, discountCode: discount ? discountCode.trim() : undefined, buyer, ship: shipAddr, shippingCostCents: ship },
  ),
@@ -273,13 +290,20 @@ function CheckoutInner() {
  {/* eslint-disable-next-line @next/next/no-img-element */}
  {it.image && <img src={it.image} alt="" className="h-full w-full object-cover" />}
  </div>
- <div className="min-w-0 flex-1"><p className="text-sm leading-snug">{it.title}</p></div>
- <p className="text-sm font-medium whitespace-nowrap">{money(it.priceCents)}</p>
+ <div className="min-w-0 flex-1">
+ <p className="text-sm leading-snug">{it.title}</p>
+ {rental?.rented && (
+ <p className="mt-1 text-[11.5px] text-[#111111]/55">
+ Rental · {rental.rented.start} to {rental.rented.end} ({rental.days} {rental.days === 1 ? "day" : "days"})
+ </p>
+ )}
+ </div>
+ <p className="text-sm font-medium whitespace-nowrap">{money(rental ? rental.rentCents : it.priceCents)}</p>
  </div>
  ))}
  </div>
  <div className="border-t border-[#111111]/10 p-4 space-y-1.5 text-sm">
- {!isCart && (
+ {!isCart && !isRental && (
  <div className="mb-2.5 flex gap-2">
  <input className={input + " flex-1"} value={discountCode} onChange={(e) => { setDiscountCode(e.target.value); setDiscount(null); setDcErr(null); }} placeholder="Discount code" />
  <button onClick={applyDiscount} disabled={dcBusy || !discountCode.trim()} className="shrink-0 border border-[#111111]/25 px-3 text-[11px] uppercase tracking-[0.14em] text-[#111111] transition hover:bg-[#111111]/5 disabled:opacity-40">{dcBusy ? "…" : "Apply"}</button>
@@ -287,7 +311,15 @@ function CheckoutInner() {
  )}
  {dcErr && <p className="-mt-1 mb-2 text-[11px] text-red-700">{dcErr}</p>}
  {discount && <p className="-mt-1 mb-2 text-[11px] text-green-700">Code {discount.code} applied.</p>}
+ {rental && rental.waiverCents > 0 && (
+ <div className="flex justify-between"><span className="text-[#111111]/60">Damage waiver</span><span>{money(rental.waiverCents)}</span></div>
+ )}
  <div className="flex justify-between"><span className="text-[#111111]/60">Subtotal</span><span>{money(info.subtotalCents)}</span></div>
+ {rental?.depositCents ? (
+ <p className="pt-1 text-[11px] leading-relaxed text-[#111111]/55">
+ A {money(rental.depositCents)} deposit is held separately and released when the piece is back.
+ </p>
+ ) : null}
  {!isCart && discount && (discountOff > 0 || discount.freeShipping) && (
  <div className="flex justify-between text-green-700"><span>Discount ({discount.code})</span><span>{discount.freeShipping && discountOff === 0 ? "Free shipping" : `−${money(discountOff)}`}</span></div>
  )}

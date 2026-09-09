@@ -6,6 +6,7 @@
 import { FreeField, emptyHint, type EditKit } from "./kit";
 import NewsletterForm from "../NewsletterForm";
 import ContactForm from "../ContactForm";
+import { readContactFields, isPlaceholderCopy } from "@/app/lib/contact-fields";
 import Countdown from "../Countdown";
 
 function Heading({ kit, className, value }: { kit: EditKit; className: string; value?: string }) {
@@ -86,10 +87,10 @@ function CountdownDisplay({ kit }: { kit: EditKit }) {
 // so its label, colour, and shape are edited on the canvas without risking a live POST.
 function FormPreview({ kit, stacked }: { kit: EditKit; stacked?: boolean }) {
  const { b, ctx, p } = kit;
- if (!ctx.edit) return <NewsletterForm accent={ctx.colors.accent} label={p.cta || "Sign up"} />;
+ if (!ctx.edit) return <NewsletterForm accent={ctx.colors.accent} label={p.cta || "Sign up"} placeholder={p.placeholder} thanks={p.thanks} />;
  return (
   <div className={stacked ? "mx-auto flex max-w-sm flex-col items-center gap-3" : "flex w-full max-w-md items-center gap-2"}>
-   <input disabled placeholder="Email address" className="vya-field w-full border border-current/20 bg-current/[0.03] px-4 py-2.5 text-sm opacity-60 outline-none" />
+   <input disabled placeholder={p.placeholder || "Email address"} className="vya-field w-full border border-current/20 bg-current/[0.03] px-4 py-2.5 text-sm opacity-60 outline-none" />
    <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Sign up"} className="vya-cta inline-block whitespace-nowrap px-8 py-2.5 text-[11px] uppercase tracking-[0.18em]" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>
  );
@@ -154,19 +155,28 @@ function NewsletterPhoto({ kit }: { kit: EditKit }) {
 // editor (with the button still editable).
 function ContactFields({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
- if (!ctx.edit && ctx.storeSlug) return <ContactForm accent={ctx.colors.accent} storeSlug={ctx.storeSlug} />;
+ const fields = readContactFields(p);
+ if (!ctx.edit && ctx.storeSlug) return <ContactForm accent={ctx.colors.accent} storeSlug={ctx.storeSlug} cta={p.cta || "Send"} fields={fields} />;
+ // The editor draws the seller's own questions, inert. It used to draw a fixed Name/Email/Message
+ // whatever the section asked, so the one place she'd notice a wrong question showed her the right
+ // one regardless.
+ const stub = "vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60";
  return (
   <div className="flex flex-col gap-2.5">
-   <input disabled placeholder="Name" className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
-   <input disabled placeholder="Email" className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
-   <textarea disabled placeholder="Message" rows={4} className="vya-field w-full border border-current/20 bg-current/[0.03] px-3 py-2.5 text-[14px] opacity-60" />
+   {fields.map((f, i) => (
+    f.type === "long"
+     ? <textarea key={i} disabled placeholder={f.label} rows={4} className={stub} />
+     : <input key={i} disabled placeholder={f.type === "choice" && f.options.length ? `${f.label} — ${f.options.join(", ")}` : f.label} className={stub} />
+   ))}
    <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Send"} fullWidth className="vya-cta mt-1 grid place-items-center py-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>
  );
 }
 function ContactEmail({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
- if (!p.email) return null;
+ // "[YOUR EMAIL]" is a prompt the template left for the seller. Useful in the editor, a broken
+ // mailto: link on a published page — so it shows while she's editing and not once it's live.
+ if (!p.email || (!ctx.edit && isPlaceholderCopy(p.email))) return null;
  return <p className="mt-6 text-center text-xs opacity-55">Or email us at <a href={`mailto:${p.email}`} style={{ color: ctx.colors.accent }}>{p.email}</a></p>;
 }
 
@@ -190,7 +200,7 @@ function ContactSplit({ kit }: { kit: EditKit }) {
    <div className="vya-free-canvas relative">
     <Heading kit={kit} className="text-3xl leading-tight @xl:text-4xl" />
     <Sub kit={kit} className="mt-4 max-w-md text-sm leading-relaxed opacity-70" />
-    {p.email && <p className="mt-6 text-[13px] opacity-70"><a href={`mailto:${p.email}`} style={{ color: ctx.colors.accent }}>{p.email}</a></p>}
+    {p.email && (ctx.edit || !isPlaceholderCopy(p.email)) && <p className="mt-6 text-[13px] opacity-70"><a href={`mailto:${p.email}`} style={{ color: ctx.colors.accent }}>{p.email}</a></p>}
    </div>
    <ContactFields kit={kit} />
   </section>

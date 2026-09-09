@@ -207,6 +207,29 @@ function ProfitAndLoss({ margin, period, onAdded }: {
       </td>
      </tr>
 
+     {/* Selling costs: what sat between gross and net and was never shown. Each line only when it
+         happened — a cash-only store with no labels and no consignors sees none of these. */}
+     {(cur.feeCents > 0 || cur.cardFeeCents > 0 || cur.labelCostCents > 0 || cur.consignorCutCents > 0) && (
+      <>
+       <tr>
+        <td colSpan={2} className="pb-1 pt-6 font-mono text-[10px] uppercase tracking-[0.13em] text-stone-400">Selling costs</td>
+       </tr>
+       {[
+        { label: "VYA fees", cents: cur.feeCents },
+        { label: "Card processing", cents: cur.cardFeeCents, est: true },
+        { label: "Shipping labels", cents: cur.labelCostCents },
+        { label: "Consignor payouts", cents: cur.consignorCutCents },
+       ].filter((l) => l.cents > 0).map((l) => (
+        <tr key={l.label}>
+         <td className="border-b border-stone-100 py-2.5 pl-4 text-stone-500">
+          {l.label}{l.est && <span className="ml-1 align-top text-[8.5px] uppercase tracking-wide text-stone-300">est</span>}
+         </td>
+         <td className="border-b border-stone-100 py-2.5 text-right font-medium text-stone-500">−{money(l.cents)}</td>
+        </tr>
+       ))}
+      </>
+     )}
+
      <tr>
       <td colSpan={2} className="pb-1 pt-6 font-mono text-[10px] uppercase tracking-[0.13em] text-stone-400">Operating costs</td>
      </tr>
@@ -262,7 +285,9 @@ function ProfitAndLoss({ margin, period, onAdded }: {
       <td className="border-t-2 border-stone-900 pt-3.5 text-right text-[15px] font-semibold">
        {margin.netProfitCents == null ? <span className="text-stone-300">—</span> : (
         <span className={margin.netProfitCents < 0 ? "text-rose-600" : undefined}>
-         {money(margin.netProfitCents)} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(margin.netMarginPct)}</span>
+         {/* Sign before the symbol — "−$82", never "$-82". The formatter puts a minus after the
+             currency sign, which reads as a typo on the one line where the minus is the point. */}
+         {margin.netProfitCents < 0 ? "−" : ""}{money(Math.abs(margin.netProfitCents))} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(margin.netMarginPct)}</span>
         </span>
        )}
       </td>
@@ -275,7 +300,7 @@ function ProfitAndLoss({ margin, period, onAdded }: {
    <p className="mt-4 text-[11px] leading-relaxed text-stone-400">
     You can also just tell VYA — &ldquo;spent 84 on poly mailers&rdquo; — and it files the cost for you.
     {cur.coveragePct < 100 && cur.totalSales > 0 && (
-     <> Revenue and cost of goods cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.</>
+     <> Revenue, cost of goods and selling costs cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.{margin.profit.missingCostNote ? ` ${margin.profit.missingCostNote}` : ""}</>
     )}
     {/* On a tax-inclusive store the listed price already contains VAT, which is never the seller's
         money. Say what was taken out — and, where no tax was recorded, say that too rather than
@@ -695,7 +720,7 @@ function Analytics() {
         <Kpi label="Revenue" value={money(sales.current.gmvCents)} delta={sales.vsPrior?.gmvPct} yoy={sales.vsYoy?.gmvPct} data={sales.series.length >= 2 ? sales.series.map((s) => s.cents) : undefined} />
         <Kpi label="Sales" value={num(sales.current.orders)} delta={sales.vsPrior?.ordersPct} yoy={sales.vsYoy?.ordersPct} />
         <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "—"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
-        <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} hint="sold ÷ sold + listed" />
+        <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} hint="how many of your pieces sold" />
        </div>
 
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -920,7 +945,7 @@ function Analytics() {
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Avg. listed" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "—"} hint={`median ${money(catalog.medianListedPriceCents)}`} />
         <Kpi label="Avg. sold" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "—"} hint={catalog.soldInPeriod ? `median ${money(catalog.medianSoldPriceCents)}` : undefined} delta={catalog.vsPrior?.avgSoldPricePct} />
-        <Kpi label="Realisation" value={pct(catalog.realisationPct)} hint="sold ÷ asking" />
+        <Kpi label="Realisation" value={pct(catalog.realisationPct)} hint="what pieces sold for, against what you asked" />
         <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} />
        </div>
 
@@ -1006,7 +1031,7 @@ function Analytics() {
        </div>
 
        <TechCard className="p-5">
-        <CardTitle hint="live at least two weeks and earning the least attention per day — the ones to re-shoot, retitle or reprice">Getting the least attention</CardTitle>
+        <CardTitle hint="Listed for at least two weeks and getting the fewest views a day. These are the ones to re-shoot, retitle or reprice">Getting the least attention</CardTitle>
         <ProductTable rows={products.worstPerformers} columns={["views", "daysLive"]} />
        </TechCard>
 
@@ -1119,7 +1144,7 @@ function Analytics() {
         </TechCard>
 
         <TechCard className="p-5">
-         <CardTitle hint="what shoppers searched for on your store — demand your catalog may not answer yet">Top searches</CardTitle>
+         <CardTitle hint="What people searched for on your store. If something comes up a lot and you don't stock it, that's worth knowing">Top searches</CardTitle>
          <Leaderboard unit="count" rows={engagement.topSearches.map((s) => ({ name: s.query, value: s.count }))} />
         </TechCard>
        </div>
@@ -1127,7 +1152,7 @@ function Analytics() {
        {(engagement.devices.length > 0 || engagement.countries.length > 0) ? (
         <div className="grid gap-4 sm:grid-cols-2">
          <TechCard className="p-5">
-          <CardTitle hint="how shoppers are browsing — it decides how you shoot and crop">Devices</CardTitle>
+          <CardTitle hint="What people browse on. Worth knowing before you decide how to shoot and crop photos">Devices</CardTitle>
           {engagement.devices.length ? (
            <Leaderboard unit="count" rows={engagement.devices.map((d) => ({ name: d.device[0].toUpperCase() + d.device.slice(1), value: d.sessions, sub: pct(d.sharePct) }))} />
           ) : <p className="py-4 text-center text-[12px] text-stone-400">No device data in this period.</p>}
@@ -1154,7 +1179,7 @@ function Analytics() {
        )}
 
        <TechCard className="p-5">
-        <CardTitle hint="the first page of each visit — where people actually enter the store">Landing pages</CardTitle>
+        <CardTitle hint="The first page people land on when they arrive">Landing pages</CardTitle>
         <Leaderboard unit="count" rows={engagement.landingPages.map((p) => ({ name: p.title || p.path, value: p.sessions }))} />
        </TechCard>
 
@@ -1184,7 +1209,7 @@ function Analytics() {
 
        {!quality.enoughData ? (
         <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Not enough listings yet"
-         body="Once you've listed enough pieces and made a handful of sales, this tab shows which listing habits actually move them." />
+         body="Once you’ve listed enough pieces and made a few sales, this shows what your fastest-selling listings have in common." />
        ) : (
         <>
          <TechCard className="p-5">
@@ -1293,14 +1318,14 @@ function Analytics() {
           <Kpi label="Stock at cost" value={money(margin.inventoryCostCents)} hint="unsold, at what you paid" />
          </div>
 
-         {(["byBrand", "byCategory"] as const).map((key) => (
-          <TechCard key={key} className="p-5">
-           <CardTitle hint="ranked by profit, not revenue">{key === "byBrand" ? "Profit by brand" : "Profit by category"}</CardTitle>
+         {(["byBrand", "byCategory", "bySource"] as const).filter((key) => key !== "bySource" || (margin.bySource ?? []).length > 0).map((key) => (
+          <TechCard key={key} className="p-5" data-testid={key === "bySource" ? "profit-by-source" : undefined}>
+           <CardTitle hint={key === "bySource" ? "where each piece came from — which buying trips pay" : "ranked by profit, not revenue"}>{key === "byBrand" ? "Profit by brand" : key === "byCategory" ? "Profit by category" : "Profit by source"}</CardTitle>
            <div className="overflow-x-auto">
             <table className="w-full">
-             <thead><tr><TH>{key === "byBrand" ? "Brand" : "Category"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
+             <thead><tr><TH>{key === "byBrand" ? "Brand" : key === "byCategory" ? "Category" : "Source"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
              <tbody>
-              {margin[key].map((r) => (
+              {(margin[key] ?? []).map((r) => (
                <tr key={r.name}>
                 <TD><span className="font-medium text-stone-800">{r.name}</span></TD>
                 <TD right>{num(r.sales)}</TD>
@@ -1350,7 +1375,7 @@ function Analytics() {
 
     </>
    ) : (
-    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Analytics unavailable" body="We couldn't load your analytics just now. Try refreshing." />
+    <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Can’t load your numbers right now" body="We couldn’t load your numbers just now. Try refreshing the page." />
    )}
   </AdminPage>
  );

@@ -6,7 +6,7 @@ import { BASE_URL } from "@/app/lib/base-url";
 export const dynamic = "force-dynamic";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
-const WORKSPACE = "/infrastructure/admin/instagram";
+const WORKSPACE = "/infrastructure/admin/marketing/instagram";
 
 // Handles the Meta OAuth return: code → user token → the Page's linked IG Business account →
 // save { ig_user_id, page access_token } for that store. The Page access token is what the

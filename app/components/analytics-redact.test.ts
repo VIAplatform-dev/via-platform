@@ -11,7 +11,7 @@ test("leaves ordinary workspace screens alone", () => {
 });
 
 test("redacts the text of what was clicked on a seller's private screens", () => {
- for (const path of ["/admin/orders", "/admin/customers/buyers", "/admin/inbox", "/admin/payments", "/admin/consignment/payouts", "/admin/recovery"]) {
+ for (const path of ["/admin/orders", "/admin/customers/buyers", "/admin/inbox", "/admin/payments", "/admin/consignment/payouts", "/admin/customers/recovery"]) {
   const out = redactOnPrivateScreens({ $pathname: path, $el_text: "Priya Raman — priya@example.com" });
   assert.equal(out.$el_text, "[redacted]", path);
  }

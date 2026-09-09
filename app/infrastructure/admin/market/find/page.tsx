@@ -25,6 +25,7 @@ async function downscale(file: File, max = 1024): Promise<string> {
 function FindInner() {
  const [q, setQ] = useState("");
  const [items, setItems] = useState<MarketItem[] | null>(null);
+ const [all, setAll] = useState<MarketItem[] | null>(null);
  const [busy, setBusy] = useState(false);
  const [photo, setPhoto] = useState<string | null>(null);
  const [match, setMatch] = useState<MatchResp | null>(null);
@@ -34,6 +35,10 @@ function FindInner() {
  const camRef = useRef<HTMLInputElement>(null);
  const adding = useSearchParams().get("add") === "1";
  const basket = adding ? readCart() : [];
+
+ useEffect(() => {
+ api<{ items: MarketItem[] }>("/api/store/market/inventory?view=available").then((r) => { if (r.ok) setAll(r.data.items); });
+ }, []);
 
  useEffect(() => {
  const t = setTimeout(async () => {
@@ -62,8 +67,8 @@ function FindInner() {
 
  const top = match?.candidates[0];
  return (
- <MarketPage title={adding ? "Add another item" : "Find item"} back={adding && basket[0] ? `${B}/item/${basket[0].itemId}` : B}>
- {adding && basket.length > 0 && <div className="mb-3 rounded-2xl px-4 py-2.5 text-[13px]" style={{ background: "rgba(93,15,23,.08)", color: "#1c1917" }}>{basket.length} item{basket.length === 1 ? "" : "s"} in this sale · pick the next one</div>}
+ <MarketPage title={adding ? "Add to cart" : "Find item"} back={adding && basket.length > 0 ? `${B}/cart` : B}>
+ {adding && basket.length > 0 && <div className="mb-3 rounded-2xl px-4 py-2.5 text-[13px]" style={{ background: "rgba(93,15,23,.08)", color: "#1c1917" }}>{basket.length} item{basket.length === 1 ? "" : "s"} in cart · pick the next one</div>}
  {/* Camera first: opens the rear camera directly on phones; a file picker on desktop. */}
  <input ref={camRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { onPhoto(e.target.files); e.target.value = ""; }} />
  <button type="button" onClick={() => camRef.current?.click()} disabled={!!matching} className="flex min-h-[76px] w-full items-center justify-center gap-3 rounded-2xl bg-stone-900 text-[18px] font-semibold text-white active:scale-[0.99] disabled:bg-stone-400">
@@ -148,11 +153,19 @@ function FindInner() {
  )}
 
  <div className="mt-5 space-y-2">
+ {/* Nothing typed and no photo result — the whole rack is right here, no search needed. */}
+ {!q.trim() && !match && (
+ <>
+ {all === null && <p className="text-center text-[13px] text-stone-400">Loading…</p>}
+ {all && all.length > 0 && <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{all.length} item{all.length === 1 ? "" : "s"} at this market</p>}
+ {all?.map((it) => <ItemCard key={it.id} item={it} to={`${B}/item/${it.id}`} />)}
+ </>
+ )}
  {busy && items === null && <p className="text-center text-[13px] text-stone-400">Searching…</p>}
  {items && items.length === 0 && (
  <div className="space-y-3">
  <Notice tone="info">No item matches “{q}”.</Notice>
- <a href={href(`${B}/quick${adding ? "?add=1" : ""}`)} className="block text-center text-[14px] font-semibold text-stone-900 underline">{adding ? "Not listed? Add it to this sale →" : "Can’t find it? Quick list →"}</a>
+ <a href={href(`${B}/quick${adding ? "?add=1" : ""}`)} className="block text-center text-[14px] font-semibold text-stone-900 underline">{adding ? "Not listed? Add it to cart →" : "Can’t find it? Quick list →"}</a>
  </div>
  )}
  {items && items.length > 0 && <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{items.length} match{items.length === 1 ? "" : "es"}</p>}

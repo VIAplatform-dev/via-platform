@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import type { ParsedCustomer } from "./parse-customers";
+import { filterCustomers, audienceIsEmpty, type AudienceFilter } from "./customer-audience-core";
 
 // A seller's existing customer list, brought over at onboarding. Stored per store
 // and deduped by email so re-uploading is safe. This is the seller's own audience
@@ -61,6 +62,16 @@ export async function importCustomers(
  phone = COALESCE(EXCLUDED.phone, store_customers.phone)`;
  }
  const total = await getCustomerCount(storeSlug);
+
+ // A store that connected Klaviyo or Mailchimp expects someone who signs up or buys to appear there
+ // now, not at the next full sync. A CSV import of ten thousand is a different case — that's what
+ // "Send everyone now" is for — so only small, live additions go across immediately.
+ if (rows.length <= 50) {
+  const { mirrorToEsp } = await import("./esp-mirror");
+  for (const r of rows) {
+   if (r.email) mirrorToEsp(storeSlug, { email: r.email.toLowerCase().trim(), name: r.name, phone: r.phone, subscribed: true });
+  }
+ }
  return { added: total - before, total };
 }
 
@@ -94,6 +105,8 @@ export type CustomerProfile = {
  addedAt: string | null; // ISO — when imported
  tags: string[]; // seller-defined segments
  notes: string | null; // seller's private note
+ /** Categories of the pieces they have bought here, lower-cased — "bought in category" filters on it. */
+ categories: string[];
 };
 
 export async function listCustomerProfiles(storeSlug: string): Promise<CustomerProfile[]> {
@@ -116,9 +129,11 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  max(o.buyer_phone) AS phone,
  count(*)::int AS orders,
  coalesce(sum(o.amount_cents), 0)::int AS spent_cents,
- max(o.paid_at) AS last_order
+ max(o.paid_at) AS last_order,
+ array_remove(array_agg(DISTINCT lower(trim(i.category))), NULL) AS categories
  FROM orders o
  JOIN sellers s ON s.id = o.seller_id
+ LEFT JOIN items i ON i.id = o.item_id AND i.category IS NOT NULL AND i.category <> ''
  WHERE s.slug = ${storeSlug}
  AND o.buyer_email IS NOT NULL AND o.buyer_email <> ''
  AND o.status IN ('paid', 'shipped', 'delivered')
@@ -133,7 +148,7 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  AND o.buyer_email IS NOT NULL AND o.buyer_email <> ''
  ORDER BY lower(o.buyer_email), o.paid_at DESC NULLS LAST
  )
- SELECT a.email, a.name, a.phone, a.orders, a.spent_cents, a.last_order,
+ SELECT a.email, a.name, a.phone, a.orders, a.spent_cents, a.last_order, a.categories,
  l.ship_city, l.ship_state, l.ship_country
  FROM agg a
  LEFT JOIN loc l USING (email)
@@ -146,7 +161,7 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  for (const r of imported) {
  const email = String(r.email || "").toLowerCase().trim();
  if (!email) continue;
- map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location: null, subscribed: r.email_subscribed !== false, source: "imported", orders: 0, spentCents: 0, lastOrderAt: null, addedAt: iso(r.created_at), tags: Array.isArray(r.tags) ? r.tags : [], notes: r.notes ?? null });
+ map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location: null, subscribed: r.email_subscribed !== false, source: "imported", orders: 0, spentCents: 0, lastOrderAt: null, addedAt: iso(r.created_at), tags: Array.isArray(r.tags) ? r.tags : [], notes: r.notes ?? null, categories: [] });
  }
  for (const r of buyers) {
  const email = String(r.email || "").toLowerCase().trim();
@@ -161,8 +176,9 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  existing.name = existing.name || r.name || null;
  existing.phone = existing.phone || r.phone || null;
  existing.location = existing.location || location;
+ existing.categories = Array.isArray(r.categories) ? r.categories.filter(Boolean) : [];
  } else {
- map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location, subscribed: true, source: "buyer", orders: r.orders, spentCents: r.spent_cents, lastOrderAt: iso(r.last_order), addedAt: null, tags: [], notes: null });
+ map.set(email, { email, name: r.name ?? null, phone: r.phone ?? null, location, subscribed: true, source: "buyer", orders: r.orders, spentCents: r.spent_cents, lastOrderAt: iso(r.last_order), addedAt: null, tags: [], notes: null, categories: Array.isArray(r.categories) ? r.categories.filter(Boolean) : [] });
  }
  }
 
@@ -175,8 +191,10 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
  * email and limited to those who are subscribed and have a valid address. This — not the raw
  * imported table — is who a campaign actually reaches, so campaigns count and send consistently.
  */
-export async function listSubscribers(storeSlug: string): Promise<{ email: string; name: string | null }[]> {
- const profiles = await listCustomerProfiles(storeSlug);
+export async function listSubscribers(storeSlug: string, audience?: AudienceFilter | null): Promise<{ email: string; name: string | null }[]> {
+ const all = await listCustomerProfiles(storeSlug);
+ // The SAME filter the customer list runs — so "Send to 38" is 38 people, not a different 40.
+ const profiles = audience && !audienceIsEmpty(audience) ? filterCustomers(all, audience) : all;
  const seen = new Set<string>();
  const out: { email: string; name: string | null }[] = [];
  for (const p of profiles) {
@@ -186,6 +204,12 @@ export async function listSubscribers(storeSlug: string): Promise<{ email: strin
  out.push({ email: p.email, name: p.name });
  }
  return out;
+}
+
+/** Every category this store has sold, lower-cased — the choices for "bought in category". */
+export async function listSoldCategories(storeSlug: string): Promise<string[]> {
+ const profiles = await listCustomerProfiles(storeSlug).catch(() => []);
+ return Array.from(new Set(profiles.flatMap((p) => p.categories))).sort();
 }
 
 /** A transparent breakdown of the audience so the count is verifiable, not a mystery number. */
@@ -215,6 +239,11 @@ export async function setEmailSubscribed(storeSlug: string, email: string, subsc
  VALUES (${storeSlug}, ${email.toLowerCase().trim()}, ${subscribed}, 'unsubscribe')
  ON CONFLICT (store_slug, email) DO UPDATE SET email_subscribed = ${subscribed}
  `.catch(() => {});
+ // If the store sends from Klaviyo or Mailchimp, tell it too. An unsubscribe that VYA honours and
+ // their other tool doesn't is the worst outcome here: the person keeps getting emails and the
+ // store looks like it ignored them.
+ const { mirrorToEsp } = await import("./esp-mirror");
+ mirrorToEsp(storeSlug, { email: email.toLowerCase().trim(), subscribed });
 }
 
 // ── CRM: tags (segments) + a private note per contact ──────────────────────────

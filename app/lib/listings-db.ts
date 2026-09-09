@@ -1,5 +1,5 @@
 import { getSellerBySlug } from "./db/sellers";
-import { createItem, updateItem, removeItem, getItem, listAvailableItems, listSellerItems } from "./db/inventory";
+import { createItem, updateItem, removeItem, getItem, listStorefrontItems, listSellerItems } from "./db/inventory";
 import { getOrCreateCollection, setItemCollections } from "./db/collections";
 import type { Item } from "./db/index";
 import { MAX_ITEM_IMAGES } from "./item-limits";
@@ -39,6 +39,8 @@ export type Listing = {
  category: string | null;
  tags: string[];
  status: ListingStatus;
+ /** Kept back for someone (or a buyer mid-checkout): on the shelf, badged, not buyable today. */
+ held: boolean;
  createdAt?: string;
 };
 
@@ -73,16 +75,18 @@ function itemToListing(it: Item, storeSlug: string): Listing {
  category: it.category ?? null,
  tags: [],
  status,
+ held: it.status === "reserved",
  createdAt: it.createdAt ? new Date(it.createdAt).toISOString() : undefined,
  };
 }
 
-/** All listings for a store. `activeOnly` for the public storefront. Returns []
- * for a store that isn't a transacting seller yet (no db/seller row). */
+/** All listings for a store. `activeOnly` for the public storefront: what is on the shelf right
+ * now — live pieces and held ones (badged "On hold"), never sold or drafts. Returns [] for a store
+ * that isn't a transacting seller yet (no db/seller row). */
 export async function getListingsByStore(storeSlug: string, activeOnly = false): Promise<Listing[]> {
  const seller = await getSellerBySlug(storeSlug);
  if (!seller) return [];
- const items = activeOnly ? await listAvailableItems(seller.id) : await listSellerItems(seller.id);
+ const items = activeOnly ? (await listStorefrontItems(seller.id)).filter((it) => it.status !== "sold") : await listSellerItems(seller.id);
  return items.filter((it) => it.status !== "removed").map((it) => itemToListing(it, storeSlug));
 }
 

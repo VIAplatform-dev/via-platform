@@ -10,7 +10,14 @@ const nextConfig: NextConfig = {
   // `/_next/static/chunks/*.js` came back 403 — which meant VYA's own checkout page, the one page
   // every hosted-store shopper is sent to, never hydrated and sat on "Loading…" forever. Dev only:
   // in production those assets are served normally and this setting does nothing.
-  allowedDevOrigins: ["*.vyasites.test", "*.vyasites.com"],
+  //
+  // 127.0.0.1 is here for the same reason and a different cause: Mailchimp refuses "localhost" as an
+  // OAuth redirect URI, so testing a connection has to happen on that host — and without this the
+  // admin loads its shell and none of its JavaScript.
+  //
+  // ONE declaration. There were briefly two, and the second silently won — a duplicate key in an
+  // object literal doesn't merge and doesn't warn.
+  allowedDevOrigins: ["*.vyasites.test", "*.vyasites.com", "127.0.0.1", "localhost"],
   // Don't advertise the framework/version.
   poweredByHeader: false,
   // Required by the /ingest reverse proxy below: PostHog's API paths are trailing-slash sensitive,

@@ -38,6 +38,6 @@ export async function POST(request: NextRequest) {
 
  await addMessage(conv.id, "buyer", text.slice(0, 5000));
  // Nudge the store their buyer replied (email + optional text) — same path as a new message.
- notifyStoreOfMessage(auth.storeSlug, { itemTitle: conv.itemTitle, buyerName: conv.buyerName, message: text.slice(0, 5000) }).catch(() => {});
+ notifyStoreOfMessage(auth.storeSlug, { itemTitle: conv.itemTitle, buyerName: conv.buyerName, message: text.slice(0, 5000), conversationId: conv.id }).catch(() => {});
  return NextResponse.json({ ok: true });
 }

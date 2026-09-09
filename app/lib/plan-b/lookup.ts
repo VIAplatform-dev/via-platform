@@ -10,9 +10,11 @@
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, items } from "@/app/lib/db/index";
 import type { Item } from "@/app/lib/db/index";
+import { SELLABLE_STATUSES } from "./cart-refusal-core.ts";
 
-/** Statuses a shopper may add to a cart. A sold one-of-one is gone, not backorderable. */
-const SELLABLE = ["active", "draft"] as const;
+/** Statuses a shopper may add to a cart. A sold one-of-one is gone, not backorderable. One list,
+ *  shared with the refusal wording (cart-refusal-core.ts) so the two can never disagree. */
+const SELLABLE = SELLABLE_STATUSES;
 
 /**
  * The item a theme's variant id refers to, scoped to one seller.

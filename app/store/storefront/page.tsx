@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { withStore } from "@/app/infrastructure/admin/market/ui";
 import { applyPageOrder, movePage } from "@/app/lib/page-order";
 import { SECTION_CATEGORIES, categoryFor, variantGroup } from "@/app/lib/storefront-variants";
 import Blocks from "@/app/s/Blocks";
@@ -164,17 +165,17 @@ export default function StorefrontEditor() {
  (async () => {
  try {
  const [meR, sfR, dsR, domR, asR, capR, cssR] = await Promise.all([
- fetch("/api/store/me"),
- fetch("/api/store/storefront"),
- fetch("/api/store/storefront/design"),
- fetch("/api/store/domain"),
- fetch("/api/store/assets"),
- fetch("/api/store/capture"),
- fetch("/api/store/capture/css"),
+ fetch(withStore("/api/store/me")),
+ fetch(withStore("/api/store/storefront")),
+ fetch(withStore("/api/store/storefront/design")),
+ fetch(withStore("/api/store/domain")),
+ fetch(withStore("/api/store/assets")),
+ fetch(withStore("/api/store/capture")),
+ fetch(withStore("/api/store/capture/css")),
  ]);
  if (cancelled) return;
  if (capR.ok) { const c = await capR.json(); setIsAdmin(!!c.isAdmin); if (c.captured > 0) setCaptured({ count: c.captured, url: c.url, slug: c.slug || null, origin: c.origin, pages: c.pages || [], unlinked: c.unlinked || [] }); }
-   fetch("/api/store/storefront/page-order").then((r) => (r.ok ? r.json() : null)).then((d) => setPageOrder(Array.isArray(d?.order) ? d.order : [])).catch(() => setPageOrder([]));
+   fetch(withStore("/api/store/storefront/page-order")).then((r) => (r.ok ? r.json() : null)).then((d) => setPageOrder(Array.isArray(d?.order) ? d.order : [])).catch(() => setPageOrder([]));
  if (cssR.ok) { const { css } = await cssR.json(); const { settings, rest } = parseDesign(css || ""); setDesign(settings); setDesignRest(rest); }
  setDesignLoaded(true);
  if (asR.ok) { const a = await asR.json(); setAssets(a.assets || []); }
@@ -251,7 +252,7 @@ export default function StorefrontEditor() {
  setPreviewKey((k) => k + 1); // reload the captured-site preview after a VYA edit
  (async () => {
  try {
- const [sfR, dsR] = await Promise.all([fetch("/api/store/storefront"), fetch("/api/store/storefront/design")]);
+ const [sfR, dsR] = await Promise.all([fetch(withStore("/api/store/storefront")), fetch(withStore("/api/store/storefront/design"))]);
  if (sfR.ok) { const d = await sfR.json(); setTagline(d.settings.tagline || ""); setHeroImage(d.settings.heroImage || ""); }
  if (dsR.ok) { const d = await dsR.json(); setTemplate(d.template); setColors(d.colors); setFonts(d.fonts); setBlocks(d.blocks || []); setShopBlocks(d.shopBlocks || []); setExtraPages(d.extraPages || []); setCustomCss(d.customCss || ""); }
  } catch { /* ignore */ }
@@ -267,10 +268,10 @@ export default function StorefrontEditor() {
  async function generateStorefront() {
  setGenBusy(true); setGenErr(null);
  try {
- const r = await fetch("/api/store/storefront/generate", { method: "POST" });
+ const r = await fetch(withStore("/api/store/storefront/generate"), { method: "POST" });
  const d = await r.json();
  if (!r.ok) { setGenErr(d.error || "Couldn’t generate — try again."); setGenBusy(false); return; }
- const dsR = await fetch("/api/store/storefront/design");
+ const dsR = await fetch(withStore("/api/store/storefront/design"));
  if (dsR.ok) { const ds = await dsR.json(); setTemplate(ds.template); setColors(ds.colors); setFonts(ds.fonts); setBlocks(ds.blocks || []); setExtraPages(ds.extraPages || []); setActiveSlug("home"); }
  setSaved(false);
  } catch { setGenErr("Couldn’t generate — try again."); }
@@ -282,7 +283,7 @@ export default function StorefrontEditor() {
  if (!captured?.origin) { setSyncMsg("We don't have your original site URL — bring it over again from “Bring your site.”"); return; }
  setSyncBusy(true); setSyncMsg(null);
  try {
- const r = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: captured.origin }) });
+ const r = await fetch(withStore("/api/store/capture"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: captured.origin }) });
  const d = await r.json();
  if (!r.ok) setSyncMsg(d.error || "Re-sync failed.");
  else { setCaptured((c) => (c ? { ...c, count: d.pages ?? c.count } : c)); setSyncMsg(`✓ Synced — ${d.pages} pages now up to date.`); setPreviewKey((k) => k + 1); }
@@ -302,7 +303,7 @@ export default function StorefrontEditor() {
  setDesignSaved(false);
  if (designSaveTimer.current) clearTimeout(designSaveTimer.current);
  designSaveTimer.current = setTimeout(() => {
- fetch("/api/store/capture/css", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ css }) }).then(() => setDesignSaved(true)).catch(() => {});
+ fetch(withStore("/api/store/capture/css"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ css }) }).then(() => setDesignSaved(true)).catch(() => {});
  }, 650);
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [design, designRest, captured, designLoaded]);
@@ -360,14 +361,14 @@ export default function StorefrontEditor() {
  // Asset library (Canva-style uploads) — the store's own photos, reusable across the whole site.
  async function loadAssets() {
  setAssetsBusy(true);
- const r = await fetch("/api/store/assets").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch(withStore("/api/store/assets")).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  setAssets(r?.assets || []);
  setAssetsBusy(false);
  }
  async function uploadAsset(file: File): Promise<string | null> {
  setAssetsBusy(true);
  const fd = new FormData(); fd.append("file", file);
- const r = await fetch("/api/store/assets", { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const r = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  setAssetsBusy(false);
  if (r?.url) { const url = r.url as string; setAssets((a) => [{ url }, ...a.filter((x) => x.url !== url)]); return url; }
  return null;
@@ -404,7 +405,7 @@ export default function StorefrontEditor() {
  async function replacePanelImage(i: number, file: File) {
  const f = panel?.fields[i]; if (!f || f.kind !== "image") return;
  const fd = new FormData(); fd.append("file", file);
- try { const r = await fetch("/api/store/assets", { method: "POST", body: fd }); if (r.ok) { const { url } = await r.json(); updatePanelField(i, { src: url }); postToPreview({ vya: "set", kind: "image", id: f.id, src: url }); } } catch { /* ignore */ }
+ try { const r = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd }); if (r.ok) { const { url } = await r.json(); updatePanelField(i, { src: url }); postToPreview({ vya: "set", kind: "image", id: f.id, src: url }); } } catch { /* ignore */ }
  }
  function savePanel() { setPanelSaving(true); postToPreview({ vya: "save" }); }
  const fieldLabel = (tag: string): string => (({ h1: "Heading", h2: "Heading", h3: "Heading", h4: "Subheading", h5: "Subheading", h6: "Subheading", p: "Text", li: "List item", a: "Link text", button: "Button", blockquote: "Quote", label: "Label", span: "Text" }) as Record<string, string>)[tag] || "Text";
@@ -486,14 +487,14 @@ export default function StorefrontEditor() {
  }
  async function saveBlocks() {
  setBusy(true); setSaved(false); setErr(null);
- try { const r = await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks, shopBlocks, extraPages }) }); if (!r.ok) setErr("Couldn’t save."); else setSaved(true); } catch { setErr("Couldn’t save."); }
+ try { const r = await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks, shopBlocks, extraPages }) }); if (!r.ok) setErr("Couldn’t save."); else setSaved(true); } catch { setErr("Couldn’t save."); }
  setBusy(false);
  }
 
  async function saveDesign() {
  setBusy(true); setSaved(false); setErr(null);
  try {
- const r = await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template, colors, fonts }) });
+ const r = await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ template, colors, fonts }) });
  if (!r.ok) setErr("Couldn’t save the design."); else setSaved(true);
  } catch { setErr("Couldn’t save the design."); }
  setBusy(false);
@@ -503,14 +504,14 @@ export default function StorefrontEditor() {
  async function toggleLive() {
  const next = !enabled;
  setEnabled(next);
- await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled: next, tagline, accentColor: colors.accent, heroImage, about }) }).catch(() => setEnabled(!next));
+ await fetch(withStore("/api/store/storefront"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled: next, tagline, accentColor: colors.accent, heroImage, about }) }).catch(() => setEnabled(!next));
  }
 
  // Admin-only: wipe this storefront entirely (settings, design, pages, public URL) and reopen blank.
  async function removeStorefront() {
  if (!confirm("DELETE STOREFRONT: wipes this store’s ENTIRE imported site — settings, design, captured pages, public URL, AND all imported inventory. This can’t be undone. Continue?")) return;
  setDelBusy(true);
- const r = await fetch("/api/store/storefront", { method: "DELETE" }).catch(() => null);
+ const r = await fetch(withStore("/api/store/storefront"), { method: "DELETE" }).catch(() => null);
  if (r && r.ok) { window.location.reload(); return; }
  setDelBusy(false);
  }
@@ -518,7 +519,7 @@ export default function StorefrontEditor() {
  async function saveDetails() {
  setBusy(true); setSaved(false); setErr(null);
  try {
- const r = await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled, tagline, accentColor: colors.accent, heroImage, about }) });
+ const r = await fetch(withStore("/api/store/storefront"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled, tagline, accentColor: colors.accent, heroImage, about }) });
  const d = await r.json();
  if (!r.ok) setErr(d.error || "Save failed."); else { setHandle(d.settings.handle); setSaved(true); }
  } catch { setErr("Save failed."); }
@@ -528,7 +529,7 @@ export default function StorefrontEditor() {
  async function connectDomain() {
  setDomBusy(true); setDomErr(null);
  try {
- const r = await fetch("/api/store/domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: domInput }) });
+ const r = await fetch(withStore("/api/store/domain"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ domain: domInput }) });
  const d = await r.json();
  if (!r.ok) setDomErr(d.error || "Couldn’t connect that domain."); else { setDom({ configured: true, domain: d.domain, status: d.status }); setDomInput(""); }
  } catch { setDomErr("Couldn’t connect that domain."); }
@@ -536,20 +537,20 @@ export default function StorefrontEditor() {
  }
  async function recheckDomain() {
  setDomBusy(true); setDomErr(null);
- try { const r = await fetch("/api/store/domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify" }) }); const d = await r.json(); if (r.ok) setDom((x) => ({ ...x, status: d.status })); else setDomErr(d.error || "Check failed."); } catch { setDomErr("Check failed."); }
+ try { const r = await fetch(withStore("/api/store/domain"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify" }) }); const d = await r.json(); if (r.ok) setDom((x) => ({ ...x, status: d.status })); else setDomErr(d.error || "Check failed."); } catch { setDomErr("Check failed."); }
  setDomBusy(false);
  }
- async function disconnectDomain() { if (!confirm("Disconnect this domain?")) return; setDomBusy(true); await fetch("/api/store/domain", { method: "DELETE" }); setDom((x) => ({ ...x, domain: null, status: null })); setDomBusy(false); }
+ async function disconnectDomain() { if (!confirm("Disconnect this domain?")) return; setDomBusy(true); await fetch(withStore("/api/store/domain"), { method: "DELETE" }); setDom((x) => ({ ...x, domain: null, status: null })); setDomBusy(false); }
  async function searchDomain() {
  const q = dsearch.trim(); if (!q) return;
  setDsBusy(true); setDres(null); setShowBuy(false); setBuyMsg(null);
- try { const r = await fetch("/api/store/domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "search", domain: q }) }); const d = await r.json(); if (r.ok) setDres({ domain: d.domain, available: d.available, priceCents: d.priceCents }); else setBuyMsg(d.error || "Search failed."); } catch { setBuyMsg("Search failed."); }
+ try { const r = await fetch(withStore("/api/store/domain"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "search", domain: q }) }); const d = await r.json(); if (r.ok) setDres({ domain: d.domain, available: d.available, priceCents: d.priceCents }); else setBuyMsg(d.error || "Search failed."); } catch { setBuyMsg("Search failed."); }
  setDsBusy(false);
  }
  async function buyDomainNow() {
  if (!dres) return;
  setBuyBusy(true); setBuyMsg(null);
- try { const r = await fetch("/api/store/domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy", domain: dres.domain, contact: buyForm }) }); const d = await r.json(); if (r.ok) { setDom((x) => ({ ...x, domain: d.domain, status: d.status })); setDres(null); setShowBuy(false); } else setBuyMsg(d.error || "Purchase failed."); } catch { setBuyMsg("Purchase failed."); }
+ try { const r = await fetch(withStore("/api/store/domain"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "buy", domain: dres.domain, contact: buyForm }) }); const d = await r.json(); if (r.ok) { setDom((x) => ({ ...x, domain: d.domain, status: d.status })); setDres(null); setShowBuy(false); } else setBuyMsg(d.error || "Purchase failed."); } catch { setBuyMsg("Purchase failed."); }
  setBuyBusy(false);
  }
 
@@ -559,13 +560,13 @@ export default function StorefrontEditor() {
  setAssetBusy(true);
  for (const f of imgs) {
  const fd = new FormData(); fd.append("file", f);
- try { const r = await fetch("/api/store/assets", { method: "POST", body: fd }); if (r.ok) { const d = await r.json(); setAssets((a) => [{ url: d.url }, ...a]); } } catch { /* skip */ }
+ try { const r = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd }); if (r.ok) { const d = await r.json(); setAssets((a) => [{ url: d.url }, ...a]); } } catch { /* skip */ }
  }
  setAssetBusy(false);
  }
  async function deleteAsset(url: string) {
  setAssets((a) => a.filter((x) => x.url !== url));
- await fetch(`/api/store/assets?url=${encodeURIComponent(url)}`, { method: "DELETE" }).catch(() => {});
+ await fetch(withStore(`/api/store/assets?url=${encodeURIComponent(url)}`), { method: "DELETE" }).catch(() => {});
  }
  // Place a photo as the hero and persist immediately. If the home page has a hero SECTION, set its
  // image (the modern block model); otherwise fall back to the legacy storefront hero image.
@@ -574,11 +575,11 @@ export default function StorefrontEditor() {
  if (heroBlock) {
  const next = blocks.map((b) => (b.id === heroBlock.id ? { ...b, props: { ...b.props, image: url } } : b));
  setBlocks(next); setSaved(false);
- await fetch("/api/store/storefront/design", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks: next, shopBlocks, extraPages }) }).catch(() => {});
+ await fetch(withStore("/api/store/storefront/design"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ blocks: next, shopBlocks, extraPages }) }).catch(() => {});
  return;
  }
  setHeroImage(url);
- await fetch("/api/store/storefront", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled, tagline, accentColor: colors.accent, heroImage: url, about }) }).catch(() => {});
+ await fetch(withStore("/api/store/storefront"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ handle, enabled, tagline, accentColor: colors.accent, heroImage: url, about }) }).catch(() => {});
  }
 
  const input = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-stone-400 focus:ring-2 focus:ring-stone-900/[0.06]";
@@ -910,7 +911,7 @@ export default function StorefrontEditor() {
  <div className="mt-5 space-y-2 border-t border-black/10 pt-4">
  <button onClick={reSync} disabled={syncBusy} className="w-full rounded-lg border border-black/15 px-3 py-1.5 text-[12px] font-medium text-stone-600 hover:border-[#5D0F17] disabled:opacity-50">{syncBusy ? "Syncing…" : "Re-sync from live site (admin)"}</button>
  {(syncBusy || syncMsg) && <p className={`text-[11px] ${syncBusy ? "text-stone-400" : syncMsg!.startsWith("✓") ? "text-green-700" : "text-amber-700"}`}>{syncBusy ? "Re-crawling — a minute or two…" : syncMsg}</p>}
- <button onClick={async () => { if (!confirm("OWNER RESET: discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone — continue?")) return; const r = await fetch("/api/store/capture", { method: "DELETE" }).catch(() => null); if (r && r.ok) { window.location.reload(); } else { const msg = r ? ((await r.json().catch(() => ({}))).error || `Reset failed (${r.status}).`) : "Reset failed — network error."; alert(msg + " The captured site was NOT removed."); } }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
+ <button onClick={async () => { if (!confirm("OWNER RESET: discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone — continue?")) return; const r = await fetch(withStore("/api/store/capture"), { method: "DELETE" }).catch(() => null); if (r && r.ok) { window.location.reload(); } else { const msg = r ? ((await r.json().catch(() => ({}))).error || `Reset failed (${r.status}).`) : "Reset failed — network error."; alert(msg + " The captured site was NOT removed."); } }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
  </div>
  )}
  {isPlatformAdmin && (
@@ -1039,7 +1040,7 @@ export default function StorefrontEditor() {
 
   const saveOrder = (next: string[]) => {
    setPageOrder(next); // the strip moves now; the save is a formality behind it
-   fetch("/api/store/storefront/page-order", {
+   fetch(withStore("/api/store/storefront/page-order"), {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next }),
    }).catch(() => { /* the arrangement is a preference — a failed save must not interrupt her */ });
   };

@@ -36,10 +36,18 @@ export async function GET(request: NextRequest) {
 
  const store = stores.find((s) => s.slug === storeSlug);
  if (!store) {
- // Store is in storeContactEmails but not yet fully onboarded — return a minimal portal
+ // Store is in storeContactEmails but not yet fully onboarded — return a minimal portal.
+ //
+ // The name comes from the sellers row, not from the slug. `stores` is a hardcoded array of the
+ // original partner shops; every store that signed up since is absent from it and fell through to
+ // this branch, where the name WAS the slug. So a seller who set her name in Settings was greeted
+ // by her URL — "Good afternoon, gianna-marie-raucher" — and nothing she typed ever changed it.
+ const named = await neon(getDatabaseUrl())`SELECT name FROM sellers WHERE slug = ${storeSlug} LIMIT 1`
+  .then((r) => (r[0]?.name as string | undefined) || null)
+  .catch(() => null);
  return NextResponse.json({
  storeSlug,
- storeName: storeSlug,
+ storeName: named || storeSlug,
  location: "",
  currency: "USD",
  website: "",

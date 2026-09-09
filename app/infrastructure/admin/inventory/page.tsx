@@ -2,11 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import { daysListed, AGING_THRESHOLDS } from "@/app/lib/aging-core";
+import { holdPill, HOLD_LENGTHS } from "@/app/lib/holds-core";
 import { Package, Search, List, LayoutGrid, Check, X, SlidersHorizontal } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, ConfirmDialog, cn } from "../ui";
+import { shipFromGate, type ShipFromGate } from "@/app/lib/setup-gate-core";
 import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
 import { Input, Field, inputCls } from "@/app/store/ui";
+import { ConditionChips, MeasurementFields, ShipsAsRow, measurementsFromForm, measurementsToForm, useStoreUnits } from "../ListingStructure";
+import { formatMeasurements, type MeasurementKey, type Measurement } from "@/app/lib/measurements-core";
+import type { ParcelEstimate } from "@/app/lib/parcel-core";
+import RentalPanel from "../rentals/RentalPanel";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 
 /**
@@ -33,6 +40,7 @@ type Item = {
  brand: string | null;
  era: string | null;
  material: string | null;
+ colour: string | null;
  condition: string | null;
  size: string | null;
  category: string | null;
@@ -45,14 +53,24 @@ type Item = {
  heightIn: number | null;
  collections?: string[];
  source?: string; // manual | imported | ai | market (quick-listed at a market)
+ createdAt?: string; // when it went on the rail — powers the Days column
+ flaws?: string[] | null; // specific visible flaws, printed under Condition on the product page
+ sourceName?: string | null; // where it came from, in her words ("Kempton", "Ana's estate")
+ acquiredAt?: string | null; // YYYY-MM-DD
+ lotId?: string | null;
+ measurementsJson?: Measurement[] | null; // structured, per category (measurements-core.ts)
+ conditionNote?: string | null; // beyond the grade
+ parcelEstimate?: ParcelEstimate | null; // what the piece looks like it ships as (parcel-core.ts)
 };
 
 const TONE = STATUS_TONE;
 
 type EditForm = {
- title: string; price: string; cost: string; brand: string; era: string; material: string;
+ title: string; price: string; cost: string; brand: string; era: string; material: string; colour: string;
  condition: string; size: string; category: string | null; description: string; status: ItemStatus; // slug, or free text under "Other"
  weightOz: string; lengthIn: string; widthIn: string; heightIn: string;
+ conditionNote: string; measurements: Partial<Record<MeasurementKey, string>>;
+ sourceName: string; acquiredAt: string;
 };
 
 export default function ItemsPage() {
@@ -61,9 +79,32 @@ export default function ItemsPage() {
  const deepLinkId = searchParams.get("item"); // ?item=<id> from global search → open its editor
  // ?missing=photo|price — Market Mode's "Before you sell" list deep-links straight to the items that
  // need fixing. Seeded from the URL once; the seller can clear it like any other filter.
+ // photo | price | details | cost | confidence — the last two are Home's "no cost" and "AI prices to
+ // check" rows; `confidence` asks /api/store/attention which live pieces intake was unsure about.
+ type MissingTag = "photo" | "price" | "details" | "cost" | "confidence";
+ const MISSING_TAGS: MissingTag[] = ["photo", "price", "details", "cost", "confidence"];
  const missingParam = searchParams.get("missing");
- const [missingTag, setMissingTag] = useState<"photo" | "price" | "details" | null>(missingParam === "photo" || missingParam === "price" || missingParam === "details" ? missingParam : null);
+ const [missingTag, setMissingTag] = useState<MissingTag | null>((MISSING_TAGS as string[]).includes(missingParam || "") ? (missingParam as MissingTag) : null);
+ const [lowConf, setLowConf] = useState<Set<string>>(new Set());
+ useEffect(() => {
+  if (missingTag !== "confidence") return;
+  let live = true;
+  fetch(withStore("/api/store/attention")).then((r) => (r.ok ? r.json() : null))
+   .then((d) => { if (live && Array.isArray(d?.lowConfidenceIds)) setLowConf(new Set<string>(d.lowConfidenceIds.map(String))); })
+   .catch(() => {});
+  return () => { live = false; };
+ }, [missingTag]);
  const [quickOnly, setQuickOnly] = useState(searchParams.get("source") === "market");
+ // Option J: without a ship-from address no draft can go live, and this is the page where that
+ // bites — so it says so here, and every draft's pill says "blocked" (setup-gate-core.ts).
+ const [gate, setGate] = useState<ShipFromGate | null>(null);
+ useEffect(() => {
+  let live = true;
+  fetch(withStore("/api/store/onboarding-status")).then((r) => (r.ok ? r.json() : null))
+   .then((d) => { if (live) setGate(shipFromGate(d?.setup)); })
+   .catch(() => {});
+  return () => { live = false; };
+ }, []);
  // ?status=active — so the Active listings card has somewhere to go. Drafts and Sold already have
  // routes of their own; without this, the one card in the middle would be the odd one out.
  const statusParam = searchParams.get("status");
@@ -84,8 +125,9 @@ export default function ItemsPage() {
  const [statusTag, setStatusTag] = useState<ItemStatus | null>((ITEM_STATUSES as readonly string[]).includes(statusParam || "") ? (statusParam as ItemStatus) : null);
  // Sorting. Filters answer "which pieces"; sorting answers "which first" — and for a seller the
  // useful order is almost always by money, which the table could show but never order by.
- type SortKey = "recent" | "revenue" | "cost" | "margin" | "title";
- const [sortKey, setSortKey] = useState<SortKey>("recent");
+ type SortKey = "recent" | "revenue" | "cost" | "margin" | "title" | "age";
+ // ?sort=oldest (Home's "listed over 90 days" tile) lands on the pieces that have sat longest.
+ const [sortKey, setSortKey] = useState<SortKey>(searchParams.get("sort") === "oldest" ? "age" : "recent");
  const [sortDesc, setSortDesc] = useState(true);
  const sortBy = (k: SortKey) => { if (k === sortKey) { setSortDesc((d) => !d); } else { setSortKey(k); setSortDesc(k !== "title"); } };
  const [famTag, setFamTag] = useState<string | null>(null);   // family alone = the whole family
@@ -101,6 +143,12 @@ export default function ItemsPage() {
  const [confirmBulk, setConfirmBulk] = useState(false);
  const [confirmReset, setConfirmReset] = useState(false);
  const [soldNotice, setSoldNotice] = useState<string | null>(null);
+ // Holds, keyed by item: a reserved piece with an entry here is kept back for a person and reads
+ // "On hold · Ana · 3 days left"; a reserved piece without one is a buyer mid-checkout, "Reserved".
+ const [holds, setHolds] = useState<Record<string, { name: string; expiresAt: string }>>({});
+ const [holdFor, setHoldFor] = useState<Item | null>(null); // the "Hold for someone" dialog
+ const [holdForm, setHoldForm] = useState<{ name: string; days: number }>({ name: "", days: 3 });
+ const [holdErr, setHoldErr] = useState<string | null>(null);
  const [isAdmin, setIsAdmin] = useState(false);
  const [selected, setSelected] = useState<Set<string>>(new Set());
  const [bulkBusy, setBulkBusy] = useState(false);
@@ -108,8 +156,17 @@ export default function ItemsPage() {
  const [bulkColName, setBulkColName] = useState("");
  const [aiNotice, setAiNotice] = useState<string | null>(null); // result of the last AI re-tag
  const [editing, setEditing] = useState<Item | null>(null);
- const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+ const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "", sourceName: "", acquiredAt: "", conditionNote: "", measurements: {} };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
+ const units = useStoreUnits(withStore);
+ const [editFlaws, setEditFlaws] = useState<string[]>([]); // one per row in the editor
+ const [newFlaw, setNewFlaw] = useState("");
+ // Bulk "Set source / date / lot cost" and "Set cost" — in-page dialogs, never a browser prompt.
+ const [lotOpen, setLotOpen] = useState(false);
+ const [lotForm, setLotForm] = useState({ sourceName: "", acquiredAt: "", lotCost: "" });
+ const [costOpen, setCostOpen] = useState(false);
+ const [costForm, setCostForm] = useState<{ mode: "each" | "total"; amount: string }>({ mode: "each", amount: "" });
+ const [bulkErr, setBulkErr] = useState<string | null>(null);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
  const [uploading, setUploading] = useState(false);
  const [savingEdit, setSavingEdit] = useState(false);
@@ -143,6 +200,12 @@ export default function ItemsPage() {
  setAuthErr("Couldn’t load items.");
  }
  setLoading(false);
+ // Best-effort: a store with no holds (or a server without the route) simply shows "Reserved".
+ fetch(withStore("/api/store/holds")).then((r) => (r.ok ? r.json() : null)).then((h) => {
+ const map: Record<string, { name: string; expiresAt: string }> = {};
+ for (const x of (h?.holds || []) as { itemId: string; name: string; expiresAt: string }[]) map[x.itemId] = { name: x.name, expiresAt: x.expiresAt };
+ setHolds(map);
+ }).catch(() => {});
  }
  useEffect(() => {
  (async () => { await load(); })();
@@ -178,7 +241,7 @@ export default function ItemsPage() {
  // The Drafts / Sold sub-tabs already pin a status — don't let a stale tag filter fight them.
  useEffect(() => { setStatusTag(null); }, [statusFilter]);
 
- async function act(id: string, action: "sold" | "remove" | "publish") {
+ async function act(id: string, action: "sold" | "remove" | "publish" | "release") {
  setConfirmRow(null);
  setBusyId(id);
  const r = await fetch(withStore(`/api/store/items/${id}`), {
@@ -186,6 +249,7 @@ export default function ItemsPage() {
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action }),
  }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ if (action === "release" && !r) setSoldNotice("Couldn’t release that hold — a buyer may be mid-checkout on it.");
  // On a sale, tell the seller which no-API channels they must pull the item from by hand.
  if (action === "sold") {
  const manual = (r?.pull || []).filter((p: { hasApi: boolean }) => !p.hasApi).map((p: { name: string }) => p.name);
@@ -195,6 +259,31 @@ export default function ItemsPage() {
  await load();
  setBusyId(null);
  }
+
+ // Keep a live piece back for someone: the same `hold` action the phone sends. The row is
+ // reserved on the server; the storefront badges it "On hold"; the sweep releases it when it lapses.
+ async function placeHold() {
+ if (!holdFor) return;
+ setHoldErr(null);
+ setBusyId(holdFor.id);
+ const r = await fetch(withStore(`/api/store/items/${holdFor.id}`), {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ action: "hold", name: holdForm.name.trim(), days: holdForm.days }),
+ }).then(async (x) => ({ ok: x.ok, body: await x.json().catch(() => null) })).catch(() => ({ ok: false, body: null }));
+ setBusyId(null);
+ if (!r.ok) { setHoldErr(r.body?.error || "Couldn’t hold that piece."); return; }
+ setHoldFor(null);
+ setHoldForm({ name: "", days: 3 });
+ if (editing?.id === holdFor.id) setEditing(null);
+ await load();
+ }
+ /** The status pill everywhere on this page — the one place "On hold" vs "Reserved" is decided. */
+ const pill = (it: { id: string; status: ItemStatus }) => (
+ it.status === "draft" && gate
+ ? <StatusPill tone="pending" title={gate.message}>Draft · blocked</StatusPill>
+ : <StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{it.status === "reserved" ? holdPill(holds[it.id] ?? null) : statusLabel(it.status)}</StatusPill>
+ );
 
  // ── Multi-select (for drops: stage drafts, then publish the batch at once) ──
  function toggle(id: string) {
@@ -280,6 +369,37 @@ export default function ItemsPage() {
  setTimeout(() => setAiNotice(null), 9000);
  }
 
+ // Where a batch came from, when, and what it cost altogether — written to every selected piece,
+ // the lot cost split across them by price (equal where a price is missing). See app/lib/lot-core.ts.
+ async function bulkLot() {
+ const ids = [...selected];
+ if (!ids.length) return;
+ const lotCostCents = lotForm.lotCost.trim() === "" ? null : Math.round(Number(lotForm.lotCost) * 100);
+ if (lotCostCents != null && !(Number.isFinite(lotCostCents) && lotCostCents >= 0)) { setBulkErr("Enter what the lot cost, like 340."); return; }
+ if (!lotForm.sourceName.trim() && !lotForm.acquiredAt && lotCostCents == null) { setBulkErr("Add a source, a date, or what it cost."); return; }
+ setBulkBusy(true); setBulkErr(null);
+ const r = await fetch(withStore("/api/store/items"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lot", ids, ...(lotForm.sourceName.trim() ? { sourceName: lotForm.sourceName.trim() } : {}), ...(lotForm.acquiredAt ? { acquiredAt: lotForm.acquiredAt } : {}), ...(lotCostCents != null ? { lotCostCents } : {}) }) }).then((x) => x.json()).catch(() => null);
+ setBulkBusy(false);
+ if (!r?.ok) { setBulkErr(r?.error || "Couldn’t save that."); return; }
+ setLotOpen(false); setLotForm({ sourceName: "", acquiredAt: "", lotCost: "" }); setSelected(new Set());
+ await load();
+ }
+ // Fill in cost on the selected pieces: the same on each, or one total split by price.
+ async function bulkCost() {
+ const ids = [...selected];
+ if (!ids.length) return;
+ const cents = Math.round(Number(costForm.amount) * 100);
+ if (costForm.amount.trim() === "" || !(Number.isFinite(cents) && cents >= 0)) { setBulkErr("Enter a cost, like 12."); return; }
+ setBulkBusy(true); setBulkErr(null);
+ const r = await fetch(withStore("/api/store/items"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "cost", ids, ...(costForm.mode === "each" ? { eachCents: cents } : { totalCents: cents }) }) }).then((x) => x.json()).catch(() => null);
+ setBulkBusy(false);
+ if (!r?.ok) { setBulkErr(r?.error || "Couldn’t save that."); return; }
+ setCostOpen(false); setCostForm({ mode: "each", amount: "" }); setSelected(new Set());
+ await load();
+ }
+ // Source names this store has used before, for the suggestions list.
+ const sourceNames = Array.from(new Set(items.map((i) => (i.sourceName || "").trim()).filter(Boolean))).sort();
+
  // Build a collection from the inventory: add all selected items to a collection (creating it if new).
  async function bulkAddToCollection(title: string) {
  const name = title.trim();
@@ -300,10 +420,14 @@ export default function ItemsPage() {
  setEditing(it);
  setEditForm({
  title: it.title, price: cents2str(it.priceCents), cost: cents2str(it.costCents),
- brand: it.brand || "", era: it.era || "", material: it.material || "", condition: it.condition || "",
+ brand: it.brand || "", era: it.era || "", material: it.material || "", colour: it.colour || "", condition: it.condition || "",
  size: it.size || "", category: toCategorySlug(it.category), description: it.description || "", status: it.status,
  weightOz: num2str(it.weightOz), lengthIn: num2str(it.lengthIn), widthIn: num2str(it.widthIn), heightIn: num2str(it.heightIn),
+ sourceName: it.sourceName || "", acquiredAt: (it.acquiredAt || "").slice(0, 10),
+ conditionNote: it.conditionNote || "", measurements: measurementsToForm(it.measurementsJson),
  });
+ setEditFlaws(Array.isArray(it.flaws) ? it.flaws : []);
+ setNewFlaw("");
  setEditImages(it.images || []);
  setSelCols(it.collections || []);
  setNewCol("");
@@ -333,11 +457,17 @@ export default function ItemsPage() {
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({
  title: editForm.title, price: Number(editForm.price) || 0, cost: editForm.cost.trim() === "" ? null : Number(editForm.cost),
- brand: editForm.brand, era: editForm.era, material: editForm.material, condition: editForm.condition,
+ brand: editForm.brand, era: editForm.era, material: editForm.material, colour: editForm.colour, condition: editForm.condition,
  // category is omitted when no tag is picked, so an unrecognised stored value survives an edit.
  size: editForm.size, ...(editForm.category ? { category: editForm.category } : {}), description: editForm.description, status: editForm.status,
  weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
  images: editImages, collections: colsForSave,
+ // Whatever is still in the "add a flaw" box counts — same rule as the collection box below.
+ flaws: newFlaw.trim() ? [...editFlaws, newFlaw.trim()] : editFlaws,
+ sourceName: editForm.sourceName, acquiredAt: editForm.acquiredAt || null,
+ // Structure: the grade sits in `condition`, her words in the note, the template's numbers as a
+ // list (empties omitted). A list clears the old free-text column server-side.
+ conditionNote: editForm.conditionNote, measurements: measurementsFromForm(editForm.measurements, units.unit),
  }),
  }).catch(() => {});
  setSavingEdit(false);
@@ -488,7 +618,7 @@ export default function ItemsPage() {
       <div className="mb-3">
        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Needs attention</p>
        <div className="flex flex-wrap gap-1.5">
-        {([["photo", "No photo"], ["price", "No price"], ["details", "Missing details"]] as const).map(([k, lab]) => (
+        {([["photo", "No photo"], ["price", "No price"], ["details", "Missing details"], ["cost", "No cost"], ["confidence", "AI price to check"]] as const).map(([k, lab]) => (
          <button key={k} type="button" onClick={() => setMissingTag((v) => (v === k ? null : k))}
           className={cn("rounded-full border px-2.5 py-1 text-[11.5px] transition", missingTag === k ? "border-transparent bg-amber-600 text-white" : "border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-400")}>
           {lab}
@@ -510,7 +640,7 @@ export default function ItemsPage() {
  const colCounts: Record<string, number> = {};
  for (const i of items) for (const c of i.collections || []) colCounts[c] = (colCounts[c] || 0) + 1;
  const needsDetails = (i: Item) => i.costCents == null || !i.size || !i.brand;
- const lacks = (i: Item) => (missingTag === "photo" ? !(i.images?.length) : missingTag === "price" ? !(i.priceCents > 0) : missingTag === "details" ? needsDetails(i) : true);
+ const lacks = (i: Item) => (missingTag === "photo" ? !(i.images?.length) : missingTag === "price" ? !(i.priceCents > 0) : missingTag === "details" ? needsDetails(i) : missingTag === "cost" ? i.costCents == null : missingTag === "confidence" ? lowConf.has(i.id) : true);
  const quickCount = items.filter((i) => i.source === "market").length;
  const detailsCount = items.filter((i) => i.source === "market" && needsDetails(i)).length;
  const shown = base
@@ -522,9 +652,12 @@ export default function ItemsPage() {
  .sort((a, b) => {
   if (sortKey === "recent") return 0; // the list already arrives newest-first
   const marginOf = (i: Item) => (i.priceCents > 0 && i.costCents != null ? (i.priceCents - i.costCents) / i.priceCents : -Infinity);
+  // Only a live piece is "on the rail" — a sold or drafted one has no age to sort by, so it sinks.
+  const ageOf = (i: Item) => (i.status === "active" ? (daysListed(i.createdAt) ?? -1) : -1);
   const v = sortKey === "title" ? a.title.localeCompare(b.title)
    : sortKey === "revenue" ? (a.priceCents || 0) - (b.priceCents || 0)
    : sortKey === "cost" ? ((a.costCents ?? -1) - (b.costCents ?? -1))
+   : sortKey === "age" ? (ageOf(a) - ageOf(b))
    : marginOf(a) - marginOf(b);
   return sortDesc ? -v : v;
  });
@@ -532,14 +665,19 @@ export default function ItemsPage() {
 
  // Exports everything currently filtered, not just the rendered page — an export
  // that silently stops at the pagination boundary is worse than none.
+ // Everything the editor holds: the flaws list, where it came from and when, the lot, how long
+ // it has been on the rail, the condition note and the measurements — a spreadsheet that says
+ // less than the page is a spreadsheet she has to go back to the page for.
  function exportCsv() {
   const rows = shown.map((i) => [
-   i.sku, i.title, i.brand ?? "", i.category ?? "", i.size ?? "", i.condition ?? "", i.era ?? "", i.material ?? "",
+   i.sku, i.title, i.brand ?? "", i.category ?? "", i.size ?? "", i.condition ?? "", i.conditionNote ?? "", i.era ?? "", i.material ?? "", i.colour ?? "",
    (i.priceCents / 100).toFixed(2), i.costCents != null ? (i.costCents / 100).toFixed(2) : "",
-   i.currency, i.status, (i.images || []).length, (i.collections || []).join(" | "),
+   i.currency, i.status === "reserved" ? holdPill(holds[i.id] ?? null) : i.status, (i.images || []).length, (i.collections || []).join(" | "),
+   (Array.isArray(i.flaws) ? i.flaws : []).join("; "), i.sourceName ?? "", (i.acquiredAt ?? "").slice(0, 10), i.lotId ?? "",
+   i.status === "active" ? (daysListed(i.createdAt) ?? "") : "", formatMeasurements(i.measurementsJson),
   ]);
   downloadCsv(datedFilename("inventory"), toCsv(
-   ["sku", "title", "brand", "category", "size", "condition", "era", "material", "price", "cost", "currency", "status", "photos", "collections"],
+   ["sku", "title", "brand", "category", "size", "condition", "condition_note", "era", "material", "colour", "price", "cost", "currency", "status", "photos", "collections", "flaws", "source", "acquired", "lot", "days_listed", "measurements"],
    rows,
   ));
  }
@@ -590,7 +728,7 @@ export default function ItemsPage() {
  <AdminHeader
  eyebrow="Sell · Inventory"
  title={heading}
- subtitle="Upload a photo — VYA writes the listing and prices it from real comps."
+ subtitle="Upload a photo. VYA writes the listing and suggests a price based on what similar pieces actually sold for."
  actions={
  <>
  {isAdmin && items.length > 0 && <button onClick={() => setConfirmReset(true)} className="text-[12px] text-rose-500/80 underline hover:text-rose-600">Clear all (owner)</button>}
@@ -631,6 +769,22 @@ export default function ItemsPage() {
  )}
 
 
+ {/* Where the missing address bites: drafts can't go live. Same bar as the missing-cost one. */}
+ {gate && (
+ <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900" data-testid="ship-from-gate">
+ <span><b className="font-semibold">Pieces can’t go live yet.</b> Add the address you ship from.</span>
+ <TechButtonLink href={withStore(gate.href)} className="ml-auto px-3 py-1.5 text-[12px]">{gate.verb}</TechButtonLink>
+ </div>
+ )}
+
+ {/* From Home's "N pieces with no cost": the fix is one selection away, not one piece at a time. */}
+ {missingTag === "cost" && selected.size === 0 && shown.length > 0 && (
+ <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900" data-testid="missing-cost-bar">
+ <span>{shown.length} {shown.length === 1 ? "piece has" : "pieces have"} no cost, so they can’t count towards your profit.</span>
+ <TechButton className="ml-auto px-3 py-1.5 text-[12px]" onClick={() => setSelected(new Set(shown.map((i) => i.id)))}>Select all without cost</TechButton>
+ </div>
+ )}
+
  {/* Bulk action bar — appears when items are selected (e.g. publish a whole drop). */}
  {selected.size > 0 && (
  <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-[13px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
@@ -638,6 +792,8 @@ export default function ItemsPage() {
  <div className="ml-auto flex items-center gap-2">
  <div className="relative">
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={bulkReprice}>Reprice</TechButton>
+ <TechButton variant={missingTag === "cost" ? "primary" : "secondary"} className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => { setBulkErr(null); setCostOpen(true); }}>Set cost</TechButton>
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => { setBulkErr(null); setLotOpen(true); }}>Set source / lot</TechButton>
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => setBulkColOpen((o) => !o)}>Add to collection ▾</TechButton>
  {bulkColOpen && (
  <div className="absolute right-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-stone-200 bg-white p-2.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]">
@@ -674,6 +830,13 @@ export default function ItemsPage() {
  </div>
  )}
 
+ {/* The toolbar (search, view, filters) lives ABOVE the results switch on purpose. It used to be
+     rendered inside each results branch, so the moment a search matched nothing the whole branch —
+     toolbar included, with the input she was typing in — was replaced by the empty state. Focus
+     vanished mid-word and Backspace had nothing to act on. Mounted here it survives every state. */}
+ <div className="mb-3">
+ <ViewToggle value={layout} onChange={changeLayout} count={shown.length} q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} filter={filterMenu} />
+ </div>
  {shown.length === 0 ? (
  <TechEmpty
  icon={<Package size={28} strokeWidth={1.5} />}
@@ -685,13 +848,12 @@ export default function ItemsPage() {
  />
  ) : layout === "grid" ? (
  <div>
- <ViewToggle value={layout} onChange={changeLayout} count={shown.length} q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} filter={filterMenu} />
  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
  {paged.map((it) => (
  <div key={it.id} className={cn("group overflow-hidden rounded-2xl border bg-white transition", selected.has(it.id) ? "border-[var(--accent,#0e9f76)]" : "border-stone-200 hover:border-stone-300")}>
  <button type="button" onClick={() => openEdit(it)} className="relative block aspect-[4/5] w-full bg-stone-100">
  {it.images[0] ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={it.images[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-[11px] text-stone-400">no photo</span>}
- <span className="absolute left-2 top-2"><StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{statusLabel(it.status)}</StatusPill></span>
+ <span className="absolute left-2 top-2">{pill(it)}</span>
  <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} onClick={(e) => e.stopPropagation()} className="absolute right-2 top-2 h-4 w-4 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${it.title}`} />
  </button>
  <div className="p-2.5">
@@ -711,7 +873,6 @@ export default function ItemsPage() {
  </div>
  ) : (
  <TechCard className="overflow-hidden">
- <ViewToggle value={layout} onChange={changeLayout} count={shown.length} inCard q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} filter={filterMenu} />
  <div className="overflow-x-auto">
  <table className="w-full text-[13px]">
  <thead>
@@ -738,6 +899,7 @@ export default function ItemsPage() {
  </TH>
  <TH right className="px-3"><button type="button" onClick={() => sortBy("revenue")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Revenue{sortKey === "revenue" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH right className="px-3"><button type="button" onClick={() => sortBy("cost")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Cost{sortKey === "cost" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
+ <TH right className="px-3"><button type="button" onClick={() => sortBy("age")} title="Days on the rail" className="inline-flex items-center gap-1 transition hover:text-stone-700">Days{sortKey === "age" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH right className="px-3"><button type="button" onClick={() => sortBy("margin")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Margin{sortKey === "margin" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH className="px-3">
  {statusFilter ? "Status" : (
@@ -801,6 +963,15 @@ export default function ItemsPage() {
  </TD>
  <TD right className="px-3 font-medium text-stone-800">${(it.priceCents / 100).toFixed(0)}</TD>
  <TD right className="px-3 text-stone-500">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "—"}</TD>
+ <TD right className="px-3 tabular-nums">
+ {(() => {
+ const d = it.status === "active" ? daysListed(it.createdAt) : null;
+ if (d === null) return <span className="text-stone-300">—</span>;
+ // Colour only once the number is a decision: 60 days asks a question, 90 answers it.
+ const tone = d >= AGING_THRESHOLDS.stale ? "font-medium text-rose-600" : d >= AGING_THRESHOLDS.attention ? "text-amber-600" : "text-stone-500";
+ return <span className={tone}>{d}</span>;
+ })()}
+ </TD>
  <TD right className="px-3">
  {(() => {
  const hasCost = it.costCents != null && it.costCents > 0;
@@ -816,7 +987,7 @@ export default function ItemsPage() {
  <span className="text-[10px] text-stone-400" title={new Date(it.publishAt).toLocaleString()}>{new Date(it.publishAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
  </div>
  ) : (
- <StatusPill tone={TONE[it.status]} dot={it.status === "active"}>{statusLabel(it.status)}</StatusPill>
+ pill(it)
  )}
  </TD>
  <TD className="px-3">{collectionsCell(it)}</TD>
@@ -825,6 +996,8 @@ export default function ItemsPage() {
  <div className="flex items-center justify-end gap-0.5">
  {it.status === "draft" && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "publish")}>Publish</TechButton>}
  {(it.status === "active" || it.status === "reserved") && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "sold")}>Mark sold</TechButton>}
+ {it.status === "active" && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => { setHoldErr(null); setHoldForm({ name: "", days: 3 }); setHoldFor(it); }}>Hold</TechButton>}
+ {it.status === "reserved" && holds[it.id] && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "release")}>Release hold</TechButton>}
  {it.status !== "removed" && (
  <button type="button" aria-label={`Remove ${it.title}`} title="Remove from sale" disabled={busyId === it.id} onClick={() => setConfirmRow(it.id)}
  className="ml-1 grid h-7 w-7 place-items-center rounded-full text-[#5D0F17]/70 transition hover:bg-[#5D0F17]/10 hover:text-[#5D0F17] disabled:opacity-40">
@@ -853,7 +1026,7 @@ export default function ItemsPage() {
  <span className="flex flex-wrap items-center gap-1.5">
  {statusTag && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{statusLabel(statusTag)}</span>}
  {(catTag || famTag) && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{catTag ? categoryValueLabel(catTag) : famTag}</span>}
- {missingTag && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">{missingTag === "photo" ? "No photo" : missingTag === "price" ? "No price" : "Needs details"}</span>}
+ {missingTag && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">{missingTag === "photo" ? "No photo" : missingTag === "price" ? "No price" : missingTag === "cost" ? "No cost" : missingTag === "confidence" ? "AI price to check" : "Needs details"}</span>}
  {quickOnly && <span className="rounded-full bg-[#5D0F17]/10 px-2 py-0.5 text-[11px] text-[#5D0F17]">Quick-listed</span>}
  {colTag && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">{colTag}</span>}
  </span>
@@ -880,7 +1053,11 @@ export default function ItemsPage() {
  <h2 className="text-base font-semibold text-stone-900">Edit listing</h2>
  <p className="font-mono text-[11px] tabular-nums text-stone-400">SKU-{1000 + editing.sku}</p>
  </div>
- <StatusPill tone={TONE[editForm.status]} dot={editForm.status === "active"}>{statusLabel(editForm.status)}</StatusPill>
+ <div className="flex items-center gap-2">
+ {editing.status === "active" && <TechButton variant="secondary" className="px-2.5 py-1 text-[12px]" disabled={busyId === editing.id} onClick={() => { setHoldErr(null); setHoldForm({ name: "", days: 3 }); setHoldFor(editing); }}>Hold for someone</TechButton>}
+ {editing.status === "reserved" && holds[editing.id] && <TechButton variant="secondary" className="px-2.5 py-1 text-[12px]" disabled={busyId === editing.id} onClick={async () => { await act(editing.id, "release"); setEditing(null); }}>Release hold</TechButton>}
+ {editForm.status === editing.status ? pill(editing) : <StatusPill tone={TONE[editForm.status]} dot={editForm.status === "active"}>{statusLabel(editForm.status)}</StatusPill>}
+ </div>
  </div>
 
  {/* Photos — reorder (‹ ›), remove (✕), add (upload). First = cover. */}
@@ -910,11 +1087,14 @@ export default function ItemsPage() {
  <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Fendi" /></Field>
  <Field label="Era"><Input value={editForm.era} onChange={(e) => setEditForm((f) => ({ ...f, era: e.target.value }))} placeholder="e.g. 1990s" /></Field>
  </div>
- <div className="grid grid-cols-3 gap-3">
- <Field label="Condition"><Input value={editForm.condition} onChange={(e) => setEditForm((f) => ({ ...f, condition: e.target.value }))} placeholder="Excellent" /></Field>
+ <ConditionChips value={editForm.condition} onChange={(g) => setEditForm((f) => ({ ...f, condition: g }))} note={editForm.conditionNote} onNoteChange={(v) => setEditForm((f) => ({ ...f, conditionNote: v }))} />
+ <div className="grid grid-cols-2 gap-3">
  <Field label="Material"><Input value={editForm.material} onChange={(e) => setEditForm((f) => ({ ...f, material: e.target.value }))} /></Field>
- <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} /></Field>
+     {/* Vestiaire requires a colour and refuses a guessed one, so it has to be somewhere a seller can type it. */}
+     <Field label="Colour"><Input value={editForm.colour} onChange={(e) => setEditForm((f) => ({ ...f, colour: e.target.value }))} placeholder="e.g. Navy" /></Field>
  </div>
+ <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} placeholder="As marked on the tag — IT 40, UK 12, M" /></Field>
+ <MeasurementFields category={editForm.category ?? editing.category} values={editForm.measurements} onChange={(m) => setEditForm((f) => ({ ...f, measurements: m }))} unit={units.unit} />
  <Field label="Category" required>
  <CategoryBreadcrumb value={editForm.category} onChange={(v) => setEditForm((f) => ({ ...f, category: v }))} />
  {!editForm.category && editing.category && (
@@ -923,7 +1103,7 @@ export default function ItemsPage() {
  </Field>
  <div className="grid grid-cols-3 gap-3">
  <Field label="Price (USD)" required><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
- <Field label="Cost (USD)"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
+ <Field label="Cost (USD)" hint="what you paid"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
  <Field label="Margin">
  {(() => {
  const p = Number(editForm.price) || 0; const hasCost = editForm.cost.trim() !== ""; const c = Number(editForm.cost) || 0;
@@ -933,14 +1113,38 @@ export default function ItemsPage() {
  })()}
  </Field>
  </div>
+ <div className="grid grid-cols-2 gap-3">
+ <Field label="Where it came from">
+ <Input value={editForm.sourceName} onChange={(e) => setEditForm((f) => ({ ...f, sourceName: e.target.value }))} placeholder="Kempton, Ana’s estate, eBay…" list="source-names" />
+ <datalist id="source-names">{sourceNames.map((n) => <option key={n} value={n} />)}</datalist>
+ </Field>
+ <Field label="Acquired on"><Input type="date" value={editForm.acquiredAt} onChange={(e) => setEditForm((f) => ({ ...f, acquiredAt: e.target.value }))} /></Field>
+ </div>
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>
+ <div data-testid="flaws-editor">
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Flaws <span className="font-normal text-stone-400">— one per line, shown under Condition on your store</span></label>
+ {editFlaws.length > 0 && (
+ <ul className="mb-2 space-y-1">
+ {editFlaws.map((f, i) => (
+ <li key={`${f}-${i}`} className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-1.5 text-[13px] text-stone-800">
+ <span className="flex-1">{f}</span>
+ <button type="button" aria-label={`Remove flaw: ${f}`} onClick={() => setEditFlaws((a) => a.filter((_, k) => k !== i))} className="text-stone-400 hover:text-rose-500">✕</button>
+ </li>
+ ))}
+ </ul>
+ )}
+ <input value={newFlaw} onChange={(e) => setNewFlaw(e.target.value)}
+ onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = newFlaw.trim(); if (v) { setEditFlaws((a) => [...a, v]); setNewFlaw(""); } } }}
+ placeholder="Add a flaw — light pilling at cuffs, scuffed toe… then Enter"
+ className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
+ </div>
  <Field label="Status">
  {/* Status can't be cleared — an item is always in one. */}
  <TagRow options={ITEM_STATUSES} value={editForm.status} onChange={(v) => setEditForm((f) => ({ ...f, status: v ?? f.status }))} labelFor={statusLabel} />
  </Field>
- <Field label="Weight (oz)"><Input type="number" inputMode="numeric" value={editForm.weightOz} onChange={(e) => setEditForm((f) => ({ ...f, weightOz: e.target.value }))} placeholder="for shipping" /></Field>
+ <ShipsAsRow weightOz={editForm.weightOz} onChange={(v) => setEditForm((f) => ({ ...f, weightOz: v }))} estimate={editing.parcelEstimate ?? null} category={editForm.category ?? editing.category} weightUnit={units.weightUnit} />
  <div className="grid grid-cols-3 gap-3">
  <Field label="Length (in)"><Input type="number" inputMode="numeric" value={editForm.lengthIn} onChange={(e) => setEditForm((f) => ({ ...f, lengthIn: e.target.value }))} /></Field>
  <Field label="Width (in)"><Input type="number" inputMode="numeric" value={editForm.widthIn} onChange={(e) => setEditForm((f) => ({ ...f, widthIn: e.target.value }))} /></Field>
@@ -973,6 +1177,7 @@ export default function ItemsPage() {
  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </div>
  </div>
+ <RentalPanel itemId={editing.id} priceCents={Math.round((Number(editForm.price) || 0) * 100)} />
  {/* The * fields are what a LIVE listing needs. A draft can be saved half-finished —
  the gate only bites when the item is going (or staying) active. */}
  {(() => {
@@ -995,6 +1200,79 @@ export default function ItemsPage() {
  </div>
  </div>
  )}
+ <ConfirmDialog
+ open={!!holdFor}
+ title={holdFor ? `Hold ${holdFor.title}` : "Hold"}
+ tone="primary"
+ confirmLabel={busyId && holdFor && busyId === holdFor.id ? "Holding…" : "Hold it"}
+ busy={!!(busyId && holdFor && busyId === holdFor.id)}
+ onCancel={() => setHoldFor(null)}
+ onConfirm={placeHold}
+ body={
+ <div className="space-y-3 text-left" data-testid="hold-dialog">
+ <Field label="Keep it back for">
+ <Input value={holdForm.name} onChange={(e) => setHoldForm((f) => ({ ...f, name: e.target.value }))} placeholder="Their name (optional)" autoFocus />
+ </Field>
+ <div className="flex flex-wrap gap-1.5">
+ {HOLD_LENGTHS.map((h) => (
+ <button key={h.days} type="button" onClick={() => setHoldForm((f) => ({ ...f, days: h.days }))}
+ className={cn("rounded-full border px-3 py-1 text-[12px] transition", holdForm.days === h.days ? "border-transparent bg-[#5D0F17] text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
+ {h.label}
+ </button>
+ ))}
+ </div>
+ <p className="text-[11.5px] text-stone-400">Shoppers see “On hold” instead of Buy. It goes back on sale by itself when the time is up.</p>
+ {holdErr && <p className="text-[12px] text-rose-600">{holdErr}</p>}
+ </div>
+ }
+ />
+ <ConfirmDialog
+ open={lotOpen}
+ title={`Set source for ${selected.size} ${selected.size === 1 ? "piece" : "pieces"}`}
+ tone="primary"
+ confirmLabel={bulkBusy ? "Saving…" : "Save"}
+ busy={bulkBusy}
+ onCancel={() => setLotOpen(false)}
+ onConfirm={bulkLot}
+ body={
+ <div className="space-y-3 text-left" data-testid="lot-dialog">
+ <Field label="Where these came from">
+ <Input value={lotForm.sourceName} onChange={(e) => setLotForm((f) => ({ ...f, sourceName: e.target.value }))} placeholder="Kempton, Ana’s estate, eBay…" list="source-names-bulk" />
+ <datalist id="source-names-bulk">{sourceNames.map((n) => <option key={n} value={n} />)}</datalist>
+ </Field>
+ <Field label="Acquired on"><Input type="date" value={lotForm.acquiredAt} onChange={(e) => setLotForm((f) => ({ ...f, acquiredAt: e.target.value }))} /></Field>
+ <Field label="The lot cost, in total (USD)">
+ <Input type="number" inputMode="decimal" value={lotForm.lotCost} onChange={(e) => setLotForm((f) => ({ ...f, lotCost: e.target.value }))} placeholder="optional — split across the pieces by price" />
+ </Field>
+ <p className="text-[11.5px] text-stone-400">The lot cost is split in proportion to each piece’s price (equally where a price is missing), to the penny.</p>
+ {bulkErr && <p className="text-[12px] text-rose-600">{bulkErr}</p>}
+ </div>
+ }
+ />
+ <ConfirmDialog
+ open={costOpen}
+ title={`Set cost on ${selected.size} ${selected.size === 1 ? "piece" : "pieces"}`}
+ tone="primary"
+ confirmLabel={bulkBusy ? "Saving…" : "Save"}
+ busy={bulkBusy}
+ onCancel={() => setCostOpen(false)}
+ onConfirm={bulkCost}
+ body={
+ <div className="space-y-3 text-left" data-testid="cost-dialog">
+ <div className="flex gap-1.5" role="radiogroup" aria-label="How to apply the cost">
+ {([["each", "$ each"], ["total", "$ total, split"]] as const).map(([k, lab]) => (
+ <button key={k} type="button" role="radio" aria-checked={costForm.mode === k} onClick={() => setCostForm((f) => ({ ...f, mode: k }))}
+ className={cn("rounded-full border px-3 py-1 text-[12px] transition", costForm.mode === k ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>{lab}</button>
+ ))}
+ </div>
+ <Field label={costForm.mode === "each" ? "Cost of each piece (USD)" : "What they cost altogether (USD)"}>
+ <Input type="number" inputMode="decimal" value={costForm.amount} onChange={(e) => setCostForm((f) => ({ ...f, amount: e.target.value }))} placeholder={costForm.mode === "each" ? "12" : "340"} autoFocus />
+ </Field>
+ {costForm.mode === "total" && <p className="text-[11.5px] text-stone-400">Split in proportion to each piece’s price (equally where a price is missing), to the penny.</p>}
+ {bulkErr && <p className="text-[12px] text-rose-600">{bulkErr}</p>}
+ </div>
+ }
+ />
  {(() => {
  const it = items.find((x) => x.id === confirmRow);
  return (
@@ -1024,7 +1302,7 @@ export default function ItemsPage() {
  <ConfirmDialog
  open={confirmBulk}
  title={`Remove ${selected.size} item${selected.size === 1 ? "" : "s"}?`}
- body="They come off your storefront and every connected channel. Sold items keep their order history."
+ body="They’re removed from your storefront and every site you’ve connected. Anything already sold keeps its order history."
  confirmLabel={`Remove ${selected.size}`}
  cancelLabel="Keep them"
  busy={bulkBusy}

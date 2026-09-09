@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { isStoreHost } from "@/app/lib/plan-b/store-host";
 import type { CSSProperties } from "react";
 import { getStorefrontByHandle, getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import ContactForm from "../../ContactForm";
@@ -44,10 +46,11 @@ export default async function StorefrontContentPage({ params, searchParams }: Pr
  const headingFont = theme.fonts?.heading;
  const bodyFont = theme.fonts?.body;
  const storeName = theme.storeName || handle.replace(/-/g, " ");
- const withPreview = (href: string) => (preview ? `${href}?preview=1` : href);
+ const base = isStoreHost((await headers()).get("host")) ? "" : `/s/${handle}`;
+ const withPreview = (href: string) => (preview ? `${href || "/"}?preview=1` : href || "/");
  const navItems = (theme.nav ?? []).map((label) => {
  const target = pages.find((p) => p.label?.toLowerCase() === label.toLowerCase());
- return { label, href: withPreview(target ? `/s/${handle}/${target.slug}` : `/s/${handle}/shop`) };
+ return { label, href: withPreview(target ? `${base}/${target.slug}` : `${base}/shop`) };
  });
 
  // Page shape drives the layout: contact → a real form, faq → Q&A, otherwise the
@@ -75,7 +78,7 @@ export default async function StorefrontContentPage({ params, searchParams }: Pr
  )}
 
  <nav className="flex items-center justify-between border-b border-black/10 px-6 py-4">
- <a href={withPreview(`/s/${handle}`)} className="text-base tracking-wide" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>
+ <a href={withPreview(`${base}`)} className="text-base tracking-wide" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>
  {storeName}
  </a>
  <div className="flex items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70">

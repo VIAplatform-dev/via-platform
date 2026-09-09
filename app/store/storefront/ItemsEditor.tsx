@@ -15,13 +15,23 @@ const FIELD_LABEL: Record<string, string> = {
  heading: "Heading", subtext: "Text", body: "Text", cta: "Button label", image: "Image", img: "Image",
  src: "Image", quote: "Quote", name: "Name", title: "Title", excerpt: "Excerpt", link: "Link",
  btn: "Button label", href: "Button link", label: "Label", price: "Price",
+ type: "Answer type", required: "Required", options: "Options",
 };
+
+/**
+ * A non-text control for one schema field. Some lists have fields that aren't free text — a contact
+ * form's answer type is one of five, and "required" is a yes or no. Typing those into a text box is
+ * how you end up with a field of type "Emial".
+ */
+export type ItemControl =
+ | { kind: "select"; options: { value: string; label: string }[] }
+ | { kind: "toggle"; on: string; off: string; hint: string };
 const IMAGE_FIELDS = new Set(["image", "img", "src"]);
 const label = (f: string) => FIELD_LABEL[f] || f.charAt(0).toUpperCase() + f.slice(1);
 // The field that names a row in its collapsed header — the first non-image field carries the meaning.
 const titleField = (schema: ItemSchema) => schema.fields.find((f) => !IMAGE_FIELDS.has(f)) || schema.fields[0];
 
-export default function ItemsEditor({ props, schema, onChange, pick, uploading, addLabel = "Add item", singular = "Item" }: {
+export default function ItemsEditor({ props, schema, onChange, pick, uploading, addLabel = "Add item", singular = "Item", controls, hide, seed }: {
  props: Record<string, string> | undefined;
  schema: ItemSchema;
  onChange: (key: string, value: string) => void;
@@ -29,6 +39,13 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
  uploading: boolean;
  addLabel?: string;
  singular?: string;
+ /** Fields that need a picker or a switch instead of a text box, keyed by schema field name. */
+ controls?: Record<string, ItemControl>;
+ /** Hide a field for rows where it means nothing — a list of options on a yes/no question. */
+ hide?: (field: string, item: Item) => boolean;
+ /** What a freshly added row starts as. A row of nothing but blanks doesn't survive a save, so any
+   * schema whose first field must be filled in should seed it. */
+ seed?: Item;
 }) {
  const items = readItems(props, schema);
  // Which row is expanded. A list of slides is far easier to reorder when each row is one line, so
@@ -79,10 +96,21 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
        </div>
        {isOpen && (
         <div className="border-t border-black/[0.06] px-2.5 py-2.5">
-         {schema.fields.map((f) => (
+         {schema.fields.filter((f) => !hide?.(f, it)).map((f) => {
+          const control = controls?.[f];
+          return (
           <div key={f} className="mb-2.5 last:mb-0">
-           <label className="mb-1 block text-[11px] font-medium text-stone-500">{label(f)}</label>
-           {IMAGE_FIELDS.has(f) ? (
+           {control?.kind !== "toggle" && <label className="mb-1 block text-[11px] font-medium text-stone-500">{label(f)}</label>}
+           {control?.kind === "select" ? (
+            <select value={it[f] || control.options[0]?.value || ""} onChange={(e) => commit(items.map((x, j) => (j === i ? { ...x, [f]: e.target.value } : x)))} className={inp}>
+             {control.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+           ) : control?.kind === "toggle" ? (
+            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-stone-600">
+             <input type="checkbox" checked={it[f] === control.on} onChange={(e) => commit(items.map((x, j) => (j === i ? { ...x, [f]: e.target.checked ? control.on : control.off } : x)))} className="h-3.5 w-3.5 accent-[#5D0F17]" />
+             {control.hint}
+            </label>
+           ) : IMAGE_FIELDS.has(f) ? (
             <div className="flex items-center gap-2">
              {it[f]
               ? <span className="h-9 w-9 shrink-0 rounded-md bg-cover bg-center ring-1 ring-black/10" style={{ backgroundImage: `url("${it[f].replace(/"/g, "%22")}")` }} />
@@ -96,14 +124,15 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
             <input defaultValue={it[f] || ""} key={`${i}-${f}-${it[f] || ""}`} onBlur={(e) => { if (e.target.value !== (it[f] || "")) commit(items.map((x, j) => (j === i ? { ...x, [f]: e.target.value } : x))); }} className={inp} />
            )}
           </div>
-         ))}
+          );
+         })}
         </div>
        )}
       </div>
      );
     })}
    </div>
-   <button type="button" onClick={() => { commit(addItem(items, schema)); setOpen(items.length); }} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-black/20 py-2 text-[12px] font-medium text-stone-500 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Plus size={13} /> {addLabel}</button>
+   <button type="button" onClick={() => { commit(addItem(items, schema, seed)); setOpen(items.length); }} className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-black/20 py-2 text-[12px] font-medium text-stone-500 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Plus size={13} /> {addLabel}</button>
   </div>
  );
 }

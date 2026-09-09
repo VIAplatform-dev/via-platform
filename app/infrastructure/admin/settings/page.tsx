@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, ChevronRight } from "lucide-react";
+import { Mail, Activity, Bell } from "lucide-react";
+import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { SETTINGS_GROUPS } from "./sections";
 import { AdminHeader, TechCard } from "../ui";
 
@@ -12,14 +14,36 @@ import { AdminHeader, TechCard } from "../ui";
 // most of them. That's why each row carries a line about what it's FOR rather than what it contains.
 
 const ICONS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
- Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText,
+ Mail, Activity, Bell,
+ Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid,
 };
 
+
+/**
+ * VYA's own sections are hidden from sellers.
+ *
+ * "Who can open a store" is our list, not a shop's. A seller seeing it would be reading our front
+ * door policy from inside their own settings.
+ */
+function useSettingsGroups() {
+ const [isVyaOwner, setIsVyaOwner] = useState(false);
+ useEffect(() => {
+  fetch("/api/infrastructure/whoami")
+   .then((r) => (r.ok ? r.json() : null))
+   .then((d) => setIsVyaOwner(d?.admin === true))
+   .catch(() => {});
+ }, []);
+ return SETTINGS_GROUPS
+  .map((g) => ({ ...g, items: g.items.filter((i) => isVyaOwner || !i.vyaOnly) }))
+  .filter((g) => g.items.length > 0);
+}
+
 export default function SettingsIndex() {
+ const groups = useSettingsGroups();
  return (
   <>
-   <AdminHeader eyebrow="Your store" title="Settings" subtitle="Everything about how your store runs, in one place." />
-   {SETTINGS_GROUPS.map((g) => (
+   <AdminHeader eyebrow="Your store" title="Settings" subtitle="How your store runs: your details, payments, shipping, tax and the rest." />
+   {groups.map((g) => (
     <div key={g.label} className="mb-6">
      <p className="mb-2 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">{g.label}</p>
      <TechCard className="overflow-hidden">

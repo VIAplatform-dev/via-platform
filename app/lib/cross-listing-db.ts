@@ -12,64 +12,14 @@ import { listOnEtsy, endOnEtsy, etsyConnected, type EtsyResult } from "./etsy";
 // content and track status, and tell the seller exactly where to pull a sold item.
 // eBay/Etsy DO have APIs (hasApi), so real auto-post/remove can plug in there later.
 
-// mode = how a piece actually gets posted: "api" (server auto-posts via the marketplace API — eBay only),
-// "extension" (the browser extension fills the seller's own logged-in form — Depop, Vestiaire first),
-// "soon" (not available yet — shown greyed as Coming soon). Only eBay has a usable public API.
-export type PlatformMode = "api" | "extension" | "soon";
-export type Platform = { key: string; name: string; hasApi: boolean; live?: boolean; mode: PlatformMode; titleMax: number; profileUrl: (handle: string) => string };
+// The platform list itself is pure (cross-listing-platforms.ts) so the content builder can be
+// tested without a database. Re-exported here so every existing caller keeps its import.
+import { platformByKey } from "./cross-listing-platforms";
+export { PLATFORMS, platformByKey, effectiveMode, EXTENSION_IN_REVIEW, type Platform, type PlatformMode } from "./cross-listing-platforms";
 
-/**
- * The Chrome extension is submitted and waiting on Google's review.
- *
- * Until it is approved there is nothing for a seller to install, so every channel that depends on
- * it — Depop, Vestiaire — is presented as coming soon rather than as a switch that silently does
- * nothing when flipped. eBay is a real API integration and is unaffected.
- *
- * FLIP THIS TO false THE DAY THE EXTENSION IS APPROVED. It is the only thing to change: the
- * platform table below still describes Depop and Vestiaire as extension channels, which is what
- * they are, and this only changes how they are offered while nobody can install the thing.
- */
-export const EXTENSION_IN_REVIEW = true;
-
-/** How a platform should be OFFERED right now, as opposed to what it fundamentally is. */
-export function effectiveMode(p: Platform): PlatformMode {
- return p.mode === "extension" && EXTENSION_IN_REVIEW ? "soon" : p.mode;
-}
-
-
-export const PLATFORMS: Platform[] = [
- { key: "ebay", name: "eBay", hasApi: true, live: true, mode: "api", titleMax: 80, profileUrl: (h) => `https://www.ebay.com/usr/${h}` },
- { key: "depop", name: "Depop", hasApi: false, live: true, mode: "extension", titleMax: 65, profileUrl: (h) => `https://www.depop.com/${h}` },
- { key: "vestiaire", name: "Vestiaire Collective", hasApi: false, live: true, mode: "extension", titleMax: 50, profileUrl: (h) => `https://www.vestiairecollective.com/profile/${h}/` },
- { key: "poshmark", name: "Poshmark", hasApi: false, live: true, mode: "soon", titleMax: 80, profileUrl: (h) => `https://poshmark.com/closet/${h}` },
- { key: "etsy", name: "Etsy", hasApi: true, live: true, mode: "soon", titleMax: 140, profileUrl: (h) => `https://www.etsy.com/shop/${h}` },
- { key: "vinted", name: "Vinted", hasApi: false, live: true, mode: "soon", titleMax: 100, profileUrl: (h) => `https://www.vinted.com/member/${h}` },
- { key: "mercari", name: "Mercari", hasApi: false, live: true, mode: "soon", titleMax: 80, profileUrl: (h) => `https://www.mercari.com/u/${h}/` },
- { key: "grailed", name: "Grailed", hasApi: false, live: true, mode: "soon", titleMax: 60, profileUrl: (h) => `https://www.grailed.com/${h}` },
- { key: "instagram", name: "Instagram", hasApi: false, live: true, mode: "soon", titleMax: 125, profileUrl: (h) => `https://www.instagram.com/${h}/` },
- { key: "facebook", name: "Facebook Marketplace", hasApi: false, live: true, mode: "soon", titleMax: 100, profileUrl: (h) => `https://www.facebook.com/${h}` },
-];
-export const platformByKey = (k: string) => PLATFORMS.find((p) => p.key === k) || null;
-
-export type ItemForPost = { title: string; brand?: string | null; condition?: string | null; size?: string | null; category?: string | null; priceCents: number; description?: string | null };
-
-// Paste-ready listing content tuned to a platform (title within its char limit, tags,
-// and — for Depop — inline hashtags). Template-based, no AI cost.
-export function crossPostContent(item: ItemForPost, platformKey: string): { title: string; body: string; tags: string[]; price: string } {
- const max = platformByKey(platformKey)?.titleMax || 80;
- const brand = (item.brand || "").trim();
- const base = [brand, item.title].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
- const title = base.length > max ? base.slice(0, max - 1).trimEnd() + "…" : base;
- const bits = [brand, item.category, item.size ? `Size ${item.size}` : "", item.condition ? `${item.condition} condition` : ""].filter(Boolean);
- const tags = Array.from(new Set([brand, item.category || "", item.size ? `size ${item.size}` : "", "vintage"].filter(Boolean).map((t) => String(t).toLowerCase().replace(/\s+/g, ""))));
- const desc = (item.description || "").trim() || `${bits.join(" · ")}. One-of-one — grab it before it's gone.`;
- // Hashtag-driven feeds (Depop, Instagram) get inline tags appended to the caption.
- const hashtagPlatforms = new Set(["depop", "instagram"]);
- const body = hashtagPlatforms.has(platformKey)
- ? `${desc}\n\n${tags.slice(0, platformKey === "instagram" ? 10 : 5).map((t) => `#${t}`).join(" ")}`
- : desc;
- return { title, body, tags, price: `$${Math.round(item.priceCents / 100)}` };
-}
+// Paste-ready listing content per platform — pure, in cross-listing-core.ts so it can be tested
+// without a database. Re-exported here so every existing caller keeps its import.
+export { crossPostContent, type ItemForPost } from "./cross-listing-core";
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -235,6 +185,13 @@ export async function getCrossListingErrors(storeSlug: string, platform?: string
   .map((r) => ({ itemId: r.item_id, title: r.title ?? "(unknown item)", platform: r.platform, status: r.status, error: r.external_url ?? null, updatedAt: r.updated_at }));
 }
 
+/** How many pieces have at least one failed post — the Home row, not the per-platform detail. */
+export async function countCrossListingErrors(storeSlug: string): Promise<number> {
+ await ensureTables();
+ const rows = (await db()`SELECT count(DISTINCT item_id)::int AS n FROM cross_listings WHERE store_slug = ${storeSlug} AND status = 'error'`) as Array<{ n: number }>;
+ return Number(rows[0]?.n ?? 0);
+}
+
 export async function markCrossListing(storeSlug: string, itemId: string, platform: string, status: string, externalUrl?: string | null): Promise<void> {
  await ensureTables();
  await db()`
@@ -302,7 +259,10 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
  return toPull;
 }
 
-export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand: string | null; listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
+export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand: string | null;
+ /** What Vestiaire's form gates on — carried so the board can warn before the seller opens their site. */
+ photoCount: number; category: string | null; condition: string | null; material: string | null; size: string | null; description: string | null;
+ listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 
 /** Every active/pending item with its per-platform cross-listing status + engagement, for the tab. */
 export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> {
@@ -311,6 +271,9 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  const [rows, statRows, vyaOffers] = await Promise.all([
  sql`
   SELECT i.id::text AS item_id, i.title, i.price_cents, i.images, i.status, i.brand,
+   -- The fields Vestiaire's form gates on, so the board can say "only 1 photo" BEFORE a seller
+   -- opens their site and retypes everything to find out.
+   i.category, i.condition, i.material, i.size, i.description,
    COALESCE(json_object_agg(c.platform, c.status) FILTER (WHERE c.platform IS NOT NULL), '{}') AS listings,
    COALESCE(json_object_agg(c.platform, c.external_url) FILTER (WHERE c.status = 'error' AND c.external_url IS NOT NULL), '{}') AS errors
   FROM items i JOIN sellers s ON s.id = i.seller_id
@@ -319,7 +282,8 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
   -- the seller had just made was simply absent here with no explanation — "missing my dior blazer".
   -- It shows with its status so she can see where it is and what it needs, rather than hunting.
   WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved', 'draft')
-  GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand
+  GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand,
+   i.category, i.condition, i.material, i.size, i.description
   ORDER BY i.created_at DESC LIMIT 200
  `.catch(() => []),
  sql`SELECT item_id, platform, likes, offers, views, watchers FROM cross_listing_stats WHERE store_slug = ${storeSlug}`.catch(() => []),
@@ -344,6 +308,9 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
  return {
  itemId: r.item_id, title: String(r.title || "Item"), priceCents: Number(r.price_cents || 0),
  image: Array.isArray(r.images) ? (r.images[0] ?? null) : null, status: String(r.status), brand: r.brand ?? null,
+ photoCount: Array.isArray(r.images) ? r.images.filter((u: unknown) => typeof u === "string" && /^https?:\/\//.test(u)).length : 0,
+ category: r.category ?? null, condition: r.condition ?? null, material: r.material ?? null,
+ size: r.size ?? null, description: r.description ?? null,
  listings: (r.listings && typeof r.listings === "object") ? r.listings : {},
  errors: (r.errors && typeof r.errors === "object") ? r.errors : {},
  stats: { totals, byPlatform },

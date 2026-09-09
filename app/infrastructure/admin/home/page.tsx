@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { groupIntoParcels, parcelsToPost } from "@/app/lib/parcels-core";
+import { agingBuckets, agingTile } from "@/app/lib/aging-core";
+import { describeHold } from "@/app/lib/holds-core";
+import type { SetupStep } from "@/app/lib/setup-core";
+import { nextStepCopy, ringProgress, rowState } from "@/app/lib/setup-card-core";
+import type { AttentionRow } from "@/app/lib/attention-core";
 import Link from "next/link";
 import { PlusCircle, Package, ShoppingBag, Megaphone, BarChart3, Store, Sparkles, ArrowUp, ArrowUpRight, ArrowLeft, SquarePen, MessageCircle, Check } from "lucide-react";
 import { RichText, TypingDots } from "@/app/store/chatRender";
@@ -11,10 +17,11 @@ type Overview = {
  productViews: number; favorites: number;
 };
 type Item = { id: string; title: string; priceCents: number; status: string; images?: string[]; createdAt?: string };
-type Order = { id: string; itemId?: string | null; itemTitle?: string | null; amountCents?: number; feeCents?: number | null; shippingPaidCents?: number | null; costCents?: number | null; buyerEmail?: string | null; status: string; paidAt?: string | null; createdAt?: string | null };
+type Order = { id: string; itemId?: string | null; itemTitle?: string | null; amountCents?: number; feeCents?: number | null; shippingPaidCents?: number | null; costCents?: number | null; buyerEmail?: string | null; status: string; paidAt?: string | null; createdAt?: string | null; paymentIntent?: string | null; deliveryMethod?: "ship" | "pickup" };
 type Offer = { id: string; buyerName?: string; amountCents: number; itemTitle?: string; title?: string; listPriceCents?: number; status?: string };
 type InboxMsg = { id: string; buyerName?: string; name?: string; body?: string; text?: string; unread?: boolean; itemTitle?: string };
 type Msg = { role: "user" | "assistant"; content: string };
+type Hold = { itemId: string; name: string; expiresAt: string; title: string | null };
 
 // Representative aggregate data — sales-by-channel and demand need cross-marketplace aggregation
 // we don't collect yet. Shapes are deck-final; swap for real feeds when wired.
@@ -40,12 +47,45 @@ export default function WorkspaceHome() {
  const [pendingOffers, setPendingOffers] = useState(0);
  const [offersList, setOffersList] = useState<Offer[]>([]);
  const [inboxMsgs, setInboxMsgs] = useState<InboxMsg[]>([]);
+ const [holds, setHolds] = useState<{ holds: Hold[]; today: Hold[]; thisWeek: Hold[] }>({ holds: [], today: [], thisWeek: [] });
  const [demand, setDemand] = useState<{ name: string; trend: string; index: number }[]>([]);
+ // "Set up your store" — six steps (setup-core.ts) shown until every required one is done. Null
+ // until the route answers, so a store that IS set up never sees the card flash on load.
+ type Setup = { steps: SetupStep[]; complete: boolean; done: number; total: number; next: SetupStep["id"] | null };
+ const [setup, setSetup] = useState<Setup | null>(null);
+ const readSetup = (d: { setup?: SetupStep[]; setupComplete?: boolean; setupDone?: number; setupTotal?: number; setupNext?: SetupStep["id"] | null } | null) => {
+ if (d && Array.isArray(d.setup)) setSetup({ steps: d.setup, complete: d.setupComplete === true, done: Number(d.setupDone) || 0, total: Number(d.setupTotal) || d.setup.length, next: d.setupNext ?? null });
+ };
+ // The copy for the left column is decided in setup-card-core.ts, not here.
+ const nextCopy = setup ? nextStepCopy(setup.steps) : null;
+ // "skip" on the optional row: persisted for this store, and the card redraws from the answer.
+ async function skipStep(id: SetupStep["id"]) {
+ const r = await fetch("/api/store/onboarding-status", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skip: id }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ readSetup(r);
+ }
+ // "Needs you" rows from /api/store/attention — already non-zero-only and in a fixed order.
+ const [needs, setNeeds] = useState<AttentionRow[]>([]);
  // Trends is VYA's own tooling, hidden from sellers in the workspace nav. The link out to it, and
  // the empty state that points at it, have to follow — a seller sent to a page she can't open
  // learns only that something exists which isn't for her.
  const [isOwner, setIsOwner] = useState(false);
  const [period, setPeriod] = useState("30d");
+ // The profit figure comes from the SAME engine as Analytics (lib/analytics/margin.ts), not from
+ // arithmetic over the order list. That engine nets out tax, subtracts labels, fees, the
+ // consignor's cut and expenses, refuses to invent a number for uncosted sales, and is allowed to
+ // go negative. The old formula here did none of those and clamped a loss to £0.
+ type ProfitLine = { label: string; cents: number; estimate?: boolean; total?: boolean };
+ type MarginSlice = { netProfitCents: number | null; netMarginPct: number | null; current: { coveredSales: number; totalSales: number }; profit: { lines: ProfitLine[]; missingCostNote: string | null } };
+ const [marginData, setMarginData] = useState<MarginSlice | null>(null);
+ useEffect(() => {
+  let alive = true;
+  const days = PERIODS[period] || 30;
+  fetch(`/api/store/analytics/suite?sections=margin&period=${days}d`)
+   .then((r) => (r.ok ? r.json() : null))
+   .then((d) => { if (alive && d?.margin) setMarginData(d.margin as MarginSlice); })
+   .catch(() => {});
+  return () => { alive = false; };
+ }, [period]);
  const [nowMs] = useState(() => Date.now()); // stable "now" (set once) — keeps date math pure in render
 
  // In-page chat state — asking from the home bar turns the page into a conversation.
@@ -61,6 +101,9 @@ export default function WorkspaceHome() {
  fetch("/api/store/me").then((r) => (r.ok ? r.json() : null)).then((d) => d && setName(d.storeName || "")).catch(() => {});
  fetch("/api/store/items").then((r) => (r.ok ? r.json() : null)).then((d) => d?.items && setItems(d.items)).catch(() => {});
  fetch("/api/store/orders").then((r) => (r.ok ? r.json() : null)).then((d) => d?.orders && setOrders(d.orders)).catch(() => {});
+ fetch("/api/store/holds").then((r) => (r.ok ? r.json() : null)).then((d) => d?.holds && setHolds(d)).catch(() => {});
+ fetch("/api/store/onboarding-status").then((r) => (r.ok ? r.json() : null)).then(readSetup).catch(() => {});
+ fetch("/api/store/attention").then((r) => (r.ok ? r.json() : null)).then((d) => { if (Array.isArray(d?.rows)) setNeeds(d.rows); }).catch(() => {});
  fetch("/api/store/offers").then((r) => (r.ok ? r.json() : null)).then((d) => {
  if (!d) return;
  const pend: Offer[] = Array.isArray(d.pending) ? d.pending : (Array.isArray(d.offers) ? d.offers.filter((o: Offer) => (o.status || "pending") === "pending") : []);
@@ -203,7 +246,8 @@ export default function WorkspaceHome() {
  const hour = new Date(nowMs).getHours();
  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
  const dateStr = new Date(nowMs).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
- const toShip = orders.filter((o) => o.status === "paid").length;
+ // Parcels, not pieces: a buyer who took three things is one bag to post (parcels-core.ts).
+ const toShip = parcelsToPost(groupIntoParcels(orders)).length;
  const drafts = items.filter((i) => i.status === "draft").length;
  const active = ov?.inventory.active ?? 0;
  // Real money math from the order list (all paid orders), filtered to the selected period by paidAt.
@@ -216,11 +260,6 @@ export default function WorkspaceHome() {
 
  const revC = inPeriod.reduce((s, o) => s + (o.amountCents || 0), 0);
  const prevRevC = prevPeriod.reduce((s, o) => s + (o.amountCents || 0), 0);
- const feesC = inPeriod.reduce((s, o) => s + (o.feeCents || 0), 0); // VYA commission + shipping margin
- const cogsC = inPeriod.reduce((s, o) => s + (o.costCents || 0), 0); // what the seller paid (real, if set)
- const cardC = inPeriod.reduce((s, o) => s + Math.round((o.amountCents || 0) * 0.029) + 30, 0); // Stripe est.
- const profitC = Math.max(0, revC - feesC - cogsC - cardC);
- const margin = revC ? Math.round((profitC / revC) * 100) : 0;
  const ordersCount = inPeriod.length;
  const aov = ordersCount ? money(Math.round(revC / ordersCount)) : "—";
  const revDelta = prevRevC > 0 ? Math.round(((revC - prevRevC) / prevRevC) * 100) : null;
@@ -245,11 +284,20 @@ export default function WorkspaceHome() {
  const chartLabel = period === "90d" ? "Weekly" : period === "30d" ? "By 2 days" : period === "7d" ? "Daily" : "Last 7 days";
 
  // Action-first: what a store owner needs to act on the moment they land. Live counts from real data.
+ // Two tiles only appear when there is something to do about them: a hold lapsing today is a call
+ // to make now, and stock that has sat 60/90 days is what to reshoot, reprice or take to the market.
+ const aging = agingBuckets(items, new Date(nowMs));
+ const agingLabel = agingTile(aging);
  const attention = [
- { label: "Orders to ship", count: toShip, href: `${B}/orders`, urgent: toShip > 0 },
+ { label: "Parcels to post", count: toShip, href: `${B}/orders`, urgent: toShip > 0 },
  { label: "Offers to review", count: pendingOffers, href: `${B}/inbox`, urgent: pendingOffers > 0 },
+ ...(holds.today.length ? [{ label: holds.today.length === 1 ? `Hold lapses today · ${describeHold(holds.today[0], new Date(nowMs)).replace(/ · .*$/, "").replace(/^Held for /, "")}` : "Holds lapse today", count: holds.today.length, href: `${B}/inventory?status=reserved`, urgent: true }] : []),
+ ...(agingLabel ? [{ label: agingLabel.replace(/^\d+ pieces? /, "Listed "), count: aging.over90 || aging.over60, href: `${B}/inventory?sort=oldest`, urgent: false }] : []),
  { label: "Drafts to publish", count: drafts, href: `${B}/inventory/drafts`, urgent: false },
  { label: "Live listings", count: active, href: `${B}/inventory`, urgent: false, good: true },
+ // The rest of what needs her, from /api/store/attention. Holds and aging are skipped here because
+ // the two tiles above already say it — with the customer's name, from the same data.
+ ...needs.filter((r) => r.id !== "holdsToday" && r.id !== "aging").map((r) => ({ label: r.label, count: r.count, href: r.href, urgent: r.urgent })),
  ];
 
  return (
@@ -262,11 +310,62 @@ export default function WorkspaceHome() {
  </div>
  <div className="flex items-center gap-2.5">
  <SegmentedControl options={["Today", "7d", "30d", "90d"]} value={period} onChange={setPeriod} />
- <button onClick={() => setChatMode(true)} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-[7px] text-[13px] font-medium text-stone-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent-ink)]">
+ {/* Open the assistant where she is, rather than replacing the page she's reading.
+     Taking over the screen to ask a question means losing the numbers you were asking about —
+     the panel already supports this via the `vya:ask` event the rest of the app uses. */}
+ <button onClick={() => window.dispatchEvent(new CustomEvent("vya:ask"))} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-[7px] text-[13px] font-medium text-stone-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent-ink)]">
  <Sparkles size={14} className="text-[var(--accent)]" /> Ask VYA
  </button>
  </div>
  </div>
+
+ {/* Set up your store — until every required step is done. Left: the one next step and its button
+     (option B). Right: the ring and every step (option F); the optional domain can be skipped. */}
+ {setup && !setup.complete && nextCopy && (
+ <TechCard className="mb-4 overflow-hidden border-[var(--accent)]/35 p-0" data-testid="setup-card">
+ <div className="grid lg:grid-cols-[5fr_4fr]">
+ <div className="bg-gradient-to-b from-[var(--accent-soft)] to-white p-5 sm:p-6">
+ <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-ink)]" data-testid="setup-eyebrow">{nextCopy.eyebrow}</p>
+ <h2 className="mt-2 text-[24px] leading-[1.15] tracking-[-0.01em] text-stone-900" style={serif} data-testid="setup-headline">{nextCopy.headline}</h2>
+ <p className="mt-1.5 text-[13px] text-stone-500">{nextCopy.hint}</p>
+ <div className="mt-4 flex flex-wrap items-center gap-3">
+ <Link href={nextCopy.href} data-testid="setup-next" className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-[var(--accent,#0e9f76)] px-4 py-2 text-[13px] font-medium text-white shadow-[0_1px_2px_rgba(16,24,40,0.08)] transition hover:bg-[var(--accent-hover,#0b8a66)]">{nextCopy.verb}</Link>
+ {(nextCopy.thenLine.then.length > 0 || nextCopy.thenLine.optional) && (
+ <p className="text-[12px] text-stone-500" data-testid="setup-then">
+ then {nextCopy.thenLine.then.join(" · ")}
+ {nextCopy.thenLine.optional && <>{nextCopy.thenLine.then.length > 0 ? " · " : " "}<span className="text-stone-400">{nextCopy.thenLine.optional}</span></>}
+ </p>
+ )}
+ </div>
+ </div>
+ <div className="border-t border-stone-100 p-5 lg:border-l lg:border-t-0">
+ <div className="flex items-center gap-3">
+ <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(var(--accent,#0e9f76) 0 ${ringProgress(setup.done, setup.total)}deg, #e7e5e4 ${ringProgress(setup.done, setup.total)}deg 360deg)` }} aria-hidden>
+ <span className="grid h-7 w-7 place-items-center rounded-full bg-white text-[10px] font-semibold tabular-nums text-stone-700" data-testid="setup-ring">{setup.done}/{setup.total}</span>
+ </div>
+ <div>
+ <p className="text-[14px] font-semibold text-stone-900">Set up your store</p>
+ <p className="text-[12px] text-stone-500">{setup.steps.filter((s) => !s.done).length} to go</p>
+ </div>
+ </div>
+ <ul className="mt-3 divide-y divide-stone-100">
+ {setup.steps.filter((s) => !s.skipped).map((s) => {
+ const state = rowState(s, setup.next);
+ return (
+ <li key={s.id} className="flex items-center gap-2.5 py-2" data-testid={`setup-row-${s.id}`} data-state={state}>
+ <span aria-hidden className={`h-3 w-3 shrink-0 rounded-full border ${state === "done" ? "border-[var(--accent)] bg-[var(--accent)]" : state === "next" ? "border-2 border-[var(--accent)]" : "border-stone-300"}`} />
+ <Link href={s.href} className={`min-w-0 flex-1 truncate text-[13px] ${state === "done" ? "text-stone-400 line-through" : state === "next" ? "font-semibold text-stone-900" : state === "optional" ? "text-stone-400" : "text-stone-700"}`}>{s.label}</Link>
+ {state === "optional" && (
+ <button type="button" onClick={() => skipStep(s.id)} className="shrink-0 text-[11.5px] text-stone-400 underline-offset-2 hover:text-stone-600 hover:underline" data-testid={`setup-skip-${s.id}`}>skip</button>
+ )}
+ </li>
+ );
+ })}
+ </ul>
+ </div>
+ </div>
+ </TechCard>
+ )}
 
  {/* Needs attention — action-first */}
  <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -300,27 +399,42 @@ export default function WorkspaceHome() {
 
  <TechCard className="p-5">
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.13em] text-stone-400">Net profit · {period === "Today" ? "today" : period}</p>
+ {marginData === null ? (
+ <p className="mt-3 text-[13px] text-stone-400">Working it out…</p>
+ ) : marginData.netProfitCents === null ? (
+ <div className="mt-3">
+ <p className="text-[13px] text-stone-700">No cost on record for anything that sold {period === "Today" ? "today" : `in the last ${period}`}.</p>
+ <p className="mt-1 text-[12.5px] text-stone-500">Add what your pieces cost and this becomes a real number. <a href={`${B}/dashboard`} className="underline">Analytics ›</a></p>
+ </div>
+ ) : (
+ <>
  <div className="mt-1.5 flex items-end gap-2">
- <span className="text-[32px] leading-none tracking-[-0.01em] text-stone-900" style={serif}>{money(profitC)}</span>
- <span className="mb-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-ink)]">{margin}% margin</span>
+ <span className={`text-[32px] leading-none tracking-[-0.01em] ${marginData.netProfitCents < 0 ? "text-rose-700" : "text-stone-900"}`} style={serif}>
+ {marginData.netProfitCents < 0 ? "−" : ""}{money(Math.abs(marginData.netProfitCents))}
+ </span>
+ {marginData.netMarginPct !== null && (
+ <span className="mb-1 rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--accent-ink)]">{marginData.netMarginPct}% margin</span>
+ )}
  </div>
  <div className="mt-4">
- {[
- { label: "Revenue", value: money(revC), est: false },
- { label: "Cost of goods", value: `−${money(cogsC)}`, est: false },
- { label: "VYA fees", value: `−${money(feesC)}`, est: false },
- { label: "Card processing", value: `−${money(cardC)}`, est: true },
- ].map((r) => (
- <div key={r.label} className="flex items-center justify-between border-b border-stone-100 py-2 text-[12.5px]">
- <span className="text-stone-500">{r.label}{r.est && <span className="ml-1 align-top text-[8.5px] uppercase tracking-wide text-stone-300">est</span>}</span>
- <span className="font-semibold tabular-nums text-stone-700">{r.value}</span>
+ {marginData.profit.lines.filter((l) => !l.total).map((l) => (
+ <div key={l.label} className="flex items-center justify-between border-b border-stone-100 py-2 text-[12.5px]">
+ <span className="text-stone-500">{l.label}{l.estimate && <span className="ml-1 align-top text-[8.5px] uppercase tracking-wide text-stone-300">est</span>}</span>
+ <span className="font-semibold tabular-nums text-stone-700">{l.cents < 0 ? `−${money(-l.cents)}` : money(l.cents)}</span>
  </div>
  ))}
  <div className="flex items-center justify-between pt-2.5 text-[13px]">
  <span className="font-semibold text-stone-900">Net profit</span>
- <span className="font-semibold tabular-nums text-[var(--accent-ink)]">{money(profitC)}</span>
+ <span className={`font-semibold tabular-nums ${marginData.netProfitCents < 0 ? "text-rose-700" : "text-[var(--accent-ink)]"}`}>
+ {marginData.netProfitCents < 0 ? "−" : ""}{money(Math.abs(marginData.netProfitCents))}
+ </span>
  </div>
+ {marginData.profit.missingCostNote && (
+ <p className="mt-2 text-[11.5px] text-stone-400">{marginData.profit.missingCostNote}</p>
+ )}
  </div>
+ </>
+ )}
  </TechCard>
  </div>
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { bagRefusal } from "@/app/lib/bag-reclaim-core";
 import { randomUUID } from "crypto";
 import { addToCart, removeFromCart, getCartItemIds, clearCart } from "@/app/lib/storefront-cart-db";
 import { getItem } from "@/app/lib/db/inventory";
@@ -45,6 +46,10 @@ export async function POST(request: NextRequest) {
 
  const item = await getItem(itemId);
  if (!item) return NextResponse.json({ error: "That piece is no longer available." }, { status: 404 });
+ // A held, sold or unpublished piece never enters the bag — the hosted-site cart already refuses
+ // these (plan-b/lookup.ts isSellable); the VYA bag let them in and the checkout sold them.
+ const refusal = bagRefusal(item.status);
+ if (refusal) return NextResponse.json({ error: refusal }, { status: 409 });
 
  let token = request.cookies.get(COOKIE)?.value;
  const isNew = !token;

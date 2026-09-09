@@ -2,11 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, Sparkles, Tag } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, Toggle, cn } from "../ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, Toggle, SectionLabel, cn } from "../ui";
 import { CategoryBreadcrumb } from "../CategoryPicker";
+import PhotoCropper from "../PhotoCropper";
 import { toCategorySlug } from "@/app/lib/item-tags";
 import { PriceScale } from "../PriceScale";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
+import { ConditionChips, MeasurementFields, measurementsFromForm, useStoreUnits } from "../ListingStructure";
+import { PACKAGING, packagingById, packedWeightOz, suggestPackaging } from "@/app/lib/packaging";
+import { toOz, fromOz } from "@/app/lib/weight-units";
+import { assignTier } from "@/app/lib/shipping-tiers";
+import { normalizeCondition } from "@/app/lib/condition-core";
+import { parcelEstimateFrom, type ParcelEstimate } from "@/app/lib/parcel-core";
+import type { MeasurementKey } from "@/app/lib/measurements-core";
 
 /**
  * Which store this listing is being created for.
@@ -15,6 +23,8 @@ import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
  * add stock for a seller you're previewing therefore published it into YOUR store instead, and it
  * never appeared on the storefront you were looking at.
  */
+import RentalPanel, { type TermsDraft } from "../rentals/RentalPanel";
+
 function withStore(path: string): string {
  if (typeof window === "undefined") return path;
  const s = new URLSearchParams(window.location.search).get("store");
@@ -29,6 +39,7 @@ type Draft = {
  brand: Field;
  era: Field;
  material: Field;
+ colour: Field;
  condition: Field;
  conditionGrade: string | null;
  flaws: string[];
@@ -39,9 +50,9 @@ type Draft = {
  priceHint: number | null;
  parcel: { weightOz: number; lengthIn: number; widthIn: number; heightIn: number };
 };
-type Form = { title: string; brand: string; era: string; material: string; condition: string; size: string; measurements: string; category: string; price: string; cost: string; description: string; weightOz: string; lengthIn: string; widthIn: string; heightIn: string };
+type Form = { title: string; brand: string; era: string; material: string; colour: string; condition: string; size: string; measurements: string; category: string; price: string; cost: string; description: string; weightOz: string; lengthIn: string; widthIn: string; heightIn: string };
 type Collection = { id: string; title: string; itemCount: number };
-const BLANK: Form = { title: "", brand: "", era: "", material: "", condition: "", size: "", measurements: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
+const BLANK: Form = { title: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", measurements: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
 
 type Flag = { level: string; message: string; marketUsd: number; pct?: number };
 
@@ -114,6 +125,18 @@ export default function IntakePage() {
  const [reverseImage, setReverseImage] = useState<{ matches: number; brand: string | null; hits: number; sampleTitles: string[] } | null>(null);
  const [specificPiece, setSpecificPiece] = useState<{ model: string; similarity: number; era: string | null; source: string; refPriceCents: number | null } | null>(null);
  const [flaws, setFlaws] = useState<string[]>([]);
+ const [newFlaw, setNewFlaw] = useState(""); // the flaw being typed; whatever is left in the box is saved too
+ // Structure (owner audit #27/#31): the note beyond the grade, the category's measurement template,
+ // and the parcel the AI judged this piece to be — kept so a typed weight can be checked against it.
+ const [conditionNote, setConditionNote] = useState("");
+ const [measurements, setMeasurements] = useState<Partial<Record<MeasurementKey, string>>>({});
+ const [aiParcel, setAiParcel] = useState<ParcelEstimate | null>(null);
+ const units = useStoreUnits(withStore);
+ // Provenance (owner audit #18): where it came from and when — hers, never shown to shoppers. The
+ // same two fields the inventory editor has; the datalist is her own previous source names.
+ const [sourceName, setSourceName] = useState("");
+ const [acquiredAt, setAcquiredAt] = useState("");
+ const [sourceNames, setSourceNames] = useState<string[]>([]);
  const [promptVersion, setPromptVersion] = useState<string | null>(null);
  const [seoBusy, setSeoBusy] = useState(false);
  const [schedule, setSchedule] = useState(""); // datetime-local value for scheduled publish
@@ -125,6 +148,15 @@ export default function IntakePage() {
  const [cols, setCols] = useState<Collection[]>([]);
  const [selectedCols, setSelectedCols] = useState<string[]>([]);
  const [newCol, setNewCol] = useState("");
+ const [addingCol, setAddingCol] = useState(false);
+ // Which photo the positioner is open on, if any.
+ const [cropping, setCropping] = useState<string | null>(null);
+ // Which photo the big frame is showing. The cover by default; clicking a thumbnail opens that one
+ // instead, because the strip is far too small to judge a crop in.
+ const [selPhoto, setSelPhoto] = useState(0);
+ // Which packaging she's using. Preselected from the AI's weight — the honest signal, since it
+ // came from looking at the actual garment.
+ const [packing, setPacking] = useState<string>("small-box");
  const fileRef = useRef<HTMLInputElement>(null);
  const dragIdx = useRef<number | null>(null);
  const [markupPct, setMarkupPct] = useState<number | null>(null);
@@ -144,6 +176,9 @@ export default function IntakePage() {
  const [priceFlag, setPriceFlag] = useState<Flag | null>(null);
  const [lowConf, setLowConf] = useState(false); // too few comps to flag over/under — show a rough range, not a verdict
  const [consigned, setConsigned] = useState(false);
+ // Rental terms decided while the piece is being written. There's no item to attach them to yet,
+ // so they're held here and written the moment publish hands back an id.
+ const [rentalDraft, setRentalDraft] = useState<TermsDraft | null>(null);
  const [consignors, setConsignors] = useState<{ id: number; name: string; defaultSplitPct: number | null }[]>([]);
  const [consignCfg, setConsignCfg] = useState<{ storeDefaultSplitPct: number } | null>(null);
  const [consign, setConsign] = useState({ consignorId: "", split: "", expiresAt: "", newName: "" });
@@ -153,6 +188,12 @@ export default function IntakePage() {
  useEffect(() => {
  fetch(withStore("/api/store/pricing")).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.minMarkupPct === "number") setMarkupPct(d.minMarkupPct); }).catch(() => {});
  fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
+ // Her previous source names, for the "Where it came from" datalist — derived from her pieces
+ // exactly as the inventory editor derives them.
+ fetch(withStore("/api/store/items")).then((r) => (r.ok ? r.json() : null)).then((d) => {
+ const names = Array.from(new Set(((d?.items || []) as { sourceName?: string | null }[]).map((i) => (i.sourceName || "").trim()).filter(Boolean))).sort();
+ setSourceNames(names);
+ }).catch(() => {});
  }, []);
 
  // ── Auto-save the in-progress listing as a DRAFT, so leaving before publish/schedule never loses it.
@@ -331,6 +372,7 @@ export default function IntakePage() {
  setReverseImage(d.reverseImage || null);
  setSpecificPiece(d.specificPiece || null);
  if (dr && Array.isArray(dr.flaws)) setFlaws(dr.flaws);
+ if (dr?.parcel) { const est = parcelEstimateFrom(dr.parcel); setAiParcel(est); setPacking(suggestPackaging(est?.weightOz)); }
  setPromptVersion(d.promptVersion || null);
  if (dr?.careTag) setCareTag(dr.careTag);
  if (d.runway || dr?.runway) setRunway(d.runway ?? dr?.runway);
@@ -350,7 +392,7 @@ export default function IntakePage() {
  // Record the AI's proposal ONLY for fields the seller left blank (a genuine prediction).
  // Pre-typed fields aren't the AI's guess → excluded, keeping the accuracy metric honest.
  { const predicted: Record<string, string | null> = {};
- ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["condition", dr.condition?.value], ["category", dr.category], ["description", dr.description]] as [keyof Form, string | null | undefined][])
+ ([["title", dr.title], ["brand", dr.brand?.value], ["era", dr.era?.value], ["material", dr.material?.value], ["colour", dr.colour?.value], ["condition", dr.condition?.value], ["category", dr.category], ["description", dr.description]] as [keyof Form, string | null | undefined][])
  .forEach(([k, aiVal]) => { if (!String(form[k]).trim() && aiVal) predicted[k] = aiVal; });
  setAiDraft(predicted); setAiPhoto(photos[0] ?? null); }
  }
@@ -366,7 +408,10 @@ export default function IntakePage() {
  fill("brand", dr.brand?.value);
  fill("era", dr.era?.value);
  fill("material", dr.material?.value);
- fill("condition", dr.condition?.value);
+ fill("colour", dr.colour?.value);
+ // The grade goes on the scale; the model's sentence about the wear becomes the note.
+ fill("condition", normalizeCondition(dr.conditionGrade) ?? normalizeCondition(dr.condition?.value) ?? dr.condition?.value);
+ if (!conditionNote.trim() && dr.condition?.value && normalizeCondition(dr.condition.value) !== dr.condition.value) setConditionNote(dr.condition.value);
  fill("category", toCategorySlug(dr.category) ?? dr.category);
  fill("description", dr.description);
  if (dr.parcel) { fill("weightOz", String(dr.parcel.weightOz)); fill("lengthIn", String(dr.parcel.lengthIn)); fill("widthIn", String(dr.parcel.widthIn)); fill("heightIn", String(dr.parcel.heightIn)); }
@@ -481,6 +526,18 @@ export default function IntakePage() {
   setErr(`Press “Add” next to “${consign.newName.trim()}” to save them as a consignor first — or clear the box if this piece isn’t on consignment.`);
   return;
  }
+ // A weight is required to go live, because here the weight IS the buyer's postage: it picks the
+ // flat tier they're charged. Shopify lets a product publish without one and finds out at checkout,
+ // but Shopify rates live at fulfilment — we quote up front, so an unweighed piece silently quotes
+ // the middle tier and the store eats the difference on anything heavy.
+ //
+ // It's cheap to satisfy: the AI weighs the piece from the photos, so the field arrives filled in.
+ // This only catches the case where that failed AND nobody typed one. Drafts are exempt — a draft
+ // isn't for sale yet.
+ if ((status === "active" || publishAt) && !(Number(form.weightOz) > 0) && !(aiParcel?.weightOz)) {
+  setErr("Add the weight before publishing — it decides what a buyer is charged for postage, and without it a heavy piece is quoted as a light one.");
+  return;
+ }
  setBusy(true);
  setBusyMsg(publishAt ? "Scheduling…" : status === "draft" ? "Saving draft…" : "Publishing…");
  setErr(null);
@@ -489,10 +546,28 @@ export default function IntakePage() {
  const r = await fetch(withStore("/api/store/intake/publish"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ ...form, status, publishAt: publishAt || null, draftId: draftIdRef.current, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, channels: Object.keys(channels).filter((k) => channels[k]), consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
+ body: JSON.stringify({ ...form,
+  // What gets stored is what the seller was shown: the weight she typed, or the AI's estimate the
+  // tier readout on this page was computed from. Sending an empty string here would publish a
+  // piece whose postage tier is decided by a number nobody ever saw.
+  weightOz: form.weightOz.trim() || (aiParcel?.weightOz ? String(aiParcel.weightOz) : ""),
+  status, publishAt: publishAt || null, draftId: draftIdRef.current, price: Number(form.price) || 0, cost: form.cost === "" ? null : Number(form.cost) || 0, collections: selectedCols, images, aiDraft,
+ // Structure: the flaws list (with whatever is still in the box), the note, the template's numbers
+ // (empties omitted; a list wins over the old free-text field), and the AI's parcel so publish can
+ // keep the estimate and fill a weight she never typed (parcel-core.ts).
+ sourceName, acquiredAt: acquiredAt || null,
+ flaws: newFlaw.trim() ? [...flaws, newFlaw.trim()] : flaws, conditionNote, measurements: Object.values(measurements).some((v) => v && v.trim()) ? measurementsFromForm(measurements, units.unit) : form.measurements || null, parcel: aiParcel, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, channels: Object.keys(channels).filter((k) => channels[k]), consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
  if (!r.ok) throw new Error(d.error || "Publish failed");
+ // The piece exists now, so its rental terms have somewhere to live. Deliberately not fatal: a
+ // published listing that failed to save its terms is fixable from the editor, whereas throwing
+ // here would tell the seller the whole publish failed when it didn't.
+ if (rentalDraft && d.itemId) {
+ await fetch(withStore(`/api/store/rentals/terms/${d.itemId}`), {
+ method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rentalDraft),
+ }).catch(() => null);
+ }
  setScheduledAt(d.scheduled ? d.publishAt : null);
  setSavedDraft(status === "draft" && !d.scheduled);
  // The autosaved draft is promoted in place by the publish endpoint (via draftId), so there's no
@@ -508,7 +583,7 @@ export default function IntakePage() {
  /** Wipe everything the AI wrote, and anything typed over it, but keep the photos. */
  function clearDetails() {
   setForm(BLANK); setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null);
-  setRunway(null); setCelebrity(null); setSpecificPiece(null); setFlaws([]); setCareTag(null);
+  setRunway(null); setCelebrity(null); setSpecificPiece(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setCareTag(null);
   setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote("");
   setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false);
   setAiDraft({}); setAiPhoto(null); setPromptVersion(null); setEmbedding(null); setReverseImage(null);
@@ -516,9 +591,9 @@ export default function IntakePage() {
 
  function reset() {
  draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
- setPhase("form"); setPhotos([]); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
- setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setSpecificPiece(null); setFlaws([]); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setAiPhoto(null); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
+ setPhase("form"); setPhotos([]); setSelPhoto(0); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
+ setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false); setSourceName(""); setAcquiredAt("");
+ setReverseImage(null); setSpecificPiece(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setAiPhoto(null); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
  }
 
  // ── Done ──
@@ -585,7 +660,7 @@ export default function IntakePage() {
  <AdminHeader
  eyebrow="Sell · Add listing"
  title="Add a listing"
- subtitle="Add photos and fill in what you know — then let AI complete the rest. Anything you type, it keeps."
+ subtitle="Add photos and fill in what you know. AI fills in the rest, and never overwrites anything you typed."
  actions={<a href="/admin/bulk-upload" className="text-[13px] font-medium text-stone-500 hover:text-stone-800">Bulk upload →</a>}
  />
 
@@ -607,9 +682,20 @@ export default function IntakePage() {
  {photos.length ? (
  <>
  <TechCard className="overflow-hidden">
- <div className="aspect-[3/4] w-full bg-stone-100">
+ {/* The cover, in the shape a shopper sees it. Clicking opens the positioner — sellers shoot
+     vertically and the card crops the middle, so a piece framed low lost its hem and there was
+     nothing to do about it. Only a real uploaded photo can be repositioned; the ghost-mannequin
+     render is generated to fit already. */}
+ <div className="group relative aspect-[3/4] w-full bg-stone-100">
  {/* eslint-disable-next-line @next/next/no-img-element */}
- <img src={ghost || photos[0]} alt="" className="h-full w-full object-cover" />
+ <img src={ghost || photos[selPhoto] || photos[0]} alt="" className="h-full w-full object-cover" />
+ {!ghost && (photos[selPhoto] || photos[0]) && (
+  <button
+   type="button"
+   onClick={() => setCropping(photos[selPhoto] || photos[0])}
+   className="absolute bottom-2 right-2 rounded-lg bg-black/65 px-2.5 py-1.5 text-[11.5px] font-medium text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+  >Reposition</button>
+ )}
  </div>
  </TechCard>
  <p className="mt-2 flex items-baseline justify-between gap-2 text-[11px] uppercase tracking-[0.08em] text-stone-400">
@@ -629,20 +715,24 @@ export default function IntakePage() {
  onDragStart={() => { dragIdx.current = i; }}
  onDragOver={(e) => e.preventDefault()}
  onDrop={() => { if (dragIdx.current !== null) reorderPhoto(dragIdx.current, i); dragIdx.current = null; }}
- className="group relative h-12 w-10 cursor-grab active:cursor-grabbing"
- title="Drag to reorder"
+ onClick={() => setSelPhoto(i)}
+ className={cn(
+  "group relative h-16 w-14 cursor-grab rounded transition active:cursor-grabbing",
+  i === selPhoto ? "ring-2 ring-[var(--accent,#0e9f76)]" : "hover:ring-2 hover:ring-[var(--accent,#0e9f76)]/40",
+ )}
+ title="Click to open · drag to reorder"
  >
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={p} alt="" className="h-full w-full rounded object-cover ring-1 ring-stone-200" />
  {i === 0 && !ghost && <span className="absolute -left-1 -top-1 rounded bg-[var(--accent,#0e9f76)] px-1 text-[8px] leading-tight text-white">cover</span>}
- <button type="button" onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] leading-none text-white group-hover:flex" aria-label="Remove">×</button>
+ <button type="button" onClick={() => { setPhotos((ps) => ps.filter((_, j) => j !== i)); setSelPhoto((n) => (i < n ? n - 1 : Math.max(0, Math.min(n, photos.length - 2)))); }} className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] leading-none text-white group-hover:flex" aria-label="Remove">×</button>
  </div>
  ))}
  {photos.length < 8 && (
- <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex h-12 w-10 items-center justify-center rounded border border-dashed border-stone-300 text-stone-400 hover:border-stone-400 hover:text-stone-600">+</button>
+ <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex h-16 w-14 items-center justify-center rounded border border-dashed border-stone-300 text-stone-400 hover:border-stone-400 hover:text-stone-600">+</button>
  )}
  </div>
- {photos.length > 1 && <p className="mt-1 text-[10px] text-stone-400">Drag to reorder{ghost ? "" : " · first is the cover"}</p>}
+ {photos.length > 1 && <p className="mt-1 text-[10px] text-stone-400">Tap one to see it big{ghost ? "" : " · drag to reorder, first is the cover"}</p>}
  {aiPhoto && photos[0] && photos[0] !== aiPhoto && (
   <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
    <p><strong>These details were written from a different photo.</strong> Everything below still describes the piece you removed.</p>
@@ -697,31 +787,40 @@ export default function IntakePage() {
  <input className={input} value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. 1990s Prada nylon shoulder bag" />
  </div>
  <div className="grid grid-cols-2 gap-3">{riskyField("brand", "Brand")}{riskyField("era", "Era")}</div>
- <div className="grid grid-cols-2 gap-3">{riskyField("material", "Material")}
- <div>
- <label className={label}>Condition</label>
- <input className={input} value={form.condition} onChange={(e) => set("condition", e.target.value)} />
- {flaws.length > 0 && (
- <p className="mt-1 text-[10.5px] text-amber-700/90">AI noted: {flaws.join(" · ")} <span className="text-stone-400">— factored into the price</span></p>
+ <div className="grid grid-cols-2 gap-3">{riskyField("material", "Material")}{riskyField("colour", "Colour")}</div>
+ <ConditionChips
+ value={form.condition}
+ onChange={(g) => set("condition", g)}
+ note={conditionNote}
+ onNoteChange={setConditionNote}
+ flagged={flagged.includes("condition") && !confirmed.condition ? <span className="ml-2 text-[11px] font-normal text-amber-600">● AI unsure — confirm</span> : null}
+ />
+ {flagged.includes("condition") && (
+ <label className="-mt-2 flex items-center gap-1.5 text-[11px] text-stone-500">
+ <input type="checkbox" checked={!!confirmed.condition} onChange={(e) => setConfirmed((c) => ({ ...c, condition: e.target.checked }))} className="accent-[var(--accent,#0e9f76)]" />
+ Confirmed
+ </label>
  )}
- </div>
- </div>
+ {/* Flaws are set by the AI from the photos and still show under Condition on the storefront.
+     The hand-entry list came off the form: eleven fields before a price is too many. */}
  <div className="grid grid-cols-2 gap-3">
- <div><label className={label}>Size</label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="M / US 8" /></div>
+ <div><label className={label}>Size <span className="font-normal text-stone-400">— as marked on the tag</span></label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="IT 40 / UK 12 / M" /></div>
  <div>
  <label className={label}>Category</label>
  <div className="pt-1"><CategoryBreadcrumb value={form.category || null} onChange={(v) => set("category", v || "")} /></div>
  </div>
  </div>
  <div>
- <label className={label}>Measurements <span className="font-normal text-stone-400">— flat, in inches</span></label>
- <input className={input} value={form.measurements} onChange={(e) => set("measurements", e.target.value)} placeholder={`Bust 34" · Waist 28" · Length 40"`} />
- {!form.measurements.trim() && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on — listings with measurements sell faster. Add the key ones.</p>}
+ <MeasurementFields category={form.category} values={measurements} onChange={setMeasurements} unit={units.unit} />
+ {!Object.values(measurements).some((v) => v && v.trim()) && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on — listings with measurements sell faster. Add the key ones.</p>}
  </div>
  <div className="grid grid-cols-2 gap-3">
  <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, marketPrice, priceLow, priceHigh)); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
- <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="What you paid" /></div>
+ <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
  </div>
+ {/* Where it came from and Acquired on came off the form — sourcing ROI is worth having, but
+     not at the cost of two more boxes between a photo and a price. Both still live in the
+     inventory editor, where a seller goes deliberately rather than forty times an afternoon. */}
  {priceLow != null && priceHigh != null && priceHigh > priceLow && (
  <PriceScale low={priceLow} high={priceHigh} market={marketPrice} value={Number(form.price) || 0} />
  )}
@@ -736,9 +835,21 @@ export default function IntakePage() {
  </div>
  )}
 
- <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
- <div className="flex items-center justify-between">
- <div><p className="text-[13px] font-medium text-stone-800">Consignment</p><p className="text-[11px] text-stone-400">Track this for a consignor &mdash; they&rsquo;re auto-credited their split when it sells.</p></div>
+ <RentalPanel priceCents={Math.round((Number(form.price) || 0) * 100)} onDraftChange={setRentalDraft} />
+
+ {/* Same shape as Renting above: these are the two "this piece works differently" switches, and
+     they were drawn differently — one with a label pill and roomy copy, one with a bold line and
+     small grey text — which made them read as unrelated features rather than a pair. */}
+ <div className="mt-5 rounded-xl border border-stone-200 p-4">
+ <div className="flex items-start justify-between gap-6">
+ <div className="min-w-0">
+ <SectionLabel className="mb-0">Consignment</SectionLabel>
+ <p className="mt-1 max-w-[52ch] text-[12px] leading-relaxed text-stone-500">
+ {consigned
+  ? "This piece belongs to a consignor. They're credited their split automatically when it sells."
+  : "Selling this for someone else? Track their split and pay them when it sells."}
+ </p>
+ </div>
  <Toggle on={consigned} onClick={toggleConsigned} />
  </div>
  {consigned && (
@@ -746,9 +857,13 @@ export default function IntakePage() {
  <div className="grid grid-cols-2 gap-3">
  <div>
  <label className={label}>Consignor</label>
- <select className={input} value={consign.consignorId} onChange={(e) => pickConsignor(e.target.value)}>
+ {/* "Add a new consignor" lives IN the list rather than as a second field below it: one control,
+     and the name box only appears when you've said you want one. */}
+ <select className={input} value={consign.newName.trim() || consign.consignorId === "__new__" ? "__new__" : consign.consignorId}
+  onChange={(e) => { if (e.target.value === "__new__") { setConsign({ ...consign, consignorId: "__new__" }); } else { setConsign({ ...consign, newName: "" }); pickConsignor(e.target.value); } }}>
  <option value="">Select…</option>
  {consignors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+ <option value="__new__">+ Add a new consignor…</option>
  </select>
  </div>
  <div><label className={label}>Consignor split %</label><input className={input} value={consign.split} onChange={(e) => setConsign({ ...consign, split: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" placeholder="auto from rules" /></div>
@@ -756,9 +871,10 @@ export default function IntakePage() {
  {/* Typing a name and NOT pressing Add used to lose it: the piece published with no consignor,
      and nothing said so. The field turns red and the button reads "Add — don't forget" while a
      name is sitting there uncommitted, and publish refuses (see consignBlocker). */}
+ {(consign.consignorId === "__new__" || consign.newName.trim()) && (
  <div className="flex items-end gap-2">
  <div className="flex-1">
-  <label className={label}>…or add a new consignor</label>
+  <label className={label}>Their name</label>
   <input
    className={`${input} ${consign.newName.trim() ? "border-red-400 bg-red-50/40" : ""}`}
    value={consign.newName}
@@ -771,6 +887,7 @@ export default function IntakePage() {
   {consign.newName.trim() ? "Add — don’t forget" : "Add"}
  </button>
  </div>
+ )}
  {consign.newName.trim() && (
   <p className="text-[11.5px] font-medium text-red-600">Press <strong>Add</strong> to save “{consign.newName.trim()}” as a consignor — otherwise this piece publishes with none.</p>
  )}
@@ -779,13 +896,62 @@ export default function IntakePage() {
  )}
  </div>
  <div>
- <label className={label}>Shipping parcel <span className="font-normal text-stone-400">— AI-estimated, edit if needed</span></label>
- <div className="grid grid-cols-4 gap-2">
- <div><input className={input} value={form.weightOz} onChange={(e) => set("weightOz", e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="oz" /><p className="mt-1 text-center text-[10px] text-stone-400">weight oz</p></div>
- <div><input className={input} value={form.lengthIn} onChange={(e) => set("lengthIn", e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="L" /><p className="mt-1 text-center text-[10px] text-stone-400">length in</p></div>
- <div><input className={input} value={form.widthIn} onChange={(e) => set("widthIn", e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="W" /><p className="mt-1 text-center text-[10px] text-stone-400">width in</p></div>
- <div><input className={input} value={form.heightIn} onChange={(e) => set("heightIn", e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" placeholder="H" /><p className="mt-1 text-center text-[10px] text-stone-400">height in</p></div>
+ {/* One question instead of four numbers — but the weight stays, because the buyer's postage is
+     chosen by the LARGER of weight and girth and getting it wrong means the store eats the
+     difference on every parcel. The AI weighs the piece from the photos; the packaging adds its
+     own; the tier and the buyer's price are shown so nothing is decided out of sight. */}
+ <label className={label}>Ships in</label>
+ <select
+  className={input}
+  value={packing}
+  onChange={(e) => {
+   const box = packagingById(e.target.value);
+   setPacking(e.target.value);
+   if (box) { set("lengthIn", String(box.lengthIn)); set("widthIn", String(box.widthIn)); set("heightIn", String(box.heightIn)); }
+  }}
+ >
+  {PACKAGING.map((b) => <option key={b.id} value={b.id}>{b.label} — {b.hint}</option>)}
+ </select>
+
+ <div className="mt-2.5 flex items-center gap-2">
+  <label className="text-[12px] font-medium text-stone-700">Weight</label>
+  {/* Shown and typed in the store's own unit; stored in ounces, which is what the tiers, the
+      carriers and the label all speak. A London shop weighs a coat in grams — asking her for
+      ounces is the same discourtesy as showing her a dollar sign, and a converted-in-her-head
+      weight is a mis-quoted parcel. */}
+  <input
+   className={cn(input, "w-24")}
+   inputMode="numeric"
+   value={form.weightOz ? String(fromOz(form.weightOz, units.weightUnit)) : ""}
+   onChange={(e) => {
+    const typed = e.target.value.replace(/[^\d]/g, "");
+    set("weightOz", typed ? String(toOz(typed, units.weightUnit)) : "");
+   }}
+   placeholder={aiParcel?.weightOz ? String(fromOz(aiParcel.weightOz, units.weightUnit)) : units.weightUnit}
+   aria-label={`Weight of the piece in ${units.weightUnit === "g" ? "grams" : "ounces"}`}
+  />
+  <span className="text-[12px] text-stone-500">{units.weightUnit}</span>
+  {!form.weightOz.trim() && aiParcel?.weightOz ? (
+   <span className="text-[11px] text-stone-400">estimated from the photos</span>
+  ) : null}
  </div>
+
+ {(() => {
+  const box = packagingById(packing);
+  const piece = Number(form.weightOz) || aiParcel?.weightOz || 0;
+  const packed = packedWeightOz(piece, box);
+  if (!box) return null;
+  if (!packed) {
+   return <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 ring-1 ring-amber-200">Add a weight — without one the buyer is quoted the middle tier, and a heavy piece costs you the difference.</p>;
+  }
+  const tier = assignTier({ weightOz: packed, lengthIn: box.lengthIn, widthIn: box.widthIn, heightIn: box.heightIn });
+  return (
+   <p className="mt-2 text-[11.5px] text-stone-500">
+    {box.lengthIn}×{box.widthIn}×{box.heightIn} in · about {packed} oz packed ·{" "}
+    <span className="font-medium text-stone-800">buyer pays {tier.label} — ${(tier.priceCents / 100).toFixed(2)}</span>
+   </p>
+  );
+ })()}
  </div>
  <div>
  <div className="flex items-center justify-between">
@@ -793,7 +959,7 @@ export default function IntakePage() {
  <button
  type="button" onClick={polishForSeo} disabled={seoBusy || form.description.trim().length < 10}
  className="text-[11px] font-medium text-[var(--accent,#0e9f76)] transition hover:opacity-70 disabled:opacity-40"
- title="Rewrite your description for search — keeps your words and facts, just makes it more findable"
+ title="Rewrite the description so it turns up in more searches. Keeps your wording and facts."
  >
  {seoBusy ? "Polishing…" : "✨ Improve for search"}
  </button>
@@ -818,9 +984,36 @@ export default function IntakePage() {
  className="rounded-full border border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] px-3 py-1.5 text-xs text-white">{t} ✕</button>
  ))}
  </div>
- <input className={cn(input, "mt-2")} value={newCol} onChange={(e) => setNewCol(e.target.value)}
- onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const t = newCol.trim(); if (t && !selectedCols.includes(t)) setSelectedCols((s) => [...s, t]); setNewCol(""); } }}
- placeholder="New collection — type &amp; Enter (Y2K, Designer bags…)" />
+ {/* A dropdown, not just chips. On a store with no collections yet there were no chips to see,
+     so this read as a free-text box and nobody knew the saved ones existed. Same shape as the
+     consignor picker: choose an existing one, or add. */}
+ <select
+  className={cn(input, "mt-2")}
+  value=""
+  onChange={(e) => {
+   const v = e.target.value;
+   if (!v) return;
+   if (v === "__new__") { setAddingCol(true); return; }
+   setSelectedCols((s) => (s.includes(v) ? s : [...s, v]));
+  }}
+ >
+  <option value="">{cols.length ? "Add to a collection…" : "No collections yet"}</option>
+  {cols.filter((c) => !selectedCols.includes(c.title)).map((c) => (
+   <option key={c.id} value={c.title}>{c.title}{c.itemCount ? ` (${c.itemCount})` : ""}</option>
+  ))}
+  <option value="__new__">+ New collection…</option>
+ </select>
+ {addingCol && (
+  <input
+   autoFocus
+   className={cn(input, "mt-2")}
+   value={newCol}
+   onChange={(e) => setNewCol(e.target.value)}
+   onBlur={() => { const t = newCol.trim(); if (t && !selectedCols.includes(t)) setSelectedCols((s) => [...s, t]); setNewCol(""); setAddingCol(false); }}
+   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") { setNewCol(""); setAddingCol(false); } }}
+   placeholder="Name it — Y2K, Designer bags…"
+  />
+ )}
  </div>
 
 
@@ -937,6 +1130,13 @@ export default function IntakePage() {
  </div>
  </TechCard>
  </div>
+ {cropping && (
+  <PhotoCropper
+   url={cropping}
+   onCancel={() => setCropping(null)}
+   onCropped={(next) => { setPhotos((ps) => ps.map((p) => (p === cropping ? next : p))); setCropping(null); }}
+  />
+ )}
  </AdminPage>
  );
 }

@@ -9,7 +9,7 @@
 // Height: any element that forces its own height carries `.vya-fill`, which is what the section's
 // resize handle (style.minH) targets. A layout that invents its own height mechanism silently breaks
 // dragging the section taller — this class is the contract.
-import { FreeField, PhotoFrame, emptyHint, panBgImg, type EditKit } from "./kit";
+import { FreeField, PhotoFrame, emptyHint, panBgImg, type EditKit, ArrangeHandle, splitRatioOf } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
 
@@ -47,14 +47,14 @@ function HeroBleed({ kit }: { kit: EditKit }) {
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-3xl text-[2rem] @lg:text-5xl leading-[1.04] @xl:text-7xl" style={{ fontFamily: head }} />
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mt-5 max-w-xl text-sm leading-relaxed text-white/85 @xl:text-[15px]" />}
-    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black" />}
+    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-9 inline-block border border-white/70 px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:bg-white hover:text-black" />}
    </div>
   </div>
  ) : (
   <div className="vya-hero-inner vya-free-canvas relative px-6 py-16 @lg:py-32 text-center">
    <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading mx-auto max-w-3xl text-[2rem] @lg:text-5xl leading-[1.05] @xl:text-6xl" style={{ fontFamily: head }} />
    {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mt-5 mx-auto max-w-xl text-sm leading-relaxed opacity-65 @xl:text-[15px]" />}
-   {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+   {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-9 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
   </div>
  );
 }
@@ -124,7 +124,7 @@ function HeroSplit({ kit }: { kit: EditKit }) {
  const right = (p.imageSide || "").toLowerCase().startsWith("r");
  // The divider position is a percentage the merchant drags (style-free: it's structural, so it lives
  // in props). Clamped to keep both panels usable no matter how far the handle is dragged.
- const ratio = Math.min(75, Math.max(25, Number(p.splitRatio) || 50));
+ const ratio = splitRatioOf(p);
  // A split hero with no photo is half a tinted rectangle and half a squeezed column of text. When
  // there is nothing to show, the whole split collapses and the type takes the full width — the
  // panel is hidden AND the grid stops splitting, because hiding only the panel would leave the
@@ -132,9 +132,13 @@ function HeroSplit({ kit }: { kit: EditKit }) {
  const showMedia = !!p.image || ctx.edit;
  return (
   <div
-   className={`vya-fill grid w-full items-stretch ${showMedia ? "@lg:grid-cols-[var(--vya-split)]" : ""}`}
+   className={`vya-arrange-box vya-fill relative grid w-full items-stretch ${showMedia ? "@lg:grid-cols-[var(--vya-split)]" : ""}`}
    style={showMedia ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}
   >
+   {/* The seam itself is the handle — the comment above has described a draggable divider since
+       this layout shipped, and there was never anything to drag. Only on the wide layout, where
+       the split actually exists; below @lg the two panels stack. */}
+   {showMedia && <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>}
    {showMedia && (
     <PhotoFrame kit={kit} className={`relative min-h-[42vh] w-full overflow-hidden @lg:min-h-[78vh] ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }}>
      {p.image && <img src={p.image} alt="" {...panBgImg(ctx, b)} className={`absolute inset-0 h-full w-full object-cover ${ctx.edit ? "cursor-grab touch-none" : ""}`} />}
@@ -144,7 +148,7 @@ function HeroSplit({ kit }: { kit: EditKit }) {
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-xl text-[1.75rem] @lg:text-4xl leading-[1.06] @xl:text-6xl" style={{ fontFamily: head }} />
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mt-5 max-w-md text-sm leading-relaxed opacity-70 @xl:text-[15px]" />}
-    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-9 inline-block self-start px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-9 inline-block self-start px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
    </div>
   </div>
  );
@@ -162,7 +166,7 @@ function HeroStack({ kit }: { kit: EditKit }) {
     {moveGrip}
     <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading mx-auto max-w-4xl text-[2rem] @lg:text-5xl leading-[1.03] @xl:text-7xl" style={{ fontFamily: head }} />
     {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className="vya-sub mx-auto mt-5 max-w-xl text-sm leading-relaxed opacity-65 @xl:text-[15px]" />}
-    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className="vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
+    {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
    </div>
    {/* No photo, no box. A 46vh tinted rectangle with nothing in it doesn't read as "a picture goes
        here" — it reads as a rendering fault, which is exactly how it looked on Heirloom. The editor
@@ -192,7 +196,7 @@ function HeroFrame({ kit }: { kit: EditKit }) {
      {moveGrip}
      <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className="vya-heading max-w-2xl text-[1.75rem] @lg:text-4xl leading-[1.05] @xl:text-6xl" style={{ fontFamily: head }} />
      {p.subtext && <FreeField b={b} ctx={ctx} fieldKey="subtext" tag="p" value={p.subtext} className={`vya-sub mt-4 max-w-md text-sm leading-relaxed @xl:text-[15px] ${p.image ? "text-white/85" : "opacity-65"}`} />}
-     {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={shopHref} className={`vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition ${p.image ? "border border-white/70 hover:bg-white hover:text-black" : "hover:opacity-85"}`} style={p.image ? undefined : { background: colors.accent, color: "#fff" }} />}
+     {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className={`vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition ${p.image ? "border border-white/70 hover:bg-white hover:text-black" : "hover:opacity-85"}`} style={p.image ? undefined : { background: colors.accent, color: "#fff" }} />}
     </div>
    </PhotoFrame>
   </div>

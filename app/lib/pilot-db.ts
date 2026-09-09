@@ -146,7 +146,7 @@ export async function approvePilotUser(email: string) {
 }
 
 /**
- * Returns the next 10 users to approve.
+ * Returns the next batch of users to approve — 50 a week, run by the Monday cron.
  * Includes both pilot_access rows with status='pending' AND waitlist-only users
  * (those not yet in pilot_access). Priority: most referrals first, then oldest signup.
  */
@@ -170,7 +170,7 @@ export async function getPendingUsersToApprove(): Promise<
       AND pa.created_at < NOW() - INTERVAL '24 hours'
     ) combined
     ORDER BY ref_count DESC, created_at ASC
-    LIMIT 20
+    LIMIT 50
   `;
   return rows as { email: string; first_name: string | null }[];
 }

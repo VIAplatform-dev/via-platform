@@ -239,3 +239,55 @@ test("in development the link keeps the host and port the store is actually reac
 test("with Plan B switched off there is no store address to link to", () => {
  assert.equal(storeEmailLinkOrigin("tess", "tess.vyasites.com", { NODE_ENV: "production" }), null);
 });
+
+test("a storefront built from sections can reach the endpoints its own pages call", () => {
+ for (const p of [
+  "/api/contact",
+  "/api/newsletter",
+  "/api/store/appointments/slots",
+  "/api/store/rentals/availability",
+  "/api/store/rentals/quote",
+  "/api/store/rentals/hold",
+  "/api/store/rentals/apply",
+ ]) {
+  assert.equal(isAllowedStoreApi(p), true, p);
+  assert.equal(isRefusedOnStoreHost(p), false, p);
+ }
+});
+
+test("the rest of /api/store stays refused on a store's own origin", () => {
+ // The allowlist is per-path on purpose: this namespace also holds settings, inventory and orders,
+ // and a seller's own script runs on that origin.
+ for (const p of [
+  "/api/store/appointments/settings",
+  "/api/store/appointments",
+  "/api/store/rentals/settings",
+  "/api/store/rentals/bookings",
+  "/api/store/inbox",
+  "/api/store/storefront/design",
+  "/api/store/orders",
+ ]) {
+  assert.equal(isAllowedStoreApi(p), false, p);
+  assert.equal(isRefusedOnStoreHost(p), true, p);
+ }
+});
+
+test("a built storefront's own pages are served on a store origin, not refused", () => {
+ // /s/… must not be caught by the /store guard — they share three letters and nothing else.
+ for (const p of ["/s/gianna", "/s/gianna/shop", "/s/gianna/p/abc"]) {
+  assert.equal(isRefusedOnStoreHost(p), false, p);
+ }
+ assert.equal(isRefusedOnStoreHost("/store"), true);
+ assert.equal(isRefusedOnStoreHost("/store/inbox"), true);
+});
+
+test("a store's own origin is what the mirror points at", () => {
+ const env = { STORE_HOST_SUFFIX: "vyasites.com" };
+ assert.equal(storePublicOrigin("gianna", env), "https://gianna.vyasites.com");
+ // No suffix configured (local dev, or before the domain is wired) → no origin, so nothing changes
+ // and /s/{handle} stays the real address.
+ assert.equal(storePublicOrigin("gianna", {}), null);
+ // A slug that would never be served must never be advertised either.
+ assert.equal(storePublicOrigin("www", env), null);
+ assert.equal(storePublicOrigin("", env), null);
+});

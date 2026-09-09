@@ -15,6 +15,8 @@ export type SettingsSection = {
  blurb: string;
  /** Lucide icon name, resolved by the components so this file stays free of JSX. */
  icon: string;
+ /** VYA's own, not a store's. Hidden from sellers; only the VYA owner sees it. */
+ vyaOnly?: boolean;
 };
 
 export type SettingsGroup = { label: string; items: SettingsSection[] };
@@ -31,6 +33,11 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
    { href: `${B}/plan`, label: "Plan & billing", blurb: "What you’re on, what you’ve been charged, and your card on file.", icon: "Sparkles" },
    { href: `${B}/payments`, label: "Payments", blurb: "How you get paid, and the Stripe account payouts land in.", icon: "CreditCard" },
    { href: `${B}/users`, label: "People", blurb: "Who can sign in and work on this store, and how many seats your plan includes.", icon: "Users" },
+   { href: `${B}/notifications`, label: "Notifications", blurb: "Which sales, messages and summaries reach your phone and your inbox.", icon: "Bell" },
+   // VYA's own list of who may open a store at all — nothing to do with a seller's own settings, and
+   // hidden from them. Kept here so it's one place to look rather than a URL you have to remember.
+   { href: `${B}/invites`, label: "Who can open a store", blurb: "VYA is invite-only. The emails allowed to create a store here.", icon: "Mail", vyaOnly: true },
+   { href: `${B}/activity`, label: "What sellers are doing", blurb: "Every screen opened and every piece published, as it happens.", icon: "Activity", vyaOnly: true },
   ],
  },
  {
@@ -38,7 +45,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   items: [
    { href: `${B}/shipping`, label: "Shipping & duties", blurb: "Where you ship, what postage costs, and who pays customs.", icon: "Truck" },
    { href: `${B}/tax`, label: "Sales tax", blurb: "Where you’re registered to collect, and how each piece is taxed.", icon: "Receipt" },
+   { href: `${B}/inbox`, label: "Messages & offers", blurb: "Whether shoppers can message you or name their price — and how offers work.", icon: "MessageCircle" },
    { href: `${B}/policies`, label: "Policies", blurb: "Returns, shipping, privacy and terms — linked from every storefront page.", icon: "ScrollText" },
+   { href: `${B}/appointments`, label: "Appointments", blurb: "Let people book a time with you — fittings, collections, sourcing chats. Yours whether or not you rent.", icon: "CalendarClock" },
+   { href: `${B}/rentals`, label: "Rentals", blurb: "Rent pieces out instead of selling them once — who can book, for how long, and on what terms.", icon: "CalendarRange" },
   ],
  },
  {
@@ -47,6 +57,10 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
    { href: `${B}/domain`, label: "Your domain", blurb: "Connect a domain you own, or buy one here.", icon: "Globe" },
    { href: `${B}/marketplaces`, label: "Marketplaces", blurb: "Depop, eBay and the accounts VYA cross-lists to.", icon: "Share2" },
    { href: `${B}/consignment`, label: "Consignment", blurb: "Splits, payout terms, and what consignors can see.", icon: "Handshake" },
+   // Lives at /admin/apps rather than under /admin/settings, but it IS a setting: the tools a store
+   // connects. It used to be a sidebar group of its own, which made plumbing look like a section of
+   // the shop.
+   { href: "/admin/apps", label: "Apps & integrations", blurb: "Klaviyo, Mailchimp and the tools you connect.", icon: "LayoutGrid" },
   ],
  },
 ];

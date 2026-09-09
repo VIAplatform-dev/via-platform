@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { auth } from "./auth";
 import { storeContactEmails } from "./stores";
 import { getMobilePayload } from "./mobileAuth";
+import { pickStoreSlug } from "./store-slug-core";
 import { storeSlugForEmail } from "./store-users-db";
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -86,6 +87,18 @@ export async function resolveStoreSlugAny(request: NextRequest): Promise<string 
  const web = await resolveStoreSlug(request);
  if (web) return web;
  const payload = getMobilePayload(request);
- if (payload?.email) return storeSlugFromEmail(payload.email) ?? (await storeSlugForEmail(payload.email));
+ if (payload?.email) return storeSlugForMobileEmail(payload.email);
  return null;
+}
+
+/**
+ * The store a MOBILE session acts as. store_users first, the hardcoded map second — the same
+ * order resolveStoreSlug uses for web sessions, for the same reason: a curated seller who later
+ * brought her own site over has two slugs, and the static map would sign her phone into the
+ * marketplace one, where her inventory isn't. The DB lookup degrades to the map, never to nothing.
+ */
+export async function storeSlugForMobileEmail(email: string): Promise<string | null> {
+ /* allow-swallow: DB unreachable must degrade to the static map, not lock the phone out */
+ const dbSlug = await storeSlugForEmail(email).catch(() => null);
+ return pickStoreSlug({ dbSlug, staticSlug: storeSlugFromEmail(email) });
 }

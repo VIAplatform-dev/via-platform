@@ -22,7 +22,7 @@ const FIELDS = [
   { key: "era", label: "Era or year", placeholder: "Late 1990s", optional: false },
   { key: "material", label: "Material", placeholder: "Re-Nylon, leather trim", optional: true },
   { key: "size", label: "Size", placeholder: "One size", optional: true },
-  { key: "cost", label: "What you paid", placeholder: "140", optional: false },
+  { key: "cost", label: "Cost", placeholder: "what you paid", optional: false },
 ] as const;
 
 export default function DetailsScreen() {
@@ -67,6 +67,7 @@ export default function DetailsScreen() {
           era: typed.era,
           material: typed.material,
           size: typed.size,
+          cost: typed.cost,
         },
         "draft",
       );

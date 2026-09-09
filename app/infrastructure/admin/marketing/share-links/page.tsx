@@ -62,7 +62,7 @@ export default function ShareLinksPage() {
 
  return (
  <AdminPage className="max-w-2xl">
- <AdminHeader eyebrow="Store · Marketing · Share links" title="Share links" subtitle="Ready-made links for your socials — tagged so every click is tracked in Audience + Performance." />
+ <AdminHeader eyebrow="Store · Marketing · Share links" title="Share links" subtitle="Links to post on social media. Each one is tagged, so you can see how many people clicked it and what they bought." />
 
  <div className={`mb-4 inline-flex rounded-full border border-stone-200 bg-white p-[3px] text-[12px] ${itemId ? "hidden" : ""}`}>
  {(["bio", "post"] as const).map((c) => (

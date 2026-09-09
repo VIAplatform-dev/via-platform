@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { getItem, markSold, removeItem, publishItem, updateItem } from "@/app/lib/db/inventory";
+import { getItem, markSold, removeItem, publishItem, updateItem, deleteItemForever } from "@/app/lib/db/inventory";
 import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
 import { delistEverywhere } from "@/app/lib/cross-listing-db";
+import { placeHold, releaseHold } from "@/app/lib/holds-db";
+import { normalizeFlaws } from "@/app/lib/flaws-core";
+import { parseAcquiredAt } from "@/app/lib/lot-core";
+import { normalizeMeasurements, unitFor, type Measurement } from "@/app/lib/measurements-core";
+import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
+import { publishRefusal } from "@/app/lib/setup-gate-core";
+import { stores } from "@/app/lib/stores";
 
 export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// POST { action: "sold" | "remove" | "publish" } — run a lifecycle transition on
-// one of the acting store's items (ownership-scoped).
+// POST { action: "sold" | "remove" | "publish" | "hold" | "release" } — run a lifecycle transition
+// on one of the acting store's items (ownership-scoped). `hold` takes { name?, days? | until? }.
 export async function POST(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,14 +42,49 @@ export async function POST(request: NextRequest, { params }: Ctx) {
  const soldOn = typeof body?.soldOn === "string" && body.soldOn ? body.soldOn : "vya";
  pull = await delistEverywhere(id, soldOn).catch(() => []);
  } else if (action === "remove") result = await removeItem(id);
- else if (action === "publish") result = await publishItem(id);
- else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+ else if (action === "publish") {
+ // A draft cannot go live without a ship-from address (no rates, no labels) — the same wall the
+ // intake publish route has, so Inventory's "Draft · blocked" is a fact, not a decoration.
+ const refusal = publishRefusal(hasShipFrom(await getShippingSettings(slug)));
+ if (refusal) return NextResponse.json({ error: refusal.error }, { status: refusal.status });
+ result = await publishItem(id);
+ } else if (action === "hold") {
+ // Keep it back for someone: a reservation tagged with their name, released by the same sweep
+ // that frees an abandoned checkout, so nothing new needs to expire it.
+ const name = typeof body?.name === "string" ? body.name : "";
+ const until = { days: typeof body?.days === "number" ? body.days : undefined, until: typeof body?.until === "string" ? body.until : undefined };
+ let res;
+ try { res = await placeHold(id, name, until); } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "Bad hold" }, { status: 400 }); }
+ if (!res) return NextResponse.json({ error: item.status === "reserved" ? "This piece is already reserved" : "Only a live piece can be held" }, { status: 409 });
+ result = await getItem(id);
+ } else if (action === "release") {
+ const r = await releaseHold(id);
+ if (!r.released) return NextResponse.json({ error: r.reason }, { status: 409 });
+ result = await getItem(id);
+ } else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 
  return NextResponse.json({ ok: true, item: result, pull });
 }
 
-// PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material,
-// condition, size, category, description, status, images, shipping dims, and collections. Every field
+// DELETE — gone for good. Only a draft or a removed piece that never sold: "remove" keeps a row
+// (sales history, cross-listing records); this is for a mistake, a duplicate, or a test row.
+export async function DELETE(request: NextRequest, { params }: Ctx) {
+ const slug = await resolveStoreSlugAny(request);
+ if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+ const { id } = await params;
+ const seller = await getSellerBySlug(slug);
+ if (!seller) return NextResponse.json({ error: "Not found" }, { status: 404 });
+ const item = await getItem(id);
+ if (!item || item.sellerId !== seller.id) return NextResponse.json({ error: "Not found" }, { status: 404 });
+ if (item.status !== "draft" && item.status !== "removed") return NextResponse.json({ error: "Only a draft or a removed piece can be deleted for good — remove it first." }, { status: 409 });
+ const deleted = await deleteItemForever(seller.id, id);
+ if (!deleted) return NextResponse.json({ error: "This piece has an order against it, so it stays on record." }, { status: 409 });
+ return NextResponse.json({ ok: true, deleted: true, id });
+}
+
+// PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material, colour,
+// condition, size, category, description, status, images, shipping dims, flaws, source/acquired date,
+// and collections. Every field
 // is optional (only sent fields change). Works on any status, so drafts can be tweaked before going live.
 export async function PATCH(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
@@ -64,8 +106,10 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
 
  const patch: Partial<{
  title: string; priceCents: number; costCents: number | null; size: string | null; category: string | null; description: string | null;
- brand: string | null; era: string | null; material: string | null; condition: string | null;
+ brand: string | null; era: string | null; material: string | null; colour: string | null; condition: string | null;
  status: (typeof STATUSES)[number]; images: string[]; weightOz: number | null; lengthIn: number | null; widthIn: number | null; heightIn: number | null;
+ flaws: string[]; sourceName: string | null; acquiredAt: string | null;
+ conditionNote: string | null; measurements: string | null; measurementsJson: Measurement[] | null;
  }> = {};
  if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 200);
  if (body.price !== undefined) patch.priceCents = cents(body.price);
@@ -76,13 +120,36 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
  if (body.brand !== undefined) patch.brand = trimOrNull(body.brand, 80);
  if (body.era !== undefined) patch.era = trimOrNull(body.era, 40);
  if (body.material !== undefined) patch.material = trimOrNull(body.material, 80);
+ if (body.colour !== undefined) patch.colour = trimOrNull(body.colour, 60);
  if (body.condition !== undefined) patch.condition = trimOrNull(body.condition, 60);
- if (typeof body.status === "string" && (STATUSES as readonly string[]).includes(body.status)) patch.status = body.status as (typeof STATUSES)[number];
+ // Beyond the grade: her own words on the wear. Never folded into the grade.
+ if (body.conditionNote !== undefined) patch.conditionNote = trimOrNull(body.conditionNote, 400);
+ // Measurements: a list is structure (measurements-core.ts, in the store's unit); a string is the
+ // old free-text column. Sending a list clears the text so the page never prints both.
+ if (Array.isArray(body.measurements)) {
+ const [shipping, store] = [await getShippingSettings(slug).catch(() => null), stores.find((s) => s.slug === slug)];
+ patch.measurementsJson = normalizeMeasurements(body.measurements, unitFor({ country: shipping?.shipFrom?.country, currency: store?.currency }));
+ patch.measurements = null;
+ } else if (typeof body.measurements === "string") patch.measurements = trimOrNull(body.measurements, 300);
+ if (typeof body.status === "string" && (STATUSES as readonly string[]).includes(body.status)) {
+ // Setting status to active IS publishing — same wall as the publish action, so a draft cannot slip
+ // live through the edit form on a store with no ship-from address.
+ if (body.status === "active" && item.status !== "active") {
+ const refusal = publishRefusal(hasShipFrom(await getShippingSettings(slug)));
+ if (refusal) return NextResponse.json({ error: refusal.error }, { status: refusal.status });
+ }
+ patch.status = body.status as (typeof STATUSES)[number];
+ }
  if (Array.isArray(body.images)) patch.images = body.images.filter((x: unknown) => typeof x === "string" && (x as string).trim()).map((x: string) => x.trim()).slice(0, 20);
  if (body.weightOz !== undefined) patch.weightOz = intOrNull(body.weightOz);
  if (body.lengthIn !== undefined) patch.lengthIn = intOrNull(body.lengthIn);
  if (body.widthIn !== undefined) patch.widthIn = intOrNull(body.widthIn);
  if (body.heightIn !== undefined) patch.heightIn = intOrNull(body.heightIn);
+ // Flaws: an array (even empty) replaces the list. Normalised against the condition being saved.
+ if (Array.isArray(body.flaws)) patch.flaws = normalizeFlaws(body.flaws, patch.condition !== undefined ? patch.condition : item.condition);
+ // Where it came from + when. `sourceName`, never `source` (that's how the row got into VYA).
+ if (body.sourceName !== undefined) patch.sourceName = trimOrNull(body.sourceName, 80);
+ if (body.acquiredAt !== undefined) patch.acquiredAt = body.acquiredAt === null || body.acquiredAt === "" ? null : parseAcquiredAt(body.acquiredAt);
  // Collections (titles). Only touched when the field is sent; an array (even empty) sets membership.
  const cols = Array.isArray(body.collections)
  ? body.collections.filter((x: unknown) => typeof x === "string" && (x as string).trim()).map((x: string) => x.trim().slice(0, 80)).slice(0, 20)

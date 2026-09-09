@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { confirmBookingPaid } from "@/app/lib/rentals/rentals-db";
+import { getAppointmentSettings, markDepositPaid } from "@/app/lib/appointments/appointments-db";
+import { notifyAppointmentBooked } from "@/app/lib/appointments/notify";
 import Stripe from "stripe";
 import { markSold, releaseReservation, relistItem } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import { creditConsignedSale, reverseConsignedSale } from "@/app/lib/consignment-db";
-import { syncOrderToKlaviyo } from "@/app/lib/klaviyo";
+import { syncOrderToKlaviyo } from "@/app/lib/esp-events";
 import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderPickup, setOrderTax } from "@/app/lib/db/orders";
 import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { logError } from "@/app/lib/error-log";
 import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
+import { sendOpsAlert } from "@/app/lib/ops-alert";
 import { applicationFeeCents } from "@/app/lib/payments-config";
 import { sendBuyerOrderConfirmation, sendSellerSaleNotification } from "@/app/lib/email";
 import { fireAutomationTrigger } from "@/app/lib/automation-engine";
@@ -18,6 +22,7 @@ import { delistEverywhere } from "@/app/lib/cross-listing-db";
 import { markOfferConsumed } from "@/app/lib/offers-db";
 import { finalizeMarketSale, closeCheckout } from "@/app/lib/market/checkout-db";
 import { MARKET_METADATA_CHANNEL } from "@/app/lib/market/stripe-market-core";
+import { pushSellerSale } from "@/app/lib/seller-push";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -75,6 +80,8 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  await recordPayout({ orderId: order.id, sellerId: o.sellerId, amountCents: order.amountCents - fee, currency: order.currency });
  // Clean event stream: the purchase, canonical items.id, at the price actually charged.
  if (sellerSlug) recordEvent({ type: "purchase", storeSlug: sellerSlug, itemId, priceCents: salePriceCents, surface: "storefront" }).catch(() => {});
+ // Her phone: "Sold: <piece>". Fire-and-forget; gated by her preferences inside (see seller-push.ts).
+ if (sellerSlug) void pushSellerSale(sellerSlug, { itemTitle: sold.title, amountCents: salePriceCents, currency: order.currency, channel: "storefront", orderId: String(order.id) });
  // Consignment: if this piece was taken on consignment, credit the consignor their split.
  creditConsignedSale({ productId: itemId, orderId: String(order.id), soldPriceCents: salePriceCents, channel: "vya" }).catch(() => {});
  // Binding offer redeemed → mark it used so the link can't buy the piece twice.
@@ -86,7 +93,22 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  // function freezes, but a failure (no ship-from / Shippo off) just leaves the manual button.
  if (idx === 0 && o.shippingPaidCents > 0) {
  const r = await generateOrderLabel(order.id).catch((e) => { logError("auto-generate-label", e, { context: { orderId: order.id } }); return { ok: false, reason: "threw" }; });
- if (!r.ok && r.reason && r.reason !== "already-labeled") console.log(`[auto-label] order ${order.id}: ${r.reason}`);
+ // A failure here used to be a console.log and nothing else: the seller had a paid order, no
+ // label, and no way to find out why. "no-rates" in particular meant something was wrong with the
+ // store's own address — two stores had a country the carriers reject — and it was invisible.
+ // The manual button still works; this is so somebody KNOWS it has to be pressed.
+ if (!r.ok && r.reason && r.reason !== "already-labeled") {
+  console.log(`[auto-label] order ${order.id}: ${r.reason}`);
+  await sendOpsAlert(
+   `Label didn't buy itself — seller ${o.sellerId} order ${order.id}`,
+   `Reason: ${r.reason}. The buyer has paid and there is no label. ` +
+   (r.reason === "no-rates"
+    ? "No carrier would quote it — check the store's ship-from address (a country that isn't a two-letter code returns no rates) and the piece's weight."
+    : r.reason === "no-ship-from"
+     ? "The store has no complete ship-from address in Settings → Locations."
+     : "Check Shippo/EasyPost configuration."),
+  ).catch(() => {});
+ }
  }
  idx++;
  }
@@ -168,6 +190,44 @@ export async function POST(request: NextRequest) {
  }
  // charge.refunded / dispute.closed fall through to unwindByPaymentIntent below — it works by PI.
  if (event.type !== "charge.refunded" && event.type !== "charge.dispute.closed") return NextResponse.json({ received: true });
+ }
+ }
+
+ // ── Rentals ──────────────────────────────────────────────────────────────────────────────
+ // A rental is not a sale: the piece isn't sold, isn't reserved by status, and stays in inventory.
+ // What payment buys is the DATES, which the booking row has already been holding — so this never
+ // goes through fulfill(), it just turns the hold into a confirmed booking.
+ {
+ const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
+ const md = (obj.metadata || {}) as Record<string, string>;
+  if (md.rentalBookingId && event.type === "payment_intent.succeeded") {
+ // The checkout wrote the renter into this payment's metadata. It's the only place those details
+ // exist, and this is the only moment we see them — so they go onto the booking here, or the store
+ // ends up with a piece out and no idea whose name is on it.
+ await confirmBookingPaid(md.rentalBookingId, String(obj.id || ""), {
+  name: md.ship_name, email: md.buyer_email, phone: md.buyer_phone, delivery: md.delivery,
+  line1: md.ship_line1, line2: md.ship_line2, city: md.ship_city,
+  state: md.ship_state, zip: md.ship_zip, country: md.ship_country,
+ }).catch(() => null);
+ return NextResponse.json({ received: true });
+ }
+ }
+
+ // ── Appointment deposits ─────────────────────────────────────────────────────────────────
+ // A deposit buys a SLOT, not a piece. Nothing is sold, so this never goes through fulfill():
+ // the money landing is what turns a held time into a real one — and only then is anyone told,
+ // so an abandoned payment page never emails a shop about a booking that isn't happening.
+ {
+ const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
+ const md = (obj.metadata || {}) as Record<string, string>;
+ if (md.appointmentId && md.storeSlug && event.type === "payment_intent.succeeded") {
+ const settings = await getAppointmentSettings(md.storeSlug).catch(() => null);
+ if (settings) {
+ const appointment = await markDepositPaid(md.appointmentId, settings.requireApproval).catch(() => null);
+ // Null = a replayed webhook, or one the shop already dealt with. Nothing to announce.
+ if (appointment) void notifyAppointmentBooked(md.storeSlug, appointment, settings);
+ }
+ return NextResponse.json({ received: true });
  }
  }
 

@@ -68,7 +68,7 @@ function GChip({ pct, breakout }: { pct: number | null; breakout?: boolean }) {
  if (pct === null) return null;
  const up = pct >= 0;
  return (
- <span title="Google Search momentum (3-mo)">
+ <span title="Change in Google searches, last 3 months">
  <StatusPill tone={breakout ? "pending" : up ? "info" : "neutral"} className="text-[10.5px]">
  <span className="font-mono text-[9px] font-bold">G</span>{up ? "+" : ""}{Math.round(pct)}%
  </StatusPill>
@@ -128,7 +128,7 @@ export default function TrendsPage() {
  <AdminHeader
  eyebrow="Platform · Trends"
  title="Trends"
- subtitle="Your sourcing & pricing playbook — VYA demand, Google Search, and real eBay secondhand prices read together into clear calls. The signals behind each call are below."
+ subtitle="What people are searching for and what it sells for, so you know what to buy and what to charge. Built from searches on VYA, Google Search interest, and real eBay sold prices. The numbers behind each answer are below."
  />
 
  {/* Source Now — the headline: what to buy right now, from VYA's own data (works before external signals are on). */}
@@ -142,7 +142,7 @@ export default function TrendsPage() {
  <div className="space-y-2">
  {sourceNow.picks.map((p) => (
  <div key={`${p.segmentType}:${p.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
- <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="Sourcing-opportunity score (0–100)">{Math.round(p.score)}</span>
+ <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="How worth buying this is, 0 to 100">{Math.round(p.score)}</span>
  <div className="min-w-0 flex-1">
  <div className="flex flex-wrap items-center gap-2">
  <span className="text-[13px] font-semibold capitalize text-stone-900">{p.segmentValue}</span>
@@ -184,7 +184,7 @@ export default function TrendsPage() {
  const mom = CMOMENTUM[c.momentum];
  return (
  <div key={`${c.segmentType}:${c.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
- <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="Number of independent writers calling this, this week">{c.writers}</span>
+ <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="How many fashion publications wrote about this in the last week">{c.writers}</span>
  <div className="min-w-0 flex-1">
  <div className="flex flex-wrap items-center gap-2">
  <span className="text-[13px] font-semibold capitalize text-stone-900">{c.segmentValue}</span>
@@ -245,7 +245,7 @@ export default function TrendsPage() {
  const traj = p.trajectory ? TRAJECTORY_PILL[p.trajectory] : null;
  return (
  <div key={`${p.segmentType}:${p.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
- <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="Supply-gap score (0–100): how far demand outruns supply">{Math.round(p.supplyGapScore)}</span>
+ <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="How much more demand there is than supply, 0 to 100">{Math.round(p.supplyGapScore)}</span>
  <div className="min-w-0 flex-1">
  <div className="flex flex-wrap items-center gap-2">
  <span className="text-[13px] font-semibold capitalize text-stone-900">{p.segmentValue}</span>

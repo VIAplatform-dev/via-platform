@@ -57,6 +57,15 @@ export async function getRefundPolicy(storeSlug: string): Promise<RefundPolicy> 
  }
 }
 
+/** Has the store DECIDED its returns policy? A saved row, whichever way it went — all-sales-final
+ *  is a policy too. getRefundPolicy returns a default for a store that never chose, which is
+ *  right for buyers and wrong for "Set up your store". */
+export async function hasRefundPolicy(storeSlug: string): Promise<boolean> {
+ await ensure();
+ const rows = await db()`SELECT 1 FROM store_policies WHERE store_slug = ${storeSlug} LIMIT 1`;
+ return rows.length > 0;
+}
+
 export async function setRefundPolicy(storeSlug: string, p: Partial<RefundPolicy>): Promise<RefundPolicy> {
  await ensure();
  const cur = await getRefundPolicy(storeSlug);

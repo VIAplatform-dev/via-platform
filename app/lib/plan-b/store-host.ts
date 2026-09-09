@@ -126,6 +126,16 @@ export function isRefusedOnStoreHost(pathname: string): boolean {
  * cart/search endpoints the seller's theme talks to. An allowlist, so adding a new internal route
  * can't accidentally expose it on 45 seller domains.
  */
+const BUILT_STOREFRONT_APIS = new Set([
+ "/api/contact",
+ "/api/newsletter",
+ "/api/store/appointments/slots",
+ "/api/store/rentals/availability",
+ "/api/store/rentals/quote",
+ "/api/store/rentals/hold",
+ "/api/store/rentals/apply",
+]);
+
 export function isAllowedStoreApi(pathname: string): boolean {
  const p = (pathname || "").toLowerCase();
  return (
@@ -144,6 +154,12 @@ export function isAllowedStoreApi(pathname: string): boolean {
   // The theme's own section renderer, for the same reason and with the same care: this ONE path,
   // never the prefix.
   p === "/api/plan-b/section" ||
+  // A storefront BUILT from sections talks to these from the shopper's browser: booking a time,
+  // pricing a rental, holding dates, the contact form, the newsletter. They're public by design
+  // (they're in PUBLIC_ROUTES too) — but they live under /api/store/, a namespace that is otherwise
+  // seller-authenticated, so they're listed ONE PATH AT A TIME. Never the prefix: `/api/store/` also
+  // holds settings, inventory and orders.
+  BUILT_STOREFRONT_APIS.has(p) ||
   // Squarespace's cart, in its own dialect. Unlike Shopify's /cart/* routes these live UNDER /api,
   // so without this the refusal above 404s the seller's own Add-to-cart before middleware ever gets
   // to rewrite it. Only the cart: the rest of Squarespace's /api surface stays refused.

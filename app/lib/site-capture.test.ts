@@ -2127,3 +2127,12 @@ test("replacing the add-to-cart button keeps the refs living inside it", () => {
   assert.equal($(`[ref="${r}"]`).length, 1, r);
  }
 });
+
+test("prepareEditMode's editor saves through the store-aware URL (capture-edit-url-core.ts, copied into the script)", () => {
+ const out = prepareEditMode(PLAIN, "shop", "/");
+ // The verbatim ES5 copy of withStoreParam, and both saves routed through it.
+ assert.match(out, /function vyaStore\(u\)\{var m=\/\^\\\/site\\\/\(\[\^\/\?#\]\+\)\/\.exec\(location\.pathname\|\|""\)/);
+ assert.match(out, /fetch\(vyaStore\("\/api\/store\/assets"\)/);
+ assert.match(out, /fetch\(vyaStore\("\/api\/store\/capture\/edit"\)/);
+ assert.doesNotMatch(out, /fetch\("\/api\/store\/(assets|capture\/edit)"/);
+});

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, isNotNull, lt, lte, ne, notLike, sql, getTableColumns } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, isNotNull, lt, lte, ne, notLike, sql, getTableColumns } from "drizzle-orm";
 import { getDb, items, reservations, orders, payouts } from "./index";
 import type { Item, NewItem, Reservation } from "./index";
 import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-core";
@@ -14,6 +14,7 @@ import { reasonForVanished } from "../unavailable-label";
 
 /** Create an item (defaults to draft). */
 export async function createItem(item: NewItem): Promise<Item> {
+ await ensurePublishAtColumn();
  const db = getDb();
  // Clean HTML out of imported descriptions at the single write path, so EVERY item — from any
  // importer (Shopify/Squarespace/connected adapters), bulk upload, or a future source — is stored
@@ -31,6 +32,7 @@ export async function ensurePublishAtColumn(): Promise<void> {
  try {
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS publish_at timestamptz`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS colour text`);
  // Source identity for the import engine (see schema.ts). Additive + nullable, so existing rows
  // and any code that doesn't know about them keep working untouched.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_platform text`);
@@ -48,6 +50,15 @@ export async function ensurePublishAtColumn(): Promise<void> {
  // out to the channels they picked when the cron publishes it hours later. NULL means
  // "no explicit choice" — fall back to each channel's auto-list default.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS cross_list_channels text[]`);
+ // Flaws as a list, and where the piece came from (see schema.ts). Additive + nullable.
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS flaws jsonb DEFAULT '[]'::jsonb`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_name text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS acquired_at date`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS lot_id text`);
+ // Structured measurements, the condition note, and the kept parcel estimate (see schema.ts).
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements_json jsonb`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS condition_note text`);
+ await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS parcel_estimate jsonb`);
  publishAtEnsured = true;
  } catch { /* db:push covers it; ignore if we lack DDL rights */ }
 }
@@ -68,7 +79,7 @@ export async function publishDueScheduledItems(now: Date): Promise<Item[]> {
  * touch availability locks (use reserve/markSold for those). */
 export async function updateItem(
  itemId: string,
- patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn" | "publishAt" | "source">>,
+ patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn" | "publishAt" | "source" | "colour" | "flaws" | "sourceName" | "acquiredAt" | "lotId" | "measurementsJson" | "conditionNote" | "parcelEstimate">>,
 ): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
@@ -187,6 +198,19 @@ export async function removeItem(itemId: string): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ status: "removed", updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
  return row ?? null;
+}
+
+/**
+ * Delete a piece for good. Only a draft or an already-removed piece, and only when no order ever
+ * referenced it (orders keep their item row; the FK has no cascade on purpose). Returns false when
+ * it wasn't deletable. Reservations and collection memberships cascade.
+ */
+export async function deleteItemForever(sellerId: string, itemId: string): Promise<boolean> {
+ const db = getDb();
+ const [ordered] = await db.select({ id: orders.id }).from(orders).where(eq(orders.itemId, itemId)).limit(1);
+ if (ordered) return false;
+ const rows = await db.delete(items).where(and(eq(items.id, itemId), eq(items.sellerId, sellerId), inArray(items.status, ["draft", "removed"]))).returning({ id: items.id });
+ return rows.length > 0;
 }
 
 /**
@@ -321,10 +345,11 @@ export async function markSold(itemId: string): Promise<Item | null> {
 }
 
 /** Put a sold/reserved item back up for sale (e.g. after a refund). One-of-one, so
- * it becomes available again. */
-export async function relistItem(itemId: string): Promise<Item | null> {
+ * it becomes available again. A void at the stall passes the status the piece had before the
+ * sale — a quick-listed draft stays a draft rather than going live online without a ship-from. */
+export async function relistItem(itemId: string, to: "active" | "draft" = "active"): Promise<Item | null> {
  const db = getDb();
- const [row] = await db.update(items).set({ status: "active", soldAt: null, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
+ const [row] = await db.update(items).set({ status: to, soldAt: null, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
  return row ?? null;
 }
 
@@ -354,13 +379,21 @@ export async function sweepExpiredReservations(): Promise<number> {
  * pieces on the shelf with a "Sold out" badge, and hiding them made a 52-product store look like a
  * 15-product one. Drafts and removed rows stay hidden; those are the seller's private state.
  *
- * Buyable pieces lead, then the archive, newest first within each.
+ * A RESERVED piece — held for a named customer, or a buyer mid-checkout — stays on the shelf too,
+ * badged "On hold" (unavailable-label.ts). It used to vanish the moment it was held, which read
+ * to the seller as a deleted listing and to the customer it was held for as a broken promise.
+ * Checkout still refuses it; the grid only shows it.
+ *
+ * Buyable pieces lead (held ones with them — they are still stock), then the archive, newest
+ * first within each.
  */
+export const STOREFRONT_STATUSES = ["active", "reserved", "sold"] as const;
+
 export async function listStorefrontItems(sellerId: string): Promise<Item[]> {
  const db = getDb();
  return db.select().from(items)
-  .where(and(eq(items.sellerId, sellerId), inArray(items.status, ["active", "sold"])))
-  .orderBy(sql`CASE WHEN ${items.status} = 'active' THEN 0 ELSE 1 END`, desc(items.createdAt));
+  .where(and(eq(items.sellerId, sellerId), inArray(items.status, [...STOREFRONT_STATUSES])))
+  .orderBy(sql`CASE WHEN ${items.status} = 'sold' THEN 1 ELSE 0 END`, desc(items.createdAt));
 }
 
 /**
@@ -377,7 +410,7 @@ export async function listStorefrontItemsBySourceIds(sellerId: string, sourceIds
  if (!sourceIds.length) return [];
  const db = getDb();
  const rows = await db.select().from(items)
-  .where(and(eq(items.sellerId, sellerId), inArray(items.status, ["active", "sold"]), inArray(items.sourceId, sourceIds)));
+  .where(and(eq(items.sellerId, sellerId), inArray(items.status, [...STOREFRONT_STATUSES]), inArray(items.sourceId, sourceIds)));
  const order = new Map(sourceIds.map((id, i) => [id, i]));
  return rows.sort((a, b) => (order.get(a.sourceId || "") ?? 0) - (order.get(b.sourceId || "") ?? 0));
 }
@@ -387,9 +420,17 @@ export async function listAvailableItems(sellerId: string): Promise<Item[]> {
  return db.select().from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));
 }
 
+/** How many pieces are live — a count, not the rows, for a checklist that only needs to know "any?". */
+export async function countAvailableItems(sellerId: string): Promise<number> {
+ const db = getDb();
+ const [row] = await db.select({ n: count() }).from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));
+ return Number(row?.n ?? 0);
+}
+
 /** All of a seller's items, any status — for the manage view. `sku` is a per-store sequence by
  *  creation order (1 = the store's first item), so every piece has a stable, meaningful ID. */
 export async function listSellerItems(sellerId: string): Promise<(Item & { sku: number })[]> {
+ await ensurePublishAtColumn();
  const db = getDb();
  return db
  .select({
@@ -401,8 +442,42 @@ export async function listSellerItems(sellerId: string): Promise<(Item & { sku: 
  .orderBy(desc(items.createdAt));
 }
 
+/**
+ * Write a lot onto a batch: where the pieces came from, when, the lot id, and each piece's share of
+ * the lot cost (already split by app/lib/lot-core.ts — this only records). Seller-scoped, so ids
+ * from another store are skipped. Only the fields given are touched; a cost of undefined leaves the
+ * piece's existing cost alone. Returns how many rows changed.
+ */
+export async function applyLot(sellerId: string, ids: string[], lot: { sourceName?: string | null; acquiredAt?: string | null; lotId?: string | null; costs?: Record<string, number> }): Promise<number> {
+ if (!ids.length) return 0;
+ await ensurePublishAtColumn();
+ const db = getDb();
+ const now = new Date();
+ let n = 0;
+ for (const id of ids) {
+ const patch: Partial<NewItem> & { updatedAt: Date } = { updatedAt: now };
+ if (lot.sourceName !== undefined) patch.sourceName = lot.sourceName;
+ if (lot.acquiredAt !== undefined) patch.acquiredAt = lot.acquiredAt;
+ if (lot.lotId !== undefined) patch.lotId = lot.lotId;
+ if (lot.costs && typeof lot.costs[id] === "number") patch.costCents = lot.costs[id];
+ const rows = await db.update(items).set(patch).where(and(eq(items.id, id), eq(items.sellerId, sellerId))).returning({ id: items.id });
+ n += rows.length;
+ }
+ return n;
+}
+
+/** Prices for a set of the seller's items — the weights a proportional lot split uses. */
+export async function priceWeights(sellerId: string, ids: string[]): Promise<Record<string, number>> {
+ if (!ids.length) return {};
+ const db = getDb();
+ const rows = await db.select({ id: items.id, priceCents: items.priceCents }).from(items).where(and(eq(items.sellerId, sellerId), inArray(items.id, ids)));
+ return Object.fromEntries(rows.map((r) => [r.id, r.priceCents]));
+}
+
 /** Fetch one item (e.g. to verify ownership before a mutation). */
 export async function getItem(itemId: string): Promise<Item | null> {
+ // Drizzle names every column it selects, so a row can't be read until the newest ones exist.
+ await ensurePublishAtColumn();
  const db = getDb();
  const [row] = await db.select().from(items).where(eq(items.id, itemId)).limit(1);
  return row ?? null;

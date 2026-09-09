@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
  category: item.category,
  priceCents: item.priceCents,
  description: (item as { description?: string | null }).description ?? null,
+ flaws: item.flaws, measurementsJson: item.measurementsJson, measurements: item.measurements,
  };
  const content = Object.fromEntries(PLATFORMS.map((p) => [p.key, crossPostContent(forPost, p.key)]));
  return NextResponse.json({ ok: true, images: item.images || [], content });

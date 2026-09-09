@@ -164,7 +164,7 @@ export default async function TemplateGallery({ searchParams }: Props) {
      </a>
     ))}
     <span className="ml-auto font-mono text-[11px] text-white/35">
-     {tpl.grid.cols}-up · {tpl.grid.ratio} · {tpl.grid.gutter} gutters · {tpl.radius} corners · {tpl.productLayout} product page
+     {tpl.grid.cols} products a row · {tpl.grid.ratio} · {tpl.grid.gutter} gutters · {tpl.radius} corners · {tpl.productLayout} product page
     </span>
    </div>
    <p className="border-t border-white/[0.07] px-4 py-2 text-[12px] leading-relaxed text-white/45">

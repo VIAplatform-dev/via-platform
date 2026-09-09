@@ -14,11 +14,15 @@ import { recordLabelTransaction } from "@/app/lib/shippo-labels-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
+import { refundOrderPayment } from "@/app/lib/order-refund";
 import { getRates, buyLabel, isShipConfigured, getOrCreateShipAccount } from "@/app/lib/ship-provider";
 import { shippingMarginCents } from "@/app/lib/shipping-tiers";
 import { logError } from "@/app/lib/error-log";
 import { sendBuyerTrackingEmail } from "@/app/lib/email";
 import { customsForOrder } from "@/app/lib/order-customs";
+import { listParcelOrders, markTrackingEmailSentMany } from "@/app/lib/db/orders";
+import { notifyParcelPosted } from "@/app/lib/parcel-notify";
+import { parcelForLabel } from "@/app/lib/parcel-core";
 
 export const dynamic = "force-dynamic";
 
@@ -94,41 +98,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
  const pay = await getSellerPayments(r.slug);
  if (r.order.stripePaymentIntent && pay?.stripeAccountId) {
- const acct = pay.stripeAccountId;
- const pi = r.order.stripePaymentIntent;
- const feeCents = r.order.feeCents || 0;
- // RECOUP: when the buyer paid return shipping, VYA keeps that label cost out of the fee it hands
- // back to the seller — so the money for the label VYA bought lands with VYA, not the seller. This
- // needs the platform application-fee id; if we can't get it, fall back to the standard refund
- // (buyer still refunded correctly, VYA just doesn't recoup — no worse than before).
- let feeId: string | null = null;
- if (returnShipDeduction > 0 && feeCents > 0) {
- try {
- const piData = await stripeGet(`payment_intents/${pi}?expand[]=latest_charge`, undefined, acct) as { latest_charge?: { application_fee?: string | { id: string } } };
- const af = piData?.latest_charge?.application_fee;
- feeId = typeof af === "string" ? af : (af?.id ?? null);
- } catch { feeId = null; }
- }
- try {
- if (feeId) {
- // 1) Refund the buyer the net amount. 2) Return the seller's share of VYA's fee — the whole fee
- // MINUS the return-label cost VYA keeps. (Fee refunds are a platform op → no connected-account.)
- await stripePost("refunds", { payment_intent: pi, amount: String(refundAmountCents) }, acct);
- const feeRefund = Math.max(0, feeCents - returnShipDeduction);
- if (feeRefund > 0) await stripePost(`application_fees/${feeId}/refunds`, { amount: String(feeRefund) }, undefined);
- } else {
- // Standard: partial refund when a deduction applies, else full; fee returned proportionally.
- await stripePost("refunds", {
- payment_intent: pi,
- refund_application_fee: "true",
- // Always scope to this order's amount when the intent carries several orders (a Market Mode
- // basket): a bare refund would return the WHOLE charge for one returned item.
- ...(totalDeduction > 0 || sharedIntent ? { amount: String(refundAmountCents) } : {}),
- }, acct);
- }
- } catch (e) {
- return NextResponse.json({ error: e instanceof Error ? e.message : "Refund failed at Stripe." }, { status: 502 });
- }
+ // The Stripe half lives in app/lib/order-refund.ts, shared with a void at the stall (Market Mode).
+ const refunded = await refundOrderPayment({
+ stripeAccountId: pay.stripeAccountId, paymentIntent: r.order.stripePaymentIntent, refundAmountCents,
+ feeCents: r.order.feeCents || 0, returnShipDeduction, totalDeduction, sharedIntent,
+ });
+ if (!refunded.ok) return NextResponse.json({ error: refunded.error }, { status: 502 });
  }
  await relistItem(r.order.itemId); // default: the one-of-one is available again
  // If this was a consigned piece, undo the consignor's credit too — otherwise a refunded sale
@@ -197,14 +172,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // the buyer their tracking. Handled before the Shippo/rate checks since it needs neither.
  if (body?.action === "mark_shipped") {
  await markOrderShipped(id);
- // Email the buyer their tracking if we have a label's tracking number (skip if they shipped their own way).
- if (order.buyerEmail && order.trackingNumber) {
- try {
- await sendBuyerTrackingEmail({ storeSlug: slug, buyerEmail: order.buyerEmail, storeName: seller.name, itemTitle: order.itemTitle || "your item", trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, orderId: id, replyTo: seller.email });
- await markTrackingEmailSent(id);
- } catch (e) { await logError("tracking-email", e, { context: { orderId: id } }); }
- }
- return NextResponse.json({ ok: true, status: "shipped" });
+ // Email the buyer their tracking — ONCE PER PARCEL. A piece bought with others shares their
+ // payment; if any of them has already been told, this one says nothing more (parcel-notify.ts).
+ // The tracking number is the bag's (the label sits on the first piece), so a sibling with none
+ // of its own still sends the bag's number.
+ const siblings = order.stripePaymentIntent ? await listParcelOrders(seller.id, order.stripePaymentIntent).catch(() => []) : [];
+ const bag = siblings.length ? siblings : [{ id, status: "shipped", itemTitle: order.itemTitle, buyerEmail: order.buyerEmail, trackingNumber: order.trackingNumber, trackingUrl: order.trackingUrl, trackingEmailSentAt: null }];
+ const email = await notifyParcelPosted(
+ { storeSlug: slug, storeName: seller.name, replyTo: seller.email, orders: bag.map((o) => ({ ...o, id: String(o.id), status: String(o.status), trackingEmailSentAt: o.trackingEmailSentAt ?? null })) },
+ { send: (p) => sendBuyerTrackingEmail(p), markSent: async (ids) => { await markTrackingEmailSentMany(ids); await markTrackingEmailSent(id); } },
+ );
+ if (!email.sent && email.reason === "send-failed") await logError("tracking-email", new Error(email.error), { context: { orderId: id } });
+ return NextResponse.json({ ok: true, status: "shipped", email: email.sent ? "sent" : email.reason });
  }
 
  // A collection is never posted — there's no address and there must be no label. Checked before
@@ -220,7 +199,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // USPS requires a sender email or phone — fall back to the seller's email.
  const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: seller.email };
  const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
- const parcel = { weightOz: order.itemWeightOz || 16, lengthIn: order.itemLengthIn || 12, widthIn: order.itemWidthIn || 9, heightIn: order.itemHeightIn || 3 };
+ // The same parcel the label will actually be bought at, so this preview can't promise a price
+ // the purchase won't honour.
+ const parcel = parcelForLabel({
+  item: { weightOz: order.itemWeightOz, lengthIn: order.itemLengthIn, widthIn: order.itemWidthIn, heightIn: order.itemHeightIn },
+  shippingPaidCents: order.shippingPaidCents,
+ });
 
  const shipAcct = await getOrCreateShipAccount(slug, seller.name); // null today (Shippo/platform account); the store's sub-account once Forge is on
  // See order-customs.ts: an international parcel needs a declaration to get rates at all, and the

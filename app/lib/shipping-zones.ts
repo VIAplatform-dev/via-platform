@@ -16,6 +16,10 @@
 // Pure — no database. store-shipping-db persists it, checkout reads it.
 
 import { SHIPPING_TIERS, assignTier, type TierId, type ParcelDims } from "./shipping-tiers.ts";
+// A cycle by design: shipping-prices-core needs the zone ids and labels for its table, and this
+// module needs its resolver for a quote. Both use the other only inside function bodies, never at
+// module load, so the live bindings are always there when they're read.
+import { resolveTierPrice } from "./shipping-prices-core.ts";
 
 export type ZoneId = "domestic" | "europe" | "north_america" | "rest_of_world";
 
@@ -102,8 +106,9 @@ export function quoteShipping(opts: {
  const z = cfg[zone];
  if (!z?.enabled) return { ok: false, zone, reason: "not-served" };
  const tier = assignTier(opts.parcel).id;
- const own = z.rates?.[tier];
- const amountCents = typeof own === "number" && own >= 0 ? Math.round(own) : tierPriceCents(tier);
+ // Her price for this tier here, or VYA's — one resolver, so the checkout, the bag and the product
+ // page can never disagree about what she charges (shipping-prices-core.ts).
+ const amountCents = resolveTierPrice({ tier, zone, overrides: cfg });
  return { ok: true, zone, tier, amountCents };
 }
 

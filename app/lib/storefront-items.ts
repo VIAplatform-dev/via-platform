@@ -25,6 +25,8 @@ export const ITEM_SCHEMAS = {
  gallery: { key: "images", fields: ["src", "pos"], loose: true },
  // Hero slideshow — each slide is a full hero's worth of content (see the `slides` hero variant).
  slides: { key: "slides", fields: ["heading", "subtext", "cta", "image"] },
+ // The questions a contact form asks. See contact-fields.ts for what the columns mean.
+ contactFields: { key: "fields", fields: ["label", "type", "required", "options"] },
 } as const satisfies Record<string, ItemSchema>;
 
 export type ItemSchemaName = keyof typeof ITEM_SCHEMAS;

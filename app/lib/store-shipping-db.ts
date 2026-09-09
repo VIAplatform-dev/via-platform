@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { isShipFromComplete, isoCountry } from "./ship-from-core";
 import type { PickupSettings } from "./pickup-core";
 
 // Per-store shipping policy: where they ship from, and who pays.
@@ -73,11 +74,23 @@ export async function getShippingSettings(storeSlug: string): Promise<ShippingSe
  return { mode, freeThresholdCents: r.free_threshold_cents ?? null, shipFrom, pickup, dutyMode: isDutyMode(r.duty_mode) ? r.duty_mode : DEFAULT_DUTY_MODE, carrierAccountId: r.carrier_account_id ?? null, zones: r.zones ? (typeof r.zones === "string" ? JSON.parse(r.zones) : r.zones) : DEFAULT_ZONES };
 }
 
+/** Has the store saved shipping settings at all? getShippingSettings answers with a default for a
+ *  store that never has, which is right for a quote and wrong for "Set up your store". */
+export async function hasShippingRow(storeSlug: string): Promise<boolean> {
+ await ensureTable();
+ const rows = await db()`SELECT 1 FROM store_shipping WHERE store_slug = ${storeSlug} LIMIT 1`;
+ return rows.length > 0;
+}
+
 export async function setShippingSettings(storeSlug: string, s: ShippingSettings): Promise<void> {
  await ensureTable();
  const mode = MODES.includes(s.mode) ? s.mode : "buyer_pays";
  const threshold = mode === "free_over" && s.freeThresholdCents && s.freeThresholdCents > 0 ? Math.round(s.freeThresholdCents) : null;
- const shipFromJson = s.shipFrom ? JSON.stringify(s.shipFrom) : null;
+ // The country is stored as the carriers need it, at the point of writing. The settings form takes
+ // free text, and two stores had "United States" saved — which Shippo and EasyPost both reject, so
+ // no rate ever came back and no label could be bought. Normalising here means it can't recur; the
+ // carrier-side calls normalise too, for rows written before this existed.
+ const shipFromJson = s.shipFrom ? JSON.stringify({ ...s.shipFrom, country: isoCountry(s.shipFrom.country) }) : null;
  const pickupJson = s.pickup ? JSON.stringify(s.pickup) : null;
  const dutyMode = isDutyMode(s.dutyMode) ? s.dutyMode : DEFAULT_DUTY_MODE;
  const carrierAccountId = s.carrierAccountId ? String(s.carrierAccountId).trim().slice(0, 60) : null;
@@ -89,6 +102,5 @@ export async function setShippingSettings(storeSlug: string, s: ShippingSettings
 
 /** Does this store have a usable ship-from address (required for rates + labels)? */
 export function hasShipFrom(s: ShippingSettings): boolean {
- const a = s.shipFrom;
- return Boolean(a && a.street1 && a.city && a.state && a.zip && a.country);
+ return isShipFromComplete(s.shipFrom);
 }

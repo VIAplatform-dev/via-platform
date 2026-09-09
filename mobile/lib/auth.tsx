@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import * as SecureStore from "expo-secure-store";
 import { apiGet, apiPost, setAuthToken } from "./api";
 import { devLogin, devLoginConfigured } from "./devAuth";
+import { registerForPush } from "./push";
 import type { User } from "./types";
 
 // Sign-in state for the whole app.
@@ -64,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (dev) {
             setStoreSlug(dev.storeSlug ?? null);
             await applyToken(dev.token, dev.user);
+            if (dev.storeSlug) void registerForPush();
           }
           return;
         }
@@ -71,6 +73,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const me = await apiGet<{ user: User; token: string; storeSlug: string | null }>("/api/mobile/auth/me");
         setStoreSlug(me.storeSlug ?? null);
         await applyToken(me.token, me.user);
+        // A store account gets its phone registered for a sale/message push. After applyToken, so
+        // the registration call carries the bearer; never awaited, so it never delays the launch.
+        if (me.storeSlug) void registerForPush();
       } catch {
         /* allow-swallow: an expired or revoked token is an ordinary way to arrive here, not an
            error to report. Clearing it drops the person on the sign-in screen, which is correct. */
@@ -95,12 +100,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const r = await apiPost<{ token: string; user: User; storeSlug?: string | null }>("/api/mobile/auth/magic-link/verify", { token: linkToken });
     setStoreSlug(r.storeSlug ?? null);
     await applyToken(r.token, r.user);
+    if (r.storeSlug) void registerForPush();
   }, [applyToken]);
 
   const signInWithGoogle = useCallback(async (idToken: string) => {
     const r = await apiPost<{ token: string; user: User; storeSlug?: string | null }>("/api/mobile/auth/google", { idToken });
     setStoreSlug(r.storeSlug ?? null);
     await applyToken(r.token, r.user);
+    if (r.storeSlug) void registerForPush();
   }, [applyToken]);
 
   const signOut = useCallback(async () => {

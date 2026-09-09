@@ -135,6 +135,10 @@ export default function SectionThumb({ type, variant }: { type: BlockType | stri
  case "contact/card": return wrap(<span className="flex w-4/5 flex-col items-start gap-1 rounded-sm border border-stone-300 bg-white p-2">{bar("50%", A)}<span className={`h-2 w-full rounded-sm ${B}`} /><span className={`h-2 w-full rounded-sm ${B}`} /><span className={`h-2 w-6 rounded-sm ${A}`} /></span>);
 
  // faq — one stack, two columns, heading beside the questions, panels, numerals, a contents column.
+  // appointments — day chips above a row of times. The composition that distinguishes these is
+  // WHERE the picker sits relative to the words, so each thumb shows that and nothing else.
+  case "appointments/split": return wrap(<div className="flex w-full items-start gap-2"><span className="flex w-1/2 flex-col gap-1">{bar("80%", A)}{bar("100%")}{bar("60%")}</span><span className="flex flex-1 flex-col gap-1"><span className="flex gap-1">{[0, 1, 2].map((i) => <span key={i} className={`h-3 flex-1 rounded-sm ${B}`} />)}</span><span className="flex gap-1">{[0, 1, 2, 3].map((i) => <span key={i} className={`h-1.5 flex-1 rounded-full ${N}`} />)}</span><span className={`mt-0.5 h-2 w-full rounded-sm ${A}`} /></span></div>);
+  case "appointments/card": return wrap(<span className="flex w-full flex-col gap-1 rounded-sm border border-stone-200 p-2">{bar("55%", A)}<span className="flex gap-1">{[0, 1, 2].map((i) => <span key={i} className={`h-3 flex-1 rounded-sm ${B}`} />)}</span><span className={`h-2 w-full rounded-sm ${A}`} /></span>);
  case "faq/two-column": return wrap(<div className="grid w-full grid-cols-2 gap-x-2">{[0, 1].map((c) => <span key={c} className="flex flex-col gap-1">{[0, 1, 2].map((i) => <span key={i} className="flex items-center justify-between rounded-sm bg-stone-100 px-1 py-0.5">{bar("60%")}<span className={`h-1 w-1 rounded-full ${N}`} /></span>)}</span>)}</div>);
  case "faq/sided": return wrap(<div className="flex w-full items-start gap-2"><span className="flex w-1/3 flex-col gap-1">{bar("100%", A)}{bar("70%")}</span><span className="flex flex-1 flex-col gap-1">{[0, 1, 2].map((i) => <span key={i} className="flex items-center justify-between border-b border-stone-200 pb-1">{bar("70%")}<span className={`h-1 w-1 rounded-full ${N}`} /></span>)}</span></div>);
  case "faq/cards": return wrap(<div className="grid w-full grid-cols-2 gap-1">{[0, 1, 2, 3].map((i) => <span key={i} className="flex flex-col gap-1 rounded-sm border border-stone-200 p-1.5">{bar("70%", A)}{bar("100%")}</span>)}</div>);
@@ -161,6 +165,7 @@ export default function SectionThumb({ type, variant }: { type: BlockType | stri
  case "contact": return wrap(<>{bar("40%", A)}<span className={`h-2 w-4/5 rounded-sm ${B}`} /><span className={`h-2 w-4/5 rounded-sm ${B}`} /><span className={`mt-0.5 h-2 w-8 rounded-full ${A}`} /></>);
  case "faq": return wrap(<span className="flex w-full flex-col gap-1">{[0, 1, 2].map((i) => <span key={i} className="flex w-full items-center justify-between rounded-sm bg-stone-100 px-1.5 py-1">{bar("55%")}<span className={`h-1 w-1 rounded-full ${N}`} /></span>)}</span>);
  case "custom": return wrap(<span className="grid h-full w-full place-items-center rounded-sm border border-dashed border-stone-300 font-mono text-[13px] font-semibold text-stone-400">{"</>"}</span>);
+  case "appointments": return wrap(<>{bar("45%", A)}<span className="flex w-full gap-1">{[0, 1, 2].map((i) => <span key={i} className={`h-3 flex-1 rounded-sm ${B}`} />)}</span><span className="flex w-full gap-1">{[0, 1, 2, 3].map((i) => <span key={i} className={`h-1.5 flex-1 rounded-full ${N}`} />)}</span><span className={`h-2 w-full rounded-sm ${A}`} /></>);
  default: return wrap(<>{bar("50%", A)}{bar("80%")}{bar("60%")}</>);
  }
 }

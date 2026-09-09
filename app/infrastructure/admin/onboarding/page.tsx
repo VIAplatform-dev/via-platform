@@ -160,6 +160,18 @@ export default function OnboardingWizard() {
    // Same wait as the build path — the import screen lives inside the workspace, so the gate has
    // to see the store before we go there or she lands back on this wizard.
    await waitForStore();
+
+   // Her whole shop was brought over before she ever signed up — every page of her site AND her
+   // inventory — and she's just been handed it. There is nothing left to import, so skip the scrape
+   // and take her to the storefront that is already there.
+   //
+   // Only when it's genuinely complete: a seeded store whose site was NOT captured still needs the
+   // scrape, or she'd get her pieces on a stock template instead of her own shop.
+   if (data?.seeded && data?.alreadyCaptured) {
+    router.replace("/admin/storefront?welcome=import");
+    return;
+   }
+
    const importUrl = /^https?:\/\//i.test(websiteUrl.trim()) ? websiteUrl.trim() : `https://${websiteUrl.trim()}`;
    // If the import fails/blocks, route to the Bring-your-site page WITH the reason + URL, not an empty editor.
    const cap = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: importUrl, replaceBlocks: true }) }).catch(() => null);
@@ -231,7 +243,7 @@ export default function OnboardingWizard() {
     <div className={`mt-12 flex-1 ${leaving ? "vya-step-out-left" : "vya-step-in-up"}`}>
      <Section title="Do you already have a website?" sub="We’ll either bring your existing site over, or build you a new one.">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-       <ChoiceCard icon={<Globe size={20} />} label="Yes, I have one" desc="Paste the URL — we’ll import it" active={hasWebsite === true} onClick={() => setHasWebsite(true)} />
+       <ChoiceCard icon={<Globe size={20} />} label="Yes, I have one" desc="Paste the web address and we’ll import it" active={hasWebsite === true} onClick={() => setHasWebsite(true)} />
        <ChoiceCard icon={<Hammer size={20} />} label="No, let’s start from scratch" desc="Choose your design" active={hasWebsite === false} onClick={() => { setHasWebsite(false); setWebsiteUrl(""); }} />
       </div>
       {hasWebsite === true && (

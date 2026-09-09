@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItem } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
-import { assignTier, flatRateCents } from "@/app/lib/shipping-tiers";
+import { assignTier } from "@/app/lib/shipping-tiers";
+import { quoteShipping } from "@/app/lib/shipping-zones";
+import { parcelForLabel } from "@/app/lib/parcel-core";
+import { isoCountry } from "@/app/lib/ship-from-core";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +31,14 @@ export async function POST(request: NextRequest) {
 
  // Flat-rate pricing: one clean tier price by the piece's size (auto-detected from its captured
  // weight/dimensions). VYA buys the real discounted label at fulfillment and keeps the spread.
- const parcel = { weightOz: item.weightOz || 16, lengthIn: item.lengthIn || 12, widthIn: item.widthIn || 9, heightIn: item.heightIn || 3 };
+ // No shipping paid yet — this IS the quote — so the floor is the middle of the ladder rather than
+ // a mailer. Guessing small here undercharges the shopper and the store eats it at label time.
+ const parcel = parcelForLabel({ item, shippingPaidCents: null });
  const tier = assignTier(parcel);
  // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
- // exactly what checkout charges. No live-rate lookup, so it never varies by distance or blocks a sale.
- const charge = flatRateCents(parcel);
- return NextResponse.json({ free: false, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: charge, estDays: null }] });
+ // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
+ // (shipping-zones.ts + shipping-prices-core.ts); a country she doesn't serve is refused, not sold.
+ const quote = quoteShipping({ fromCountry: isoCountry(shipping.shipFrom?.country), toCountry: isoCountry(to.country), parcel, zones: shipping.zones });
+ if (!quote.ok) return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+ return NextResponse.json({ free: false, currency: item.currency, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: quote.amountCents, estDays: null }] });
 }

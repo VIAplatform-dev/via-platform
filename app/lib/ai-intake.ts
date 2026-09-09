@@ -23,6 +23,7 @@ export type ListingDraft = {
  brand: DraftField;
  era: DraftField;
  material: DraftField;
+ colour: DraftField;   // the dominant colour, as a plain word — Vestiaire requires one and refuses a guess
  condition: DraftField;
  conditionGrade: string | null; // canonical resale grade (Deadstock/NWT…Fair) from VISIBLE wear
  flaws: string[]; // specific visible flaws (pilling, scuffs, tarnish…) — [] if none seen
@@ -56,6 +57,7 @@ const INSTRUCTION = `Return ONLY a JSON object (no prose, no markdown) with exac
  "brand": {"value": string|null, "confidence": number},
  "era": {"value": string|null, "confidence": number},      // e.g. "1990s","Y2K","2000s"
  "material": {"value": string|null, "confidence": number}, // prefer the care tag if legible
+ "colour": {"value": string|null, "confidence": number},   // the ONE dominant colour of the piece as a plain word: Black, White, Beige, Brown, Camel, Grey, Navy, Blue, Green, Red, Burgundy, Pink, Purple, Orange, Yellow, Gold, Silver, Ecru, Khaki, Turquoise, Anthracite, or Multicolour for a print or several colours with no dominant one. Unlike fibre, colour IS readable from a photo, so fill it — but judge the GARMENT, not the backdrop or the lighting, and use Multicolour rather than picking one colour out of a print.
  "condition": {"value": string|null, "confidence": number},   // a short, honest customer-facing condition note (e.g. "Excellent — light wear to the sole")
  "conditionGrade": string|null,                    // EXACTLY one of: "Deadstock/NWT","Excellent","Very Good","Good","Fair". Grade STRICTLY from VISIBLE wear only. Inspect closely for: pilling, stains, fading, sole/heel wear, scuffs, tarnished or missing hardware, holes, loose threads, pulls, stretched/misshapen areas, yellowing. A clean piece with NO visible flaws is "Excellent" (or "Deadstock/NWT" only if tags/deadstock are visible) — do NOT default to "Good". Only grade down for wear you can actually see.
  "flaws": string[],                                // the specific visible flaws behind the grade, e.g. ["light pilling at cuffs","scuffed toe","tarnished zipper pull"]. [] if none are visible. NEVER invent a flaw you cannot clearly see in the photos.
@@ -98,6 +100,7 @@ function parseDraft(text: string): ListingDraft {
  brand: toField(raw.brand),
  era: toField(raw.era),
  material: toField(raw.material),
+ colour: toField(raw.colour),
  condition: toField(raw.condition),
  conditionGrade: typeof raw.conditionGrade === "string" && raw.conditionGrade.trim() ? raw.conditionGrade.trim().slice(0, 40) : null,
  flaws: Array.isArray(raw.flaws) ? raw.flaws.filter((f: any) => typeof f === "string" && f.trim()).map((f: string) => f.trim().slice(0, 120)).slice(0, 8) : [],

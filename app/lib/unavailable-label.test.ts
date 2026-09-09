@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { unavailableLabel, reasonFromImport, reasonForVanished, type UnavailableReason } from "./unavailable-label.ts";
+import { unavailableLabel, reasonFromImport, reasonForVanished, storefrontAvailability, type UnavailableReason } from "./unavailable-label.ts";
 
 test("a piece the seller's own platform reported sold out says so", () => {
  assert.equal(unavailableLabel("sold_out"), "Sold out");
@@ -33,4 +33,17 @@ test("the importer records what the platform actually said", () => {
 
 test("the sweep records that it inferred, not that it was told", () => {
  assert.equal(reasonForVanished(), "vanished");
+});
+
+test("a held piece stays on the shelf, unbuyable, badged On hold — never Sold", () => {
+ assert.equal(unavailableLabel("on_hold"), "On hold");
+ assert.deepEqual(storefrontAvailability({ status: "reserved", unavailableReason: null }), { available: false, unavailableReason: "on_hold" });
+ // A reserved row never carries a recorded reason; even if one leaked in, the hold wins.
+ assert.deepEqual(storefrontAvailability({ status: "reserved", unavailableReason: "vanished" }), { available: false, unavailableReason: "on_hold" });
+});
+
+test("a sold piece keeps whatever reason was recorded; a live one is simply available", () => {
+ assert.deepEqual(storefrontAvailability({ status: "sold", unavailableReason: "vanished" }), { available: false, unavailableReason: "vanished" });
+ assert.deepEqual(storefrontAvailability({ status: "sold" }), { available: false, unavailableReason: null });
+ assert.deepEqual(storefrontAvailability({ status: "active", unavailableReason: "sold_out" }), { available: true, unavailableReason: null });
 });

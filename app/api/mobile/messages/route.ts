@@ -7,11 +7,10 @@ import {
  postMessage,
  listCustomerConversations,
  getMessages,
- getStorePushTokens,
 } from "@/app/lib/messages-db";
 import { storeContactEmails } from "@/app/lib/stores";
 import { sendStoreMessageNotification } from "@/app/lib/email";
-import { sendExpoPush } from "@/app/lib/push";
+import { pushSellerMessage } from "@/app/lib/seller-push";
 
 export const dynamic = "force-dynamic";
 
@@ -75,31 +74,24 @@ export async function POST(request: Request) {
  const message = await postMessage(conv.id, "customer", clipped);
 
  // Notify the store — email + push, both best-effort.
+ const user = await getUserById(userId).catch(() => null);
+ const customerName = user?.name ?? user?.email ?? null;
  try {
  const storeEmail = storeContactEmails[conv.storeSlug];
  if (storeEmail) {
- const user = await getUserById(userId);
  await sendStoreMessageNotification({
  storeEmail,
  storeName: conv.storeSlug,
  productTitle: conv.productTitle,
- customerName: user?.name ?? user?.email ?? null,
+ customerName,
  messageBody: clipped,
  });
  }
  } catch {
  // ignore email failures
  }
- try {
- const tokens = await getStorePushTokens(conv.storeSlug);
- await sendExpoPush(tokens, {
- title: "New customer question",
- body: clipped.slice(0, 140),
- data: { type: "store_message", conversationId: conv.id },
- });
- } catch {
- // ignore push failures
- }
+ // The push is gated by the store's notification preferences and never throws (seller-push.ts).
+ void pushSellerMessage(conv.storeSlug, { buyerName: customerName, itemTitle: conv.productTitle, message: clipped, conversationId: conv.id, source: "marketplace" });
 
  const messages = await getMessages(conv.id);
  return NextResponse.json({ conversation: conv, messages, message });

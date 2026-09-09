@@ -102,7 +102,9 @@ export function CategoryBreadcrumb({ value, onChange, className }: {
         onClick={() => pickFamily(OTHER_FAMILY)}
         className={cn(MENU_ITEM, isOther && "text-[var(--accent-ink,#0b7a5c)]")}
        >
-        <span>Other…</span>
+        {/* Was "Other…", which reads as a dustbin rather than an invitation. Sellers asked for
+            custom categories not knowing this already made one. */}
+        <span>+ Add your own…</span>
         <span className="text-[10px] text-stone-400">type your own</span>
        </button>
       </div>
