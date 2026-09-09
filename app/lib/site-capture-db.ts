@@ -139,6 +139,24 @@ export async function deleteCaptures(slug: string): Promise<void> {
  await sql()`DELETE FROM site_captures WHERE store_slug = ${slug}`;
 }
 
+/**
+ * Every store that holds captures, with the shop each one came from — one row per store.
+ *
+ * The inverse of getCaptureOrigin: that asks "which shop is this store?", this answers "which store
+ * holds this shop?", which is how an import into the wrong store gets refused before it deletes
+ * anything (see import-engine/origin-owner.ts). One row per store, so this stays small: it is the
+ * store count, not the page count.
+ */
+export async function listCaptureOrigins(): Promise<{ slug: string; origin: string }[]> {
+ await ensure();
+ const rows = (await sql()`
+  SELECT DISTINCT ON (store_slug) store_slug, source_url
+  FROM site_captures
+  WHERE source_url IS NOT NULL AND source_url <> ''
+  ORDER BY store_slug, path`) as { store_slug: string; source_url: string }[];
+ return rows.map((r) => ({ slug: r.store_slug, origin: r.source_url }));
+}
+
 /** The original site origin for a captured store (from any stored page's source_url). */
 export async function getCaptureOrigin(slug: string): Promise<string | null> {
  await ensure();
