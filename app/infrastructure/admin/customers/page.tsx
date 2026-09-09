@@ -7,6 +7,7 @@ import { Users } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, TH, TD, cn } from "../ui";
 import { Input, Field, inputCls } from "@/app/store/ui";
 import { filterCustomers, parseAudience, audienceIsEmpty, type AudienceFilter } from "@/app/lib/customer-audience-core";
+import { customerFileRefusal, CUSTOMER_FILE_TYPES, CUSTOMER_FILE_TYPES_LABEL } from "@/app/lib/customer-file-core";
 
 type Customer = {
  email: string;
@@ -99,8 +100,14 @@ export default function CustomersPage() {
  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
  const f = e.target.files?.[0];
  if (!f) return;
+ const text = await f.text();
+ // An Excel workbook read as text is zip bytes — the parser would report "no email addresses"
+ // and the seller would blame her list. Name the real problem and the way out instead.
+ const refusal = customerFileRefusal({ name: f.name, text });
+ if (refusal) { setErr(refusal); setFileName(null); setCsv(""); e.target.value = ""; return; }
+ setErr(null);
  setFileName(f.name);
- setCsv(await f.text());
+ setCsv(text);
  }
 
  async function importNow() {
@@ -187,8 +194,9 @@ export default function CustomersPage() {
  ) : (
  <>
  <p className="mb-2 text-[13px] font-medium text-stone-700">Bring your audience with you</p>
- <p className="mb-4 text-[13px] text-stone-500">Upload a list from any platform — Shopify, Square, Mailchimp, or plain emails. We read any format, skip non-emails, and never add duplicates.</p>
- <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={onFile} className="block w-full text-[13px] text-stone-500 file:mr-3 file:rounded-md file:border file:border-stone-300 file:bg-white file:px-4 file:py-2 file:text-[13px] file:font-medium file:text-stone-700 hover:file:bg-stone-50" />
+ <p className="mb-4 text-[13px] text-stone-500">Upload a CSV export from Shopify, Square, Mailchimp, or any list of emails. We skip anything that isn’t an email and never add duplicates.</p>
+ <p className="mb-2 text-[12px] font-medium text-stone-600">CSV file <span className="font-normal text-stone-400">({CUSTOMER_FILE_TYPES_LABEL}). From Excel or Numbers, use File › Save as › CSV first.</span></p>
+ <input type="file" accept={CUSTOMER_FILE_TYPES.join(",")} onChange={onFile} className="block w-full text-[13px] text-stone-500 file:mr-3 file:rounded-md file:border file:border-stone-300 file:bg-white file:px-4 file:py-2 file:text-[13px] file:font-medium file:text-stone-700 hover:file:bg-stone-50" />
  <p className="my-4 text-center text-[11px] uppercase tracking-[0.16em] text-stone-300">or paste it</p>
  <textarea
  className={cn(inputCls, "h-32 py-2.5 font-mono text-xs")}

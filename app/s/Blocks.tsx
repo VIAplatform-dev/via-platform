@@ -7,7 +7,7 @@ import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
 import { resolveVariant } from "@/app/lib/storefront-variants";
 import { skinCss } from "@/app/lib/storefront-skins";
 import { radiusCss } from "@/app/lib/storefront-chrome-css";
-import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { GripVertical, ChevronUp, ChevronDown, X } from "lucide-react";
 import SandboxEmbed from "./SandboxEmbed";
 // The shared editing kit + the per-family layout files. See blocks/kit.tsx for why the editing
 // affordances live outside this file.
@@ -502,6 +502,7 @@ export default function Blocks({
  onArrangeStart,
  onPickImage,
  onDropImage,
+ onRemove,
  skin,
 }: {
  blocks: Block[];
@@ -558,6 +559,11 @@ export default function Blocks({
  onResizeSectionStart?: (blockId: string, edge: "top" | "bottom", e: React.PointerEvent) => void;
  // Editor-only: drag a layout's spacing / card width / split seam directly on the canvas.
  onArrangeStart?: (blockId: string, prop: string, e: React.PointerEvent) => void;
+ // Editor-only: the ✕ on a section's hover chrome. Deleting used to live only on the floating bar
+ // you get after selecting the section itself — and a section full of tiles or text has almost
+ // nowhere to click that isn't a tile or text, so sellers looked for an X, found none, and gave
+ // up ("i cant delete all of these"). Now it sits next to the move arrows on every section.
+ onRemove?: (id: string) => void;
  // Editor-only: open the file picker for an image slot clicked directly on the canvas.
  onPickImage?: (apply: (url: string) => void) => void;
  onDropImage?: (file: File, apply: (url: string) => void) => void;
@@ -731,6 +737,9 @@ export default function Blocks({
  >
  <GripVertical size={14} />
  </button>
+ {onRemove && (
+ <button type="button" title="Delete section" onClick={(e) => { e.stopPropagation(); onRemove(b.id); }} className="grid h-6 w-6 place-items-center rounded text-stone-500 transition hover:bg-red-50 hover:text-red-600"><X size={14} /></button>
+ )}
  </div>
  )}
  {editable && onResizeSectionStart && selectedId === b.id && SEC_HANDLE_POS.map(([edge, pos]) => (

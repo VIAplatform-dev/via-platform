@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useInSiteDialog } from "@/app/components/InSiteDialog";
 import { Globe, Check, Copy } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, TH, TD, cn } from "../../ui";
 
@@ -53,6 +54,7 @@ function CopyField({ value }: { value: string }) {
 }
 
 export default function DomainPage() {
+ const dialog = useInSiteDialog();
  const [loading, setLoading] = useState(true);
  const [configured, setConfigured] = useState(false);
  const [domain, setDomain] = useState<string | null>(null);
@@ -123,7 +125,7 @@ export default function DomainPage() {
  }
 
  async function disconnect() {
-  if (!confirm(`Disconnect ${domain}? Your storefront stays live on its VYA address.`)) return;
+  if (!(await dialog.confirm({ title: `Disconnect ${domain}?`, body: "Your storefront stays live on its VYA address.", confirmLabel: "Disconnect" }))) return;
   setBusy(true);
   await fetch("/api/store/domain", { method: "DELETE" }).catch(() => {});
   setDomain(null); setStatus(null); setBusy(false);
@@ -171,7 +173,7 @@ export default function DomainPage() {
  }
 
  async function transferOut() {
-  if (!confirm(`Move ${domain} to another registrar?\n\nYou keep the domain — we'll give you the auth code to hand your new registrar. Your storefront stays live until the transfer completes on their side.`)) return;
+  if (!(await dialog.confirm({ title: `Move ${domain} to another registrar?`, body: `You keep the domain — we'll give you the auth code to hand your new registrar. Your storefront stays live until the transfer completes on their side.`, confirmLabel: "Start transfer", tone: "primary" }))) return;
   setDnsBusy(true); setDnsErr(null);
   const r = await fetch("/api/store/domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transfer-out" }) });
   const d2 = await r.json().catch(() => ({}));
@@ -185,6 +187,7 @@ export default function DomainPage() {
 
  return (
   <AdminPage className="max-w-3xl">
+   {dialog.node}
    <AdminHeader
     eyebrow="Store · Storefront"
     title="Your own domain"
