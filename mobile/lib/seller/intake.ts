@@ -85,7 +85,7 @@ export async function priceListing(imageUrls: string[], fields: DraftFields, ext
  * screen that publishes.
  */
 export async function publishListing(
-  fields: Omit<DraftFields, "cost"> & { imageUrls: string[]; priceCents?: number | null; sourceName?: string; acquiredAt?: string; lotId?: string; cost?: string | number },
+  fields: Omit<DraftFields, "cost"> & { imageUrls: string[]; priceCents?: number | null; cost?: string | number },
   status: "active" | "draft",
 ) {
   const { priceCents, cost, ...rest } = fields;

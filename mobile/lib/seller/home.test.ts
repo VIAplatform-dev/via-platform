@@ -59,14 +59,14 @@ test("the delta is rounded to whole percent", () => {
 /* ── the tile labels ────────────────────────────────────────────────────── */
 
 test("the orders tile counts one order in the singular", () => {
-  // The wide tile at the top of Home. "1 orders to post" is the kind of thing a seller notices
+  // The wide tile at the top of Home. "1 orders to ship" is the kind of thing a seller notices
   // every single morning.
-  assert.equal(ordersToPostLabel(1), "1 order to post");
-  assert.equal(ordersToPostLabel(2), "2 orders to post");
+  assert.equal(ordersToPostLabel(1), "1 order to ship");
+  assert.equal(ordersToPostLabel(2), "2 orders to ship");
 });
 
 test("nothing to post says so in words rather than showing a zero", () => {
-  assert.equal(ordersToPostLabel(0), "Nothing to post");
+  assert.equal(ordersToPostLabel(0), "Nothing to ship");
 });
 
 test("the inventory tile reads live and drafts together", () => {

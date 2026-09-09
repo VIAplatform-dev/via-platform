@@ -139,6 +139,22 @@ export function featuresForTier(tierId: TierId): Feature[] {
  return (Object.keys(FEATURE_MIN_TIER) as Feature[]).filter((f) => tierIncludesFeature(tierId, f));
 }
 
+/**
+ * The features a tier ADDS over the tier below it — what upgrading to it actually buys.
+ *
+ * Higher tiers are cumulative, so the three plan cards are largely the same list three times and a
+ * seller reading them can't see where one stops being the other. The cards highlight these, which is
+ * the only part of the column that is news.
+ *
+ * The lowest tier adds nothing: there is no tier beneath it to gain anything over, and highlighting
+ * its whole list would emphasise everything and so distinguish nothing.
+ */
+export function addedFeaturesForTier(tierId: TierId): Feature[] {
+ const order = TIER_ORDER[tierId];
+ if (order <= Math.min(...TIERS.map((t) => t.order))) return [];
+ return featuresForTier(tierId).filter((f) => FEATURE_MIN_TIER[f] === order);
+}
+
 // ── Stripe Price IDs (env-driven; set when the prices are finalized) ─────────
 // Env var per tier+interval, e.g. STRIPE_PRICE_STUDIO_MONTHLY / STRIPE_PRICE_STUDIO_ANNUAL.
 export function priceEnvName(tierId: TierId, interval: Interval): string {

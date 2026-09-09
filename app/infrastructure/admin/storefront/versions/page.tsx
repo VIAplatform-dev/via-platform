@@ -16,10 +16,14 @@ type Version = { id: string; name: string; kind: VersionKind; published: boolean
 
 const KIND_LABEL: Record<VersionKind, string> = { imported: "Imported site", built: "Built here" };
 
+// The TIME, not just the day. A seller saving a copy before each big change has three drafts all
+// reading "saved Sep 8, 2026" — the line that exists to tell them apart tells them nothing, and the
+// only way to find the one from before lunch is to open each in turn. This component is client-only
+// and its data is fetched after mount, so a locale-formatted time can't mismatch a server render.
 const when = (iso: string | null) => {
  if (!iso) return "";
  const d = new Date(iso);
- return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+ return Number.isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
 export default function StorefrontVersionsPage() {
@@ -111,10 +115,19 @@ export default function StorefrontVersionsPage() {
        <Upload size={14} /> {busy === "fresh" ? "Setting up…" : "Start a new design"}
       </TechButton>
      </div>
-     <p className="mb-6 text-[12px] leading-relaxed text-stone-400">
-      “Start a new design” keeps your current storefront as a draft and puts you on a blank one — nothing is deleted,
-      and you can publish the old one again at any time.
-     </p>
+     {/* Both buttons, explained. Only "Start a new design" used to be, and a seller asked of the other
+         one: "what does this do? save it as is in case you change things and wish to go back?" — which
+         is exactly what it does, so the answer belongs on the page rather than in her head. */}
+     <div className="mb-6 space-y-1.5 text-[12px] leading-relaxed text-stone-400">
+      <p>
+       “Save a copy of what’s live” keeps your storefront exactly as it is right now as a draft. Your live site
+       doesn’t change — the copy is there to come back to if you edit something and change your mind.
+      </p>
+      <p>
+       “Start a new design” keeps your current storefront as a draft and puts you on a blank one — nothing is deleted,
+       and you can publish the old one again at any time.
+      </p>
+     </div>
 
      {/* ── Drafts ───────────────────────────────────────────────────────── */}
      <TechCard className="overflow-hidden">

@@ -55,9 +55,6 @@ type Item = {
  source?: string; // manual | imported | ai | market (quick-listed at a market)
  createdAt?: string; // when it went on the rail — powers the Days column
  flaws?: string[] | null; // specific visible flaws, printed under Condition on the product page
- sourceName?: string | null; // where it came from, in her words ("Kempton", "Ana's estate")
- acquiredAt?: string | null; // YYYY-MM-DD
- lotId?: string | null;
  measurementsJson?: Measurement[] | null; // structured, per category (measurements-core.ts)
  conditionNote?: string | null; // beyond the grade
  parcelEstimate?: ParcelEstimate | null; // what the piece looks like it ships as (parcel-core.ts)
@@ -70,7 +67,6 @@ type EditForm = {
  condition: string; size: string; category: string | null; description: string; status: ItemStatus; // slug, or free text under "Other"
  weightOz: string; lengthIn: string; widthIn: string; heightIn: string;
  conditionNote: string; measurements: Partial<Record<MeasurementKey, string>>;
- sourceName: string; acquiredAt: string;
 };
 
 export default function ItemsPage() {
@@ -156,14 +152,12 @@ export default function ItemsPage() {
  const [bulkColName, setBulkColName] = useState("");
  const [aiNotice, setAiNotice] = useState<string | null>(null); // result of the last AI re-tag
  const [editing, setEditing] = useState<Item | null>(null);
- const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "", sourceName: "", acquiredAt: "", conditionNote: "", measurements: {} };
+ const EMPTY_EDIT: EditForm = { title: "", price: "", cost: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", category: null, description: "", status: "draft", weightOz: "", lengthIn: "", widthIn: "", heightIn: "", conditionNote: "", measurements: {} };
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const units = useStoreUnits(withStore);
  const [editFlaws, setEditFlaws] = useState<string[]>([]); // one per row in the editor
  const [newFlaw, setNewFlaw] = useState("");
- // Bulk "Set source / date / lot cost" and "Set cost" — in-page dialogs, never a browser prompt.
- const [lotOpen, setLotOpen] = useState(false);
- const [lotForm, setLotForm] = useState({ sourceName: "", acquiredAt: "", lotCost: "" });
+ // Bulk "Set cost" — an in-page dialog, never a browser prompt.
  const [costOpen, setCostOpen] = useState(false);
  const [costForm, setCostForm] = useState<{ mode: "each" | "total"; amount: string }>({ mode: "each", amount: "" });
  const [bulkErr, setBulkErr] = useState<string | null>(null);
@@ -369,21 +363,6 @@ export default function ItemsPage() {
  setTimeout(() => setAiNotice(null), 9000);
  }
 
- // Where a batch came from, when, and what it cost altogether — written to every selected piece,
- // the lot cost split across them by price (equal where a price is missing). See app/lib/lot-core.ts.
- async function bulkLot() {
- const ids = [...selected];
- if (!ids.length) return;
- const lotCostCents = lotForm.lotCost.trim() === "" ? null : Math.round(Number(lotForm.lotCost) * 100);
- if (lotCostCents != null && !(Number.isFinite(lotCostCents) && lotCostCents >= 0)) { setBulkErr("Enter what the lot cost, like 340."); return; }
- if (!lotForm.sourceName.trim() && !lotForm.acquiredAt && lotCostCents == null) { setBulkErr("Add a source, a date, or what it cost."); return; }
- setBulkBusy(true); setBulkErr(null);
- const r = await fetch(withStore("/api/store/items"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "lot", ids, ...(lotForm.sourceName.trim() ? { sourceName: lotForm.sourceName.trim() } : {}), ...(lotForm.acquiredAt ? { acquiredAt: lotForm.acquiredAt } : {}), ...(lotCostCents != null ? { lotCostCents } : {}) }) }).then((x) => x.json()).catch(() => null);
- setBulkBusy(false);
- if (!r?.ok) { setBulkErr(r?.error || "Couldn’t save that."); return; }
- setLotOpen(false); setLotForm({ sourceName: "", acquiredAt: "", lotCost: "" }); setSelected(new Set());
- await load();
- }
  // Fill in cost on the selected pieces: the same on each, or one total split by price.
  async function bulkCost() {
  const ids = [...selected];
@@ -398,7 +377,6 @@ export default function ItemsPage() {
  await load();
  }
  // Source names this store has used before, for the suggestions list.
- const sourceNames = Array.from(new Set(items.map((i) => (i.sourceName || "").trim()).filter(Boolean))).sort();
 
  // Build a collection from the inventory: add all selected items to a collection (creating it if new).
  async function bulkAddToCollection(title: string) {
@@ -423,7 +401,6 @@ export default function ItemsPage() {
  brand: it.brand || "", era: it.era || "", material: it.material || "", colour: it.colour || "", condition: it.condition || "",
  size: it.size || "", category: toCategorySlug(it.category), description: it.description || "", status: it.status,
  weightOz: num2str(it.weightOz), lengthIn: num2str(it.lengthIn), widthIn: num2str(it.widthIn), heightIn: num2str(it.heightIn),
- sourceName: it.sourceName || "", acquiredAt: (it.acquiredAt || "").slice(0, 10),
  conditionNote: it.conditionNote || "", measurements: measurementsToForm(it.measurementsJson),
  });
  setEditFlaws(Array.isArray(it.flaws) ? it.flaws : []);
@@ -464,7 +441,6 @@ export default function ItemsPage() {
  images: editImages, collections: colsForSave,
  // Whatever is still in the "add a flaw" box counts — same rule as the collection box below.
  flaws: newFlaw.trim() ? [...editFlaws, newFlaw.trim()] : editFlaws,
- sourceName: editForm.sourceName, acquiredAt: editForm.acquiredAt || null,
  // Structure: the grade sits in `condition`, her words in the note, the template's numbers as a
  // list (empties omitted). A list clears the old free-text column server-side.
  conditionNote: editForm.conditionNote, measurements: measurementsFromForm(editForm.measurements, units.unit),
@@ -673,11 +649,11 @@ export default function ItemsPage() {
    i.sku, i.title, i.brand ?? "", i.category ?? "", i.size ?? "", i.condition ?? "", i.conditionNote ?? "", i.era ?? "", i.material ?? "", i.colour ?? "",
    (i.priceCents / 100).toFixed(2), i.costCents != null ? (i.costCents / 100).toFixed(2) : "",
    i.currency, i.status === "reserved" ? holdPill(holds[i.id] ?? null) : i.status, (i.images || []).length, (i.collections || []).join(" | "),
-   (Array.isArray(i.flaws) ? i.flaws : []).join("; "), i.sourceName ?? "", (i.acquiredAt ?? "").slice(0, 10), i.lotId ?? "",
+   (Array.isArray(i.flaws) ? i.flaws : []).join("; "),
    i.status === "active" ? (daysListed(i.createdAt) ?? "") : "", formatMeasurements(i.measurementsJson),
   ]);
   downloadCsv(datedFilename("inventory"), toCsv(
-   ["sku", "title", "brand", "category", "size", "condition", "condition_note", "era", "material", "colour", "price", "cost", "currency", "status", "photos", "collections", "flaws", "source", "acquired", "lot", "days_listed", "measurements"],
+   ["sku", "title", "brand", "category", "size", "condition", "condition_note", "era", "material", "colour", "price", "cost", "currency", "status", "photos", "collections", "flaws", "days_listed", "measurements"],
    rows,
   ));
  }
@@ -793,7 +769,6 @@ export default function ItemsPage() {
  <div className="relative">
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={bulkReprice}>Reprice</TechButton>
  <TechButton variant={missingTag === "cost" ? "primary" : "secondary"} className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => { setBulkErr(null); setCostOpen(true); }}>Set cost</TechButton>
- <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => { setBulkErr(null); setLotOpen(true); }}>Set source / lot</TechButton>
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => setBulkColOpen((o) => !o)}>Add to collection ▾</TechButton>
  {bulkColOpen && (
  <div className="absolute right-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-stone-200 bg-white p-2.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]">
@@ -1113,13 +1088,6 @@ export default function ItemsPage() {
  })()}
  </Field>
  </div>
- <div className="grid grid-cols-2 gap-3">
- <Field label="Where it came from">
- <Input value={editForm.sourceName} onChange={(e) => setEditForm((f) => ({ ...f, sourceName: e.target.value }))} placeholder="Kempton, Ana’s estate, eBay…" list="source-names" />
- <datalist id="source-names">{sourceNames.map((n) => <option key={n} value={n} />)}</datalist>
- </Field>
- <Field label="Acquired on"><Input type="date" value={editForm.acquiredAt} onChange={(e) => setEditForm((f) => ({ ...f, acquiredAt: e.target.value }))} /></Field>
- </div>
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>
@@ -1223,29 +1191,6 @@ export default function ItemsPage() {
  </div>
  <p className="text-[11.5px] text-stone-400">Shoppers see “On hold” instead of Buy. It goes back on sale by itself when the time is up.</p>
  {holdErr && <p className="text-[12px] text-rose-600">{holdErr}</p>}
- </div>
- }
- />
- <ConfirmDialog
- open={lotOpen}
- title={`Set source for ${selected.size} ${selected.size === 1 ? "piece" : "pieces"}`}
- tone="primary"
- confirmLabel={bulkBusy ? "Saving…" : "Save"}
- busy={bulkBusy}
- onCancel={() => setLotOpen(false)}
- onConfirm={bulkLot}
- body={
- <div className="space-y-3 text-left" data-testid="lot-dialog">
- <Field label="Where these came from">
- <Input value={lotForm.sourceName} onChange={(e) => setLotForm((f) => ({ ...f, sourceName: e.target.value }))} placeholder="Kempton, Ana’s estate, eBay…" list="source-names-bulk" />
- <datalist id="source-names-bulk">{sourceNames.map((n) => <option key={n} value={n} />)}</datalist>
- </Field>
- <Field label="Acquired on"><Input type="date" value={lotForm.acquiredAt} onChange={(e) => setLotForm((f) => ({ ...f, acquiredAt: e.target.value }))} /></Field>
- <Field label="The lot cost, in total (USD)">
- <Input type="number" inputMode="decimal" value={lotForm.lotCost} onChange={(e) => setLotForm((f) => ({ ...f, lotCost: e.target.value }))} placeholder="optional — split across the pieces by price" />
- </Field>
- <p className="text-[11.5px] text-stone-400">The lot cost is split in proportion to each piece’s price (equally where a price is missing), to the penny.</p>
- {bulkErr && <p className="text-[12px] text-rose-600">{bulkErr}</p>}
  </div>
  }
  />

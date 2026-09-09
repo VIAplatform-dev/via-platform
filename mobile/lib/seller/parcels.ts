@@ -92,7 +92,9 @@ export function parcelsToCollect<T extends ParcelOrder>(parcels: Parcel<T>[]): P
   return parcels.filter((p) => p.status === "paid" && p.deliveryMethod === "pickup");
 }
 
+// "Packages", not "parcels" — the seller reading this is American and said so. The unit is
+// unchanged: one bag for one buyer, however many pieces are in it.
 export function parcelsToPostLabel(count: number): string {
-  if (count === 0) return "Nothing to post";
-  return `${count} ${count === 1 ? "parcel" : "parcels"} to post`;
+  if (count === 0) return "Nothing to ship";
+  return `${count} ${count === 1 ? "package" : "packages"} to ship`;
 }

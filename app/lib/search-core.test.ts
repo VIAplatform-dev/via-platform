@@ -4,9 +4,9 @@ import { itemSearchText, itemStatusWord } from "./search-core.ts";
 
 const base = { sku: 12, title: "Fendi baguette", brand: "Fendi", category: "handbags", size: null, status: "active" };
 
-test("where it came from, its flaws and the condition note are all searchable", () => {
- const text = itemSearchText({ ...base, sourceName: "Kempton", flaws: ["scuffed toe", "light pilling"], conditionNote: "One loose button" });
- for (const q of ["kempton", "scuffed toe", "pilling", "loose button", "sku-1012", "fendi", "handbags"]) assert.ok(text.includes(q), q);
+test("its flaws and the condition note are all searchable", () => {
+ const text = itemSearchText({ ...base, flaws: ["scuffed toe", "light pilling"], conditionNote: "One loose button" });
+ for (const q of ["scuffed toe", "pilling", "loose button", "sku-1012", "fendi", "handbags"]) assert.ok(text.includes(q), q);
 });
 
 test("a missing or malformed flaws list never breaks the haystack", () => {

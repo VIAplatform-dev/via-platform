@@ -90,8 +90,6 @@ export type MarginMetrics = {
  vsPrior: { profitPct: number | null; marginPct: number | null } | null;
  byBrand: MarginRow[];
  byCategory: MarginRow[];
- /** Profit by where the pieces came from (items.source_name); pieces with none sit under "Unknown". */
- bySource: MarginRow[];
  bestMargin: MarginItem[];
  worstMargin: MarginItem[];
  /** Live listings with no cost recorded — what to fill in to widen coverage. */
@@ -120,7 +118,7 @@ const ZERO: MarginTotals = {
 
 const EMPTY: MarginMetrics = {
  available: false, current: ZERO, prior: null, vsPrior: null,
- byBrand: [], byCategory: [], bySource: [], bestMargin: [], worstMargin: [],
+ byBrand: [], byCategory: [], bestMargin: [], worstMargin: [],
  activeWithoutCost: 0, activeTotal: 0, inventoryCostCents: 0,
  operating: {
   totalCents: 0, byCategory: [], priorTotalCents: null,
@@ -216,7 +214,7 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
   await ensureAnalyticsViews();
   const sql = sqlRows();
 
-  const [cur, pri, brandRows, catRows, sourceRows, itemRows, activeRows, opex, salesByDay, priorOpex] = await Promise.all([
+  const [cur, pri, brandRows, catRows, itemRows, activeRows, opex, salesByDay, priorOpex] = await Promise.all([
    totalsFor(sellerId, current),
    prior ? totalsFor(sellerId, prior) : Promise.resolve(null),
    sql`
@@ -237,17 +235,6 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
      AND s.sold_at >= ${current.startISO} AND s.sold_at < ${current.endISO}
     GROUP BY 1 ORDER BY (COALESCE(SUM(s.amount_cents), 0) - COALESCE(SUM(i.cost_cents), 0)) DESC LIMIT 8
    `,
-   // Which buying trips pay: the same costed slice, grouped by where she said the piece came from.
-   // Tolerant of a database that predates the column, so the rest of the page still renders.
-   sql`
-    SELECT COALESCE(NULLIF(i.source_name, ''), 'Unknown') AS name, COUNT(*)::int AS sales,
-     COALESCE(SUM(s.amount_cents), 0)::bigint AS revenue_cents,
-     COALESCE(SUM(i.cost_cents), 0)::bigint AS cost_cents
-    FROM vya_store_sales s JOIN items i ON i.id = s.item_id
-    WHERE s.seller_id = ${sellerId}::uuid AND i.cost_cents > 0
-     AND s.sold_at >= ${current.startISO} AND s.sold_at < ${current.endISO}
-    GROUP BY 1 ORDER BY (COALESCE(SUM(s.amount_cents), 0) - COALESCE(SUM(i.cost_cents), 0)) DESC LIMIT 12
-   `.catch(() => [] as Row[]),
    sql`
     SELECT i.id AS item_id, i.title, i.images, s.amount_cents AS price_cents, i.cost_cents, s.sold_at
     FROM vya_store_sales s JOIN items i ON i.id = s.item_id
@@ -325,7 +312,6 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
    } : null,
    byBrand: rowsFrom(brandRows),
    byCategory: rowsFrom(catRows),
-   bySource: rowsFrom(sourceRows),
    bestMargin: byProfit.slice(0, 8),
    // The tail, worst first — pieces that lost money or barely broke even. Excludes
    // anything already shown as a best seller, so a short list can't print twice.

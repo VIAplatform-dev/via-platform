@@ -33,8 +33,6 @@ type Item = {
   category?: string | null;
   measurementsJson?: Measurement[] | null;
   flaws?: string[] | null;
-  sourceName?: string | null;
-  acquiredAt?: string | null;
   createdAt?: string;
   views?: number;
   favorites?: number;
@@ -42,7 +40,7 @@ type Item = {
 
 type Hold = { itemId: string; name: string; expiresAt: string };
 
-type FieldKey = "title" | "price" | "cost" | "brand" | "size" | "condition" | "conditionNote" | "flaws" | "sourceName" | "acquiredAt";
+type FieldKey = "title" | "price" | "cost" | "brand" | "size" | "condition" | "conditionNote" | "flaws";
 const FIELDS: { key: FieldKey; label: string; numeric?: boolean; placeholder?: string }[] = [
   { key: "title", label: "Title" },
   { key: "price", label: "Price", numeric: true },
@@ -53,11 +51,9 @@ const FIELDS: { key: FieldKey; label: string; numeric?: boolean; placeholder?: s
   { key: "condition", label: "Condition" },
   // Beyond the grade — her words on the wear, the same note Review and the web editor take.
   { key: "conditionNote", label: "Condition note", placeholder: "light wear to the sole, tiny mark inside…" },
-  // The same three the web editor has, in the same words. Flaws are typed as one comma-separated
-  // line, like Review, and stored as the list the product page prints under Condition.
+  // As the web editor has it. Flaws are typed as one comma-separated line, like Review, and stored
+  // as the list the product page prints under Condition.
   { key: "flaws", label: "Flaws", placeholder: "scuffed toe, light pilling — comma-separated" },
-  { key: "sourceName", label: "Where it came from", placeholder: "Kempton, Ana’s estate…" },
-  { key: "acquiredAt", label: "Acquired on", placeholder: "YYYY-MM-DD" },
 ];
 
 function Button({ label, onPress, disabled, primary }: { label: string; onPress?: () => void; disabled?: boolean; primary?: boolean }) {
@@ -129,7 +125,6 @@ export default function PieceScreen() {
         // Cost may be cleared: an empty box means "I don't know", which the route stores as null.
         else if (f.key === "cost") { const t = v.replace(/[^0-9.]/g, ""); const n = Number(t); body.cost = t === "" ? null : (Number.isFinite(n) && n >= 0 ? n : undefined); if (body.cost === undefined) delete body.cost; }
         else if (f.key === "flaws") body.flaws = flawsFromLine(v);
-        else if (f.key === "acquiredAt") body.acquiredAt = v.trim() || null;
         else body[f.key] = v;
       }
       // The template's numbers as the list the route stores (empties omitted), only once touched.
@@ -173,7 +168,6 @@ export default function PieceScreen() {
     key === "price" ? String(item.priceCents / 100)
     : key === "cost" ? (item.costCents == null ? "" : String(item.costCents / 100))
     : key === "flaws" ? flawsToLine(Array.isArray(item.flaws) ? item.flaws.filter(Boolean) : [])
-    : key === "acquiredAt" ? String(item.acquiredAt ?? "").slice(0, 10)
     : String((item as unknown as Record<string, unknown>)[key] ?? ""));
   const flaws = Array.isArray(item.flaws) ? item.flaws.filter(Boolean) : [];
   // Measurements: the category's template, the stored numbers as its strings until she edits them.
@@ -222,7 +216,7 @@ export default function PieceScreen() {
               <TextInput
                 value={current(f.key)}
                 onChangeText={(v) => setForm({ ...form, [f.key]: v })}
-                keyboardType={f.numeric ? "decimal-pad" : f.key === "acquiredAt" ? "numbers-and-punctuation" : "default"}
+                keyboardType={f.numeric ? "decimal-pad" : "default"}
                 placeholder={f.placeholder}
                 placeholderTextColor={colors.textDim}
                 style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}
@@ -341,12 +335,6 @@ export default function PieceScreen() {
           <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700" }}>MEASUREMENTS</Text>
           <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{storedMeasurementsLine}</Text>
         </View>
-      ) : null}
-      {/* Where it came from and when — hers, never shown to shoppers. */}
-      {(item.sourceName || item.acquiredAt) && mode === "view" ? (
-        <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.lg }}>
-          {[item.sourceName ? `From ${item.sourceName}` : null, item.acquiredAt ? `acquired ${String(item.acquiredAt).slice(0, 10)}` : null].filter(Boolean).join(" · ")}
-        </Text>
       ) : null}
     </SellerScreen>
   );

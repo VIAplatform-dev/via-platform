@@ -1318,12 +1318,12 @@ function Analytics() {
           <Kpi label="Stock at cost" value={money(margin.inventoryCostCents)} hint="unsold, at what you paid" />
          </div>
 
-         {(["byBrand", "byCategory", "bySource"] as const).filter((key) => key !== "bySource" || (margin.bySource ?? []).length > 0).map((key) => (
-          <TechCard key={key} className="p-5" data-testid={key === "bySource" ? "profit-by-source" : undefined}>
-           <CardTitle hint={key === "bySource" ? "where each piece came from — which buying trips pay" : "ranked by profit, not revenue"}>{key === "byBrand" ? "Profit by brand" : key === "byCategory" ? "Profit by category" : "Profit by source"}</CardTitle>
+         {(["byBrand", "byCategory"] as const).map((key) => (
+          <TechCard key={key} className="p-5">
+           <CardTitle hint="ranked by profit, not revenue">{key === "byBrand" ? "Profit by brand" : "Profit by category"}</CardTitle>
            <div className="overflow-x-auto">
             <table className="w-full">
-             <thead><tr><TH>{key === "byBrand" ? "Brand" : key === "byCategory" ? "Category" : "Source"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
+             <thead><tr><TH>{key === "byBrand" ? "Brand" : "Category"}</TH><TH right>Sales</TH><TH right>Revenue</TH><TH right>Cost</TH><TH right>Profit</TH><TH right>Margin</TH></tr></thead>
              <tbody>
               {(margin[key] ?? []).map((r) => (
                <tr key={r.name}>

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { listSellerItems, deleteAllItems, publishItems, removeItems, applyLot, priceWeights } from "@/app/lib/db/inventory";
+import { listSellerItems, deleteAllItems, publishItems, removeItems, setItemCosts, priceWeights } from "@/app/lib/db/inventory";
 import { getCollectionTitlesForItems, addItemsToCollection, deleteAllCollections } from "@/app/lib/db/collections";
-import { splitLotCost, newLotId, parseAcquiredAt } from "@/app/lib/lot-core";
+import { splitCostAcross } from "@/app/lib/cost-split";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { publishRefusal } from "@/app/lib/setup-gate-core";
 
@@ -23,14 +23,16 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, items: withCols, isAdmin: isOwner(request, slug) });
 }
 
-// POST { action: "publish" | "remove" | "addToCollection" | "lot" | "cost", ids: string[] } — bulk
+// POST { action: "publish" | "remove" | "addToCollection" | "cost", ids: string[] } — bulk
 // action on the acting store's items, e.g. push a whole drop of drafts live at once. Scoped to the
 // seller, so passing another store's ids is a no-op.
 //
-//   lot  { sourceName?, acquiredAt?, lotCostCents? } — where the batch came from and when, written to
-//        every piece; the lot cost split across them in proportion to their prices (equal when a
-//        price is missing), remainder pennies to the first. The batch gets one lot id.
-//   cost { eachCents } | { totalCents } — fill in cost: the same on every piece, or a total split.
+//   cost { eachCents } | { totalCents } — fill in cost: the same on every piece, or a total split
+//        across them in proportion to their prices (equal when a price is missing), remainder
+//        pennies to the first.
+//
+// The "lot" action — a batch's source name, acquired date and lot id — was removed with the
+// sourcing fields. Dividing what a batch cost survives it, as `cost`.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,20 +57,6 @@ export async function POST(request: NextRequest) {
  if (!title) return NextResponse.json({ error: "Collection name required" }, { status: 400 });
  const col = await addItemsToCollection(seller.id, title, ids);
  return NextResponse.json({ ok: true, count: ids.length, collection: { id: col.id, title: col.title } });
- } else if (action === "lot") {
- const sourceName = body?.sourceName === undefined ? undefined : (String(body.sourceName ?? "").trim().slice(0, 80) || null);
- const acquiredAt = body?.acquiredAt === undefined ? undefined : parseAcquiredAt(body.acquiredAt);
- if (body?.acquiredAt && acquiredAt === null) return NextResponse.json({ error: "That date didn't make sense — use YYYY-MM-DD." }, { status: 400 });
- const lotCost = body?.lotCostCents == null || body.lotCostCents === "" ? null : Math.round(Number(body.lotCostCents));
- if (lotCost != null && !(Number.isFinite(lotCost) && lotCost >= 0)) return NextResponse.json({ error: "Enter what the lot cost." }, { status: 400 });
- if (sourceName === undefined && acquiredAt === undefined && lotCost == null) return NextResponse.json({ error: "Nothing to set" }, { status: 400 });
- // Split by price where every piece has one, so the coat carries more of the lot than the scarf.
- const weights = lotCost != null ? await priceWeights(seller.id, ids) : {};
- const owned = lotCost != null ? ids.filter((id: string) => id in weights) : ids;
- const costs = lotCost != null ? splitLotCost(lotCost, owned, weights) : undefined;
- const lotId = newLotId();
- count = await applyLot(seller.id, owned, { sourceName, acquiredAt, lotId, costs });
- return NextResponse.json({ ok: true, count, lotId, costs: costs ?? null });
  } else if (action === "cost") {
  const each = body?.eachCents == null || body.eachCents === "" ? null : Math.round(Number(body.eachCents));
  const total = body?.totalCents == null || body.totalCents === "" ? null : Math.round(Number(body.totalCents));
@@ -76,8 +64,8 @@ export async function POST(request: NextRequest) {
  if ((each != null && !(Number.isFinite(each) && each >= 0)) || (total != null && !(Number.isFinite(total) && total >= 0))) return NextResponse.json({ error: "Enter a cost." }, { status: 400 });
  const weights = await priceWeights(seller.id, ids);
  const owned = ids.filter((id: string) => id in weights);
- const costs = each != null ? Object.fromEntries(owned.map((id: string) => [id, each])) : splitLotCost(total as number, owned, weights);
- count = await applyLot(seller.id, owned, { costs });
+ const costs = each != null ? Object.fromEntries(owned.map((id: string) => [id, each])) : splitCostAcross(total as number, owned, weights);
+ count = await setItemCosts(seller.id, owned, costs);
  return NextResponse.json({ ok: true, count, costs });
  } else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 

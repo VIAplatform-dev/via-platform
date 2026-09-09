@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, Footprints, type LucideIcon } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, type LucideIcon } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
 import CommandBar from "./CommandBar";
 import { loginHref } from "@/app/store/auth-route";
@@ -14,7 +14,7 @@ import { B, M, MARKET_GROUPS, MARKET_TABS, visibleNavGroups } from "./nav";
 // What the sidebar contains lives in ./nav.ts as data (and is tested there); this file only knows
 // how to draw it. Icons arrive as names so that file stays loadable without React.
 const ICONS: Record<string, LucideIcon> = {
- Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, Footprints,
+ Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock,
 };
 
 function withPreview(path: string): string {

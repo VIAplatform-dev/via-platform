@@ -3,7 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorePlan } from "@/app/lib/store-plans-db";
 import {
  TIERS, TRIAL_DAYS, ANNUAL_DISCOUNT_PCT, plansConfigured,
- priceIdFor, featuresForTier, FEATURE_LABELS, type Interval,
+ priceIdFor, featuresForTier, addedFeaturesForTier, FEATURE_LABELS, type Interval,
 } from "@/app/lib/plans";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +48,9 @@ export async function GET(request: NextRequest) {
    priced: !!(priceIdFor(t.id, "month") || priceIdFor(t.id, "year")),
    price, // { month:{amount,currency}|null, year:{...}|null } — amount in cents
    features: featuresForTier(t.id).map((f) => FEATURE_LABELS[f]),
+   // The subset of `features` this tier introduces, so the cards can mark what upgrading buys.
+   // Sent alongside rather than reshaping `features` into objects — that field is public API.
+   newFeatures: addedFeaturesForTier(t.id).map((f) => FEATURE_LABELS[f]),
   };
  }),
  );

@@ -845,6 +845,13 @@ export async function sendStoreCampaign(opts: {
  link?: string;
  recipients: string[];
  brand?: EmailBrand;
+ /**
+  * Build the HTML for one recipient. Campaigns written in the composer pass this, so the email that
+  * sends is the one the seller laid out — the design, the pieces, the code, the link row. Without it
+  * this falls back to the plain headline-and-link build, which is all the older callers (the
+  * assistant, automations) ever had.
+  */
+ renderHtml?: (unsubscribeUrl: string) => string;
 }): Promise<{ sent: number; failed: number }> {
  const resend = getResend();
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
@@ -861,7 +868,7 @@ export async function sendStoreCampaign(opts: {
  const unsubscribeUrl = `${BASE_URL}/api/storefront/unsubscribe?t=${signUnsubToken(opts.storeSlug, to)}`;
  return {
  from, to, replyTo: opts.storeEmail, subject: opts.subject,
- html: campaignEmailHtml({ storeName: cleanName, body: opts.body, link: opts.link, brand: opts.brand, unsubscribeUrl }),
+ html: opts.renderHtml ? opts.renderHtml(unsubscribeUrl) : campaignEmailHtml({ storeName: cleanName, body: opts.body, link: opts.link, brand: opts.brand, unsubscribeUrl }),
  headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
  };
  }));

@@ -7,7 +7,7 @@ import { Check } from "lucide-react";
 type Price = { amount: number; currency: string } | null;
 type TierCard = {
  id: string; name: string; tagline: string; order: number; priced: boolean;
- price: { month: Price; year: Price }; features: string[];
+ price: { month: Price; year: Price }; features: string[]; newFeatures?: string[];
 };
 type Billing = {
  configured: boolean; trialDays: number; annualDiscountPct: number;
@@ -124,12 +124,19 @@ export default function BillingPage() {
  </div>
  {p && interval === "year" && <p className="mt-0.5 text-[11.5px] text-stone-400">≈ {money(Math.round(p.amount / 12), p.currency)}/mo, billed annually</p>}
 
+ {/* What this tier ADDS over the one below is bold; everything it inherits stays quiet. The plans
+     are cumulative, so without this the cards are the same list three times and the only way to
+     find the difference is to read all three in parallel. The entry plan marks nothing — it has no
+     tier below it, and bolding all of it would emphasise everything and distinguish nothing. */}
  <div className="mt-4 flex-1 space-y-2">
- {t.features.map((f) => (
- <div key={f} className="flex items-start gap-2 text-[12.5px] text-stone-600">
+ {t.features.map((f) => {
+ const isNew = t.newFeatures?.includes(f) ?? false;
+ return (
+ <div key={f} className={`flex items-start gap-2 text-[12.5px] ${isNew ? "font-semibold text-stone-900" : "text-stone-600"}`}>
  <Check size={14} className="mt-0.5 shrink-0 text-[var(--accent,#0e9f76)]" /> <span>{f}</span>
  </div>
- ))}
+ );
+ })}
  </div>
 
  <div className="mt-5">

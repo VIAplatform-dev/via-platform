@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Send, Check, AlertCircle } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, cn } from "../../../ui";
@@ -57,6 +57,7 @@ function Compose() {
  const [showPrices, setShowPrices] = useState(true);
 
  const [html, setHtml] = useState("");
+ const [senderName, setSenderName] = useState("");
  const [count, setCount] = useState(0);
  // Who it goes to: everyone, or a tag / spent-over / bought-in slice. Resolved by the SAME filter the
  // Customers page runs, and the count comes from the server so the button says what will send.
@@ -110,27 +111,41 @@ function Compose() {
   if (audience.tags?.length) qs.set("tag", audience.tags.join(","));
   if (audience.spentOverCents != null) qs.set("spentOver", String(audience.spentOverCents / 100));
   if (audience.category) qs.set("category", audience.category);
+  if (audience.notOrderedInDays != null) qs.set("notOrderedInDays", String(audience.notOrderedInDays));
   fetch(`/api/store/campaign${qs.toString() ? `?${qs}` : ""}`).then((r) => (r.ok ? r.json() : null))
    .then((d) => setCount(d?.recipientCount ?? 0)).catch(() => {});
  }, [audience]);
+
+ // The layout, in ONE place. The preview posts it and the send posts it, and they were separate
+ // object literals before — which is how the send quietly stopped carrying the design at all while
+ // the preview kept showing it. One object, so they cannot drift again; and because the memo lists
+ // every field, a control left out of it is a control that visibly does nothing rather than one
+ // that works on screen and not in the inbox. (Background and Show prices were both missing.)
+ const layout = useMemo(
+  () => ({ design, headline, subhead, ctaLabel, link, pieceCount, itemIds, eyebrow, preheader, productsHeading, code, links, ground, showPrices }),
+  [design, headline, subhead, ctaLabel, link, pieceCount, itemIds, eyebrow, preheader, productsHeading, code, links, ground, showPrices],
+ );
 
  // Re-render as you type, but not on every keystroke — this hits the server.
  const render = useCallback(() => {
   fetch("/api/store/campaign/render", {
    method: "POST", headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ design, headline, subhead, ctaLabel, link, pieceCount, eyebrow, preheader, productsHeading, code, links, itemIds, ground, showPrices }),
-  }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.html) setHtml(d.html); }).catch(() => {});
- }, [design, headline, subhead, ctaLabel, link, pieceCount, eyebrow, preheader, productsHeading, code, links, itemIds]);
+   body: JSON.stringify(layout),
+  }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.html) setHtml(d.html); if (d?.storeName) setSenderName(d.storeName); }).catch(() => {});
+ }, [layout]);
 
  useEffect(() => { const t = setTimeout(render, 250); return () => clearTimeout(t); }, [render]);
 
  async function send(test: boolean) {
   setSending(true); setNote(null);
-  // The body the sender expects: first line is the headline, the rest sits under it.
+  // The body the sender expects: first line is the headline, the rest sits under it. It is only the
+  // plain-text fallback now — `design` is what actually renders, and it has to be the SAME set of
+  // fields the preview posts to /render, or the test lands in her inbox looking like a different
+  // email than the one on screen. That is exactly what used to happen.
   const body = [headline, subhead].filter(Boolean).join("\n");
   const r = await fetch("/api/store/campaign", {
    method: "POST", headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ subject, body, link, test, audience, scheduledAt: !test && sendAt ? new Date(sendAt).toISOString() : undefined }),
+   body: JSON.stringify({ subject, body, link, test, audience, design: layout, scheduledAt: !test && sendAt ? new Date(sendAt).toISOString() : undefined }),
   }).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
   setSending(false);
   setNote(r?.ok
@@ -183,7 +198,7 @@ function Compose() {
      <TechCard className="flex flex-col gap-3 p-5" data-testid="audience-picker">
       <Field label="Who gets it" hint={`${describeAudience(audience)} · ${count.toLocaleString()} ${count === 1 ? "person" : "people"}`}>
        <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" onClick={() => { setAudience({ tags: [], spentOverCents: null, category: null }); setSpentOverText(""); }}
+        <button type="button" onClick={() => { setAudience({ tags: [], spentOverCents: null, category: null, notOrderedInDays: null }); setSpentOverText(""); }}
          className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", audienceIsEmpty(audience) ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>Everyone</button>
         {choices.tags.map(({ tag, count: n }) => {
          const on = (audience.tags || []).includes(tag);
@@ -200,6 +215,23 @@ function Compose() {
         <input type="number" inputMode="decimal" min={0} value={spentOverText} placeholder="0" aria-label="Spent over"
          onChange={(e) => { const t = e.target.value; setSpentOverText(t); const n = Number(t); setAudience((a) => ({ ...a, spentOverCents: t.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null })); }}
          className={cn(input, "w-24")} />
+       </label>
+       {/* Win-back. Preset spans rather than a free number: "haven't shopped in a while" is a rough
+           idea in a seller's head, and three sensible spans get her there without inventing one. */}
+       <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+        <span className="whitespace-nowrap">Haven&apos;t shopped in</span>
+        <select
+         value={audience.notOrderedInDays ?? ""}
+         onChange={(e) => setAudience((a) => ({ ...a, notOrderedInDays: e.target.value ? Number(e.target.value) : null }))}
+         aria-label="Haven't shopped in"
+         className={cn(input, "w-auto")}
+        >
+         <option value="">any time</option>
+         <option value="30">over a month</option>
+         <option value="90">over 3 months</option>
+         <option value="180">over 6 months</option>
+         <option value="365">over a year</option>
+        </select>
        </label>
        {choices.categories.length > 0 && (
         <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
@@ -293,7 +325,21 @@ function Compose() {
      <TechCard className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-2.5">
        <p className="text-[12px] text-stone-500">Preview</p>
-       <p className="ml-auto truncate text-[12px] text-stone-400">{subject || "No subject yet"}</p>
+      </div>
+      {/* The inbox line, before the email itself. Subject and preview text are written in two boxes
+          far apart in the form and read as ONE line in a real inbox — the only place you can see
+          whether they repeat each other, or whether the preview text is cut off, is here. Left
+          blank, an inbox falls back to the first words of the email, which is a line wasted saying
+          the shop's name twice. */}
+      <div className="border-b border-stone-100 bg-stone-50/60 px-4 py-3">
+       <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.12em] text-stone-400">In their inbox</p>
+       <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
+        <p className="truncate text-[12.5px] font-semibold text-stone-900">{senderName || "Your shop"}</p>
+        <p className="truncate text-[12.5px] text-stone-800">{subject || "No subject yet"}</p>
+        <p className="truncate text-[12px] text-stone-400">
+         {preheader.trim() || `${senderName || "Your shop"} — add a preview line so this isn’t wasted`}
+        </p>
+       </div>
       </div>
       <iframe srcDoc={html} title="Email preview" sandbox="" className="h-[620px] w-full border-0 bg-white" />
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 bg-stone-50/60 px-4 py-3">
