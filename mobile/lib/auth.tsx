@@ -88,13 +88,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (r.token && r.user) await applyToken(r.token, r.user);
   }, [applyToken]);
 
+  // BOTH sign-in paths must set storeSlug, not just the launch check above. It is what the app
+  // routes a seller on, so leaving it null here would land a store owner in the shopper tabs and
+  // only correct itself when they next relaunch.
   const verifyMagicLink = useCallback(async (linkToken: string) => {
-    const r = await apiPost<{ token: string; user: User }>("/api/mobile/auth/magic-link/verify", { token: linkToken });
+    const r = await apiPost<{ token: string; user: User; storeSlug?: string | null }>("/api/mobile/auth/magic-link/verify", { token: linkToken });
+    setStoreSlug(r.storeSlug ?? null);
     await applyToken(r.token, r.user);
   }, [applyToken]);
 
   const signInWithGoogle = useCallback(async (idToken: string) => {
-    const r = await apiPost<{ token: string; user: User }>("/api/mobile/auth/google", { idToken });
+    const r = await apiPost<{ token: string; user: User; storeSlug?: string | null }>("/api/mobile/auth/google", { idToken });
+    setStoreSlug(r.storeSlug ?? null);
     await applyToken(r.token, r.user);
   }, [applyToken]);
 

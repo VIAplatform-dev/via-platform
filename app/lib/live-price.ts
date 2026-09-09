@@ -59,19 +59,105 @@ function format(cents: number, currency: string | null, decimals: number, showCo
  return showCode ? `${out} ${code}` : out;
 }
 
+// ── Deriving the price slot, instead of recognising it ───────────────────────────────────────────
+//
+// Everything above finds the price by NAME, from PRICE_HOST — a list that has grown after every
+// theme that broke it, and will grow again. There is no end to it: a theme is arbitrary markup, and
+// a shop owner can rename any of it. The list already missed the one element holding the money on a
+// newer Shopify theme, and feathers served a dress at $200 that the cart charged $125 for.
+//
+// So ask a different question. At the moment we capture a product page we ALREADY KNOW what the
+// piece costs — the same import that stored the page read the price from the seller's own feed. The
+// element whose text is that amount is the price slot, whatever it calls itself. Mark it once, at
+// capture; from then on the rewrite lands on the mark and no name is involved.
+//
+// The same trick as derive-cart-template.ts, and for the same stated reason: put in something you
+// know the answer to, and let the theme show you its own layout.
+//
+// Marking is additive. A page captured before this existed carries no marks and keeps using
+// PRICE_HOST exactly as before.
+
+/** Money text → cents, or null if it isn't a plain amount.
+ *
+ *  Handles both separator conventions by deciding from the string itself: a `.` or `,` followed by
+ *  exactly two digits at the END is the decimal point, and every other separator is grouping. So
+ *  "$2,295.00" and "€2.295,00" both read as 229500, without needing to know the locale. */
+function parseMoneyCents(text: string): number | null {
+ const t = text.trim();
+ if (!WHOLE_MONEY.test(t) || !/\d/.test(t)) return null;
+ const digits = t.replace(/[^\d.,]/g, "");
+ if (!digits) return null;
+ const dec = /[.,](\d{2})$/.exec(digits);
+ const whole = (dec ? digits.slice(0, -3) : digits).replace(/[.,]/g, "");
+ if (!/^\d+$/.test(whole)) return null;
+ return Number(whole) * 100 + (dec ? Number(dec[1]) : 0);
+}
+
+/** The 3-letter currency code the text states, if it states one. */
+function statedCurrency(text: string): string | null {
+ return /(?:^|[^A-Z])([A-Z]{3})(?:[^A-Z]|$)/.exec(text.trim())?.[1] ?? null;
+}
+
+/**
+ * Mark the elements that hold this piece's price, by matching the amount we already know.
+ *
+ * Call at CAPTURE time, while the stored page and the item record still agree — that agreement is
+ * the answer key. `data-vya-price` is the live price; `data-vya-was` is the seller's markdown, told
+ * apart by its value rather than by which tag a theme happened to use for it.
+ *
+ * Marks nothing when nothing matches, which leaves the selector path to do its job rather than
+ * asserting something we did not actually find.
+ */
+export function markPriceSlots(html: string, item: PricedItem): string {
+ if (item.priceCents == null) return html;
+ const $ = cheerio.load(html);
+ const want = new Map<number, string>([[item.priceCents, "data-vya-price"]]);
+ if (item.compareAtCents != null && item.compareAtCents !== item.priceCents) want.set(item.compareAtCents, "data-vya-was");
+
+ for (const el of $("*").toArray() as DomElement[]) {
+  const tag = (el.tagName || "").toLowerCase();
+  // Nothing a shopper reads lives in these, and a price inside one is a coincidence.
+  if (tag === "script" || tag === "style" || tag === "noscript" || tag === "template" || tag === "meta" || tag === "title") continue;
+  const $el = $(el);
+  if ($el.attr("data-vya-price") != null || $el.attr("data-vya-was") != null) continue; // already marked
+  for (const node of ($el.contents().toArray() as { type?: string; data?: string }[])) {
+   if (node.type !== "text" || !node.data) continue;
+   const cents = parseMoneyCents(node.data);
+   if (cents == null) continue;
+   const attr = want.get(cents);
+   if (!attr) continue;
+   // An explicit code that contradicts the record is a different currency, not this price. Same
+   // digits under the wrong symbol is precisely the blummier failure, not a match.
+   const stated = statedCurrency(node.data);
+   if (stated && item.currency && stated !== item.currency.toUpperCase()) continue;
+   $el.attr(attr, "1");
+   break;
+  }
+ }
+ return $.html();
+}
+
 export function applyLivePrice(html: string, item: PricedItem): string {
  // No price on the record is not the same as a price of zero. Say nothing rather than something
  // false — the seller's own page is a better answer than "£0.00".
  if (item.priceCents == null) return html;
  const $ = cheerio.load(html);
 
- $(NOT_OURS_TO_CLAIM).filter((_: number, el: DomElement) => {
+ // A page marked at capture (see markPriceSlots) states which element is ITS price. Believe it, and
+ // touch nothing else: the selector sweep rewrites every money-bearing price element on the page,
+ // which on a theme that renders a recommendations strip overwrites the neighbouring pieces' prices
+ // with this one's. A marked page cannot make that mistake.
+ const marked = $("[data-vya-price]");
+ const hosts = marked.length ? marked : $(PRICE_HOST);
+
+ $(marked.length ? "[data-vya-was]" : NOT_OURS_TO_CLAIM).filter((_: number, el: DomElement) => {
+  if (marked.length) return true; // marked by value at capture — no context test needed
   // Only inside a price context: a theme's <s> in its copy is not a compare-at price.
   return $(el).is(PRICE_HOST) || $(el).parents(PRICE_HOST).length > 0;
  }).remove();
 
  let rewrote = false;
- for (const el of $(PRICE_HOST).toArray() as DomElement[]) {
+ for (const el of hosts.toArray() as DomElement[]) {
   // Direct text children only. A wrapper's descendants include the title; the element that actually
   // holds the money is the one whose own text node IS the money.
   for (const node of ($(el).contents().toArray() as { type?: string; data?: string }[])) {

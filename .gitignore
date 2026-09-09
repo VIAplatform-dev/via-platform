@@ -48,6 +48,7 @@ next-env.d.ts
 
 # local-only docs / editor config — never push
 /SECURITY_AUDIT_2026-08.md
+/docs/audit/
 /docs/architecture.md
 /.vscode
 .eval-cache/

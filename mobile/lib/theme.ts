@@ -20,6 +20,19 @@ export const colors = {
   /** The puck behind a heart sitting on a photograph. Grey, not white: most vintage is shot on a
    *  white sweep, and a white chip on a white background is an invisible button. */
   overlayChip: "rgba(120, 100, 100, 0.22)",
+
+  // ── Seller app only ────────────────────────────────────────────────────────────────────────
+  // The shopper app has one ink colour and no second accent. The seller app needs exactly one
+  // more, because it reports numbers that can be good or bad: a rise, a live storefront, a piece
+  // that sold. Burgundy cannot say "up 22%" — it is the colour everything else is already in.
+
+  /** Positive movement only: the ↑ delta, the live dot, "Label sent to you". Never decoration. */
+  positive: "#1F7A5C",
+  /** Ground behind an unselected filter chip and the tiles on Home. */
+  chip: "#EFEAE1",
+  /** Ground behind a SELECTED filter chip — near-black, as the mockups draw "All". */
+  chipActive: "#1A1A1A",
+  chipActiveText: "#FFFFFF",
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };

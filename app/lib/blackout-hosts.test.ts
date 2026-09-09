@@ -62,3 +62,20 @@ test("with no known seller domain, only Shopify's own hosts are blocked", () => 
  assert.equal(blocksAtCancellation("https://cdn.shopify.com/a.jpg", null, "x.vyasites.test"), true);
  assert.equal(blocksAtCancellation("https://someshop.com/a.jpg", null, "x.vyasites.test"), false);
 });
+
+// OUR OWN /cdn/ PROXY IS THE SELLER'S SHOP WEARING OUR HOSTNAME.
+// It fetches the file from her live site at request time, so it dies with her shop — but it is
+// same-origin, so the gate used to wave it through and score the page as surviving.
+test("our /cdn proxy is blocked, because it is a round trip to her shop", () => {
+ assert.equal(block("https://blummier.vyasites.test/cdn/shop/t/11/assets/base.css"), true);
+ assert.equal(block("https://blummier.vyasites.test/cdn/fonts/karla/karla_n4.woff2"), true);
+});
+
+test("everything else on our own host still loads", () => {
+ assert.equal(block("https://blummier.vyasites.test/"), false);
+ assert.equal(block("https://blummier.vyasites.test/collections/all"), false);
+ assert.equal(block("https://blummier.vyasites.test/api/storefront/account/orders"), false);
+ assert.equal(block("https://blummier.vyasites.test/_next/static/chunk.js"), false);
+ // Our re-hosted copies live on Blob, not behind the proxy — they survive and must not be blocked.
+ assert.equal(block("https://q74gqbmcafgdbaxy.public.blob.vercel-storage.com/theme/x/a.js"), false);
+});

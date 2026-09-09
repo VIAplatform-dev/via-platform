@@ -2093,7 +2093,9 @@ export async function sendCollabsLinksStuckAlert(stuckProducts: DBProduct[]): Pr
 
 // One-click Auth.js magic sign-in. callbackUrl = where to land AFTER sign-in (default: the buyer
 // pilot-check flow → home). fallbackPath = where to send them if we can't mint a token (no secret/DB).
-async function createMagicSignInLink(email: string, callbackUrl: string = `/api/pilot-check?next=/`, fallbackPath: string = "/login"): Promise<string> {
+// Exported for the printed-flyer signup, which needs this link handed over directly rather than
+// mailed: the visitor is standing in front of the poster and access has to be immediate.
+export async function createMagicSignInLink(email: string, callbackUrl: string = `/api/pilot-check?next=/`, fallbackPath: string = "/login"): Promise<string> {
  try {
  const secret = process.env.AUTH_SECRET;
  if (!secret) return `${BASE_URL}${fallbackPath}`;

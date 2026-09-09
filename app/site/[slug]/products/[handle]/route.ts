@@ -21,7 +21,7 @@ import { listItemsBySource } from "@/app/lib/db/inventory";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { isStoreHost, storeHostSuffix } from "@/app/lib/plan-b/store-host";
 import { matchItemId } from "@/app/lib/capture-commerce";
-import { applyLivePrice } from "@/app/lib/live-price";
+import { applyLivePrice, markPriceSlots } from "@/app/lib/live-price";
 import { captureStorefrontEntry } from "@/app/lib/store-visits-db";
 import { recordProductView } from "@/app/lib/store-favorites-db";
 
@@ -172,6 +172,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // Add-to-cart is replaced rather than kept beside ours — leaving both produced a page with two Add
  // buttons, one of which quietly did nothing because its JavaScript had not booted.
  html = rewireCommerce(cap.html, buyHref, { keepThemeButtons: false });
+ // Mark this theme's price slot NOW, while the page and the item record still agree — the page was
+ // fetched a moment ago from the same shop the record came from, so the amount is the answer key.
+ // Do it before the page is stored, and every later reprice lands on the mark instead of on a
+ // guess about what this theme calls its price element. See markPriceSlots.
+ const priced = itemId ? await getItem(itemId).catch(() => null) : null;
+ if (priced) html = markPriceSlots(html, { priceCents: priced.priceCents, currency: priced.currency, compareAtCents: priced.compareAtCents });
  await saveCapturePage(slug, path, html, `${origin}${path}`);
  } catch {
  return new Response("Couldn't load that product.", { status: 502, headers: { "Content-Type": "text/plain" } });
@@ -272,7 +278,10 @@ async function serveQuickshopView(slug: string, handle: string, req: NextRequest
    html = rewireCommerce(cap.html, buyHref, { keepThemeButtons: false });
    // A page captured just now is already stale if the piece was repriced after the crawl.
    const fresh = itemId ? await getItem(itemId).catch(() => null) : null;
-   if (fresh) html = applyLivePrice(html, { priceCents: fresh.priceCents, currency: fresh.currency, compareAtCents: fresh.compareAtCents });
+   if (fresh) {
+    html = markPriceSlots(html, { priceCents: fresh.priceCents, currency: fresh.currency, compareAtCents: fresh.compareAtCents });
+    html = applyLivePrice(html, { priceCents: fresh.priceCents, currency: fresh.currency, compareAtCents: fresh.compareAtCents });
+   }
    await saveCapturePage(slug, key, html, sourceUrl);
   } catch {
    return new Response("Couldn't load that product.", { status: 502, headers: { "Content-Type": "text/plain" } });

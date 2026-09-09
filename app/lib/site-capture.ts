@@ -950,20 +950,51 @@ export function rewireCommerce(html: string, buyHref: string | null, opts: Rewir
  // applies that to ours. See the styleFromTheme block in CART_UI. Without it every store got the
  // same black button regardless of its palette.
  const proto = (tag: string, cls: string) => `data-vya-proto="${escAttr(`${tag}|${cls}`)}"`;
- const buttons = (cls: string, tag = "button") => sold
- ? `<a href="#" class="${cls}" ${proto(tag, cls)} style="${base}background:#111;color:#fff;border:1px solid #111;opacity:.4;pointer-events:none;">${escHtml(unavailableLabel(opts.unavailableReason))}</a>`
- : `<a href="#" data-vya-add="${itemId}" class="${cls}" ${proto(tag, cls)} style="${base}background:#111;color:#fff;border:1px solid #111;">Add to cart</a><a href="${buyHref}" class="${cls}" ${proto(tag, cls)} data-vya-secondary="1" style="${base}background:#fff;color:#111;border:1px solid #111;">Buy now</a>`;
+ // THE THEME'S OWN NAME FOR THIS BUTTON, carried across the swap.
+ //
+ // Horizon-family themes register web components that look their children up by a `ref` attribute:
+ // `add-to-cart-component` and `sticky-add-to-cart` both call #updateRefs on connectedCallback and
+ // THROW if `ref="addToCartButton"` is missing. Replacing the button without its ref meant both
+ // components threw on every product page — and every line of their startup after that never ran.
+ //
+ // Nothing looked broken, because our own control handles the click. That is what makes it worth
+ // fixing: a theme's script dying early is how the last round of faults hid (see the /variants
+ // section 404 that took out a whole theme's boot).
+ //
+ // Only the PRIMARY control inherits it. Two elements answering to one ref is its own bug.
+ const refAttr = (ref: string) => (ref ? ` ref="${escAttr(ref)}"` : "");
+ // …AND ITS REF-BEARING CHILDREN, which live INSIDE the button we are throwing away:
+ //
+ //   <button ref="addToCartButton">
+ //     <span class="add-to-cart-text">
+ //       <span ref="quantityDisplay" style="display:none"> (<span ref="quantityNumber">1</span>)</span>
+ //
+ // Replacing the button discards its contents, so `sticky-add-to-cart` lost quantityDisplay and
+ // threw on connect even once the button's own ref was carried across. Keep those subtrees, hidden:
+ // the theme resolves them with querySelector inside itself, which does not care whether they are
+ // painted, and they carry no text a shopper can read.
+ const carryRefs = ($btn: cheerio.Cheerio<DomElement>): string => {
+  const inner = $btn.find("[ref]").toArray() as DomElement[];
+  // Only the OUTERMOST ones: keeping a nested ref as well would duplicate it, and two elements
+  // answering to one ref is the bug this is fixing, in mirror image.
+  const tops = inner.filter((e) => !inner.some((o) => o !== e && $.contains(o, e)));
+  if (!tops.length) return "";
+  return `<span data-vya-theme-refs="1" hidden style="display:none">${tops.map((e) => $.html(e)).join("")}</span>`;
+ };
+ const buttons = (cls: string, tag = "button", ref = "", keep = "") => sold
+ ? `<a href="#" class="${cls}"${refAttr(ref)} ${proto(tag, cls)} style="${base}background:#111;color:#fff;border:1px solid #111;opacity:.4;pointer-events:none;">${escHtml(unavailableLabel(opts.unavailableReason))}${keep}</a>`
+ : `<a href="#" data-vya-add="${itemId}" class="${cls}"${refAttr(ref)} ${proto(tag, cls)} style="${base}background:#111;color:#fff;border:1px solid #111;">Add to cart${keep}</a><a href="${buyHref}" class="${cls}" ${proto(tag, cls)} data-vya-secondary="1" style="${base}background:#fff;color:#111;border:1px solid #111;">Buy now</a>`;
 
  let done = false;
  $('form[action*="/cart"]').each((_: number, el: any) => {
  const $btn = $(el).find('[name="add"], button[type="submit"], .product-form__submit, .add-to-cart, .product__add-to-cart').first();
  const cls = $btn.attr("class") || "";
- if ($btn.length) $btn.replaceWith(buttons(cls, ($btn.get(0) as { tagName?: string } | undefined)?.tagName || "button")); else $(el).append(buttons(cls));
+ if ($btn.length) $btn.replaceWith(buttons(cls, ($btn.get(0) as { tagName?: string } | undefined)?.tagName || "button", $btn.attr("ref") || "", carryRefs($btn))); else $(el).append(buttons(cls));
  $(el).find(".shopify-payment-button").remove();
  $(el).removeAttr("action").attr("onsubmit", "return false");
  done = true;
  });
- if (!done) { const $b = $('button:contains("Add to cart"), button:contains("Add to Cart"), [name="add"]').first(); if ($b.length) $b.replaceWith(buttons($b.attr("class") || "")); }
+ if (!done) { const $b = $('button:contains("Add to cart"), button:contains("Add to Cart"), [name="add"]').first(); if ($b.length) $b.replaceWith(buttons($b.attr("class") || "", "button", $b.attr("ref") || "", carryRefs($b))); }
  return $.html();
 }
 

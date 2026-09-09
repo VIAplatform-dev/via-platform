@@ -621,9 +621,13 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
  const host = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
  // The loop lives in collection-membership.ts so it can be tested without a network: it used to stop
  // after 25 collections, which is why ~500 collections across the fleet held nothing at all.
- const read = await readCollectionMembership(slugs, { fetchPage: (slug, page) => collectionPage(host, slug, page) });
+ // A budget the read STOPS at, so the step cannot outlive the invocation running it. Production
+ // caps a function at maxDuration 300s; without this the read simply ran until something killed it
+ // and every collection it had already read was lost with it — 25 minutes and nothing to show, on a
+ // 761-collection store. 150s leaves room for the write pass and the steps after it.
+ const read = await readCollectionMembership(slugs, { fetchPage: (slug, page) => collectionPage(host, slug, page), budgetMs: 150_000 });
  if (read.notAttempted.length) {
-  console.log(`[collections] ${host}: ${read.notAttempted.length} collections past the ceiling were not read`);
+  console.log(`[collections] ${host}: ${read.notAttempted.length} collection(s) not read (past the ceiling, or the read ran out of time) — marked unread, so what we hold for them stands`);
  }
  if (read.throttleHits) console.log(`[collections] ${host}: asked to slow down ${read.throttleHits}\u00d7 — paced accordingly`);
  // A collection bigger than one pass. What we read is used; the shortfall is ours, not the seller's.

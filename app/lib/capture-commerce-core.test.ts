@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { worthImporting, unreadCollectionSlugs, membershipToWrite, taggedSlugs, unfileVanished } from "./capture-commerce-core.ts";
+import { membershipSubjects, mergeCapturedMembership, worthImporting, unreadCollectionSlugs, membershipToWrite, taggedSlugs, unfileVanished } from "./capture-commerce-core.ts";
 
 // ── a piece she has sold and zeroed the price on ─────────────────────────────────────────────────
 test("a SOLD piece with no price is still imported", () => {
@@ -151,4 +151,116 @@ test("unfileVanished: a piece still listed on her site is never touched here", (
 test("unfileVanished: no write when there is nothing to unfile", () => {
  const out = unfileVanished({ held: new Map(), vanished: new Set(["i1"]), unread: [] });
  assert.equal(out.size, 0);
+});
+
+// ── Who the membership pass is ABOUT ─────────────────────────────────────────────────────────────
+// The pass walked `products` — whatever the feed read returned in the SAME invocation — and looked
+// each one up in the database. On a small store that is invisible: one read returns the whole
+// catalogue, so "what the feed returned" and "what we hold" are the same list.
+//
+// They come apart completely on a large one. 2nd Street's shop holds 5,289 items; a feed read
+// against a rate-limited storefront returned 72. So the pass read up to 300 of her collections from
+// her live site — ten minutes of requests — and could then file at most those 72 pieces. It reported
+// success and wrote nothing. Every one of her 761 collection pages would have been empty.
+//
+// The collection read is the authority on membership, and it is keyed by source id, not by whether
+// a product happened to appear in this run's feed. So the subjects are the items we HOLD.
+
+test("membershipSubjects: every held item is a subject, not just the ones this feed read returned", () => {
+ const items = [
+  { id: "i1", sourceId: "h1", title: "Silk Slip", origin: "import" },
+  { id: "i2", sourceId: "h2", title: "Beaded Clutch", origin: "import" },
+  { id: "i3", sourceId: "h3", title: "Wool Coat", origin: "import" },
+ ];
+ const products = [{ sourceId: "h2", name: "Beaded Clutch", tags: ["bags"] }];
+ const subjects = membershipSubjects(items, products);
+ assert.deepEqual(subjects.map((s) => s.itemId), ["i1", "i2", "i3"]);
+});
+
+test("membershipSubjects: the feed's tags ride along when the feed saw the piece", () => {
+ const items = [
+  { id: "i1", sourceId: "h1", title: "Silk Slip", origin: "import" },
+  { id: "i2", sourceId: "h2", title: "Beaded Clutch", origin: "import" },
+ ];
+ const products = [{ sourceId: "h2", name: "Beaded Clutch", tags: ["bags", "evening"] }];
+ const subjects = membershipSubjects(items, products);
+ assert.deepEqual(subjects.find((s) => s.itemId === "i2")!.tags, ["bags", "evening"]);
+ // Tags only ever vote on collections we could NOT read (see taggedSlugs), so a piece the feed
+ // missed simply gets no tag vote — never a guess in place of one.
+ assert.deepEqual(subjects.find((s) => s.itemId === "i1")!.tags, []);
+});
+
+test("membershipSubjects: a piece the seller filed herself is left alone", () => {
+ // Same rule the old loop enforced with `if (item.origin === "user") continue`. A seller who has
+ // organised her own collections owns that decision.
+ const items = [
+  { id: "i1", sourceId: "h1", title: "Silk Slip", origin: "user" },
+  { id: "i2", sourceId: "h2", title: "Beaded Clutch", origin: "import" },
+ ];
+ assert.deepEqual(membershipSubjects(items, []).map((s) => s.itemId), ["i2"]);
+});
+
+test("membershipSubjects: an old row with no source id is still matched by title", () => {
+ // Rows imported before source identity existed carry no sourceId — the legacy byTitle fallback.
+ const items = [{ id: "i1", sourceId: null, title: "Silk  SLIP ", origin: "import" }];
+ const products = [{ sourceId: "h9", name: "silk slip", tags: ["dresses"] }];
+ const s = membershipSubjects(items, products);
+ assert.equal(s.length, 1);
+ assert.deepEqual(s[0].tags, ["dresses"], "matched to the feed row by title");
+ assert.equal(s[0].sourceId, "h9", "and adopts the source id the feed knows it by");
+});
+
+test("membershipSubjects: two held rows never fight over one feed row", () => {
+ // A title collision must not let one feed row's tags attach to two different pieces.
+ const items = [
+  { id: "i1", sourceId: null, title: "Silk Slip", origin: "import" },
+  { id: "i2", sourceId: null, title: "Silk Slip", origin: "import" },
+ ];
+ const products = [{ sourceId: "h1", name: "Silk Slip", tags: ["dresses"] }];
+ const s = membershipSubjects(items, products);
+ assert.equal(s.length, 2);
+ assert.equal(s.filter((x) => x.sourceId === "h1").length, 1, "only one row claims the feed row");
+});
+
+// ── Collections we could not read live ───────────────────────────────────────────────────────────
+// A collection the live pass could not reach — throttled, or past the ceiling — holds nothing at
+// all. 461 of 2nd Street's 761 are in that position on every run. But we have already downloaded
+// its page: the crawl stored /collections/{slug} along with 941 others. Reading membership off the
+// page we already paid for costs no requests at all.
+//
+// It is a WORSE source than the live read: page one only, frozen at crawl day. So it is additive
+// and it never wins. Where we read the collection live, the live answer stands; where we did not,
+// stale-and-partial beats empty. And the collection stays marked unread either way, so nothing we
+// already hold can be removed on the strength of a captured page.
+
+test("mergeCapturedMembership: an unread collection is filled from the page we already have", () => {
+ const live = new Map<string, string[]>([["h1", ["dresses"]]]);
+ const captured = new Map<string, string[]>([["boots", ["h1", "h2"]]]);
+ const out = mergeCapturedMembership(live, captured, new Set(["boots"]));
+ assert.deepEqual(out.get("h1"), ["dresses", "boots"], "added, and the live answer is kept");
+ assert.deepEqual(out.get("h2"), ["boots"], "a piece the live read never mentioned is still filed");
+});
+
+test("mergeCapturedMembership: a collection we DID read live is never overridden by a stale page", () => {
+ // She emptied "dresses" and we read that correctly. The captured page is from crawl day and still
+ // shows the old contents — believing it would put her archive back, which is the whole failure
+ // mode the sold-policy and unread work exists to prevent.
+ const live = new Map<string, string[]>();
+ const captured = new Map<string, string[]>([["dresses", ["h1", "h2"]]]);
+ const out = mergeCapturedMembership(live, captured, new Set());
+ assert.equal(out.size, 0, "read live and empty means empty");
+});
+
+test("mergeCapturedMembership: filing a piece twice does not duplicate it", () => {
+ const live = new Map<string, string[]>([["h1", ["boots"]]]);
+ const captured = new Map<string, string[]>([["boots", ["h1"]]]);
+ const out = mergeCapturedMembership(live, captured, new Set(["boots"]));
+ assert.deepEqual(out.get("h1"), ["boots"]);
+});
+
+test("mergeCapturedMembership: the live map is not mutated", () => {
+ const live = new Map<string, string[]>([["h1", ["dresses"]]]);
+ const out = mergeCapturedMembership(live, new Map([["boots", ["h1"]]]), new Set(["boots"]));
+ assert.deepEqual(live.get("h1"), ["dresses"], "caller's map untouched");
+ assert.deepEqual(out.get("h1"), ["dresses", "boots"]);
 });

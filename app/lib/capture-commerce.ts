@@ -16,7 +16,7 @@ import { MAX_ITEM_IMAGES } from "./item-limits";
 // Pure helpers (money, identity, hashing) live in capture-commerce-core.ts so they can be unit
 // tested without the database layer — same split as inventory-core.ts.
 export { productContentHash, centsOf, currencyOf, identityKey, slugifyHandle } from "./capture-commerce-core.ts";
-import { unfileVanished, taggedSlugs, membershipToWrite, worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, unreadCollectionSlugs } from "./capture-commerce-core.ts";
+import { membershipSubjects, mergeCapturedMembership, unfileVanished, taggedSlugs, membershipToWrite, worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, unreadCollectionSlugs } from "./capture-commerce-core.ts";
 
 /** Create/refresh db/items (checkout-able inventory) for a captured store's products.
  *
@@ -328,6 +328,34 @@ export async function syncCollectionMembership(
   }
   unreadSlugs = unreadCollectionSlugs({ readCount, storedCount, unread: unreadSlugs, completed: completedSlugs });
  }
+ // Collections the live pass could not reach hold nothing at all — 461 of 2nd Street's 761 on every
+ // run. Their pages are already in our capture from the crawl, so fill them from those: no outbound
+ // requests, and a stale page one beats an empty collection. Additive only, and they stay marked
+ // UNREAD below, so nothing already filed can be removed on a captured page's say-so.
+ if (unreadSlugs.length) {
+  try {
+   const { listCapturePaths, getCapturePage } = await import("./site-capture-db.ts");
+   const { capturedGridProductHandles } = await import("./site-capture.ts");
+   const paths = new Set(await listCapturePaths(slug));
+   const capturedBySlug = new Map<string, string[]>();
+   for (const colSlug of unreadSlugs) {
+    const path = [`/collections/${colSlug}`, `/collections/${colSlug}/`].find((c) => paths.has(c));
+    if (!path) continue;
+    const html = await getCapturePage(slug, path);
+    if (!html) continue;
+    const handles = capturedGridProductHandles(html);
+    if (handles.length) capturedBySlug.set(colSlug, handles);
+   }
+   if (capturedBySlug.size) {
+    membership = mergeCapturedMembership(membership, capturedBySlug, new Set(unreadSlugs));
+    console.log(`[collections] ${slug}: filled ${capturedBySlug.size} unread collection(s) from pages already captured`);
+   }
+  } catch (e) {
+   // Best effort by design: the live read's answer is unaffected, so a failure here costs the
+   // fallback and nothing else.
+   policyWarnings.push(`couldn't read your captured collection pages as a fallback (${String((e as Error).message).slice(0, 50)})`);
+  }
+ }
  const unreadIds = new Set(unreadSlugs.map((s) => colBySlug.get(s)).filter(Boolean) as string[]);
  // A collection we have judged unread must not hand over an order either. Belt and braces — an
  // unread collection records no order in the first place — but the two judgements are made in
@@ -377,21 +405,23 @@ export async function syncCollectionMembership(
  }
 
  const items = await listItemsBySource(seller.id, "captured");
- const bySourceId = new Map(items.filter((i) => i.sourceId).map((i) => [i.sourceId as string, i]));
- const byTitle = new Map(items.map((i) => [norm(i.title), i]));
+ const byItemId = new Map(items.map((i) => [i.id, i]));
 
  let links = 0;
  const failed: string[] = [];
  const used = new Set<string>();
- for (const p of products) {
-  const item = (p.sourceId && bySourceId.get(p.sourceId)) || byTitle.get(norm(p.name || "")) || null;
+ // The subjects are the pieces we HOLD, not the ones this run's feed read happened to return. See
+ // membershipSubjects(): walking the feed meant a store whose feed read came back short filed
+ // almost nothing, however many of its collections we had just spent minutes reading. 2nd Street's
+ // shop held 5,289 pieces against a 72-piece read and ended with zero membership across 761
+ // collections, reported as success.
+ for (const subject of membershipSubjects(items, products)) {
+  const item = byItemId.get(subject.itemId);
   if (!item) continue;
-  // A seller who has organised their own collections owns that decision — don't reshuffle it.
-  if (item.origin === "user") continue;
 
-  const handleSlugs = p.sourceId ? membership.get(p.sourceId) || [] : [];
+  const handleSlugs = subject.sourceId ? membership.get(subject.sourceId) || [] : [];
   // Tags only get a vote on collections we could NOT read this pass — see taggedSlugs.
-  const tagSlugs = taggedSlugs({ tags: p.tags || [], known: new Set(colBySlug.keys()), unread: new Set(unreadSlugs) });
+  const tagSlugs = taggedSlugs({ tags: subject.tags, known: new Set(colBySlug.keys()), unread: new Set(unreadSlugs) });
   const slugs = [...new Set([...handleSlugs, ...tagSlugs])].filter((s) => colBySlug.has(s));
 
   const ids = slugs.map((s) => colBySlug.get(s)!).filter(Boolean);

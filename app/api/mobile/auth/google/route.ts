@@ -4,6 +4,7 @@ import {
  signMobileJwt,
 } from "@/app/lib/mobileAuth";
 import { getPilotStatus } from "@/app/lib/pilot-db";
+import { storeSlugFromEmail } from "@/app/lib/storeAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,8 @@ export async function POST(request: Request) {
  user: { id: userId, email, name: info.name ?? null },
  approved: status === "approved",
  status,
+ // Matches /api/mobile/auth/me — the app routes sellers to their own tabs on this.
+ storeSlug: storeSlugFromEmail(email),
  });
  } catch (err) {
  console.error("[mobile-google] error:", err);
