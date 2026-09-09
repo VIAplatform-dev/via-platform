@@ -14,6 +14,7 @@ import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, HEADER_LAYOUTS, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
+import { pickTargetSection, type Rect, type SectionRect } from "@/app/lib/storefront-target-section";
 import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, isTemplatePageSlug, type StorefrontTemplate } from "@/app/lib/storefront-templates";
 import { HexInput, ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
@@ -1396,53 +1397,31 @@ export default function StorefrontStudio() {
  // `form` was missing from both of these, so a form element listed itself as "Line" with a line's icon.
  const overlayLabel = (o: Overlay) => o.kind === "text" ? (o.props?.text || "Text") : o.kind === "button" ? (o.props?.label || "Button") : o.kind === "image" ? "Image" : o.kind === "rect" ? "Rectangle" : o.kind === "circle" ? "Circle" : o.kind === "form" ? (o.props?.title || "Form") : "Line";
  const OverlayIcon = (o: Overlay) => o.kind === "text" ? Type : o.kind === "button" ? MousePointerClick : o.kind === "image" ? ImageIcon : o.kind === "rect" ? Square : o.kind === "circle" ? Circle : o.kind === "form" ? AlignLeft : Minus;
- // Add an element to the SELECTED section (fallback: the last section on the page), then select it.
- // The section currently centered in the canvas viewport, by its `vya-b-<id>` class. Lets a newly
- // added element land where the user is looking instead of at the bottom of the page. Returns null
- // if the canvas isn't mounted or no section overlaps the viewport.
- // The section you're actually looking at = the one filling the most of the canvas right now, by
- // VISIBLE AREA. The old version used "center nearest the viewport middle", which broke on a tall
- // hero: a hero taller than the viewport has its center off-screen, so a shorter next section whose
- // center sits near the middle would win — and a button added "to the section in view" landed in the
- // wrong one. Most-visible-area gets it right: a hero filling the screen wins even with its center off.
- function sectionInViewId(): string | null {
+ /** Every section of the page being edited, measured, in DOM order. */
+ function measureSections(): { view: Rect; sections: SectionRect[] } | null {
  const c = canvasRef.current;
  if (!c) return null;
  const cr = c.getBoundingClientRect();
- let bestId: string | null = null, bestVisible = 0;
+ const sections: SectionRect[] = [];
  c.querySelectorAll<HTMLElement>(".vya-sec").forEach((sec) => {
- const r = sec.getBoundingClientRect();
- const visible = Math.max(0, Math.min(r.bottom, cr.bottom) - Math.max(r.top, cr.top));
- if (visible > bestVisible) {
  const cls = Array.from(sec.classList).find((k) => k.startsWith("vya-b-"));
- if (cls) { bestVisible = visible; bestId = cls.slice("vya-b-".length); }
- }
+ const id = cls?.slice("vya-b-".length);
+ // Only sections of the page being edited — the zoomed-out view renders other pages' canvases too,
+ // and an element must never land on a page the seller isn't looking at.
+ if (!id || !curBlocks.some((b) => b.id === id)) return;
+ const r = sec.getBoundingClientRect();
+ sections.push({ id, top: r.top, bottom: r.bottom });
  });
- return bestId;
- }
- /** Is this section at least partly on screen right now? Used so a stale selection that's been
-  *  scrolled away doesn't capture a new element meant for the section actually in view. */
- function isSectionOnScreen(blockId: string): boolean {
- const c = canvasRef.current;
- const sec = c?.querySelector<HTMLElement>(`.vya-b-${blockId}`);
- if (!c || !sec) return false;
- const cr = c.getBoundingClientRect(), r = sec.getBoundingClientRect();
- return r.bottom > cr.top && r.top < cr.bottom;
+ return { view: { top: cr.top, bottom: cr.bottom }, sections };
  }
  function addElement(kind: OverlayKind, extraProps?: Record<string, string>) {
- // Where the new element lands, in order:
- //  1. the selected section — but ONLY if it's still on screen (a selection you scrolled away from
- //     shouldn't hijack an element you're adding to the hero you're now looking at),
- //  2. otherwise the section filling the most of the canvas — what you're actually looking at,
- //  3. otherwise the selected section even if off-screen, then the last section.
- // This is the fix for "added a button and it went to the next section / clicked me out of hero":
- // the target is now the section in view, and we keep it selected below.
- const inView = sectionInViewId();
- const selUsable = selBlock && curBlocks.some((b) => b.id === selBlock);
- const targetId = (selUsable && isSectionOnScreen(selBlock!)) ? selBlock
- : (inView && curBlocks.some((b) => b.id === inView)) ? inView
- : selUsable ? selBlock
- : curBlocks[curBlocks.length - 1]?.id;
+ // Which section the new element belongs to is pure geometry — measured here, decided (and tested)
+ // in storefront-target-section.ts. Whatever it picks is selected below, so the answer is visible.
+ const m = measureSections();
+ const selUsable = selBlock && curBlocks.some((b) => b.id === selBlock) ? selBlock : null;
+ const targetId = (m ? pickTargetSection(m.view, m.sections, selUsable) : null)
+ ?? selUsable
+ ?? curBlocks[curBlocks.length - 1]?.id;
  if (!targetId) { setRailTab("sections"); window.alert("Add a section first, then drop elements onto it."); return; }
  const o = makeOverlay(kind);
  if (extraProps) o.props = { ...(o.props || {}), ...extraProps };
@@ -1999,8 +1978,18 @@ export default function StorefrontStudio() {
   <div className="absolute inset-0 z-10 transition group-hover/pv:bg-[#5D0F17]/[0.04] group-hover/pv:ring-2 group-hover/pv:ring-inset group-hover/pv:ring-[#5D0F17]/30" />
  </div>
  );
- // The site nav shown in the persistent header/footer — one entry per page, current page marked active.
- const chromeNav: ChromeNav[] = pageList.map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
+ // The site nav shown in the persistent header/footer — one entry per page, current page marked active,
+ // PLUS the store's collections between Shop and the extra pages. The live header lists those
+ // (StorefrontView's blockNav does); the editor listed pages only, so a store with two collections saw
+ // a five-item menu while editing and a seven-item one on its own site. Collections aren't editable
+ // pages — they're generated from inventory — so an entry opens the real page in a new tab instead of
+ // switching the canvas to something that can't be edited.
+ const pageNav: ChromeNav[] = pageList.map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
+ const collectionNav: ChromeNav[] = settings?.handle
+ ? collections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: `/s/${settings.handle}/collections/${c.slug}?preview=1` }))
+ : [];
+ // pageList is built as [Home, Shop, ...extraPages], so index 2 is where the collections go.
+ const chromeNav: ChromeNav[] = [...pageNav.slice(0, 2), ...collectionNav, ...pageNav.slice(2)];
  const headerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: l.href }))];
  const footerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: l.href }))];
 

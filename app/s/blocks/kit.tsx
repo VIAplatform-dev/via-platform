@@ -200,11 +200,14 @@ export function ImageSlot({ kit, src, alt, onPick, pos, onPos, zoom, ratio = "as
    {src
     ? <img src={src} alt={alt || ""} loading="lazy" draggable={false} className="h-full w-full select-none object-cover" style={{ ...(pos ? { objectPosition: pos } : {}), ...zoomStyle }} />
     : <span className="text-[10px] uppercase tracking-[0.2em] opacity-40">{open ? `Add ${label.toLowerCase()}` : label}</span>}
-   {/* A PLACEHOLDER is ours, not the seller's — so it says so, permanently rather than on hover, and
-       greys back so it reads as scaffolding rather than as a design decision someone made. Editor
-       only: on the live storefront it renders as a plain picture, which is the point of having one. */}
+   {/* A PLACEHOLDER is ours, not the seller's — so it says so, permanently rather than on hover. The
+       badge used to sit on a 45% white sheet across the whole photo; that (with the grayscale filter
+       in Blocks.tsx) meant the editor showed a washed-out grey version of a picture the live site
+       renders in full colour, which is what made the canvas stop reading as a preview. The pill is
+       dark enough to read on any photo by itself, and Blocks.tsx outlines the frame. Editor only: on
+       the live storefront it renders as a plain picture, which is the point of having one. */}
    {src && open && isPlaceholderImage(src) && (
-    <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/45">
+    <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2">
      <span className="rounded-full bg-black/70 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white">Replace with your image</span>
     </span>
    )}
@@ -510,7 +513,7 @@ export function PhotoFrame({ kit, className = "", style, children }: {
  // Same contract as ImageSlot, for the full-bleed photos that aren't slots — a hero's picture, a
  // split's panel. Without it those would be the one place a placeholder looked like a real choice.
  const note = isPlaceholderImage(b.props?.image) ? (
-  <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-white/45">
+  <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
    <span className="rounded-full bg-black/70 px-3 py-1.5 text-center text-[10px] font-semibold uppercase tracking-[0.14em] text-white">Replace with your image</span>
   </span>
  ) : null;

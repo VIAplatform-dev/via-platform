@@ -594,11 +594,6 @@ export default function ItemsPage() {
  actions={
  <>
  {isAdmin && items.length > 0 && <button onClick={() => setConfirmReset(true)} className="text-[12px] text-rose-500/80 underline hover:text-rose-600">Clear all (owner)</button>}
- <div className="relative">
- <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
- <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search items…" aria-label="Search items"
- className="h-9 w-full rounded-full border border-stone-200 bg-white pl-8 pr-3 text-[13px] text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-[var(--accent,#0e9f76)] sm:w-52" />
- </div>
  <TechButton variant="secondary" onClick={exportCsv}>Export</TechButton>
  <TechButton variant="secondary" onClick={() => setImportOpen(true)}>Import</TechButton>
  <TechButtonLink href={withStore("/admin/add-listing")}>+ New listing</TechButtonLink>

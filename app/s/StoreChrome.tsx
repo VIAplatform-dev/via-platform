@@ -74,7 +74,7 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
   ? <img src={logo} alt={storeName} className="h-7 w-auto shrink-0 object-contain" draggable={false} />
   : <NavItem n={{ ...(nav.find((n) => /^home/i.test(n.label)) || {}), label: storeName }} onNav={onNav} className="shrink-0 text-lg tracking-[0.12em]" style={headingFontFamily} />;
  const links = (items: ChromeNav[], className = "") => (
-  <div className={`hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 @3xl:flex ${className}`}>
+  <div className={`hidden min-w-0 flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px] uppercase tracking-[0.16em] opacity-70 @3xl:flex ${className}`}>
    {items.map((n, i) => <NavItem key={i} n={n} onNav={onNav} className={`hover:opacity-100 ${n.active ? "opacity-100 underline underline-offset-4" : ""}`} />)}
   </div>
  );

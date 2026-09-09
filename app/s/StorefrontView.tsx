@@ -354,10 +354,17 @@ export default async function StorefrontView({ settings, view = "home", preview 
  )}
  </a>
  );
+ // `items`, not `headerNav` — the split layout passes each HALF of the menu in, and mapping the whole
+ // menu here rendered the entire nav on BOTH sides of the brand. A seller with seven pages saw
+ // fourteen links in preview and five in the editor, which is what "what I edit and what I preview
+ // look completely different" meant.
  const links = (items: typeof headerNav, extra = "") => (
- <div className={`hidden items-center gap-6 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex ${extra}`}>
-
- {headerNav.map((n, i) =>
+ // `flex-wrap` + `min-w-0`: a menu too long for its half wraps onto a second row instead of running
+ // off the edge of the page. The duplication above was what made an eight-page store overflow (it was
+ // laying out sixteen links), but a store with enough pages could clip on its own, and a nav item you
+ // can't see or click is the one failure a header cannot have.
+ <div className={`hidden min-w-0 flex-wrap items-center gap-x-6 gap-y-1.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:flex ${extra}`}>
+ {items.map((n, i) =>
  /^shop/i.test(n.label) && shopMenu.length ? (
  <div key={i} className="group relative">
  {/* A drawn chevron, not the "⌄" character. That glyph is a text arrowhead: it renders at whatever
@@ -430,9 +437,14 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </nav>
  );
  })()}
- {/* Mobile nav row */}
+ {/* Mobile nav row — WRAPS, it does not scroll, and for the reasons StoreChrome.tsx sets out at
+     length: a horizontally-scrollable strip slices the last label mid-word against the screen edge
+     with nothing to say the row can be swiped, so a store with seven pages looks like a store whose
+     header is cut off. The editor's chrome was changed to wrap; this, the renderer a shopper actually
+     meets, was left scrolling — so the phone preview and the phone disagreed. `whitespace-nowrap`
+     stays on each ITEM, so "Shipping & Returns" breaks between links rather than through one. */}
  {headerNav.length > 0 && (
- <div className="flex items-center gap-5 overflow-x-auto border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden">
+ <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden">
  {headerNav.map((n, i) => (
  <a key={i} href={n.href} className="whitespace-nowrap">{n.label}</a>
  ))}

@@ -574,11 +574,20 @@ export default function Blocks({
  // placeholder that looks like a real photograph is one a seller publishes by accident.
  //
  // So it's an attribute selector on the source path: one rule, no renderer can escape it, and a new
- // layout added tomorrow inherits it for free. Desaturated and dimmed so it reads as scaffolding
- // rather than as a photo someone chose. Editor only — on the live storefront these render normally,
- // which is the entire point of shipping a template with pictures in it.
+ // layout added tomorrow inherits it for free.
+ //
+ // The MARK is a border, not a repaint. It used to be `grayscale(1) contrast(.92) opacity(.62)`, over
+ // the 45% white sheet the badge sits on — between them the picture kept about a third of itself, and
+ // the editor stopped being a preview: a seller put her own site beside the canvas and saw a vivid
+ // photograph next to a grey rectangle, and reasonably asked which one was her store. It also hid the
+ // problems it should have shown — dark hero type over a busy photo looks fine against 45% white and
+ // is illegible over the real thing, so the one view meant to catch that couldn't.
+ //
+ // An outline marks the photo without touching a pixel of it: same universal coverage, and what the
+ // seller is looking at is now what a shopper gets. It's drawn INSIDE the edge (negative offset) so a
+ // full-bleed hero still shows the whole frame, and outlines don't affect layout, so nothing shifts.
  const placeholderCss = edit
-  ? `.vya-sec img[src*="${PLACEHOLDER_MARK}"]{filter:grayscale(1) contrast(.92) opacity(.62)}`
+  ? `.vya-sec img[src*="${PLACEHOLDER_MARK}"]{outline:2px dashed rgba(93,15,23,0.5);outline-offset:-2px}`
   : "";
  const skinRules = skinCss(skin);
  // A photo that has been MOVED is positioned, and a positioned element later in the DOM paints over
