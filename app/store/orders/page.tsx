@@ -133,7 +133,7 @@ export default function OrdersPage() {
  const aov = orders.length ? revenue / orders.length : 0;
  const currency = orders[0]?.currency || imported[0]?.currency || "USD";
  // Parcels, not pieces (parcels-core.ts): a buyer who took three things is one row, one label, one
- // Mark posted — and "to post" counts bags on her table, not lines on a list.
+ // Mark posted — and "to ship" counts bags on her table, not lines on a list.
  const parcels = groupIntoParcels(orders);
  const toPost = parcelsToPost(parcels).length;
  const shown = pickupOnly ? parcels.filter((p) => p.deliveryMethod === "pickup" && p.status === "paid") : parcels;
@@ -162,7 +162,7 @@ export default function OrdersPage() {
 
  {orders.length > 0 && (
  <div className="mb-6 grid grid-cols-4 gap-3">
- <Stat label="Parcels to post" value={toPost} />
+ <Stat label="Packages to ship" value={toPost} />
  <Stat label="Orders" value={orders.length} />
  <Stat label="Revenue" value={formatPriceCents(Math.round(revenue / 100) * 100, currency)} />
  <Stat label="Avg. order" value={formatPriceCents(Math.round(aov / 100) * 100, currency)} />

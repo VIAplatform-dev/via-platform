@@ -8,9 +8,11 @@ import { deleteAllItems } from "@/app/lib/db/inventory";
 import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { runImportJob } from "@/app/lib/import-engine/wire";
 import { createJob, getActiveJob, getLatestJob, getJob, saveJob } from "@/app/lib/import-engine/jobs-db";
+import { listCaptureOrigins } from "@/app/lib/site-capture-db";
 import { describeError, isResumable, reportLine, type ImportJob } from "@/app/lib/import-engine/report";
 import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
 import { shouldReuseExistingCapture } from "@/app/lib/import-engine/reuse-capture";
+import { conflictingOwner } from "@/app/lib/import-engine/origin-owner";
 
 // WHERE THE SELLER'S HOSTED SITE ACTUALLY LIVES — the one address she is given for it.
 //
@@ -178,6 +180,28 @@ export async function POST(request: NextRequest) {
 
   const url = body?.url ? String(body.url).trim() : "";
   if (!url) return NextResponse.json({ error: "Paste your site URL." }, { status: 400 });
+
+  // ── A shop that belongs to ANOTHER store is never imported here ────────────────────────────
+  // The reuse guard above asks "does this STORE already have a site?" and lets the owner through,
+  // because re-importing is the repair path. It has no idea which store is selected — so one wrong
+  // pick in the switcher crawls somebody else's shop into a seller's account, writing their
+  // products into her inventory and deleting whatever she had first. That is not a hypothetical:
+  // a job row reading `gianna-marie-raucher | https://tesselizabethvintage.com/` cost 142 products,
+  // 23 collections and 42 pages to undo. Exact host match only, so re-importing your own shop and
+  // importing one nobody holds both pass untouched. `force` is the deliberate override.
+  const owner = isOwner(request, slug);
+  const claims = await listCaptureOrigins().catch(() => [] as { slug: string; origin: string }[]); /* allow-swallow: this guard only ever REFUSES work — a read blip must not block an import the seller is entitled to run */
+  const heldBy = conflictingOwner(url, slug, claims, body?.force === true);
+  if (heldBy) {
+   // The other store is named only for the owner. A seller learning another store's slug from an
+   // error message is a leak, and she can do nothing with it either way.
+   return NextResponse.json({
+    error: owner
+     ? `That site is already imported for “${heldBy}”. Switch to that store to re-import it — or send force:true to import it here anyway and take it over.`
+     : "That site belongs to another store on VYA. Check the address, or get in touch if it's yours.",
+    conflict: { url, heldBy: owner ? heldBy : null },
+   }, { status: 409 });
+  }
 
   // One import per store at a time. A second request (an impatient double-click, or a re-import
   // while the sweeper is resuming) would otherwise run a parallel crawl over the same slug —

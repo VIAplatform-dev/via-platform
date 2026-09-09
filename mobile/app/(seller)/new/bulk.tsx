@@ -8,7 +8,7 @@ import { apiPost } from "../../../lib/api";
 import { colors, spacing, fonts } from "../../../lib/theme";
 import { uploadPhoto, publishListing, draftListing, priceListing } from "../../../lib/seller/intake";
 import { rowReadiness, batchSummary, canPriceBatch, type BulkRow } from "../../../lib/seller/listing";
-import { splitLotCost, todayISO, lotLine, newLotId } from "../../../lib/seller/lot";
+import { splitCostAcross, batchCostLine } from "../../../lib/seller/cost-split";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../../lib/api";
 
@@ -37,29 +37,20 @@ export default function BulkScreen() {
   const [status, setStatus] = useState<Status>("idle");
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Batch-level: applied to every row when it is published.
-  const [sourceName, setSourceName] = useState("");
-  const [acquiredAt, setAcquiredAt] = useState(todayISO());
+  // Batch-level: one price for all of them, divided at publish.
   const [lotTotal, setLotTotal] = useState("");
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<{ currency: string }>("/api/store/me") });
   const currency = me.data?.currency ?? "USD";
 
-  /** What each row carries at publish: the batch source/date, ONE lot id for the whole batch (so
-   *  "the Tuesday lot" can be found again, like a web lot), and its cost — typed, or its share. */
-  function lotFields(): Record<string, { sourceName?: string; acquiredAt?: string; lotId: string; cost?: number }> {
+  /** What each row carries at publish: its cost — typed on the row, or its share of the batch. */
+  function batchCosts(): Record<string, { cost?: number }> {
     const totalCents = lotTotal.trim() ? Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) : 0;
-    const share = totalCents > 0 ? splitLotCost(totalCents, rows.map((r) => r.id)) : {};
-    const lotId = newLotId();
-    const out: Record<string, { sourceName?: string; acquiredAt?: string; lotId: string; cost?: number }> = {};
+    const share = totalCents > 0 ? splitCostAcross(totalCents, rows.map((r) => r.id)) : {};
+    const out: Record<string, { cost?: number }> = {};
     for (const r of rows) {
       const typed = r.cost.trim() ? Number(r.cost.replace(/[^0-9.]/g, "")) : NaN;
       const cost = Number.isFinite(typed) && typed >= 0 ? typed : share[r.id] != null ? share[r.id] / 100 : undefined;
-      out[r.id] = {
-        lotId,
-        ...(sourceName.trim() ? { sourceName: sourceName.trim() } : {}),
-        ...(acquiredAt.trim() ? { acquiredAt: acquiredAt.trim() } : {}),
-        ...(cost !== undefined ? { cost } : {}),
-      };
+      out[r.id] = cost !== undefined ? { cost } : {};
     }
     return out;
   }
@@ -103,7 +94,7 @@ export default function BulkScreen() {
     setError(null);
     setStatus("saving");
     try {
-      const lot = lotFields();
+      const lot = batchCosts();
       for (const [i, r] of rows.entries()) {
         setProgress({ done: i, total: rows.length });
         await publishListing(
@@ -127,7 +118,7 @@ export default function BulkScreen() {
     setError(null);
     setStatus("pricing");
     try {
-      const lot = lotFields();
+      const lot = batchCosts();
       for (const [i, r] of rows.entries()) {
         setProgress({ done: i, total: rows.length });
         const filled = { brand: r.brand, cost: r.cost };
@@ -186,23 +177,15 @@ export default function BulkScreen() {
             Fill in what you know
           </Text>
 
-          {/* The batch: one source, one date, one price — for all of them. */}
+          {/* The batch: one price for all of them. */}
           <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginBottom: spacing.sm }}>
             <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: spacing.sm }}>
-              <Text style={{ width: 128, fontSize: 13, color: colors.textMuted }}>Where these came from</Text>
-              <TextInput value={sourceName} onChangeText={setSourceName} placeholder="Kempton, Ana’s estate…" placeholderTextColor={colors.textDim} style={{ flex: 1, fontSize: 14, color: colors.text, fontWeight: "600" }} />
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border }}>
-              <Text style={{ width: 128, fontSize: 13, color: colors.textMuted }}>Acquired on</Text>
-              <TextInput value={acquiredAt} onChangeText={setAcquiredAt} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textDim} keyboardType="numbers-and-punctuation" style={{ flex: 1, fontSize: 14, color: colors.text, fontWeight: "600" }} />
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border }}>
               <Text style={{ width: 128, fontSize: 13, color: colors.textMuted }}>These {rows.length} cost</Text>
               <TextInput value={lotTotal} onChangeText={setLotTotal} placeholder="total, e.g. 340" placeholderTextColor={colors.textDim} keyboardType="decimal-pad" style={{ flex: 1, fontSize: 14, color: colors.text, fontWeight: "600" }} />
             </View>
-            {lotLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency) ? (
+            {batchCostLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency) ? (
               <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs }}>
-                {lotLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency)} — a cost typed on a row wins.
+                {batchCostLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency)} — a cost typed on a row wins.
               </Text>
             ) : null}
           </View>

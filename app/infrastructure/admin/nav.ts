@@ -118,7 +118,6 @@ export const GROUPS: NavGroup[] = [
   { href: `${B}/trends`, label: "Trends", icon: "TrendingUp" },
   { href: `${B}/ai`, label: "AI accuracy", icon: "Target" },
   { href: `${B}/golden-review`, label: "Golden set", icon: "Gem" },
-  { href: `${B}/setup-funnel`, label: "Where stores get stuck", icon: "Footprints" },
  ] },
 ];
 

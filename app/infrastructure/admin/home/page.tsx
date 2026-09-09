@@ -7,6 +7,7 @@ import { describeHold } from "@/app/lib/holds-core";
 import type { SetupStep } from "@/app/lib/setup-core";
 import { nextStepCopy, ringProgress, rowState } from "@/app/lib/setup-card-core";
 import type { AttentionRow } from "@/app/lib/attention-core";
+import { homeTiles, type Tile } from "@/app/lib/attention-tiles";
 import Link from "next/link";
 import { PlusCircle, Package, ShoppingBag, Megaphone, BarChart3, Store, Sparkles, ArrowUp, ArrowUpRight, ArrowLeft, SquarePen, MessageCircle, Check } from "lucide-react";
 import { RichText, TypingDots } from "@/app/store/chatRender";
@@ -288,17 +289,20 @@ export default function WorkspaceHome() {
  // to make now, and stock that has sat 60/90 days is what to reshoot, reprice or take to the market.
  const aging = agingBuckets(items, new Date(nowMs));
  const agingLabel = agingTile(aging);
- const attention = [
- { label: "Parcels to post", count: toShip, href: `${B}/orders`, urgent: toShip > 0 },
- { label: "Offers to review", count: pendingOffers, href: `${B}/inbox`, urgent: pendingOffers > 0 },
- ...(holds.today.length ? [{ label: holds.today.length === 1 ? `Hold lapses today · ${describeHold(holds.today[0], new Date(nowMs)).replace(/ · .*$/, "").replace(/^Held for /, "")}` : "Holds lapse today", count: holds.today.length, href: `${B}/inventory?status=reserved`, urgent: true }] : []),
- ...(agingLabel ? [{ label: agingLabel.replace(/^\d+ pieces? /, "Listed "), count: aging.over90 || aging.over60, href: `${B}/inventory?sort=oldest`, urgent: false }] : []),
- { label: "Drafts to publish", count: drafts, href: `${B}/inventory/drafts`, urgent: false },
- { label: "Live listings", count: active, href: `${B}/inventory`, urgent: false, good: true },
+ // Everything Home COULD show. Which four actually make it, and in what order, is decided by
+ // attention-tiles.ts — pressing things claim the slots, the resting four fill the rest.
+ const candidates: Tile[] = [
+ { id: "toShip", label: "Packages to ship", count: toShip, href: `${B}/orders`, urgent: toShip > 0 },
+ { id: "offers", label: "Offers to review", count: pendingOffers, href: `${B}/inbox`, urgent: pendingOffers > 0 },
+ ...(holds.today.length ? [{ id: "holdsToday" as const, label: holds.today.length === 1 ? `Hold lapses today · ${describeHold(holds.today[0], new Date(nowMs)).replace(/ · .*$/, "").replace(/^Held for /, "")}` : "Holds lapse today", count: holds.today.length, href: `${B}/inventory?status=reserved`, urgent: true }] : []),
+ ...(agingLabel ? [{ id: "aging" as const, label: agingLabel.replace(/^\d+ pieces? /, "Listed "), count: aging.over90 || aging.over60, href: `${B}/inventory?sort=oldest`, urgent: false }] : []),
+ { id: "drafts", label: "Drafts to publish", count: drafts, href: `${B}/inventory/drafts`, urgent: false },
+ { id: "liveListings", label: "Live listings", count: active, href: `${B}/inventory`, urgent: false, good: true },
  // The rest of what needs her, from /api/store/attention. Holds and aging are skipped here because
  // the two tiles above already say it — with the customer's name, from the same data.
- ...needs.filter((r) => r.id !== "holdsToday" && r.id !== "aging").map((r) => ({ label: r.label, count: r.count, href: r.href, urgent: r.urgent })),
+ ...needs.filter((r) => r.id !== "holdsToday" && r.id !== "aging").map((r) => ({ id: r.id, label: r.label, count: r.count, href: r.href, urgent: r.urgent })),
  ];
+ const attention = homeTiles(candidates);
 
  return (
  <div className="mx-auto max-w-6xl px-6 py-9 sm:px-10">
@@ -370,7 +374,7 @@ export default function WorkspaceHome() {
  {/* Needs attention — action-first */}
  <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
  {attention.map((a) => (
- <Link key={a.label} href={a.href} className={`group relative overflow-hidden rounded-2xl border p-4 transition ${a.urgent ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : a.good ? "border-[var(--accent)]/15 bg-[var(--accent-soft)]/50 hover:bg-[var(--accent-soft)]" : "border-stone-200 bg-white hover:border-stone-300"}`}>
+ <Link key={a.id} href={a.href} className={`group relative overflow-hidden rounded-2xl border p-4 transition ${a.urgent ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : a.good ? "border-[var(--accent)]/15 bg-[var(--accent-soft)]/50 hover:bg-[var(--accent-soft)]" : "border-stone-200 bg-white hover:border-stone-300"}`}>
  <div className="flex items-center justify-between">
  <span className={`text-[26px] font-semibold leading-none tabular-nums ${a.urgent ? "text-amber-600" : a.good ? "text-[var(--accent-ink)]" : "text-stone-900"}`}>{a.count}</span>
  <ArrowUpRight size={16} className="text-stone-300 transition group-hover:translate-x-0.5 group-hover:text-stone-500" />

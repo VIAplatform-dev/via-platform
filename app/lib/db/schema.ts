@@ -98,13 +98,6 @@ export const items = pgTable(
  // returned them; the listing finally has somewhere to keep them. Printed under Condition on the
  // product page. See app/lib/flaws-core.ts.
  flaws: jsonb("flaws").$type<string[]>().default([]),
- // Where the piece came from and when — the seller's own words ("Kempton", "Ana's estate", "eBay"),
- // NOT the `source` column above, which is how the row got into VYA (manual | imported | ai | market).
- // Groups the P&L by source so she learns which buying trips pay. `lotId` ties a batch bought
- // together for one price; the lot cost was split across them at the time (app/lib/lot-core.ts).
- sourceName: text("source_name"),
- acquiredAt: date("acquired_at"),
- lotId: text("lot_id"),
  // Sizing and condition as structure (owner audit #31, #27):
  //  measurementsJson — `{ key, value, unit }[]` per app/lib/measurements-core.ts. The older
  //   `measurements` TEXT column stays for imported prose; the product page prefers this one.

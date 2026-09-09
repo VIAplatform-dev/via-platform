@@ -6,7 +6,6 @@ import { CategoryBreadcrumb } from "../CategoryPicker";
 import { Input, Field } from "@/app/store/ui";
 import { ITEM_STATUSES, STATUS_TONE, toCategorySlug, categoryTagLabel, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 import { PriceScale } from "../PriceScale";
-import { todayISO } from "@/app/lib/lot-core";
 import { ConditionChips, MeasurementFields, measurementsFromForm, measurementsToForm, useStoreUnits } from "../ListingStructure";
 import { normalizeCondition } from "@/app/lib/condition-core";
 import type { MeasurementKey } from "@/app/lib/measurements-core";
@@ -122,8 +121,9 @@ export default function BulkUploadPage() {
  const [hydrated, setHydrated] = useState(false);  // cost/dims/collections loaded — until then, don't send them
  // THE BATCH IS A LOT — the same three answers the phone's Add many asks for: where these came
  // from, when, and what they cost altogether. Written to every drafted piece after the run via the
- // bulk `lot` action, the cost split by price with the same remainder rule (lot-core.ts).
- const [lot, setLot] = useState({ sourceName: "", acquiredAt: todayISO(), lotCost: "" });
+ // What the whole batch cost, split across the pieces by price with the same remainder rule
+ // (cost-split.ts) the Inventory bulk `cost` action uses.
+ const [batch, setBatch] = useState({ cost: "" });
  const [lotNote, setLotNote] = useState<string | null>(null);
 
  useEffect(() => {
@@ -361,21 +361,20 @@ export default function BulkUploadPage() {
   }));
   setSaved({ drafted, failed });
   setBusy(false);
-  await applyLot(createdIds);
+  await applyBatchCost(createdIds);
  }
 
- /** After the run: where the batch came from, when, and what it cost — onto every piece it made. */
- async function applyLot(ids: string[]) {
-  const lotCostCents = lot.lotCost.trim() === "" ? null : Math.round(Number(lot.lotCost) * 100);
-  const sourceName = lot.sourceName.trim();
-  if (!ids.length || (!sourceName && !lot.acquiredAt && lotCostCents == null)) return;
-  if (lotCostCents != null && !(Number.isFinite(lotCostCents) && lotCostCents >= 0)) { setLotNote("The lot cost didn’t make sense — set it from Inventory (Set source / lot)."); return; }
+ /** After the run: what the batch cost, divided across every piece it made. */
+ async function applyBatchCost(ids: string[]) {
+  const totalCents = batch.cost.trim() === "" ? null : Math.round(Number(batch.cost) * 100);
+  if (!ids.length || totalCents == null) return;
+  if (!(Number.isFinite(totalCents) && totalCents >= 0)) { setLotNote("That cost didn’t make sense — set it from Inventory (Set cost)."); return; }
   const r = await fetch(withStore("/api/store/items"), {
    method: "POST", headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ action: "lot", ids, ...(sourceName ? { sourceName } : {}), ...(lot.acquiredAt ? { acquiredAt: lot.acquiredAt } : {}), ...(lotCostCents != null ? { lotCostCents } : {}) }),
+   body: JSON.stringify({ action: "cost", ids, totalCents }),
   }).then((x) => x.json()).catch(() => null);
-  if (!r?.ok) { setLotNote(r?.error || "Couldn’t write the source and cost onto the batch — set them from Inventory (Set source / lot)."); return; }
-  setLotNote([sourceName ? `from ${sourceName}` : null, lot.acquiredAt ? `acquired ${lot.acquiredAt}` : null, lotCostCents != null ? `${(lotCostCents / 100).toFixed(2)} split across ${r.count} pieces` : null].filter(Boolean).join(" · "));
+  if (!r?.ok) { setLotNote(r?.error || "Couldn’t write the cost onto the batch — set it from Inventory (Set cost)."); return; }
+  setLotNote(`${(totalCents / 100).toFixed(2)} split across ${r.count} pieces`);
  }
 
  // ── Edit a drafted item in place — open the popup, save straight back to the draft. ──
@@ -545,12 +544,10 @@ export default function BulkUploadPage() {
    )}
 
    {itemCount > 0 && !saved && (
-    <div className="mt-5 rounded-xl border border-stone-200 bg-white p-4" data-testid="bulk-lot">
+    <div className="mt-5 rounded-xl border border-stone-200 bg-white p-4" data-testid="bulk-cost">
      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-400">This batch</p>
-     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <Field label="Where these came from"><Input value={lot.sourceName} onChange={(e) => setLot((l) => ({ ...l, sourceName: e.target.value }))} placeholder="Kempton, Ana’s estate, eBay…" disabled={locked} /></Field>
-      <Field label="Acquired on"><Input type="date" value={lot.acquiredAt} onChange={(e) => setLot((l) => ({ ...l, acquiredAt: e.target.value }))} disabled={locked} /></Field>
-      <Field label={`These ${itemCount} cost (USD)`} hint="in total — split across the pieces by price"><Input type="number" inputMode="decimal" value={lot.lotCost} onChange={(e) => setLot((l) => ({ ...l, lotCost: e.target.value }))} placeholder="optional, e.g. 340" disabled={locked} /></Field>
+     <div className="grid grid-cols-1 gap-3">
+      <Field label={`These ${itemCount} cost (USD)`} hint="in total — split across the pieces by price"><Input type="number" inputMode="decimal" value={batch.cost} onChange={(e) => setBatch((b) => ({ ...b, cost: e.target.value }))} placeholder="optional, e.g. 340" disabled={locked} /></Field>
      </div>
     </div>
    )}

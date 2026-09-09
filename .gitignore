@@ -48,6 +48,7 @@ next-env.d.ts
 
 # local-only docs / editor config — never push
 /SECURITY_AUDIT_2026-08.md
+/docs/audit/
 /docs/architecture.md
 /.vscode
 .eval-cache/
@@ -81,3 +82,23 @@ public/collections/originals/
 
 # Playwright output (e2e/)
 test-results/
+
+# iCloud conflicted copies — "page 2.tsx" sitting next to "page.tsx".
+#
+# This repo lives in ~/Documents, which iCloud syncs. When the same file is written from two places
+# at once (two editors, or an agent mid-merge), iCloud does not pick a winner: it keeps both and
+# appends " 2" to one. Those copies can be snapshots of a half-finished merge, conflict markers and
+# all, so committing one breaks the build — and `git add -A` would happily commit it.
+#
+# Scoped to source files rather than everything: `public/icon 2.png` is a real, tracked asset, and a
+# broad `* [0-9].*` would put every future asset like it at risk.
+* [0-9].ts
+* [0-9].tsx
+* [0-9].mts
+* [0-9].js
+* [0-9].mjs
+* [0-9].cjs
+* [0-9].json
+* [0-9].css
+* [0-9].sql
+* [0-9].md

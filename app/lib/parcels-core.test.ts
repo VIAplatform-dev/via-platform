@@ -47,9 +47,9 @@ test("'to post' counts parcels going by post, not pieces and not collections", (
   o("f", { paymentIntent: "pi_4", status: "shipped" }),
  ]);
  assert.equal(parcelsToPost(parcels).length, 2);
- assert.equal(parcelsToPostLabel(0), "Nothing to post");
- assert.equal(parcelsToPostLabel(1), "1 parcel to post");
- assert.equal(parcelsToPostLabel(2), "2 parcels to post");
+ assert.equal(parcelsToPostLabel(0), "Nothing to ship");
+ assert.equal(parcelsToPostLabel(1), "1 package to ship");
+ assert.equal(parcelsToPostLabel(2), "2 packages to ship");
 });
 
 test("a parcel carries the tracking and label of whichever piece has them", () => {

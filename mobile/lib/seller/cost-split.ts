@@ -1,5 +1,8 @@
-// A lot on the phone: "these 12 cost £340 total". Mirrors app/lib/lot-core.ts on the server —
-// same remainder rule, so the numbers she sees before saving are the numbers that get saved.
+// Splitting one payment across several pieces, and the line that describes it. Mirrors
+// app/lib/cost-split.ts — the phone and the web must divide a batch the same way to the penny.
+//
+// All that remains of lot.ts: lots (a batch’s source, acquired date and lot id) were removed;
+// dividing what a batch cost is a separate feature and stayed.
 
 // Pennies matter on a per-piece cost (£33.34, not £33), so this formats its own — Home's
 // formatMoney rounds to whole units on purpose.
@@ -10,7 +13,7 @@ function pennies(cents: number, currency: string): string {
   return `${symbol}${(cents / 100).toFixed(2)}`;
 }
 
-export function splitLotCost(totalCents: number, ids: string[], weights?: Record<string, number | null | undefined>): Record<string, number> {
+export function splitCostAcross(totalCents: number, ids: string[], weights?: Record<string, number | null | undefined>): Record<string, number> {
   const out: Record<string, number> = {};
   if (!ids.length) return out;
   const total = Math.max(0, Math.round(Number(totalCents) || 0));
@@ -32,22 +35,8 @@ export function splitLotCost(totalCents: number, ids: string[], weights?: Record
   return out;
 }
 
-/** A short random id that ties a batch together — same shape as the server's (app/lib/lot-core.ts
- *  newLotId), so a lot minted on the phone reads like one minted on the web. One per batch. */
-export function newLotId(random: () => number = Math.random): string {
-  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let s = "";
-  for (let i = 0; i < 12; i++) s += alphabet[Math.floor(random() * alphabet.length)];
-  return `lot_${s}`;
-}
-
-/** Today as the plain date the server's acquired_at column takes. */
-export function todayISO(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
-
 /** "£33.34 each, give or take a penny" — or nothing when there is nothing to say. */
-export function lotLine(count: number, totalCents: number, currency: string): string | null {
+export function batchCostLine(count: number, totalCents: number, currency: string): string | null {
   if (!(count > 0) || !(totalCents > 0)) return null;
   return `${pennies(Math.round(totalCents / count), currency)} each, give or take a penny`;
 }

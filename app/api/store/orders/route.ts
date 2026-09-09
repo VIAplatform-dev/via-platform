@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
  const collected = new Set(pickupIds);
  const rows = orders.map((o) => ({ ...o, deliveryMethod: (collected.has(String(o.id)) ? "pickup" : "ship") as "pickup" | "ship" }));
  // Parcels, not pieces: the same rows grouped by payment (parcels-core.ts), so every screen that
- // counts "to post" counts bags. The flat list stays for everything that reads orders one by one.
+ // counts "to ship" counts bags. The flat list stays for everything that reads orders one by one.
  const parcels = groupIntoParcels(rows).map((p) => ({ ...p, orderIds: p.orders.map((o) => String(o.id)), orders: undefined }));
  return NextResponse.json({ ok: true, orders: rows, parcels, imported });
 }

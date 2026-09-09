@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { sendStoreCampaign, getStoreEmailBrand } from "./email";
+import { campaignRenderer, parseCampaignDesign } from "./campaign-email";
 import { resolveStoreSender } from "./email-settings-db";
 import { listSubscribers, listCustomerProfiles } from "./store-customers-db";
 import { audienceIsEmpty, type AudienceFilter } from "./customer-audience-core";
@@ -47,6 +48,9 @@ async function ensureTable() {
  recipient_count INTEGER NOT NULL DEFAULT 0,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
+ // The composer's layout, so a scheduled campaign sends what she designed rather than the plain
+ // fallback. Nullable: rows written before this, and campaigns sent by the assistant, have none.
+ await sql`ALTER TABLE store_campaigns ADD COLUMN IF NOT EXISTS design JSONB`;
  await sql`CREATE INDEX IF NOT EXISTS idx_store_campaigns_store ON store_campaigns (store_slug, created_at DESC)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_store_campaigns_due ON store_campaigns (status, scheduled_at)`;
  ensured = true;
@@ -84,11 +88,11 @@ export async function getCampaign(storeSlug: string, id: number): Promise<Campai
 }
 
 /** Queue a campaign to auto-send at a future time. The cron delivers it. */
-export async function createScheduledCampaign(storeSlug: string, c: { subject: string; body: string; link?: string | null; segment?: string | null; scheduledAt: Date }): Promise<Campaign> {
+export async function createScheduledCampaign(storeSlug: string, c: { subject: string; body: string; link?: string | null; segment?: string | null; scheduledAt: Date; design?: unknown }): Promise<Campaign> {
  await ensureTable();
  const rows = (await db()`
- INSERT INTO store_campaigns (store_slug, subject, body, link, segment, status, scheduled_at)
- VALUES (${storeSlug}, ${c.subject.slice(0, 200)}, ${c.body.slice(0, 10000)}, ${c.link ?? null}, ${c.segment ?? null}, 'scheduled', ${c.scheduledAt.toISOString()})
+ INSERT INTO store_campaigns (store_slug, subject, body, link, segment, status, scheduled_at, design)
+ VALUES (${storeSlug}, ${c.subject.slice(0, 200)}, ${c.body.slice(0, 10000)}, ${c.link ?? null}, ${c.segment ?? null}, 'scheduled', ${c.scheduledAt.toISOString()}, ${c.design ? JSON.stringify(c.design) : null}::jsonb)
  RETURNING *
  `) as any[];
  return mapRow(rows[0]);
@@ -118,14 +122,14 @@ export async function recordSentCampaign(storeSlug: string, c: { subject: string
 /** The audience an email is aimed at, stored in `segment` as JSON. Empty = everyone → null. */
 export function encodeAudience(a: AudienceFilter | null | undefined): string | null {
  if (!a || audienceIsEmpty(a)) return null;
- return JSON.stringify({ tags: a.tags ?? [], spentOverCents: a.spentOverCents ?? null, category: a.category ?? null });
+ return JSON.stringify({ tags: a.tags ?? [], spentOverCents: a.spentOverCents ?? null, category: a.category ?? null, notOrderedInDays: a.notOrderedInDays ?? null });
 }
 
 export function decodeAudience(segment: string | null | undefined): AudienceFilter | null {
  if (!segment || !segment.trim().startsWith("{")) return null;
  try {
  const a = JSON.parse(segment) as AudienceFilter;
- return { tags: Array.isArray(a.tags) ? a.tags.map(String) : [], spentOverCents: typeof a.spentOverCents === "number" ? a.spentOverCents : null, category: typeof a.category === "string" ? a.category : null };
+ return { tags: Array.isArray(a.tags) ? a.tags.map(String) : [], spentOverCents: typeof a.spentOverCents === "number" ? a.spentOverCents : null, category: typeof a.category === "string" ? a.category : null, notOrderedInDays: typeof a.notOrderedInDays === "number" ? a.notOrderedInDays : null };
  } catch { return null; }
 }
 
@@ -146,14 +150,19 @@ export async function resolveRecipients(storeSlug: string, segment?: string | nu
 }
 
 /** Actually deliver a campaign now (used by immediate send AND the scheduler cron). Returns recipient count. */
-export async function deliverCampaign(storeSlug: string, c: { subject: string; body: string; link?: string | null; segment?: string | null }): Promise<{ recipientCount: number }> {
+export async function deliverCampaign(storeSlug: string, c: { subject: string; body: string; link?: string | null; segment?: string | null; design?: unknown }): Promise<{ recipientCount: number }> {
  const [sender, brand, recipients] = await Promise.all([
  resolveStoreSender(storeSlug),
  getStoreEmailBrand(storeSlug),
  resolveRecipients(storeSlug, c.segment),
  ]);
  if (!recipients.length) return { recipientCount: 0 };
- await sendStoreCampaign({ storeSlug, storeName: sender.fromName, storeEmail: sender.replyTo, fromAddress: sender.fromAddress, subject: c.subject.slice(0, 200), body: c.body.slice(0, 10000), link: c.link || undefined, brand, recipients } as any);
+ // Send what she laid out. A campaign stored before the design column existed has none, and falls
+ // back to the plain build rather than not going out at all.
+ const renderHtml = c.design
+  ? (await campaignRenderer(storeSlug, parseCampaignDesign(c.design), { fallbackLink: c.link || undefined }).catch(() => null))?.render
+  : undefined;
+ await sendStoreCampaign({ storeSlug, storeName: sender.fromName, storeEmail: sender.replyTo, fromAddress: sender.fromAddress, subject: c.subject.slice(0, 200), body: c.body.slice(0, 10000), link: c.link || undefined, brand, recipients, renderHtml } as any);
  return { recipientCount: recipients.length };
 }
 
@@ -174,7 +183,7 @@ export async function sendDueCampaigns(now: Date): Promise<{ sent: number; recip
  let sent = 0, recipients = 0, failed = 0;
  for (const row of due) {
  try {
- const r = await deliverCampaign(row.store_slug, { subject: row.subject, body: row.body, link: row.link, segment: row.segment });
+ const r = await deliverCampaign(row.store_slug, { subject: row.subject, body: row.body, link: row.link, segment: row.segment, design: row.design });
  await sql`UPDATE store_campaigns SET status = 'sent', sent_at = now(), recipient_count = ${r.recipientCount} WHERE id = ${row.id}`;
  sent++; recipients += r.recipientCount;
  } catch (err) {

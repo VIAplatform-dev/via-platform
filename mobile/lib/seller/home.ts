@@ -43,8 +43,8 @@ export function percentDelta(current: number, prior: number): number | null {
  * does — often standing in a post office queue — so this outranks every other number on the screen.
  */
 export function ordersToPostLabel(count: number): string {
-  if (count === 0) return "Nothing to post";
-  return `${count} ${count === 1 ? "order" : "orders"} to post`;
+  if (count === 0) return "Nothing to ship";
+  return `${count} ${count === 1 ? "order" : "orders"} to ship`;
 }
 
 /** The Inventory tile's second line: what is live, and what is still waiting to be finished. */

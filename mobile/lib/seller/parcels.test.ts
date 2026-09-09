@@ -37,9 +37,9 @@ test("status is the least-advanced piece; refunded pieces leave the bag", () => 
 test("to post counts bags by post; the Home line says parcels", () => {
   const parcels = groupIntoParcels([o("a", { paymentIntent: "pi_1" }), o("b", { paymentIntent: "pi_1" }), o("c", { paymentIntent: "pi_2" }), o("d", { paymentIntent: "pi_3", deliveryMethod: "pickup" }), o("e", { paymentIntent: "pi_4", status: "shipped" })]);
   assert.equal(parcelsToPost(parcels).length, 2);
-  assert.equal(parcelsToPostLabel(0), "Nothing to post");
-  assert.equal(parcelsToPostLabel(1), "1 parcel to post");
-  assert.equal(parcelsToPostLabel(3), "3 parcels to post");
+  assert.equal(parcelsToPostLabel(0), "Nothing to ship");
+  assert.equal(parcelsToPostLabel(1), "1 package to ship");
+  assert.equal(parcelsToPostLabel(3), "3 packages to ship");
 });
 
 test("a parcel carries whichever piece's label and tracking", () => {

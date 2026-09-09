@@ -69,14 +69,16 @@ function panTileImage(e: React.PointerEvent, pos: string | undefined, commit: (v
  window.addEventListener("pointerup", up);
 }
 
-// A little ✕ in the corner of a tile (edit mode only): one click clears the photo, or removes the
-// whole tile if it has no photo. Matches "I should be able to just delete the photos."
-function TileDelete({ hasImg, onClear, onRemove }: { hasImg: boolean; onClear: () => void; onRemove: () => void }) {
+// A little ✕ in the corner of a tile (edit mode only): one click removes the tile. It used to clear
+// the photo first and only delete the tile on a second click — so a seller trying to get rid of six
+// template tiles clicked ✕ six times, watched the photos vanish, and reported she couldn't delete
+// them. Clearing just the photo is its own "Remove" pill beside "Replace" (see Tile / circles).
+function TileDelete({ onRemove }: { onRemove: () => void }) {
  return (
   <button
    type="button"
-   title={hasImg ? "Remove this photo" : "Delete this tile"}
-   onClick={(e) => { e.preventDefault(); e.stopPropagation(); (hasImg ? onClear : onRemove)(); }}
+   title="Delete this tile"
+   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
    className="absolute right-1.5 top-1.5 z-20 grid h-6 w-6 place-items-center rounded-full bg-white/95 text-stone-600 opacity-0 shadow ring-1 ring-black/10 transition group-hover:opacity-100 hover:text-red-600"
   >×</button>
  );
@@ -93,7 +95,7 @@ function Tile({ kit, t, i, setLabel, setImg, ratio, rounded }: { kit: EditKit; t
  const { ctx } = kit;
  return (
   <a href={ctx.edit ? undefined : tileHref(ctx, t.label)} className={`vya-round group relative block ${ratio} ${rounded || ""} overflow-hidden`} style={{ background: t.img ? undefined : `${ctx.fg}12` }}>
-   {ctx.edit && (() => { const all = kit.items(S); return <TileDelete hasImg={!!t.img} onClear={() => kit.setItems(S, all.map((x, j) => (j === i ? { ...x, img: "" } : x)))} onRemove={() => kit.setItems(S, all.filter((_, j) => j !== i))} />; })()}
+   {ctx.edit && <TileDelete onRemove={() => kit.setItems(S, kit.items(S).filter((_, j) => j !== i))} />}
    {t.img && <img src={t.img} alt={t.label} loading="lazy" draggable={false} className="absolute inset-0 h-full w-full select-none object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.05]" style={t.pos ? { objectPosition: t.pos } : undefined} />}
    {t.img && <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />}
    {/* Editor: the tile's photo area. Empty → click to add. Filled → drag to reposition the crop,
@@ -108,7 +110,10 @@ function Tile({ kit, t, i, setLabel, setImg, ratio, rounded }: { kit: EditKit; t
      className={`absolute inset-x-0 top-0 bottom-14 z-10 grid place-items-center ${t.img ? "cursor-grab" : "cursor-pointer"}`}
     >
      {t.img
-      ? <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onPickImage!((url) => setImg(i, url)); }} className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-800 opacity-0 transition-opacity group-hover:opacity-100">Replace</button>
+      ? <span className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+         <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onPickImage!((url) => setImg(i, url)); }} className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-800">Replace</button>
+         <button type="button" title="Remove this photo (keeps the tile)" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); kit.setItems(S, kit.items(S).map((x, j) => (j === i ? { ...x, img: "" } : x))); }} className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-800">Remove</button>
+        </span>
       : <span className="rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-current opacity-45">Add photo</span>}
     </span>
    )}
@@ -189,7 +194,7 @@ function CollectionsCircles({ kit }: { kit: EditKit }) {
    <div className="flex flex-wrap justify-center gap-6 @xl:gap-9">
     {tiles.slice(0, 8).map((t, i) => (
      <a key={i} href={ctx.edit ? undefined : tileHref(ctx, t)} className="group relative flex w-24 flex-col items-center gap-3 @xl:w-28">
-      {ctx.edit && <TileDelete hasImg={!!t.img} onClear={() => clearImg(i)} onRemove={() => removeTile(i)} />}
+      {ctx.edit && <TileDelete onRemove={() => removeTile(i)} />}
       <span
        className={`relative block h-24 w-24 overflow-hidden rounded-full @xl:h-28 @xl:w-28 ${canEdit ? (t.img ? "cursor-grab" : "cursor-pointer") : ""}`}
        style={{ background: t.img ? undefined : `${ctx.fg}12` }}
@@ -201,8 +206,10 @@ function CollectionsCircles({ kit }: { kit: EditKit }) {
        {t.img && <img src={t.img} alt={t.label} loading="lazy" draggable={false} className="absolute inset-0 h-full w-full select-none object-cover transition-transform duration-[800ms] ease-out group-hover:scale-[1.07]" style={t.pos ? { objectPosition: t.pos } : undefined} />}
        {ctx.edit && !t.img && <span className="absolute inset-0 grid place-items-center text-[9px] uppercase tracking-[0.14em] opacity-45">Photo</span>}
        {canEdit && t.img && (
-        <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onPickImage!((url) => setImg(i, url)); }}
-         className="absolute inset-x-0 bottom-0 grid place-items-center bg-black/40 py-1 text-[8px] font-semibold uppercase tracking-[0.14em] text-white opacity-0 transition-opacity group-hover:opacity-100">Replace</button>
+        <span className="absolute inset-x-0 bottom-0 flex items-stretch bg-black/40 text-[8px] font-semibold uppercase tracking-[0.14em] text-white opacity-0 transition-opacity group-hover:opacity-100">
+         <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); ctx.onPickImage!((url) => setImg(i, url)); }} className="flex-1 py-1">Replace</button>
+         <button type="button" title="Remove this photo (keeps the tile)" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); clearImg(i); }} className="flex-1 border-l border-white/30 py-1">Remove</button>
+        </span>
        )}
       </span>
       <span {...kit.txtItem(t.label, (val) => setLabel(i, val))} className={`text-center uppercase tracking-[0.14em] opacity-75 ${kit.p.tileSizePx ? "" : "text-[11px]"}`} style={captionStyle(kit)} />

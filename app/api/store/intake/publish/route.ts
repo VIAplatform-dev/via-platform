@@ -14,7 +14,6 @@ import { recordIntakeExample } from "@/app/lib/training-data-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 import { normalizeFlaws } from "@/app/lib/flaws-core";
-import { parseAcquiredAt } from "@/app/lib/lot-core";
 import { resolveParcelAtPublish } from "@/app/lib/parcel-core";
 import { normalizeMeasurements, unitFor } from "@/app/lib/measurements-core";
 
@@ -94,12 +93,6 @@ export async function POST(request: NextRequest) {
  // The AI's flaws list (or the seller's own), kept as a list so the product page can print it
  // under Condition rather than losing it in the description.
  flaws: normalizeFlaws(body.flaws, str(body.condition, 80)),
- // Where it came from and when — batch-level on the phone's Add many, per piece on the web. The
- // phone mints one lot id per batch and sends it on every row, so a batch listed there is a lot
- // exactly as a web "Set source / lot" makes one.
- sourceName: str(body.sourceName, 80),
- acquiredAt: parseAcquiredAt(body.acquiredAt),
- lotId: typeof body.lotId === "string" && /^lot_[a-z0-9]{6,32}$/.test(body.lotId) ? body.lotId : null,
  weightOz: parcel.weightOz,
  lengthIn: parcel.lengthIn,
  widthIn: parcel.widthIn,

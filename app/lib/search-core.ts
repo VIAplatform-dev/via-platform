@@ -12,7 +12,6 @@ export type SearchableItem = {
  category?: string | null;
  size?: string | null;
  status: string;
- sourceName?: string | null;
  flaws?: unknown;
  conditionNote?: string | null;
 };
@@ -20,7 +19,7 @@ export type SearchableItem = {
 /** One lowercase string per item: everything a query may match against. */
 export function itemSearchText(it: SearchableItem): string {
  const flaws = Array.isArray(it.flaws) ? it.flaws.filter((f): f is string => typeof f === "string") : [];
- return [`SKU-${1000 + it.sku}`, it.title, it.brand || "", it.category || "", it.size || "", it.status, it.sourceName || "", ...flaws, it.conditionNote || ""]
+ return [`SKU-${1000 + it.sku}`, it.title, it.brand || "", it.category || "", it.size || "", it.status, ...flaws, it.conditionNote || ""]
   .join(" ")
   .toLowerCase();
 }

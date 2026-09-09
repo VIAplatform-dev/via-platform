@@ -182,7 +182,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
   : `<div style="font-family:${heading};font-size:22px;letter-spacing:0.02em;color:${text};">${name}</div>`;
 
  const eyebrow = o.eyebrow
-  ? `<div style="font-family:${body};font-size:12px;letter-spacing:0.14em;text-transform:uppercase;line-height:1.5;color:${text};opacity:0.7;padding:0 0 14px;">${esc(plainText(o.eyebrow))}</div>`
+  ? `<div style="font-family:${body};font-size:12px;letter-spacing:0.08em;line-height:1.5;color:${text};opacity:0.7;padding:0 0 14px;">${esc(plainText(o.eyebrow))}</div>`
   : "";
 
  // The headline is the email. Big, serif, and short enough to read in one go.
@@ -281,7 +281,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
 
  const statementBlock = `
   <tr><td style="background:${accent};padding:44px 32px;text-align:center;">
-   ${o.eyebrow ? `<div style="font-family:${body};font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#ffffff;opacity:0.75;padding:0 0 14px;">${esc(plainText(o.eyebrow))}</div>` : ""}
+   ${o.eyebrow ? `<div style="font-family:${body};font-size:11px;letter-spacing:0.08em;color:#ffffff;opacity:0.75;padding:0 0 14px;">${esc(plainText(o.eyebrow))}</div>` : ""}
    <div style="font-family:${heading};font-size:34px;line-height:1.15;color:#ffffff;">${esc(plainText(o.headline))}</div>
    ${o.subhead ? `<div style="font-family:${body};font-size:13px;line-height:1.6;color:#ffffff;opacity:0.85;padding:14px 0 0;">${esc(plainText(o.subhead))}</div>` : ""}
    ${btnUrl ? `<div style="padding:22px 0 0;"><a href="${btnUrl}" style="display:inline-block;background:#ffffff;color:${accent};text-decoration:none;font-family:${body};font-size:12px;letter-spacing:0.08em;text-transform:uppercase;padding:13px 30px;border-radius:${radius};">${esc(o.button?.label || b.buttonLabel || "Shop now")}</a></div>` : ""}
@@ -294,7 +294,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
 
  const editorialBlock = `
   <tr><td style="border-top:1px solid ${text}22;border-bottom:1px solid ${text}22;padding:38px 24px;text-align:center;">
-   ${o.eyebrow ? `<div style="font-family:${body};font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:${text};opacity:0.55;padding:0 0 16px;">${esc(plainText(o.eyebrow))}</div>` : ""}
+   ${o.eyebrow ? `<div style="font-family:${body};font-size:11px;letter-spacing:0.08em;color:${text};opacity:0.55;padding:0 0 16px;">${esc(plainText(o.eyebrow))}</div>` : ""}
    <div style="font-family:${heading};font-size:28px;line-height:1.35;color:${text};">${esc(plainText(o.headline))}</div>
    ${o.subhead ? `<div style="font-family:${body};font-size:13px;line-height:1.7;color:${text};opacity:0.7;padding:16px 40px 0;">${esc(plainText(o.subhead))}</div>` : ""}
    ${button}

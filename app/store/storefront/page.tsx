@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useInSiteDialog } from "@/app/components/InSiteDialog";
 import { withStore } from "@/app/infrastructure/admin/market/ui";
 import { applyPageOrder, movePage } from "@/app/lib/page-order";
 import { SECTION_CATEGORIES, categoryFor, variantGroup } from "@/app/lib/storefront-variants";
@@ -41,6 +42,7 @@ const FONT_PAIRS: { name: string; heading: string; body: string }[] = [
 const money = (c: number | null, cur: string) => (c == null ? "" : new Intl.NumberFormat("en-US", { style: "currency", currency: cur || "USD", maximumFractionDigits: 0 }).format(c / 100));
 
 export default function StorefrontEditor() {
+ const dialog = useInSiteDialog();
  const base = useStoreBase();
  const [loading, setLoading] = useState(true);
  const [tab, setTab] = useState<"design" | "sections" | "assets" | "details" | "domain">("sections");
@@ -470,8 +472,8 @@ export default function StorefrontEditor() {
  if (cmd === "foreColor") document.execCommand("styleWithCSS", false, "false");
  }
 
- function addPage() {
- const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
+ async function addPage() {
+ const title = await dialog.prompt({ title: "Name the new page", placeholder: "About, FAQ, Shipping…", confirmLabel: "Add page" });
  if (!title || !title.trim()) return;
  let slug = pageSlugify(title);
  const taken = new Set(["home", "shop", ...extraPages.map((p) => p.slug)]);
@@ -479,8 +481,9 @@ export default function StorefrontEditor() {
  setExtraPages((ps) => [...ps, { slug, title: title.trim().slice(0, 60), blocks: [] }]);
  setActiveSlug(slug); setSaved(false);
  }
- function deletePage(slug: string) {
- if (!window.confirm("Delete this page?")) return;
+ async function deletePage(slug: string) {
+ const page = extraPages.find((p) => p.slug === slug);
+ if (!(await dialog.confirm({ title: `Delete “${page?.title || slug}”?`, body: "Everything on the page goes with it.", confirmLabel: "Delete page" }))) return;
  setExtraPages((ps) => ps.filter((p) => p.slug !== slug));
  if (activeSlug === slug) setActiveSlug("home");
  setSaved(false);
@@ -509,7 +512,7 @@ export default function StorefrontEditor() {
 
  // Admin-only: wipe this storefront entirely (settings, design, pages, public URL) and reopen blank.
  async function removeStorefront() {
- if (!confirm("DELETE STOREFRONT: wipes this store’s ENTIRE imported site — settings, design, captured pages, public URL, AND all imported inventory. This can’t be undone. Continue?")) return;
+ if (!(await dialog.confirm({ title: "Delete this storefront?", body: "Wipes the entire imported site — settings, design, captured pages, public URL, and all imported inventory. This can’t be undone.", confirmLabel: "Delete everything" }))) return;
  setDelBusy(true);
  const r = await fetch(withStore("/api/store/storefront"), { method: "DELETE" }).catch(() => null);
  if (r && r.ok) { window.location.reload(); return; }
@@ -540,7 +543,7 @@ export default function StorefrontEditor() {
  try { const r = await fetch(withStore("/api/store/domain"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify" }) }); const d = await r.json(); if (r.ok) setDom((x) => ({ ...x, status: d.status })); else setDomErr(d.error || "Check failed."); } catch { setDomErr("Check failed."); }
  setDomBusy(false);
  }
- async function disconnectDomain() { if (!confirm("Disconnect this domain?")) return; setDomBusy(true); await fetch(withStore("/api/store/domain"), { method: "DELETE" }); setDom((x) => ({ ...x, domain: null, status: null })); setDomBusy(false); }
+ async function disconnectDomain() { if (!(await dialog.confirm({ title: "Disconnect this domain?", body: "Your storefront stays live on its VYA address.", confirmLabel: "Disconnect" }))) return; setDomBusy(true); await fetch(withStore("/api/store/domain"), { method: "DELETE" }); setDom((x) => ({ ...x, domain: null, status: null })); setDomBusy(false); }
  async function searchDomain() {
  const q = dsearch.trim(); if (!q) return;
  setDsBusy(true); setDres(null); setShowBuy(false); setBuyMsg(null);
@@ -624,6 +627,7 @@ export default function StorefrontEditor() {
  );
  return (
  <div className="fixed inset-x-0 bottom-0 z-[60] flex flex-col bg-[#fbf9f5] text-stone-900" style={{ top: "var(--vya-banner, 0px)" }}>
+ {dialog.node}
  <HideGlobalChat />
  {/* Top bar — matches the studio */}
  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
@@ -911,7 +915,7 @@ export default function StorefrontEditor() {
  <div className="mt-5 space-y-2 border-t border-black/10 pt-4">
  <button onClick={reSync} disabled={syncBusy} className="w-full rounded-lg border border-black/15 px-3 py-1.5 text-[12px] font-medium text-stone-600 hover:border-[#5D0F17] disabled:opacity-50">{syncBusy ? "Syncing…" : "Re-sync from live site (admin)"}</button>
  {(syncBusy || syncMsg) && <p className={`text-[11px] ${syncBusy ? "text-stone-400" : syncMsg!.startsWith("✓") ? "text-green-700" : "text-amber-700"}`}>{syncBusy ? "Re-crawling — a minute or two…" : syncMsg}</p>}
- <button onClick={async () => { if (!confirm("OWNER RESET: discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone — continue?")) return; const r = await fetch(withStore("/api/store/capture"), { method: "DELETE" }).catch(() => null); if (r && r.ok) { window.location.reload(); } else { const msg = r ? ((await r.json().catch(() => ({}))).error || `Reset failed (${r.status}).`) : "Reset failed — network error."; alert(msg + " The captured site was NOT removed."); } }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
+ <button onClick={async () => { if (!(await dialog.confirm({ title: "Reset this store?", body: "discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone.", confirmLabel: "Reset" }))) return; const r = await fetch(withStore("/api/store/capture"), { method: "DELETE" }).catch(() => null); if (r && r.ok) { window.location.reload(); } else { const msg = r ? ((await r.json().catch(() => ({}))).error || `Reset failed (${r.status}).`) : "Reset failed — network error."; alert(msg + " The captured site was NOT removed."); } }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
  </div>
  )}
  {isPlatformAdmin && (

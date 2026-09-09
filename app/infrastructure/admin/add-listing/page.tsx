@@ -134,9 +134,6 @@ export default function IntakePage() {
  const units = useStoreUnits(withStore);
  // Provenance (owner audit #18): where it came from and when — hers, never shown to shoppers. The
  // same two fields the inventory editor has; the datalist is her own previous source names.
- const [sourceName, setSourceName] = useState("");
- const [acquiredAt, setAcquiredAt] = useState("");
- const [sourceNames, setSourceNames] = useState<string[]>([]);
  const [promptVersion, setPromptVersion] = useState<string | null>(null);
  const [seoBusy, setSeoBusy] = useState(false);
  const [schedule, setSchedule] = useState(""); // datetime-local value for scheduled publish
@@ -188,12 +185,6 @@ export default function IntakePage() {
  useEffect(() => {
  fetch(withStore("/api/store/pricing")).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d && typeof d.minMarkupPct === "number") setMarkupPct(d.minMarkupPct); }).catch(() => {});
  fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
- // Her previous source names, for the "Where it came from" datalist — derived from her pieces
- // exactly as the inventory editor derives them.
- fetch(withStore("/api/store/items")).then((r) => (r.ok ? r.json() : null)).then((d) => {
- const names = Array.from(new Set(((d?.items || []) as { sourceName?: string | null }[]).map((i) => (i.sourceName || "").trim()).filter(Boolean))).sort();
- setSourceNames(names);
- }).catch(() => {});
  }, []);
 
  // ── Auto-save the in-progress listing as a DRAFT, so leaving before publish/schedule never loses it.
@@ -555,7 +546,6 @@ export default function IntakePage() {
  // Structure: the flaws list (with whatever is still in the box), the note, the template's numbers
  // (empties omitted; a list wins over the old free-text field), and the AI's parcel so publish can
  // keep the estimate and fill a weight she never typed (parcel-core.ts).
- sourceName, acquiredAt: acquiredAt || null,
  flaws: newFlaw.trim() ? [...flaws, newFlaw.trim()] : flaws, conditionNote, measurements: Object.values(measurements).some((v) => v && v.trim()) ? measurementsFromForm(measurements, units.unit) : form.measurements || null, parcel: aiParcel, photo: photos[0] ?? null, embedding, marketCents: rawMarketCents, aiConfidence, runway, celebrity, reverseImage, promptVersion, reviewed: allConfirmed, channels: Object.keys(channels).filter((k) => channels[k]), consignment: consigned && consign.consignorId ? { consignorId: Number(consign.consignorId), splitPct: consign.split ? Number(consign.split) : null, expiresAt: consign.expiresAt || null } : null }),
  });
  const d = await r.json();
@@ -592,7 +582,7 @@ export default function IntakePage() {
  function reset() {
  draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
  setPhase("form"); setPhotos([]); setSelPhoto(0); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
- setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false); setSourceName(""); setAcquiredAt("");
+ setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
  setReverseImage(null); setSpecificPiece(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setAiPhoto(null); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
  }
 
@@ -818,9 +808,6 @@ export default function IntakePage() {
  <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, marketPrice, priceLow, priceHigh)); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
  <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
  </div>
- {/* Where it came from and Acquired on came off the form — sourcing ROI is worth having, but
-     not at the cost of two more boxes between a photo and a price. Both still live in the
-     inventory editor, where a seller goes deliberately rather than forty times an afternoon. */}
  {priceLow != null && priceHigh != null && priceHigh > priceLow && (
  <PriceScale low={priceLow} high={priceHigh} market={marketPrice} value={Number(form.price) || 0} />
  )}

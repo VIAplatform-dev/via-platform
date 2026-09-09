@@ -50,11 +50,8 @@ export async function ensurePublishAtColumn(): Promise<void> {
  // out to the channels they picked when the cron publishes it hours later. NULL means
  // "no explicit choice" — fall back to each channel's auto-list default.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS cross_list_channels text[]`);
- // Flaws as a list, and where the piece came from (see schema.ts). Additive + nullable.
+ // Flaws as a list (see schema.ts). Additive + nullable.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS flaws jsonb DEFAULT '[]'::jsonb`);
- await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS source_name text`);
- await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS acquired_at date`);
- await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS lot_id text`);
  // Structured measurements, the condition note, and the kept parcel estimate (see schema.ts).
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS measurements_json jsonb`);
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS condition_note text`);
@@ -79,7 +76,7 @@ export async function publishDueScheduledItems(now: Date): Promise<Item[]> {
  * touch availability locks (use reserve/markSold for those). */
 export async function updateItem(
  itemId: string,
- patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn" | "publishAt" | "source" | "colour" | "flaws" | "sourceName" | "acquiredAt" | "lotId" | "measurementsJson" | "conditionNote" | "parcelEstimate">>,
+ patch: Partial<Pick<NewItem, "title" | "priceCents" | "costCents" | "currency" | "images" | "brand" | "era" | "material" | "condition" | "size" | "measurements" | "description" | "category" | "status" | "weightOz" | "lengthIn" | "widthIn" | "heightIn" | "publishAt" | "source" | "colour" | "flaws" | "measurementsJson" | "conditionNote" | "parcelEstimate">>,
 ): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ ...patch, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
@@ -443,30 +440,29 @@ export async function listSellerItems(sellerId: string): Promise<(Item & { sku: 
 }
 
 /**
- * Write a lot onto a batch: where the pieces came from, when, the lot id, and each piece's share of
- * the lot cost (already split by app/lib/lot-core.ts — this only records). Seller-scoped, so ids
- * from another store are skipped. Only the fields given are touched; a cost of undefined leaves the
- * piece's existing cost alone. Returns how many rows changed.
+ * Write a cost onto each of a batch of pieces — already divided by app/lib/cost-split.ts, this only
+ * records. Seller-scoped, so ids from another store are skipped; a piece with no entry in `costs`
+ * keeps the cost it has. Returns how many rows changed.
+ *
+ * Was `applyLot`, which also wrote a batch's source, acquired date and lot id. Those were removed;
+ * dividing what a batch cost is a separate thing and the margin report still needs it.
  */
-export async function applyLot(sellerId: string, ids: string[], lot: { sourceName?: string | null; acquiredAt?: string | null; lotId?: string | null; costs?: Record<string, number> }): Promise<number> {
+export async function setItemCosts(sellerId: string, ids: string[], costs: Record<string, number>): Promise<number> {
  if (!ids.length) return 0;
  await ensurePublishAtColumn();
  const db = getDb();
  const now = new Date();
  let n = 0;
  for (const id of ids) {
- const patch: Partial<NewItem> & { updatedAt: Date } = { updatedAt: now };
- if (lot.sourceName !== undefined) patch.sourceName = lot.sourceName;
- if (lot.acquiredAt !== undefined) patch.acquiredAt = lot.acquiredAt;
- if (lot.lotId !== undefined) patch.lotId = lot.lotId;
- if (lot.costs && typeof lot.costs[id] === "number") patch.costCents = lot.costs[id];
+ if (typeof costs[id] !== "number") continue;
+ const patch: Partial<NewItem> & { updatedAt: Date } = { updatedAt: now, costCents: costs[id] };
  const rows = await db.update(items).set(patch).where(and(eq(items.id, id), eq(items.sellerId, sellerId))).returning({ id: items.id });
  n += rows.length;
  }
  return n;
 }
 
-/** Prices for a set of the seller's items — the weights a proportional lot split uses. */
+/** Prices for a set of the seller's items — the weights a proportional cost split uses. */
 export async function priceWeights(sellerId: string, ids: string[]): Promise<Record<string, number>> {
  if (!ids.length) return {};
  const db = getDb();

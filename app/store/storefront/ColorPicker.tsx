@@ -3,7 +3,7 @@
 // The visual colour picker used across the storefront editors — a draggable saturation/value square + a
 // hue bar + a hex field (like Figma/Canva), plus a swatch that opens it in a popover. Shared so both the
 // blocks studio and the captured-site editor use the exact same control (never the native OS picker).
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 // A hex-code field so sellers can type/paste a colour (e.g. #5A0E17). Applies only on a valid 6-digit hex.
@@ -41,6 +41,47 @@ export function hsvToHex(h: number, s: number, v: number): string {
  const hx = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, "0");
  return `#${hx(r)}${hx(g)}${hx(b)}`;
 }
+// The eyedropper — sellers asked to sample a colour they can already see (the live preview behind the
+// popover, a product photo, another swatch) instead of copying a hex. The native EyeDropper API hands
+// back the pixel under the cursor anywhere on screen. Chrome/Edge only, so the button renders only where
+// it works rather than showing a control that does nothing (Safari/Firefox keep the hex field).
+type EyeDropperOpen = { open: (opts?: { signal?: AbortSignal }) => Promise<{ sRGBHex: string }> };
+declare global { interface Window { EyeDropper?: new () => EyeDropperOpen } }
+
+export function EyeDropperButton({ onPick }: { onPick: (hex: string) => void }) {
+ const [supported, setSupported] = useState(false); // resolved in an effect so SSR and the first client render match
+ const [picking, setPicking] = useState(false);
+ useEffect(() => { setSupported(typeof window.EyeDropper === "function"); }, []);
+ if (!supported) return null;
+ const pick = async (e: React.MouseEvent) => {
+ e.stopPropagation();
+ if (picking) return;
+ setPicking(true);
+ try {
+ const { sRGBHex } = await new window.EyeDropper!().open();
+ if (/^#[0-9a-f]{6}$/i.test(sRGBHex)) onPick(sRGBHex.toLowerCase());
+ } catch {
+ // Esc / dismissed — keep the current colour.
+ } finally {
+ setPicking(false);
+ }
+ };
+ return (
+ <button
+ type="button"
+ onClick={pick}
+ title="Pick a colour from anywhere on screen"
+ aria-label="Pick a colour from anywhere on screen"
+ className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border transition ${picking ? "border-[#5D0F17] bg-[#5D0F17] text-white" : "border-black/10 bg-white text-stone-500 hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"}`}
+ >
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+ <path d="m2 22 1-1h3l9-9" />
+ <path d="M3 21v-3l9-9" />
+ <path d="m15 6 3.4-3.4a2.1 2.1 0 0 1 3 3L18 9l.4.4a1 1 0 1 1-3 3l-3.8-3.8a1 1 0 1 1 3-3l.4.4Z" />
+ </svg>
+ </button>
+ );
+}
 export function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
  const [hsv, setHsv] = useState(() => hexToHsv(value));
  const [last, setLast] = useState(value);
@@ -76,7 +117,8 @@ export function ColorPicker({ value, onChange }: { value: string; onChange: (v: 
  </div>
  <div className="mt-3 flex items-center gap-2">
  <span className="h-6 w-6 shrink-0 rounded-md ring-1 ring-black/10" style={{ background: value }} />
- <HexInput value={value} onChange={onChange} className="w-full rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] uppercase text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ <HexInput value={value} onChange={onChange} className="w-full min-w-0 rounded-md border border-black/10 bg-white px-2 py-1 text-[12px] uppercase text-stone-700 outline-none focus:border-[#5D0F17]/50" />
+ <EyeDropperButton onPick={onChange} />
  </div>
  </div>
  );
@@ -86,13 +128,29 @@ export function ColorPicker({ value, onChange }: { value: string; onChange: (v: 
 // `position: fixed` resolve against that ancestor (not the viewport), re-clipping the popover (e.g. the
 // element toolbar, which is translateX(-50%) + overflow-x-auto — the swatch popover was invisible there).
 export function PickerPopover({ anchor, value, onChange, onClose }: { anchor: DOMRect; value: string; onChange: (v: string) => void; onClose: () => void }) {
- const top = anchor.bottom + 6;
+ // Below the swatch by default. But a swatch near the foot of a long scrolled panel — Accent, at the
+ // bottom of the Design sidebar — left the popover hanging off the window: the hex field and the
+ // eyedropper were simply not on screen, which reads as "that control disappears at some scroll
+ // positions". So it flips above the swatch when it won't fit below, and clamps either way.
+ //
+ // Measured in a ref callback (commit phase, before paint) rather than from a hardcoded height: no
+ // setState, no second render, and it stays right if the picker ever grows another row. `top` is set
+ // imperatively and deliberately left OUT of the style prop below — dragging the saturation square
+ // re-renders this popover on every pointer move, and a `top` in the prop would be rewritten to the
+ // un-flipped value each time (the callback only re-runs when the anchor changes), so the popover
+ // would jump back down mid-drag. A property React never sets is a property it never resets.
+ const place = useCallback((el: HTMLDivElement | null) => {
+ if (!el) return;
+ const h = el.offsetHeight, vh = window.innerHeight, below = anchor.bottom + 6;
+ const t = below + h > vh - 8 ? anchor.top - h - 6 : below;
+ el.style.top = `${Math.max(8, Math.min(t, vh - h - 8))}px`;
+ }, [anchor]);
  const left = Math.max(8, Math.min(anchor.left, (typeof window !== "undefined" ? window.innerWidth : 1200) - 232));
  if (typeof document === "undefined") return null;
  return createPortal(
  <>
  <button type="button" aria-label="Close" className="fixed inset-0 z-[68] cursor-default" onClick={(e) => { e.stopPropagation(); onClose(); }} />
- <div style={{ position: "fixed", top, left }} className="z-[70] w-56 rounded-xl border border-black/10 bg-white p-3 shadow-[0_18px_44px_-12px_rgba(43,36,29,0.45)]" onClick={(e) => e.stopPropagation()}>
+ <div ref={place} style={{ position: "fixed", left }} className="z-[70] w-56 rounded-xl border border-black/10 bg-white p-3 shadow-[0_18px_44px_-12px_rgba(43,36,29,0.45)]" onClick={(e) => e.stopPropagation()}>
  <ColorPicker value={value} onChange={onChange} />
  </div>
  </>,

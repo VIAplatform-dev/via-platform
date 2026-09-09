@@ -6,7 +6,6 @@ import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collecti
 import { delistEverywhere } from "@/app/lib/cross-listing-db";
 import { placeHold, releaseHold } from "@/app/lib/holds-db";
 import { normalizeFlaws } from "@/app/lib/flaws-core";
-import { parseAcquiredAt } from "@/app/lib/lot-core";
 import { normalizeMeasurements, unitFor, type Measurement } from "@/app/lib/measurements-core";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
 import { publishRefusal } from "@/app/lib/setup-gate-core";
@@ -83,7 +82,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
 }
 
 // PATCH — full edit of one of the acting store's items: title, price, cost, brand, era, material, colour,
-// condition, size, category, description, status, images, shipping dims, flaws, source/acquired date,
+// condition, size, category, description, status, images, shipping dims, flaws,
 // and collections. Every field
 // is optional (only sent fields change). Works on any status, so drafts can be tweaked before going live.
 export async function PATCH(request: NextRequest, { params }: Ctx) {
@@ -108,7 +107,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
  title: string; priceCents: number; costCents: number | null; size: string | null; category: string | null; description: string | null;
  brand: string | null; era: string | null; material: string | null; colour: string | null; condition: string | null;
  status: (typeof STATUSES)[number]; images: string[]; weightOz: number | null; lengthIn: number | null; widthIn: number | null; heightIn: number | null;
- flaws: string[]; sourceName: string | null; acquiredAt: string | null;
+ flaws: string[];
  conditionNote: string | null; measurements: string | null; measurementsJson: Measurement[] | null;
  }> = {};
  if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim().slice(0, 200);
@@ -147,9 +146,6 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
  if (body.heightIn !== undefined) patch.heightIn = intOrNull(body.heightIn);
  // Flaws: an array (even empty) replaces the list. Normalised against the condition being saved.
  if (Array.isArray(body.flaws)) patch.flaws = normalizeFlaws(body.flaws, patch.condition !== undefined ? patch.condition : item.condition);
- // Where it came from + when. `sourceName`, never `source` (that's how the row got into VYA).
- if (body.sourceName !== undefined) patch.sourceName = trimOrNull(body.sourceName, 80);
- if (body.acquiredAt !== undefined) patch.acquiredAt = body.acquiredAt === null || body.acquiredAt === "" ? null : parseAcquiredAt(body.acquiredAt);
  // Collections (titles). Only touched when the field is sent; an array (even empty) sets membership.
  const cols = Array.isArray(body.collections)
  ? body.collections.filter((x: unknown) => typeof x === "string" && (x as string).trim()).map((x: string) => x.trim().slice(0, 80)).slice(0, 20)

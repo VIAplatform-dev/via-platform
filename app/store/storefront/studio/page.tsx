@@ -7,6 +7,7 @@
 // Blocks renderer (edit mode) + the design API. Every change autosaves; VYA's changes reload it.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useInSiteDialog } from "@/app/components/InSiteDialog";
 import { withStore } from "@/app/infrastructure/admin/market/ui";
 import { createPortal } from "react-dom";
 import { useStoreBase } from "../../nav-base";
@@ -15,6 +16,7 @@ import Blocks, { decodeEntities, effectiveSectionColors } from "@/app/s/Blocks";
 import { StoreHeader, StoreFooter, HEADER_LAYOUTS, DEFAULT_FOOTER_NEWSLETTER, type ChromeNav, type HeaderLayout } from "@/app/s/StoreChrome";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { makeBlock, makeOverlay, newBlockId, pageSlugify, blockDef, backgroundEmbedSrc, minSectionHeight, maxSectionHeight, type Block, type BlockType, type BlockStyle, type BgMedia, type FreeStyle, type Overlay, type OverlayKind, type StorePage } from "@/app/lib/storefront-blocks";
+import { pickTargetSection, type Rect, type SectionRect } from "@/app/lib/storefront-target-section";
 import { IMG_RADIUS, BTN_RADIUS } from "@/app/lib/storefront-chrome-css";
 import { resolveProductPage, reorderFields, visibleFields, canChip, FIELD_CATALOGUE, DEFAULT_ASSURANCE, DEFAULT_BACK_LABEL, DEFAULT_BUTTONS, BUTTON_RADII, SLOT_CATALOGUE, ADDABLE_SLOTS, isBuiltinSlot, REQUIRED_SLOT, type ProductPageConfig, type FieldMode, type ButtonStyle, type ProductSlot, type SlotKind } from "@/app/lib/storefront-product-page";
 import { STOREFRONT_TEMPLATES, templateBlocks, templateShopBlocks, templatePages, STOREFRONT_PALETTES, HEADING_FONTS, BODY_FONTS, SERIF_FONTS, ALL_STOREFRONT_FONTS, storefrontFontsHref, isTemplatePageSlug, PRODUCT_LAYOUTS, type StorefrontTemplate, type ProductLayout } from "@/app/lib/storefront-templates";
@@ -477,6 +479,7 @@ function FooterEmailPreview({ accent }: { accent: string }) {
 }
 
 export default function StorefrontStudio() {
+ const dialog = useInSiteDialog();
  // Return to whichever surface the studio was opened from (/store or /admin), not a
  // hardcoded /admin — otherwise "back" jumps surfaces and 404s from the seller portal.
  const base = useStoreBase();
@@ -1002,8 +1005,8 @@ export default function StorefrontStudio() {
   switchPage(page.slug);
  }
 
- function addBlankPage() {
-  const title = window.prompt("Page name (e.g. About, FAQ, Shipping)");
+ async function addBlankPage() {
+  const title = await dialog.prompt({ title: "Name the new page", placeholder: "About, FAQ, Shipping…", confirmLabel: "Add page" });
   if (!title || !title.trim()) return;
   let slug = pageSlugify(title);
   const taken = new Set(["home", "shop", "product", ...extraPages.map((p) => p.slug)]);
@@ -1019,8 +1022,27 @@ export default function StorefrontStudio() {
   if (missingTemplatePages.length === 0) { addBlankPage(); return; }
   setAddingPage(true);
  }
- function deletePage(slug: string) {
- if (!window.confirm("Delete this page?")) return;
+ // Home, Shop and Product have no ✕ in the page strip — Shop IS the catalogue and Product is the
+ // template every listing renders through, so a store without them has nothing to sell. Say so on
+ // hover; the sections inside them delete like anywhere else.
+ function builtInPageNote(slug: string): string | null {
+ if (slug === "shop") return "Shop — built in. Every store has one; delete or change the sections inside it instead.";
+ if (slug === "product") return "Product — built in. The template every listing uses; edit its layout under Design › Product page.";
+ if (slug === "home") return "Home — built in. Delete or change the sections inside it instead.";
+ return null;
+ }
+ // The strip used to label pages "7. Home", "1. Shop" — the number was the page's SECTION COUNT,
+ // but nobody reads a leading number as anything but an order, so it looked like broken numbering.
+ // The count now lives in the tooltip; the label is just the page's name.
+ function pageTileTitle(p: { slug: string; title: string; n: number }): string {
+ const note = builtInPageNote(p.slug);
+ if (p.slug === "product") return note || p.title;
+ const count = `${p.n} section${p.n === 1 ? "" : "s"}`;
+ return note ? `${note} (${count})` : `${p.title} · ${count}`;
+ }
+ async function deletePage(slug: string) {
+ const page = extraPages.find((p) => p.slug === slug);
+ if (!(await dialog.confirm({ title: `Delete “${page?.title || slug}”?`, body: "Everything on the page goes with it. ⌘Z brings it back if you change your mind.", confirmLabel: "Delete page" }))) return;
  setExtraPages((ps) => ps.filter((p) => p.slug !== slug));
  if (activeSlug === slug) switchPage("home");
  }
@@ -1066,7 +1088,7 @@ export default function StorefrontStudio() {
  const dropped = extraPages.filter((e) => isTemplatePageSlug(e.slug) && !incoming.some((p) => p.slug === e.slug));
  const droppedNote = dropped.length ? ` It removes ${dropped.length} page${dropped.length === 1 ? "" : "s"} from your current template (${dropped.map((p) => p.title).join(", ")}).` : "";
  const keptNote = kept.length ? ` Your own ${kept.length} page${kept.length === 1 ? "" : "s"} (${kept.map((p) => p.title).join(", ")}) stay.` : "";
- if (!window.confirm(`Switch to “${t.name}”? This restyles your store, replaces the Home and Shop page sections, and lays down its own ${incoming.length} pages (${incoming.map((p) => p.title).join(", ")}).${droppedNote}${keptNote} Your products and settings are unaffected.`)) return;
+ if (!(await dialog.confirm({ title: `Switch to “${t.name}”?`, body: `This restyles your store, replaces the Home and Shop page sections, and lays down its own ${incoming.length} pages (${incoming.map((p) => p.title).join(", ")}).${droppedNote}${keptNote} Your products and settings are unaffected.`, confirmLabel: "Switch template", tone: "primary" }))) return;
  setColors(t.colors);
  setBaseColors(t.colors);
  setFonts(t.fonts);
@@ -1608,54 +1630,32 @@ export default function StorefrontStudio() {
  // `form` was missing from both of these, so a form element listed itself as "Line" with a line's icon.
  const overlayLabel = (o: Overlay) => o.kind === "text" ? (o.props?.text || "Text") : o.kind === "button" ? (o.props?.label || "Button") : o.kind === "image" ? "Image" : o.kind === "rect" ? "Rectangle" : o.kind === "circle" ? "Circle" : o.kind === "form" ? (o.props?.title || "Form") : "Line";
  const OverlayIcon = (o: Overlay) => o.kind === "text" ? Type : o.kind === "button" ? MousePointerClick : o.kind === "image" ? ImageIcon : o.kind === "rect" ? Square : o.kind === "circle" ? Circle : o.kind === "form" ? AlignLeft : Minus;
- // Add an element to the SELECTED section (fallback: the last section on the page), then select it.
- // The section currently centered in the canvas viewport, by its `vya-b-<id>` class. Lets a newly
- // added element land where the user is looking instead of at the bottom of the page. Returns null
- // if the canvas isn't mounted or no section overlaps the viewport.
- // The section you're actually looking at = the one filling the most of the canvas right now, by
- // VISIBLE AREA. The old version used "center nearest the viewport middle", which broke on a tall
- // hero: a hero taller than the viewport has its center off-screen, so a shorter next section whose
- // center sits near the middle would win — and a button added "to the section in view" landed in the
- // wrong one. Most-visible-area gets it right: a hero filling the screen wins even with its center off.
- function sectionInViewId(): string | null {
+ /** Every section of the page being edited, measured, in DOM order. */
+ function measureSections(): { view: Rect; sections: SectionRect[] } | null {
  const c = canvasRef.current;
  if (!c) return null;
  const cr = c.getBoundingClientRect();
- let bestId: string | null = null, bestVisible = 0;
+ const sections: SectionRect[] = [];
  c.querySelectorAll<HTMLElement>(".vya-sec").forEach((sec) => {
- const r = sec.getBoundingClientRect();
- const visible = Math.max(0, Math.min(r.bottom, cr.bottom) - Math.max(r.top, cr.top));
- if (visible > bestVisible) {
  const cls = Array.from(sec.classList).find((k) => k.startsWith("vya-b-"));
- if (cls) { bestVisible = visible; bestId = cls.slice("vya-b-".length); }
- }
+ const id = cls?.slice("vya-b-".length);
+ // Only sections of the page being edited — the zoomed-out view renders other pages' canvases too,
+ // and an element must never land on a page the seller isn't looking at.
+ if (!id || !curBlocks.some((b) => b.id === id)) return;
+ const r = sec.getBoundingClientRect();
+ sections.push({ id, top: r.top, bottom: r.bottom });
  });
- return bestId;
- }
- /** Is this section at least partly on screen right now? Used so a stale selection that's been
-  *  scrolled away doesn't capture a new element meant for the section actually in view. */
- function isSectionOnScreen(blockId: string): boolean {
- const c = canvasRef.current;
- const sec = c?.querySelector<HTMLElement>(`.vya-b-${blockId}`);
- if (!c || !sec) return false;
- const cr = c.getBoundingClientRect(), r = sec.getBoundingClientRect();
- return r.bottom > cr.top && r.top < cr.bottom;
+ return { view: { top: cr.top, bottom: cr.bottom }, sections };
  }
  function addElement(kind: OverlayKind, extraProps?: Record<string, string>) {
- // Where the new element lands, in order:
- //  1. the selected section — but ONLY if it's still on screen (a selection you scrolled away from
- //     shouldn't hijack an element you're adding to the hero you're now looking at),
- //  2. otherwise the section filling the most of the canvas — what you're actually looking at,
- //  3. otherwise the selected section even if off-screen, then the last section.
- // This is the fix for "added a button and it went to the next section / clicked me out of hero":
- // the target is now the section in view, and we keep it selected below.
- const inView = sectionInViewId();
- const selUsable = selBlock && curBlocks.some((b) => b.id === selBlock);
- const targetId = (selUsable && isSectionOnScreen(selBlock!)) ? selBlock
- : (inView && curBlocks.some((b) => b.id === inView)) ? inView
- : selUsable ? selBlock
- : curBlocks[curBlocks.length - 1]?.id;
- if (!targetId) { setRailTab("sections"); window.alert("Add a section first, then drop elements onto it."); return; }
+ // Which section the new element belongs to is pure geometry — measured here, decided (and tested)
+ // in storefront-target-section.ts. Whatever it picks is selected below, so the answer is visible.
+ const m = measureSections();
+ const selUsable = selBlock && curBlocks.some((b) => b.id === selBlock) ? selBlock : null;
+ const targetId = (m ? pickTargetSection(m.view, m.sections, selUsable) : null)
+ ?? selUsable
+ ?? curBlocks[curBlocks.length - 1]?.id;
+ if (!targetId) { setRailTab("sections"); void dialog.alert({ title: "Add a section first", body: "Elements sit on a section — pick a layout, then drop this onto it." }); return; }
  const o = makeOverlay(kind);
  if (extraProps) o.props = { ...(o.props || {}), ...extraProps };
  updateCur((bs) => bs.map((b) => (b.id === targetId ? { ...b, overlays: [...(b.overlays || []), o] } : b)));
@@ -2375,10 +2375,21 @@ export default function StorefrontStudio() {
   <div className="absolute inset-0 z-10 transition group-hover/pv:bg-[#5D0F17]/[0.04] group-hover/pv:ring-2 group-hover/pv:ring-inset group-hover/pv:ring-[#5D0F17]/30" />
  </div>
  );
- // The site nav shown in the persistent header/footer — one entry per page, current page marked active.
- // The site's own nav — the pages a SHOPPER can reach. The product template is edited here but has
- // no URL, so listing it put a dead "Product" link in the header of every storefront.
- const chromeNav: ChromeNav[] = pageList.filter((p) => p.slug !== "product").map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
+ // The site's own nav — the pages a SHOPPER can reach, current page marked active. The product
+ // template is edited here but has no URL, so listing it put a dead "Product" link in the header of
+ // every storefront.
+ const pageNav: ChromeNav[] = pageList.filter((p) => p.slug !== "product").map((p) => ({ label: p.title, slug: p.slug, active: p.slug === activeSlug }));
+ // Plus the store's collections, between Shop and the extra pages. The live header lists those
+ // (StorefrontView's blockNav does); the editor listed pages only, so a store with two collections
+ // saw a five-item menu while editing and a seven-item one on its own site. Collections aren't
+ // editable pages — they're generated from inventory — so an entry opens the real page in a new tab
+ // rather than switching the canvas to something that can't be edited.
+ const collectionNav: ChromeNav[] = handle
+ ? collections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: `/s/${handle}/collections/${c.slug}?preview=1` }))
+ : [];
+ // pageNav is [Home, Shop, ...extraPages] once the product template is dropped, so index 2 is where
+ // the collections go.
+ const chromeNav: ChromeNav[] = [...pageNav.slice(0, 2), ...collectionNav, ...pageNav.slice(2)];
  // "View" means "show me THIS, live" — it used to always open the home page, so checking a change to
  // the shop or a product meant landing on the home page and navigating back to where you already
  // were. The product template has no URL of its own, so it opens the real listing it's drawn from.
@@ -2403,6 +2414,7 @@ export default function StorefrontStudio() {
  return (
  // fixed inset-0 z-[60] covers the portal sidebar + floating chat — a focused full-screen builder.
  <div className="fixed inset-x-0 bottom-0 z-[60] flex flex-col overflow-hidden bg-[#e7e3db] text-stone-800" style={{ top: "var(--vya-banner, 0px)" }}>
+ {dialog.node}
  {/* Upload error toast — says WHY an upload failed (too big, wrong type, offline). Click to dismiss. */}
  {uploadErr && (
  <div className="fixed left-1/2 top-4 z-[95] flex -translate-x-1/2 items-start gap-3 rounded-xl border border-red-200 bg-white px-4 py-3 shadow-[0_16px_44px_-12px_rgba(43,36,29,0.5)]" role="alert">
@@ -3739,7 +3751,7 @@ export default function StorefrontStudio() {
  <StoreHeader layout={headerLayout} storeName={storeName} logo={logo || null} nav={headerChromeNav} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={(item) => item.slug ? switchPage(item.slug) : item.href && window.open(item.href, "_blank")} search={<Search size={16} strokeWidth={1.8} />} />
  </div>
  {curBlocks.length > 0 ? (
- <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} words={resolveWords(words)} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setTextFocus(null); setSelFree(null); setFreeEditing(null); setSelChrome(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} freeEdit={freeEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} onFieldFocus={(blockId, key) => { setSelBlock(blockId); setSelOverlay(null); setTextFocus({ blockId, key }); setPanelOpen(true); }} onResizeSectionStart={onSectionResizeStart} onArrangeStart={onArrangeStart} onPickImage={pickAndUpload} onDropImage={dropAndUpload} skin={skin || undefined} />
+ <Blocks blocks={curBlocks} colors={colors} fonts={fonts} radius={radius} products={products} collections={collections} words={resolveWords(words)} onRemove={removeBlock} onSelect={(id) => { setSelBlock(id); setSelOverlay(null); setTextFocus(null); setSelFree(null); setFreeEditing(null); setSelChrome(null); setPanelOpen(true); }} selectedId={selOverlay ? null : selBlock} edit onEditField={editField} reorder={canvasReorder} overlayEdit={overlayEdit} freeEdit={freeEdit} onContentDragStart={onHeroContentDragStart} onFaqOp={faqOp} faqDnd={faqDnd} onFieldFocus={(blockId, key) => { setSelBlock(blockId); setSelOverlay(null); setTextFocus({ blockId, key }); setPanelOpen(true); }} onResizeSectionStart={onSectionResizeStart} onArrangeStart={onArrangeStart} onPickImage={pickAndUpload} onDropImage={dropAndUpload} skin={skin || undefined} />
  ) : activeSlug === "shop" || activeSlug === "product" ? null : (
  <div className="flex min-h-[280px] flex-col items-center justify-center gap-3 px-8 py-20 text-center">
  <p className="text-[14px] text-stone-400" style={{ fontFamily: ff(fonts.body) }}>This page is empty.</p>
@@ -3779,7 +3791,7 @@ export default function StorefrontStudio() {
  <div key={p.slug} className="group/pt flex shrink-0 flex-col items-center gap-1.5">
  {/* Tile + delete are SIBLINGS in a relative wrapper — a <button> can't nest inside a <button>. */}
  <div className="relative">
- <button type="button" onClick={() => switchPage(p.slug)} title={p.title} className={`relative grid h-[46px] w-[36px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${p.slug === activeSlug ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
+ <button type="button" onClick={() => switchPage(p.slug)} title={pageTileTitle(p)} className={`relative grid h-[46px] w-[36px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${p.slug === activeSlug ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"}`}>
  <div className="absolute inset-0 flex flex-col gap-0.5 p-1">
  <div className="h-1 w-3/4 rounded-full bg-stone-200" />
  <div className="h-[3px] w-full rounded-full bg-stone-100" />
@@ -3788,10 +3800,10 @@ export default function StorefrontStudio() {
  </div>
  </button>
  {p.slug !== "home" && p.slug !== "shop" && p.slug !== "product" && (
- <button type="button" onClick={(e) => { e.stopPropagation(); deletePage(p.slug); }} title="Delete page" className="absolute -right-1 -top-1 z-10 hidden h-4 w-4 place-items-center rounded-full bg-white text-stone-400 shadow ring-1 ring-black/10 hover:text-red-600 group-hover/pt:grid"><X size={10} /></button>
+ <button type="button" onClick={(e) => { e.stopPropagation(); deletePage(p.slug); }} title="Delete page" className={`absolute -right-1 -top-1 z-10 h-4 w-4 place-items-center rounded-full bg-white text-stone-400 shadow ring-1 ring-black/10 hover:text-red-600 ${p.slug === activeSlug ? "grid" : "hidden group-hover/pt:grid"}`}><X size={10} /></button>
  )}
  </div>
- <span className={`max-w-[52px] truncate text-[9px] ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-500"}`}>{p.slug === "product" ? p.title : `${p.n}. ${p.title}`}</span>
+ <span className={`max-w-[52px] truncate text-[9px] ${p.slug === activeSlug ? "font-semibold text-[#5D0F17]" : "text-stone-500"}`}>{p.title}</span>
  </div>
  ))}
  <div className="flex shrink-0 flex-col items-center gap-1.5">
