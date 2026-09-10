@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
+import { onboardingGate } from "../onboarding-gate";
 import { useRouter } from "next/navigation";
 import { Globe, Hammer, ArrowRight, Loader2 } from "lucide-react";
 import { BuildWizardInner } from "./build/page";
@@ -55,29 +56,22 @@ export default function OnboardingWizard() {
  // before the gate runs, so the gate can decide whether to let them stay.
  const [again, setAgain] = useState(false);
  useEffect(() => {
-  // Read inside the effect, not at render: it only matters once, and computing it in the body
-  // would make it a dependency of a hook that must run exactly once.
-  const wantsAgain = new URLSearchParams(window.location.search).get("again") === "1";
   let active = true;
   (async () => {
    /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
    const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
    if (!active) return;
-   // Nobody signed in at all → the seller sign-in.
-   if (!me || (!me.needsOnboarding && !me.slug && me.admin !== true)) {
+   // The decision itself lives in onboarding-gate.ts, with a case table — it has been wrong twice
+   // and both times the mistake was invisible here and obvious to whoever hit it.
+   const decision = onboardingGate(me);
+   if (decision.go === "sign-in") {
+    // NOT a dead end: this page bouncing a signed-in seller to /store/login was an infinite loop
+    // once — login asked whoami, got a valid identity, honoured ?next and returned her here.
     window.location.href = "/store/login?next=%2Fadmin%2Fonboarding";
     return;
    }
-   // VYA's own people, having explicitly asked to run this again (?again=1), stay put — this is
-   // how the signup flow gets tested and demoed without a fresh email address each time. It takes
-   // the URL flag AND a staff address: neither alone, so a stray reload can't fork a real store,
-   // and a seller who guesses the parameter gets the ordinary redirect.
-   if (wantsAgain && (me.admin === true || me.staff === true)) { setAgain(true); setChecking(false); return; }
-   // The OWNER is not signed out — she is signed in as VYA, and already has a workspace. Sending
-   // her to the seller sign-in was an infinite loop: this page bounced her to /store/login, which
-   // asked whoami, got a perfectly valid identity back, honoured ?next and returned her here.
-   // Onboarding builds a SELLER's store; the owner's destination is her workspace.
-   if (me.admin === true || me.slug) { window.location.href = "/admin/home"; return; }
+   if (decision.go === "home") { window.location.href = "/admin/home"; return; }
+   setAgain(decision.again);
    setChecking(false);
   })();
   return () => { active = false; };

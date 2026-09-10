@@ -170,11 +170,12 @@ export default function AdminUsersPage() {
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">Testing the signup flow</p>
         <p className="mt-2 text-[13px] leading-relaxed text-stone-500">
           Anyone above can walk seller signup again, as many times as they like, even with a store
-          already. Each run builds a separate test store and switches you into it — your real store is
-          untouched, and the shop name at the top of the sidebar switches you back.
+          already — just go to <span className="font-mono text-[12px]">/onboarding</span>. Each run
+          builds a separate test store and switches you into it; your real store is untouched, and the
+          shop name at the top of the sidebar switches you back.
         </p>
         <a
-          href="/admin/onboarding?again=1"
+          href="/onboarding"
           className="mt-3 inline-block rounded-lg border border-stone-200 px-3.5 py-2 text-[12px] font-medium text-stone-700 transition hover:border-stone-400"
         >
           Run signup again →

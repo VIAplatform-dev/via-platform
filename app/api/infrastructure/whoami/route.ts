@@ -60,7 +60,11 @@ export async function GET(request: NextRequest) {
  const account = await getStoreAccountByOwner(session.user.email).catch(() => null);
  if (account?.slug) {
   await addStoreUser(account.slug, session.user.email, "owner").catch(() => {}); /* allow-swallow: reporting the store matters more than repairing the row */
-  return NextResponse.json({ admin: false, slug: account.slug, repaired: true });
+  // `staff` belongs on THIS answer too. Leaving it off was a real bug: a VYA person whose access
+  // row had gone missing came back through the repair path with staff undefined, so the onboarding
+  // gate read her as an ordinary seller with a shop and bounced her to Home — the exact symptom
+  // reported. Every path that can describe a signed-in person has to describe them the same way.
+  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff });
  }
 
  // Authenticated but genuinely attached to nothing → the signup wizard.
