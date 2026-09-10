@@ -19,7 +19,7 @@ test("the groups and rows are the pre-audit sidebar, in order", () => {
  assert.deepEqual(group(GROUPS, "Store")!.items[2].children!.map((c) => c.label), ["Buyers", "Cart recovery"]);
  assert.deepEqual(group(GROUPS, "Business")!.items.map((n) => n.label), ["Analytics", "Settings"]);
  assert.deepEqual(group(GROUPS, "Business")!.items[1].children!.map((c) => c.label), ["General", "Plan & billing", "Payments", "Shipping & duties", "Sales tax"]);
- assert.deepEqual(group(GROUPS, "Platform")!.items.map((n) => n.label), ["Trends", "AI accuracy", "Golden set", "Where stores get stuck"]);
+ assert.deepEqual(group(GROUPS, "Platform")!.items.map((n) => n.label), ["Trends", "AI accuracy", "Golden set", "Where stores get stuck", "Admin access"]);
 });
 
 test("a seller never sees the Platform group, Apps, or Bring your site; the owner does", () => {
@@ -31,6 +31,9 @@ test("a seller never sees the Platform group, Apps, or Bring your site; the owne
  assert.ok(group(owner, "Platform"));
  assert.ok(hrefs(owner).includes("/admin/import"));
  assert.ok(hrefs(owner).includes("/admin/setup-funnel"));
+ // A page that hands out admin access must never render in a store partner's rail.
+ assert.ok(!hrefs(seller).includes("/admin/users"));
+ assert.ok(hrefs(owner).includes("/admin/users"));
 });
 
 test("rentals, appointments and the inbox follow their switches", () => {

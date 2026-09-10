@@ -5,6 +5,8 @@ import { getListingsByStore } from "@/app/lib/listings-db";
 import { getSetupSkipped, setSetupSkipped } from "@/app/lib/store-profile-db";
 import { isSkippableStep, setupInputFor } from "@/app/lib/setup-status-db";
 import { setupSteps, setupSummary } from "@/app/lib/setup-core";
+import { auth } from "@/app/lib/auth";
+import { isAdminEmail } from "@/app/lib/admin-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,11 @@ async function status(slug: string) {
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- return NextResponse.json(await status(slug));
+ // VYA's own people may walk the signup flow again — the wizard reads this instead of bouncing
+ // them to the dashboard the moment they have a store. See app/api/store/onboarding/route.ts.
+ const session = await auth().catch(() => null);
+ const canRepeatOnboarding = isAdminEmail(session?.user?.email);
+ return NextResponse.json({ ...(await status(slug)), canRepeatOnboarding });
 }
 
 // PUT { skip: "domain" } | { unskip: "domain" } — hide an OPTIONAL step from her checklist (or put

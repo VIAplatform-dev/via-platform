@@ -6,6 +6,7 @@ import { getOrCreateSeller } from "@/app/lib/db/sellers";
 import { mayOpenStore, chooseStoreSlug, NOT_INVITED_MESSAGE } from "@/app/lib/seller-access";
 import { isInvited, markInviteUsed, reservedStoreFor } from "@/app/lib/seller-invites-db";
 import { hasCaptures } from "@/app/lib/site-capture-db";
+import { isAdminEmail } from "@/app/lib/admin-emails";
 import { logActivity } from "@/app/lib/seller-activity-db";
 import crypto from "crypto";
 
@@ -29,7 +30,21 @@ export async function POST(request: NextRequest) {
 
  const body = await request.json().catch(() => null);
 
+ // VYA's own people may run this flow again, and only when they ASK to.
+ //
+ // Everyone else gets the idempotent path below: one owner, one store, and a refresh or a
+ // double-submit returns the shop they already have rather than making a second one. That rule is
+ // what stops a seller ending up with two half-built shops she didn't mean to create.
+ //
+ // But the flow itself has to be testable and demonstrable, and it could only ever be walked once
+ // per email address — so trying a change to it meant inventing a new address every time. An admin
+ // who passes `startOver` skips the early return and gets a genuinely new store, its slug
+ // uniquified by generateUniqueSlug (gianna-test, gianna-test-2, …). Never automatic: without the
+ // flag an admin behaves exactly like a seller, so a stray refresh still can't fork her store.
+ const startOver = body?.startOver === true && isAdminEmail(email);
+
  // Already attached to a store? Return it (idempotent) — never a second store for the same owner.
+ if (!startOver) {
  const existingSlug = await storeSlugForEmail(email);
  if (existingSlug) return NextResponse.json({ ok: true, slug: existingSlug, existing: true });
  const existingAccount = await getStoreAccountByOwner(email);
@@ -37,12 +52,16 @@ export async function POST(request: NextRequest) {
   await addStoreUser(existingAccount.slug, email, "owner");
   return NextResponse.json({ ok: true, slug: existingAccount.slug, existing: true });
  }
+ }
 
  // VYA is invite-only. Checked AFTER the "already has a store" paths above, so that removing an
  // invite can never lock an existing seller out of a shop she's been running.
  const adminPw = process.env.ADMIN_PASSWORD;
  const adminToken = request.cookies.get("via_admin_token")?.value;
- const isVyaOwner = Boolean(adminPw && adminToken && adminToken === crypto.createHash("sha256").update(adminPw).digest("hex"));
+ // The admin COOKIE, or one of VYA's own addresses. The cookie alone wasn't enough: an admin
+ // signed into the seller side in a different browser (or on the phone) is still VYA staff, and
+ // the invite gate below would otherwise refuse her her own product.
+ const isVyaOwner = Boolean(adminPw && adminToken && adminToken === crypto.createHash("sha256").update(adminPw).digest("hex")) || isAdminEmail(email);
  const decision = mayOpenStore({ email, invited: await isInvited(email), isVyaOwner });
  if (!decision.ok) {
   // WHICH email is being refused. Without it this screen is unanswerable: someone signed in with the

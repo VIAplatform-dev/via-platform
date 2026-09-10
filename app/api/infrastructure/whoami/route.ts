@@ -3,6 +3,7 @@ import { isAdminRequest, resolveStoreSlug } from "@/app/lib/storeAuth";
 import { auth } from "@/app/lib/auth";
 import { getStoreAccountByOwner } from "@/app/lib/store-accounts-db";
 import { addStoreUser } from "@/app/lib/store-users-db";
+import { isAdminEmail } from "@/app/lib/admin-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +29,21 @@ export async function GET(request: NextRequest) {
  }
 
  // Owner / break-glass admin: full workspace as the synthetic via-admin store.
- if (isAdminRequest(request)) return NextResponse.json({ admin: true, slug: "via-admin" });
+ if (isAdminRequest(request)) return NextResponse.json({ admin: true, slug: "via-admin", staff: true });
 
  const session = await auth();
  if (!session?.user?.email) return NextResponse.json({ admin: false }, { status: 401 });
 
+ // `staff` is a WEAKER claim than `admin`, and separate on purpose. `admin` means this request
+ // carries the admin cookie and may drive the owner workspace. `staff` only means the signed-in
+ // address belongs to one of VYA's own people (admin-emails.ts), which is enough to be allowed to
+ // walk the seller signup flow a second time and nothing else. Gianna testing the flow while
+ // signed in as a seller is staff, not admin.
+ const staff = isAdminEmail(session.user.email);
+
  // Signed-in partner: resolve their store (session email → store_users / static map).
  const slug = await resolveStoreSlug(request);
- if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug });
+ if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug, staff });
 
  // SECOND PLACE TO LOOK, before declaring she has no shop.
  //
@@ -56,5 +64,5 @@ export async function GET(request: NextRequest) {
  }
 
  // Authenticated but genuinely attached to nothing → the signup wizard.
- return NextResponse.json({ admin: false, needsOnboarding: true, email: session.user.email });
+ return NextResponse.json({ admin: false, needsOnboarding: true, email: session.user.email, staff });
 }

@@ -129,6 +129,9 @@ export const GROUPS: NavGroup[] = [
   // Owner-only, like the three above it: where stores stall on the way to their first sale.
   // Lost in a merge — the comment at the top of this file promised it and the route exists.
   { href: `${B}/setup-funnel`, label: "Where stores get stuck", icon: "Filter" },
+  // Who at VYA can sign in here. Owner-only for the obvious reason: a page that hands out admin
+  // must never render for a store partner, and INTERNAL below is what keeps it out of their rail.
+  { href: `${B}/users`, label: "Admin access", icon: "Users" },
  ] },
 ];
 
@@ -161,7 +164,7 @@ export const MARKET_TABS: { href: string; label: string; icon: string }[] = [
 // VYA's own tooling, not a store's. Trends, AI accuracy and the golden set are how WE measure the
 // model. "Import your site" is a step INSIDE onboarding, not a place in the workspace — a seller
 // who has just imported her site should not see an invitation to import it again. Owner-only.
-export const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/setup-funnel`, `${B}/apps`, `${B}/import`]);
+export const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/setup-funnel`, `${B}/apps`, `${B}/import`, `${B}/users`]);
 
 export type NavSwitches = {
  /** The workspace owner (ADMIN_PASSWORD), NOT a signed-in store partner. */

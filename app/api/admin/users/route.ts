@@ -4,6 +4,7 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import { listAdmins, inviteAdmin, removeAdmin } from "@/app/lib/admin-users-db";
 import { getBaseUrl } from "@/app/lib/base-url";
+import { ADMIN_EMAILS } from "@/app/lib/admin-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,11 @@ async function sendInviteEmail(email: string, token: string) {
 export async function GET() {
  if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const admins = await listAdmins().catch(() => []);
- return NextResponse.json({ ok: true, admins });
+ // Who SHOULD have access, from admin-emails.ts. Sent alongside rather than merged in: a row in
+ // this table is a real account with a real password, and a name from a code constant is not — the
+ // page shows the difference and offers to close it, rather than implying the four are already set
+ // up. `expected` does not grant anything on its own; only an accepted invite does.
+ return NextResponse.json({ ok: true, admins, expected: ADMIN_EMAILS });
 }
 
 export async function POST(request: NextRequest) {
