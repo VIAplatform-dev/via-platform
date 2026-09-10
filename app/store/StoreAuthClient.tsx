@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { destinationAfterAuth, loginHref, safeNext, STORE_LOGIN } from "@/app/store/auth-route";
+import { destinationAfterAuth, loginHref, safeNext, STORE_LOGIN, lastAuthStall } from "@/app/store/auth-route";
 
 // Sign-in and sign-up for SELLERS.
 //
@@ -59,7 +59,17 @@ export default function StoreAuthClient({ mode }: { mode: "login" | "signup" }) 
   destinationAfterAuth(next)
    .then((dest) => {
     if (cancelled) return;
-    if (dest === STORE_LOGIN) { setChecking(false); return; }
+    if (dest === STORE_LOGIN) {
+     // Say why, when there is a why. Coming back to a blank form after signing in reads as "it
+     // didn't submit"; the real answer is usually that the browser isn't sending a session back on
+     // THIS address, which nobody can guess at from an empty screen.
+     if (lastAuthStall === "signed-out" && typeof window !== "undefined") {
+      setError(`Signed in, but this browser isn’t sending a session back on ${window.location.host}. Try again here — if it keeps happening, sign in on the address you were given.`);
+     } else if (lastAuthStall === "unreachable") {
+      setError("We couldn’t reach VYA to finish signing you in. Check your connection and try again.");
+     }
+     setChecking(false); return;
+    }
     window.location.replace(dest);
    })
    .catch(() => { if (!cancelled) setChecking(false); });

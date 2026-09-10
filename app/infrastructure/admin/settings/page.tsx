@@ -28,7 +28,8 @@ const ICONS: Record<string, React.ComponentType<{ size?: number; className?: str
 function useSettingsGroups() {
  const [isVyaOwner, setIsVyaOwner] = useState(false);
  useEffect(() => {
-  fetch("/api/infrastructure/whoami")
+  /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
+  fetch("/api/infrastructure/whoami", { cache: "no-store" })
    .then((r) => (r.ok ? r.json() : null))
    .then((d) => setIsVyaOwner(d?.admin === true))
    .catch(() => {});

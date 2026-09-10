@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createOffer } from "@/app/lib/offers-db";
+import { pushSellerOffer } from "@/app/lib/seller-push";
 import { getInboxSettings } from "@/app/lib/storefront-settings-db";
 import { sendNewOfferToStore } from "@/app/lib/email";
 import { getItem } from "@/app/lib/db/inventory";
@@ -64,5 +65,11 @@ export async function POST(request: NextRequest) {
  binding: settings.offersBinding,
  });
  await sendNewOfferToStore(offer).catch(() => {});
+ // The phone, as well as the email. "An offer comes in" has been a switch in Notifications with
+ // nothing behind it — this is the sender it was always missing.
+ void pushSellerOffer(storeSlug, {
+ buyerName: offer.buyerName, itemTitle: offer.itemTitle,
+ amountCents: offer.amountCents, currency: "usd", offerId: offer.id,
+ });
  return NextResponse.json({ ok: true, token: offer.token });
 }

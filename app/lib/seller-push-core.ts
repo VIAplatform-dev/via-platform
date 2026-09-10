@@ -57,3 +57,26 @@ export function messagePush(o: { buyerName: string | null | undefined; itemTitle
   data: { type: "store_message", source: o.source, conversationId: o.conversationId },
  };
 }
+
+// ── the two events the settings screen offered and nothing ever sent ───────────────────────────
+// "An offer comes in" and "A payout lands" were switches in Notifications with no sender behind
+// them: a seller could turn them on, off, on again, and the app would never push either. The
+// payloads follow the same shape as the two that worked, so the phone routes them the same way.
+
+export function offerPush(o: { buyerName: string | null | undefined; itemTitle: string | null | undefined; amountCents: number; currency: string; offerId: number | string }): PushPayload {
+ const who = (o.buyerName ?? "").trim();
+ const what = (o.itemTitle ?? "").trim();
+ return {
+  title: what ? `Offer on ${what}` : "You have an offer",
+  body: `${formatMoney(o.amountCents, o.currency)}${who ? ` from ${who}` : ""}`,
+  data: { type: "offer", offerId: o.offerId },
+ };
+}
+
+export function payoutPush(o: { amountCents: number; currency: string; payoutId: number | string }): PushPayload {
+ return {
+  title: "Payout on its way",
+  body: `${formatMoney(o.amountCents, o.currency)} is heading to your bank.`,
+  data: { type: "payout", payoutId: o.payoutId },
+ };
+}

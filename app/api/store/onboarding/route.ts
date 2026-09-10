@@ -45,7 +45,10 @@ export async function POST(request: NextRequest) {
  const isVyaOwner = Boolean(adminPw && adminToken && adminToken === crypto.createHash("sha256").update(adminPw).digest("hex"));
  const decision = mayOpenStore({ email, invited: await isInvited(email), isVyaOwner });
  if (!decision.ok) {
-  return NextResponse.json({ error: NOT_INVITED_MESSAGE, notInvited: true }, { status: 403 });
+  // WHICH email is being refused. Without it this screen is unanswerable: someone signed in with the
+  // wrong Google account sees "VYA is invite-only" and has no way to know that her actual shop is
+  // sitting under her other address. The email is her own, already in her session.
+  return NextResponse.json({ error: NOT_INVITED_MESSAGE, notInvited: true, email }, { status: 403 });
  }
 
  const name = String(body?.name || "").trim().slice(0, 80);

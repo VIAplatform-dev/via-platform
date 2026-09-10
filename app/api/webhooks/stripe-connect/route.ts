@@ -11,6 +11,9 @@ import { syncOrderToKlaviyo } from "@/app/lib/esp-events";
 import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrdersForConfirmation, resetConfirmationSent, getOrdersByPaymentIntent, updateOrderStatus, setOrderPickup, setOrderTax } from "@/app/lib/db/orders";
 import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
+import { recordTaxTransaction } from "@/app/lib/sales-tax";
+import { pushSellerPayout } from "@/app/lib/seller-push";
+import { getStoreSlugByStripeAccount, updateSellerStatus } from "@/app/lib/seller-payments-db";
 import { logError } from "@/app/lib/error-log";
 import { generateOrderLabel, voidOrderLabel } from "@/app/lib/order-label";
 import { sendOpsAlert } from "@/app/lib/ops-alert";
@@ -174,6 +177,41 @@ export async function POST(request: NextRequest) {
  try {
  // ── Market Mode (in-person) payments ─────────────────────────────────────────────────────
  // Tagged in metadata at creation. They have no shipping, no buyer address and no label, so they
+ // ── A SELLER FINISHING ONBOARDING ────────────────────────────────────────────────────────────
+ // `charges_enabled` is read from OUR row, not from Stripe, on every checkout — payableAccountId
+ // refuses an account we have recorded as not ready. That row was refreshed in exactly one place:
+ // when the seller happened to open her own Payments page. So a seller who finished Stripe's
+ // onboarding and never went back was told "this store can't take payments yet" indefinitely, while
+ // Stripe considered her live. This is the event that says otherwise.
+ if (event.type === "account.updated" && event.account) {
+ const acct = event.data.object as { charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
+ const slug = await getStoreSlugByStripeAccount(event.account).catch(() => null);
+ if (slug) {
+  await updateSellerStatus(slug, {
+  chargesEnabled: Boolean(acct.charges_enabled),
+  payoutsEnabled: Boolean(acct.payouts_enabled),
+  detailsSubmitted: Boolean(acct.details_submitted),
+  }).catch(() => {});
+ }
+ return NextResponse.json({ received: true });
+ }
+
+ // ── "A payout lands" ─────────────────────────────────────────────────────────────────────────
+ // A switch on the Notifications screen with no sender behind it: a seller could turn it on and off
+ // forever and never be told her money had moved. Stripe pays the connected account directly, so
+ // this is the only place that knows.
+ //
+ // Requires `payout.paid` on the Connect webhook endpoint. Until that is subscribed nothing arrives
+ // here and nothing breaks — the branch simply never runs.
+ if (event.type === "payout.paid" && event.account) {
+ const po = event.data.object as { id?: string; amount?: number; currency?: string };
+ const slug = await getStoreSlugByStripeAccount(event.account).catch(() => null);
+ if (slug && typeof po.amount === "number") {
+  void pushSellerPayout(slug, { amountCents: po.amount, currency: po.currency || "usd", payoutId: po.id || "" });
+ }
+ return NextResponse.json({ received: true });
+ }
+
  // never go through fulfill(); the market engine records the sale (idempotent on the PI).
  {
  const obj = event.data.object as { metadata?: Record<string, string> | null; payment_intent?: string | { id: string } | null; id?: string; payment_status?: string; status?: string; customer_details?: { email?: string | null } | null; receipt_email?: string | null };
@@ -290,7 +328,17 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
  const ship2: ShipAddr = md2.ship_line1
   ? { line1: md2.ship_line1, line2: md2.ship_line2 || null, city: md2.ship_city || null, state: md2.ship_state || null, postal: md2.ship_zip || null, country: md2.ship_country || "US" }
   : addr2 ? { line1: addr2.line1, line2: addr2.line2, city: addr2.city, state: addr2.state, postal: addr2.postal_code, country: addr2.country } : null;
- await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || md2.buyer_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null, delivery: deliveryFromMetadata(md2) });
+ await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || md2.buyer_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null, delivery: deliveryFromMetadata(md2),
+ // Tax the embedded Payment Element collected. It comes off OUR metadata rather than a session's
+ // total_details, because a PaymentIntent has no session — see app/lib/sales-tax.ts.
+ taxCents: md2.tax_cents ? parseInt(md2.tax_cents, 10) || null : null,
+ });
+ // COLLECTING TAX IS HALF THE JOB. Turning the calculation into a Tax Transaction is what puts it
+ // in the seller's Stripe Tax reports, which is the half that matters at filing time. Idempotent on
+ // the intent id, so a webhook delivered twice files once.
+ if (md2.tax_calculation && event.account) {
+ void recordTaxTransaction({ acctId: event.account, calculationId: md2.tax_calculation, reference: p.id });
+ }
  // Per-store discount redemption for a single-item embedded checkout (idempotent per store+code+order).
  if (md2.discount_code && md2.discount_store) {
   recordDiscountRedemption({

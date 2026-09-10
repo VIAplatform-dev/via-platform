@@ -60,7 +60,7 @@ function CheckoutInner() {
  const storeSlug = sp.get("store") || "";
  const storeQ = storeSlug ? `?store=${encodeURIComponent(storeSlug)}` : "";
  const [info, setInfo] = useState<Info | null>(null);
- const [rental, setRental] = useState<{ id: string; rented: { start: string; end: string } | null; days: number; rentCents: number; waiverCents: number; totalCents: number; depositCents: number | null; fulfilment: string; termsText: string | null } | null>(null);
+ const [rental, setRental] = useState<{ id: string; rented: { start: string; end: string } | null; days: number; rentCents: number; waiverCents: number; totalCents: number; depositCents: number | null; fulfilment: string; termsText: string | null; discountsAllowed?: boolean } | null>(null);
  const [loadErr, setLoadErr] = useState<string | null>(null);
  const [email, setEmail] = useState("");
  const [a, setA] = useState({ name: "", line1: "", line2: "", city: "", state: "", zip: "", country: "US", phone: "" });
@@ -73,6 +73,9 @@ function CheckoutInner() {
  const [clientSecret, setClientSecret] = useState<string | null>(null);
  const [stripeP, setStripeP] = useState<Promise<Stripe | null> | null>(null);
  const [payTotal, setPayTotal] = useState(0);
+ // Sales tax the server calculated on the intent. Shown as its own line: a total that grows with no
+ // line to explain it reads as a mistake.
+ const [payTax, setPayTax] = useState(0);
  // A platform-key Stripe instance JUST for the Address Element (autocomplete) — separate from the
  // connected-account instance the Payment Element uses. Loaded once the publishable key arrives.
  const [addrStripe, setAddrStripe] = useState<Promise<Stripe | null> | null>(null);
@@ -154,9 +157,9 @@ function CheckoutInner() {
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify(
  isRental
- ? { rentalId, buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship" }
+ ? { rentalId, buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship", discountCode: discount ? discountCode.trim() : undefined }
  : isCart
- ? { buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship" }
+ ? { buyer, ship: shipAddr, shippingCostCents: ship, delivery: collecting ? "pickup" : "ship", discountCode: discount ? discountCode.trim() : undefined }
  : { itemId, offer: offerToken || undefined, discountCode: discount ? discountCode.trim() : undefined, buyer, ship: shipAddr, shippingCostCents: ship },
  ),
  });
@@ -166,7 +169,7 @@ function CheckoutInner() {
  // postage. Show what it decided, not what we asked for.
  if (d2.delivery === "pickup") { setShipCents(0); setCollect({ address: d2.collectFrom ?? null, instructions: d2.collectInstructions ?? null }); }
  else if (typeof d2.shippingCents === "number") { setShipCents(d2.shippingCents); setCollect(null); if (collecting) setDelivery("ship"); }
- setPayTotal(d2.amountCents);
+ setPayTotal(d2.amountCents); setPayTax(typeof d2.taxCents === "number" ? d2.taxCents : 0);
  setStripeP(loadStripe(d2.publishableKey, { stripeAccount: d2.stripeAccount }));
  setClientSecret(d2.clientSecret);
  } catch { setErr("Couldn’t prepare checkout."); preparedKey.current = ""; }
@@ -181,13 +184,20 @@ function CheckoutInner() {
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [info, readyToPay, prepKey]);
 
- // Validate a discount code for THIS store (server scopes it to the item's seller).
+ // Validate a discount code for THIS store. A single item names its seller; a cart has no item, so
+ // it names the store outright — which is why /api/storefront/discount takes either.
  async function applyDiscount() {
  const code = discountCode.trim();
  if (!code || !info) return;
  setDcBusy(true); setDcErr(null);
  try {
- const r = await fetch("/api/storefront/discount", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId, code, subtotalCents: info.subtotalCents }) });
+ const r = await fetch("/api/storefront/discount", { method: "POST", headers: { "Content-Type": "application/json" }, // The lines and the email travel with the code, because a code can now be for particular pieces
+ // or for particular customers — and this quote has to reach the same answer the payment will.
+ body: JSON.stringify({
+ ...(isCart ? { storeSlug } : { itemId }),
+ code, subtotalCents: info.subtotalCents, email: email || null,
+ lines: info.items.map((it) => ({ itemId: it.id, amountCents: it.priceCents })),
+ }) });
  const d = await r.json();
  if (d.ok) { setDiscount({ code: d.code, offCents: d.offCents, freeShipping: d.freeShipping }); setDcErr(null); }
  else { setDiscount(null); setDcErr(d.error || "That code isn’t valid."); }
@@ -198,8 +208,8 @@ function CheckoutInner() {
  if (loadErr) return <main className="min-h-screen bg-[#ffffff] text-[#111111] flex items-center justify-center"><p className="text-sm text-[#111111]/60">{loadErr}</p></main>;
  if (!info) return <main className="min-h-screen bg-[#ffffff] text-[#111111] flex items-center justify-center"><p className="text-sm text-[#111111]/50">Loading…</p></main>;
 
- const discountOff = !isCart && discount ? discount.offCents : 0;
- const codeFreeShip = !isCart && !!discount?.freeShipping;
+ const discountOff = discount ? discount.offCents : 0;
+ const codeFreeShip = !!discount?.freeShipping;
  const shownShip = info.freeShipping || codeFreeShip ? 0 : shipCents;
  const total = clientSecret ? payTotal : Math.max(0, info.subtotalCents - discountOff) + (shownShip || 0);
 
@@ -303,7 +313,8 @@ function CheckoutInner() {
  ))}
  </div>
  <div className="border-t border-[#111111]/10 p-4 space-y-1.5 text-sm">
- {!isCart && !isRental && (
+ {/* Rentals only where the store said codes may be used — see Settings → Rentals. */}
+ {(!isRental || rental?.discountsAllowed) && (
  <div className="mb-2.5 flex gap-2">
  <input className={input + " flex-1"} value={discountCode} onChange={(e) => { setDiscountCode(e.target.value); setDiscount(null); setDcErr(null); }} placeholder="Discount code" />
  <button onClick={applyDiscount} disabled={dcBusy || !discountCode.trim()} className="shrink-0 border border-[#111111]/25 px-3 text-[11px] uppercase tracking-[0.14em] text-[#111111] transition hover:bg-[#111111]/5 disabled:opacity-40">{dcBusy ? "…" : "Apply"}</button>
@@ -320,12 +331,13 @@ function CheckoutInner() {
  A {money(rental.depositCents)} deposit is held separately and released when the piece is back.
  </p>
  ) : null}
- {!isCart && discount && (discountOff > 0 || discount.freeShipping) && (
+ {discount && (discountOff > 0 || discount.freeShipping) && (
  <div className="flex justify-between text-green-700"><span>Discount ({discount.code})</span><span>{discount.freeShipping && discountOff === 0 ? "Free shipping" : `−${money(discountOff)}`}</span></div>
  )}
  {collecting
  ? <div className="flex justify-between"><span className="text-[#111111]/60">Shipping</span><span>Collecting in store</span></div>
  : <div className="flex justify-between"><span className="text-[#111111]/60">Shipping</span><span>{info.freeShipping || codeFreeShip ? "Free" : shownShip === null ? <span className="text-[#111111]/40">Calculated at address</span> : money(shownShip)}</span></div>}
+ {payTax > 0 && <div className="flex justify-between"><span className="text-[#111111]/60">Sales tax</span><span>{money(payTax)}</span></div>}
  <div className="flex justify-between border-t border-[#111111]/10 pt-2 mt-1 text-base font-semibold"><span>Total</span><span>{money(total)}</span></div>
  </div>
  </div>

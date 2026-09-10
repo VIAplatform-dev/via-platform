@@ -100,7 +100,13 @@ export const GROUPS: NavGroup[] = [
  {
   label: "Business",
   items: [
-   { href: `${B}/dashboard`, label: "Analytics", icon: "BarChart3" },
+     {
+    href: `${B}/dashboard`, label: "Analytics", icon: "BarChart3",
+    children: [
+     { href: `${B}/dashboard`, label: "Overview" },
+     { href: `${B}/dashboard/profit`, label: "Profit & loss" },
+    ],
+   },
    {
     href: `${B}/settings`, label: "Settings", icon: "Settings",
     // Five sections, not the sixteen the audit expanded to. `match` on /apps is deliberately NOT

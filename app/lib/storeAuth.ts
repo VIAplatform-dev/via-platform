@@ -4,7 +4,7 @@ import { auth } from "./auth";
 import { storeContactEmails } from "./stores";
 import { getMobilePayload } from "./mobileAuth";
 import { pickStoreSlug } from "./store-slug-core";
-import { storeSlugForEmail } from "./store-users-db";
+import { storeSlugForEmail, emailBelongsToStore } from "./store-users-db";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Store-portal auth resolution. Normally the store is the logged-in partner
@@ -46,6 +46,26 @@ export async function resolveStoreSlug(request: NextRequest): Promise<string | n
  if (preview && isAdminRequest(request)) return preview;
  const session = await auth();
  if (session?.user?.email) {
+ // A STORE IN THE URL, FOR THE PEOPLE WHO BELONG TO IT.
+ //
+ // `?store=` used to be admin-only, which made it an impersonation tool rather than an address. But
+ // store_users is UNIQUE(store_slug, email), so one person can genuinely work at two shops — and
+ // storeSlugForEmail() answers with LIMIT 1, meaning she was dropped into whichever the ORDER BY
+ // picked, with nothing naming it and no way to move. Honouring an explicit slug SHE HAS ACCESS TO
+ // is what makes /admin/inventory?store=her-shop a real, shareable address instead of a guess.
+ //
+ // Authorised every time, per request: membership is the check, never the fact that she asked.
+ if (preview) {
+  /* allow-swallow: a DB blip must fall through to her default store, never grant a store */
+  const allowed = await emailBelongsToStore(preview, session.user.email).catch(() => false);
+  if (allowed) return preview;
+ }
+ // Her own last choice, when she has more than one shop and picked one. Same authorisation.
+ const chosen = request.cookies.get("via_store")?.value;
+ if (chosen && chosen !== preview) {
+  const allowed = await emailBelongsToStore(chosen, session.user.email).catch(() => false);
+  if (allowed) return chosen;
+ }
  // store_users FIRST, the hardcoded map second.
  //
  // store-users-db.ts describes itself as "the DYNAMIC, self-serve replacement for the hardcoded

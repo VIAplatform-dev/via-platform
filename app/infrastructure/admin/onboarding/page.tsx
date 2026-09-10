@@ -44,6 +44,8 @@ export default function OnboardingWizard() {
  const [websiteUrl, setWebsiteUrl] = useState("");
  const [busy, setBusy] = useState(false);
  const [error, setError] = useState<string | null>(null);
+ // The address the invite gate turned away, when it did — shown so she can recognise it.
+ const [wrongAccount, setWrongAccount] = useState<string | null>(null);
  // Check she's signed in BEFORE she does any work. The wizard used to let her choose a template,
  // pick pages, colours and fonts — and only then fail on the final button, which is where
  // "sign in first" came from on a page that never offered a sign-in. If there's no session she
@@ -52,7 +54,8 @@ export default function OnboardingWizard() {
  useEffect(() => {
   let active = true;
   (async () => {
-   const me = await fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+   /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
+   const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
    if (!active) return;
    // Nobody signed in at all → the seller sign-in.
    if (!me || (!me.needsOnboarding && !me.slug && me.admin !== true)) {
@@ -124,6 +127,14 @@ export default function OnboardingWizard() {
    // Failures that used to look identical and read as "you're not logged in" to someone who
    // plainly was. Each now has a way forward instead of a dead end.
    if (data?.needsSignIn) { window.location.href = "/store/login?next=%2Fadmin%2Fonboarding"; return false; }
+   // Name the account being refused. "VYA is invite-only" to someone who already HAS a shop under
+   // another address is a dead end she cannot reason about — the answer is nearly always that she
+   // is signed in as the wrong Google account, and only we can see which one.
+   if (data?.notInvited && data?.email) {
+    setWrongAccount(String(data.email));
+    setError(null);
+    return false;
+   }
    setError(data?.error || "We couldn’t create your store — try again.");
    return false;
   }
@@ -203,6 +214,30 @@ export default function OnboardingWizard() {
         branch renders ONLY the builder, so that message had nowhere to appear. Pressing "Create my
         store" simply did nothing, with no way for the seller to find out why. Sits above the
         builder (z-[70]) because the builder is itself fixed and full-screen. */}
+    {/* Turned away by the invite gate. Its own panel rather than the red toast, because this is not
+        an error she made and there IS something she can do: the shop is usually under her other
+        address, and nothing on screen was telling her which one she had used. */}
+    {wrongAccount && (
+     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-stone-900/25 px-4">
+      <div className="max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+       <p className="text-[15px] font-semibold text-stone-900">You&rsquo;re signed in as {wrongAccount}</p>
+       <p className="mt-2 text-[13.5px] leading-relaxed text-stone-600">
+        There&rsquo;s no store on this address, and VYA is invite-only while the pilot runs. If your shop is
+        under a different email, sign in with that one and you&rsquo;ll land straight in it.
+       </p>
+       <div className="mt-4 flex flex-wrap gap-2">
+        <a href="/api/auth/signout?callbackUrl=%2Fstore%2Flogin" className="rounded-lg bg-stone-900 px-3.5 py-2 text-[13px] font-medium text-white transition hover:opacity-90">
+         Use a different email
+        </a>
+        <button type="button" onClick={() => setWrongAccount(null)} className="rounded-lg border border-stone-200 px-3.5 py-2 text-[13px] text-stone-600 transition hover:border-stone-300">
+         Stay here
+        </button>
+       </div>
+       <p className="mt-3 text-[12px] text-stone-400">If this is the right address, ask us for an invite and we&rsquo;ll add it.</p>
+      </div>
+     </div>
+    )}
+
     {error && (
      <div className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-4 pb-4" role="alert" aria-live="assertive">
       <div className="flex max-w-md items-start gap-3 rounded-xl border border-rose-200 bg-white px-4 py-3 shadow-lg">

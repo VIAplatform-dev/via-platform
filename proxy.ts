@@ -80,7 +80,16 @@ const PUBLIC_ROUTES = [
   "/api/public",
   "/api/mobile",
   "/api/admin/editors-picks",
-  "/api/store/me",
+  // ── THE WHOLE STORE API ──────────────────────────────────────────────────────────────────────
+  // One entry, not forty. Every /api/store/* route authorises itself — resolveStoreSlugAny (or the
+  // shared handler it delegates to) answers 401 without a store session, and the OAuth callbacks
+  // verify their own state — so the proxy has nothing left to protect here.
+  //
+  // Listing them one by one was the bug: forty-odd were listed and forty-two were not, so whether a
+  // seller could reach Rentals, Sales tax or her own People page depended on whether someone had
+  // remembered to add a line here. An endpoint left off didn't 404 either, which is worse — it fell
+  // through to the pilot gate and answered a fetch() with a redirect to an HTML page.
+  "/api/store",
   "/api/store/analytics",
   "/api/store/sourcing",
   "/api/store/messages",

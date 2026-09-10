@@ -55,3 +55,27 @@ test("the nav is data: icons are names, so Node can load it without React", () =
  for (const n of [...GROUPS, ...MARKET_GROUPS].flatMap((g) => g.items)) assert.equal(typeof n.icon, "string");
  for (const t of MARKET_TABS) assert.equal(typeof t.icon, "string");
 });
+
+// ── children on the rows that earn them ────────────────────────────────────────────────────────
+// Not every row: a flat list of thirty links is the thing a sidebar exists to avoid. Analytics earned
+// children because Profit & loss is a page of its own; Rentals and Appointments are one page each.
+test("Analytics expands to its own pages", () => {
+ const item = GROUPS.flatMap((g) => g.items).find((i) => i.label === "Analytics");
+ assert.ok(item);
+ assert.deepEqual(item!.children?.map((c) => c.label), ["Overview", "Profit & loss"]);
+});
+
+test("Rentals and Appointments stay flat — one page each, so a child would only add a click", () => {
+ const items = GROUPS.flatMap((g) => g.items);
+ for (const label of ["Rentals", "Appointments"]) {
+  const it = items.find((i) => i.label === label);
+  assert.ok(it, `${label} is in the sidebar`);
+  assert.equal(it!.children, undefined, `${label} has no children`);
+ }
+});
+
+test("every child points somewhere under /admin", () => {
+ for (const g of GROUPS) for (const i of g.items) for (const c of i.children ?? []) {
+  assert.match(c.href, /^\/admin\//, `${c.label} → ${c.href}`);
+ }
+});

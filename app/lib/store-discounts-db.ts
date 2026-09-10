@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import type { DiscountAudience } from "./discount-scope";
 
 // Per-store discount codes. A store can keep many (to feature in campaigns / on the
 // store page), but only ONE can be the click-through auto-apply (Shopify applies one
@@ -35,21 +36,35 @@ let endsAtReady = false;
 async function ensureEndsAt() {
  if (endsAtReady) return;
  await db()`ALTER TABLE store_discounts ADD COLUMN IF NOT EXISTS ends_at TIMESTAMPTZ`.catch(() => {});
+ // Scope: WHICH pieces a code is for, and WHO may use it. Added the same lazy, idempotent way.
+ await db()`ALTER TABLE store_discounts
+  ADD COLUMN IF NOT EXISTS item_ids JSONB,
+  ADD COLUMN IF NOT EXISTS audience TEXT,
+  ADD COLUMN IF NOT EXISTS lapsed_days INTEGER`.catch(() => {});
  endsAtReady = true;
 }
 
-export type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean; endsAt: string | null };
+export type Discount = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; autoApply: boolean; endsAt: string | null; itemIds: string[]; audience: DiscountAudience; lapsedDays: number | null };
 
-type Row = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; auto_apply: boolean; ends_at?: string | Date | null };
-const map = (r: Row): Discount => ({ id: Number(r.id), code: r.code, label: r.label, kind: r.kind, value: r.value == null ? null : Number(r.value), active: !!r.active, autoApply: !!r.auto_apply, endsAt: r.ends_at ? new Date(r.ends_at).toISOString() : null });
+type Row = { id: number; code: string; label: string | null; kind: string; value: number | null; active: boolean; auto_apply: boolean; ends_at?: string | Date | null; item_ids?: unknown; audience?: string | null; lapsed_days?: number | null };
+const AUDIENCES = new Set(["all", "new", "lapsed"]);
+const map = (r: Row): Discount => ({
+ id: Number(r.id), code: r.code, label: r.label, kind: r.kind,
+ value: r.value == null ? null : Number(r.value),
+ active: !!r.active, autoApply: !!r.auto_apply,
+ endsAt: r.ends_at ? new Date(r.ends_at).toISOString() : null,
+ itemIds: Array.isArray(r.item_ids) ? (r.item_ids as unknown[]).map(String).filter(Boolean) : [],
+ audience: (AUDIENCES.has(String(r.audience)) ? String(r.audience) : "all") as DiscountAudience,
+ lapsedDays: r.lapsed_days == null ? null : Number(r.lapsed_days),
+});
 
 export async function listDiscounts(storeSlug: string): Promise<Discount[]> {
  await ensureTable(); await ensureEndsAt();
- const rows = await db()`SELECT id, code, label, kind, value, active, auto_apply, ends_at FROM store_discounts WHERE store_slug = ${storeSlug} ORDER BY created_at DESC`;
+ const rows = await db()`SELECT id, code, label, kind, value, active, auto_apply, ends_at, item_ids, audience, lapsed_days FROM store_discounts WHERE store_slug = ${storeSlug} ORDER BY created_at DESC`;
  return (rows as Row[]).map(map);
 }
 
-export async function addDiscount(storeSlug: string, d: { code: string; label?: string; kind?: string; value?: number | null; endsAt?: string | null }): Promise<Discount | null> {
+export async function addDiscount(storeSlug: string, d: { code: string; label?: string; kind?: string; value?: number | null; endsAt?: string | null; itemIds?: string[] | null; audience?: string | null; lapsedDays?: number | null }): Promise<Discount | null> {
  await ensureTable(); await ensureEndsAt();
  const code = (d.code || "").trim().toUpperCase().slice(0, 64);
  if (!code) return null;
@@ -59,9 +74,12 @@ export async function addDiscount(storeSlug: string, d: { code: string; label?: 
  const existing = await db()`SELECT COUNT(*)::int AS n FROM store_discounts WHERE store_slug = ${storeSlug}`;
  const isFirst = Number((existing[0] as { n: number }).n) === 0;
  const endsAt = d.endsAt && !Number.isNaN(Date.parse(d.endsAt)) ? new Date(d.endsAt).toISOString() : null;
- const rows = await db()`INSERT INTO store_discounts (store_slug, code, label, kind, value, auto_apply, ends_at)
- VALUES (${storeSlug}, ${code}, ${d.label?.trim() || null}, ${kind}, ${value}, ${isFirst}, ${endsAt})
- RETURNING id, code, label, kind, value, active, auto_apply, ends_at`;
+ const ids = Array.isArray(d.itemIds) ? d.itemIds.map(String).filter(Boolean).slice(0, 200) : [];
+ const aud = AUDIENCES.has(String(d.audience)) ? String(d.audience) : "all";
+ const lapsed = d.lapsedDays == null ? null : Math.max(1, Math.round(Number(d.lapsedDays) || 0)) || null;
+ const rows = await db()`INSERT INTO store_discounts (store_slug, code, label, kind, value, auto_apply, ends_at, item_ids, audience, lapsed_days)
+ VALUES (${storeSlug}, ${code}, ${d.label?.trim() || null}, ${kind}, ${value}, ${isFirst}, ${endsAt}, ${JSON.stringify(ids)}, ${aud}, ${lapsed})
+ RETURNING id, code, label, kind, value, active, auto_apply, ends_at, item_ids, audience, lapsed_days`;
  return map(rows[0] as Row);
 }
 
@@ -73,7 +91,7 @@ export async function addDiscount(storeSlug: string, d: { code: string; label?: 
  * deleted and made again. The percentage, the code itself, its label and when it stops are all
  * editable now; only fields actually present in the patch are written.
  */
-export async function updateDiscount(storeSlug: string, id: number, patch: { active?: boolean; autoApply?: boolean; code?: string; label?: string | null; kind?: string; value?: number | null; endsAt?: string | null }): Promise<void> {
+export async function updateDiscount(storeSlug: string, id: number, patch: { active?: boolean; autoApply?: boolean; code?: string; label?: string | null; kind?: string; value?: number | null; endsAt?: string | null; itemIds?: string[] | null; audience?: string | null; lapsedDays?: number | null }): Promise<void> {
  await ensureTable(); await ensureEndsAt();
  if (typeof patch.code === "string") {
   const code = patch.code.trim().toUpperCase().slice(0, 64);
@@ -92,6 +110,18 @@ export async function updateDiscount(storeSlug: string, id: number, patch: { act
  if (patch.endsAt !== undefined) {
   const e = patch.endsAt && !Number.isNaN(Date.parse(patch.endsAt)) ? new Date(patch.endsAt).toISOString() : null;
   await db()`UPDATE store_discounts SET ends_at = ${e} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (patch.itemIds !== undefined) {
+  const ids = Array.isArray(patch.itemIds) ? patch.itemIds.map(String).filter(Boolean).slice(0, 200) : [];
+  await db()`UPDATE store_discounts SET item_ids = ${JSON.stringify(ids)} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (patch.audience !== undefined) {
+  const aud = AUDIENCES.has(String(patch.audience)) ? String(patch.audience) : "all";
+  await db()`UPDATE store_discounts SET audience = ${aud} WHERE store_slug = ${storeSlug} AND id = ${id}`;
+ }
+ if (patch.lapsedDays !== undefined) {
+  const d2 = patch.lapsedDays == null ? null : Math.max(1, Math.round(Number(patch.lapsedDays) || 0)) || null;
+  await db()`UPDATE store_discounts SET lapsed_days = ${d2} WHERE store_slug = ${storeSlug} AND id = ${id}`;
  }
  if (patch.autoApply === true) {
  // only one auto-apply per store
@@ -125,7 +155,7 @@ export async function getAutoApplyCode(storeSlug: string): Promise<string | null
 // code created by store A can never match store B's items. Used by the native
 // VYA checkout (single-item + cart), NOT the click-through marketplace.
 
-export type ValidDiscount = { id: number; code: string; label: string | null; kind: string; value: number | null };
+export type ValidDiscount = { id: number; code: string; label: string | null; kind: string; value: number | null; itemIds: string[]; audience: DiscountAudience; lapsedDays: number | null };
 
 /** Look up an ACTIVE code for THIS store only. Returns null if it isn't this store's code. */
 export async function validateDiscount(storeSlug: string, codeRaw: string): Promise<ValidDiscount | null> {
@@ -136,13 +166,13 @@ export async function validateDiscount(storeSlug: string, codeRaw: string): Prom
  // An expiry that isn't enforced here is decoration: this is the one gate every checkout path goes
  // through, so "15% off for 24 hours only" has to mean the code stops working when the day is up.
  const rows = await db()`
- SELECT id, code, label, kind, value FROM store_discounts
+ SELECT id, code, label, kind, value, active, auto_apply, ends_at, item_ids, audience, lapsed_days FROM store_discounts
  WHERE store_slug = ${storeSlug} AND active = true AND UPPER(code) = ${code}
    AND (ends_at IS NULL OR ends_at > now())
  LIMIT 1`;
  if (!rows[0]) return null;
- const r = rows[0] as { id: number; code: string; label: string | null; kind: string; value: number | null };
- return { id: Number(r.id), code: r.code, label: r.label, kind: r.kind, value: r.value == null ? null : Number(r.value) };
+ const d = map(rows[0] as Row);
+ return { id: d.id, code: d.code, label: d.label, kind: d.kind, value: d.value, itemIds: d.itemIds, audience: d.audience, lapsedDays: d.lapsedDays };
 }
 
 /** How much a discount takes off a subtotal (cents), and whether it waives shipping.
@@ -201,4 +231,27 @@ export async function redemptionCount(storeSlug: string, code: string): Promise<
  await ensureRedemptions();
  const rows = await db()`SELECT COUNT(*)::int AS n FROM store_discount_redemptions WHERE store_slug = ${storeSlug} AND UPPER(code) = ${code.toUpperCase()}`;
  return Number((rows[0] as { n: number }).n) || 0;
+}
+
+/**
+ * When this buyer last bought from THIS store — null if never.
+ *
+ * The one fact an audience-gated code needs. Matched on the email the buyer is checking out with,
+ * case-insensitively, because that is the only identity a guest checkout has.
+ */
+export async function lastOrderAtForBuyer(storeSlug: string, email: string | null | undefined): Promise<Date | null> {
+ const e = (email || "").trim().toLowerCase();
+ if (!e) return null;
+ try {
+  const rows = await db()`
+   SELECT MAX(o.created_at) AS last_at
+   FROM orders o
+   JOIN sellers s ON s.id = o.seller_id
+   WHERE s.slug = ${storeSlug} AND LOWER(o.buyer_email) = ${e}`;
+  const v = (rows[0] as { last_at?: string | Date | null } | undefined)?.last_at;
+  return v ? new Date(v) : null;
+ } catch {
+  // A history we cannot read must not hand out a discount the buyer may not be entitled to.
+  return new Date();
+ }
 }

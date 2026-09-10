@@ -331,6 +331,19 @@ export default function RentalSettingsPage() {
      </Row>
     </Card>
 
+    <Card title="Discount codes">
+     {/* A rental is three numbers, so "15% off" needs an answer before a code can mean anything.
+         The deposit is deliberately not offered: it is the renter's money coming back to her, so
+         taking a discount off it would refund more than she ever paid. */}
+     <Row label="What a code comes off" hint="Your deposit is never discounted — that money goes back to the renter, so taking a percentage off it would refund more than she paid.">
+      <span className="flex flex-wrap gap-1.5">
+       <Tag on={s.discountApplies === "none"} onClick={() => set("discountApplies", "none")}>No codes on rentals</Tag>
+       <Tag on={s.discountApplies === "rent"} onClick={() => set("discountApplies", "rent")}>The rental fee</Tag>
+       <Tag on={s.discountApplies === "rent_waiver"} onClick={() => set("discountApplies", "rent_waiver")}>Rental fee + waiver</Tag>
+      </span>
+     </Row>
+    </Card>
+
     <Card title="Damage and late returns">
      <Row label="If a piece comes back damaged" hint="What you charge, if anything, to cover it.">
       <span className="flex gap-1.5">

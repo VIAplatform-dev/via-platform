@@ -6,7 +6,11 @@
 // notification-prefs-db.ts.
 
 export const PUSH_EVENTS = ["sold", "message", "offer", "payout"] as const;
-export const EMAIL_EVENTS = ["daily", "weekly", "needs"] as const;
+// "daily" and "weekly" were here, and nothing ever sent either one: there is no daily-summary and no
+// weekly-numbers email in the codebase, so both were switches a seller could flip forever with no
+// effect. A control that governs nothing is worse than a missing feature — it makes a promise. They
+// come back the day the emails do.
+export const EMAIL_EVENTS = ["needs"] as const;
 export type PushEvent = (typeof PUSH_EVENTS)[number];
 export type EmailEvent = (typeof EMAIL_EVENTS)[number];
 
@@ -20,11 +24,11 @@ export type NotificationPrefsPatch = { push?: Partial<Record<PushEvent, boolean>
 
 /** What each toggle is called — the phone's Notifications screen uses the same words. */
 export const PUSH_LABELS: Record<PushEvent, string> = { sold: "A piece sells", message: "A buyer messages", offer: "An offer comes in", payout: "A payout lands" };
-export const EMAIL_LABELS: Record<EmailEvent, string> = { daily: "Daily summary", weekly: "Weekly numbers", needs: "Something needs you" };
+export const EMAIL_LABELS: Record<EmailEvent, string> = { needs: "Something needs you" };
 
 export const DEFAULT_PREFS: NotificationPrefs = {
  push: { sold: true, message: true, offer: true, payout: false },
- email: { daily: false, weekly: true, needs: true },
+ email: { needs: true },
 };
 
 function pick<K extends string>(keys: readonly K[], base: Record<K, boolean>, raw: unknown): Record<K, boolean> {
@@ -50,4 +54,10 @@ export function mergePrefs(current: NotificationPrefs, patch: NotificationPrefsP
 /** The gate every push sender asks before it sends. */
 export function pushEnabled(prefs: NotificationPrefs, ev: PushEvent): boolean {
  return prefs.push[ev] === true;
+}
+
+/** Does this store want this email? Mirrors pushEnabled, and exists because the digests were sending
+ *  to every store regardless — a seller who switched "Something needs you" off still got it. */
+export function emailEnabled(prefs: NotificationPrefs, ev: EmailEvent): boolean {
+ return prefs.email?.[ev] !== false;
 }

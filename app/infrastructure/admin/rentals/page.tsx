@@ -48,9 +48,9 @@ const TAB_LABEL: Record<Tab, string> = {
 const TAB_HINT: Record<Tab, string> = {
  today: "Going out today — pack these and get them posted or ready to collect.",
  upcoming: "Paid and dated, leaving another day. Nothing to do yet.",
- out: "With a customer right now. Anything past its return date is flagged.",
+ out: "Out with a customer now. Anything past its return date is marked overdue.",
  inspect: "Returned by the renter and waiting on you. Check them over, then put them back on the rack.",
- requests: "People asking to rent. Their dates are held while you decide, so answering frees the piece up.",
+ requests: "People asking to rent, waiting on your yes or no. Answering frees the piece up either way.",
 };
 
 function withStore(path: string): string {
@@ -300,7 +300,7 @@ export default function RentalsQueuePage() {
     <TechCard className="px-5 py-10 text-center text-[13px] text-stone-400">Loading…</TechCard>
    ) : tab === "requests" ? (
     (requests ?? []).length === 0
-     ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="When someone asks to rent a piece, it appears here and their dates are held until you answer." />
+     ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="Anyone asking to rent a piece lands here for you to approve or decline. Whether their dates are held while they wait is your call — Rental settings › Who can book." />
      : <div className="flex flex-col gap-3">{(requests ?? []).map(reqRow)}</div>
    ) : shown.length === 0 ? (
     <TechEmpty

@@ -14,6 +14,9 @@ import { settleCrossListedBeforeCharge } from "@/app/lib/market-sync";
 import { quoteShipping } from "@/app/lib/shipping-zones";
 import { resolveDelivery, deliveryMetadata } from "@/app/lib/checkout-delivery.ts";
 import { getCheckoutMethods } from "@/app/lib/store-checkout-db";
+import { validateDiscount, distributeDiscount, lastOrderAtForBuyer } from "@/app/lib/store-discounts-db";
+import { applyDiscountToOrder } from "@/app/lib/discount-scope";
+import { calculateSalesTax } from "@/app/lib/sales-tax";
 import { emptyBagMessage } from "@/app/lib/storefront-cart-core";
 
 export const dynamic = "force-dynamic";
@@ -124,22 +127,67 @@ export async function POST(request: NextRequest) {
 
  try {
  const subtotal = reserved.reduce((s, it) => s + it.priceCents, 0);
- const amount = subtotal + shippingCostCents;
+ const cur = (reserved[0].currency || "usd").toLowerCase();
+
+ // A DISCOUNT CODE WORKS ON A BAG OF THINGS TOO.
+ // Single-item checkout has always taken a code; a cart never did — the seller's own WELCOME10 was
+ // unusable to anyone buying two pieces. Spread across the lines the way the hosted route did it, so
+ // each consignor's cut and the platform fee are computed on what the piece actually sold for.
+ let effShippingCents = shippingCostCents;
+ let appliedDiscount: { id: number; code: string; offCents: number } | null = null;
+ let lineAmounts = reserved.map((it) => it.priceCents);
+ const discountCode = typeof body?.discountCode === "string" ? body.discountCode.trim() : "";
+ if (discountCode) {
+ const d = await validateDiscount(seller.slug, discountCode).catch(() => null);
+ if (d) {
+  const lastOrderAt = d.audience === "all" ? null : await lastOrderAtForBuyer(seller.slug, buyerEmail);
+  const c = applyDiscountToOrder(d, reserved.map((it) => ({ itemId: it.id, amountCents: it.priceCents })), { lastOrderAt, email: buyerEmail });
+  if (!c.refusal) {
+  // Spread over the pieces the code is FOR. A dresses-only code must not quietly take money off
+  // the bag beside it — that would be the bag's consignor paying for someone else's sale.
+  const scoped = new Set((d.itemIds.length ? d.itemIds : reserved.map((it) => it.id)).map(String));
+  const eligibleIdx = reserved.map((it, i) => (scoped.has(String(it.id)) ? i : -1)).filter((i) => i >= 0);
+  const spread = distributeDiscount(eligibleIdx.map((i) => lineAmounts[i]), c.offCents);
+  eligibleIdx.forEach((idx, k) => { lineAmounts[idx] = spread[k]; });
+  if (c.freeShipping) effShippingCents = 0;
+  appliedDiscount = { id: d.id, code: d.code, offCents: c.offCents + (c.freeShipping ? shippingCostCents : 0) };
+  }
+ }
+ }
+ const discountedSubtotal = lineAmounts.reduce((a, b) => a + b, 0);
+
+ // Sales tax — see item-intent and app/lib/sales-tax.ts for why this is not `automatic_tax`.
+ const tax = await calculateSalesTax({
+ slug: seller.slug, acctId, currency: cur,
+ lines: reserved.map((it, i) => ({ reference: it.id, amountCents: lineAmounts[i], title: it.title, category: it.category })),
+ shippingCents: effShippingCents,
+ ship: delivery.method === "ship" ? { line1: ship.line1, line2: ship.line2, city: ship.city, state: ship.state, zip: ship.zip, country: ship.country } : {},
+ });
+ const taxCents = delivery.method === "ship" ? (tax?.addCents ?? 0) : 0;
+
+ const amount = discountedSubtotal + effShippingCents + taxCents;
  // Consignment: route each consignor's cut into VYA's balance ONLY when they're paid by Stripe
  // direct-deposit. Cash / store-credit stores keep the full proceeds and settle with the
  // consignor themselves — VYA holds nothing.
  let consignTotal = 0;
- for (const it of reserved) consignTotal += await consignorCutToHold(it.id, it.priceCents).catch(() => 0);
- const appFee = applicationFeeCents(subtotal) + shippingCostCents + consignTotal;
- const cur = (reserved[0].currency || "usd").toLowerCase();
+ for (let i = 0; i < reserved.length; i++) consignTotal += await consignorCutToHold(reserved[i].id, lineAmounts[i]).catch(() => 0);
+ const appFee = applicationFeeCents(discountedSubtotal) + effShippingCents + consignTotal;
  const meta: Record<string, string> = {
  itemIds: reserved.map((it) => it.id).join(","), sellerId: seller.id,
  // buyer_name, not ship_name: a collection has no shipping block, and the seller still needs to
  // know who is walking in to collect.
- buyer_name: String(buyer.name || ""), buyer_phone: String(buyer.phone || ""), buyer_email: buyerEmail, shipping_paid_cents: String(shippingCostCents),
+ buyer_name: String(buyer.name || ""), buyer_phone: String(buyer.phone || ""), buyer_email: buyerEmail, shipping_paid_cents: String(effShippingCents),
  // The method the SERVER decided, stamped on the payment so the webhook records it on the order.
  ...deliveryMetadata(delivery),
  };
+ if (appliedDiscount) {
+ meta.discount_code = appliedDiscount.code;
+ meta.discount_off_cents = String(appliedDiscount.offCents);
+ meta.discount_id = String(appliedDiscount.id);
+ meta.discount_store = seller.slug;
+ }
+ if (taxCents > 0) meta.tax_cents = String(taxCents);
+ if (tax?.calculationId && taxCents > 0) meta.tax_calculation = tax.calculationId;
  // A collection has no address to post to — don't invent one on the order or the confirmation.
  if (delivery.method === "ship") {
  Object.assign(meta, {
@@ -173,7 +221,9 @@ export async function POST(request: NextRequest) {
  clientSecret: intent.client_secret,
  publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim(),
  stripeAccount: acctId,
- amountCents: amount, currency: cur,
+ amountCents: amount, currency: cur, taxCents,
+ // What the discount actually took off, so the summary can name it instead of the total quietly dropping.
+ discount: appliedDiscount ? { code: appliedDiscount.code, offCents: appliedDiscount.offCents } : null,
  // What the server actually decided — so the summary shows the total that's really being charged,
  // even if the shopper's choice was stale (seller switched collection off) or forged.
  delivery: delivery.method, shippingCents: delivery.shippingCents,

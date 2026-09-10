@@ -115,7 +115,8 @@ export default function WorkspaceHome() {
  fetch("/api/store/market-insights").then((r) => (r.ok ? r.json() : null)).then((d) => {
   if (Array.isArray(d?.trending) && d.trending.length) setDemand(d.trending.slice(0, 6).map((t: { segmentValue: string; demandTrend: string; demandIndex: number }) => ({ name: t.segmentValue, trend: t.demandTrend, index: t.demandIndex })));
  }).catch(() => {});
- fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).then((d) => setIsOwner(d?.admin === true)).catch(() => {});
+ /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
+ fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => setIsOwner(d?.admin === true)).catch(() => {});
  // Load any saved conversation so the chat (and its memory) continues where it left off.
  fetch("/api/store/assistant").then((r) => (r.ok ? r.json() : null)).then((d) => {
  if (d && Array.isArray(d.messages) && d.messages.length) { msgsRef.current = d.messages; setMsgs(d.messages); }

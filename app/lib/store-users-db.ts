@@ -108,6 +108,24 @@ export async function storeSlugForEmail(email: string): Promise<string | null> {
  return rows[0]?.store_slug ?? null;
 }
 
+/**
+ * EVERY store this email can reach, owners' stores first.
+ *
+ * storeSlugForEmail() below answers the same question with LIMIT 1, which is the right answer for
+ * "sign her in somewhere" and the wrong one for "which shops are hers". A person who helps at two
+ * shops was silently dropped into whichever one the ORDER BY picked, with nothing on screen naming
+ * it and no way to move — this is what lets the workspace ask instead of guess.
+ */
+export async function storesForEmail(email: string): Promise<{ storeSlug: string; role: StoreRole }[]> {
+ const e = normEmail(email);
+ if (!e) return [];
+ await ensureTable();
+ const rows = await db()`SELECT store_slug, role FROM store_users
+  WHERE email = ${e}
+  ORDER BY (role = 'owner') DESC, created_at ASC` as Array<{ store_slug: string; role: string }>;
+ return rows.map((r) => ({ storeSlug: r.store_slug, role: (r.role as StoreRole) ?? "owner" }));
+}
+
 /** Does this email have access to this specific store? (authorization check) */
 export async function emailBelongsToStore(storeSlug: string, email: string): Promise<boolean> {
  await ensureTable();

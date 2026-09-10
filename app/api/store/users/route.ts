@@ -4,6 +4,10 @@ import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { listStoreUsers, addStoreUser, removeStoreUser, setStoreUserPermissions } from "@/app/lib/store-users-db";
 import { getStoreTier } from "@/app/lib/store-plans-db";
 import { canAddSeat, seatsForTier } from "@/app/lib/plans";
+import { sendStoreInvite } from "@/app/lib/email";
+import { auth } from "@/app/lib/auth";
+import { getBaseUrl } from "@/app/lib/base-url";
+import { stores as CURATED } from "@/app/lib/stores";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +59,19 @@ export async function POST(request: NextRequest) {
  if (!room.ok) return NextResponse.json({ error: room.reason, limit: room.limit }, { status: 402 });
 
  await addStoreUser(slug, email, role);
+
+ // TELL THEM. This wrote a row and said nothing to anybody: access was real from that moment, but
+ // the person only ever found out by happening to sign in with that exact address. Best-effort —
+ // the seat is granted either way, and a mail provider having a bad minute must not undo that.
+ const inviter = (await auth().catch(() => null))?.user?.email ?? null;
+ const storeName = CURATED.find((st) => st.slug === slug)?.name || slug;
+ void sendStoreInvite({
+  email, storeName, role, invitedBy: inviter,
+  // Addressed to the store, so the link lands them in the right shop even where they belong to more
+  // than one — see the membership check in storeAuth.resolveStoreSlug.
+  signInUrl: `${getBaseUrl()}/admin/home?store=${encodeURIComponent(slug)}`,
+ }).catch(() => {});
+
  const after = await listStoreUsers(slug);
  return NextResponse.json({ ok: true, users: after, seats: { used: after.length, limit: seatsForTier(tier), remaining: Math.max(0, seatsForTier(tier) - after.length) } });
 }

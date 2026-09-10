@@ -2018,6 +2018,51 @@ export async function sendStoreListingDigest(params: {
  });
 }
 
+/**
+ * "You've been added to <shop>" — the email that was missing.
+ *
+ * Adding a teammate wrote a row in store_users and told nobody. Access was real from that moment,
+ * but the person had no idea: they only got in if they happened to sign in with that exact address
+ * for some other reason. An invitation nobody receives is not an invitation.
+ *
+ * The row IS the grant — access is by email match — so this carries no token to redeem. What it
+ * carries is the news, and a link to the door.
+ */
+export async function sendStoreInvite(params: {
+ email: string;
+ storeName: string;
+ invitedBy?: string | null;
+ role: "owner" | "staff";
+ signInUrl: string;
+}): Promise<void> {
+ const resend = getResend();
+ if (!resend) return;
+ const who = params.invitedBy ? `${params.invitedBy} has` : "You've been";
+ const what = params.role === "owner"
+  ? "You can do everything an owner can — including adding other people."
+  : "You'll see the areas they've given you access to; they can change that any time.";
+ const html = `<div style="background:#FFFDF8;padding:32px 20px;font-family:Georgia,'Times New Roman',serif;color:#5D0F17;">
+ <div style="max-width:560px;margin:0 auto;">
+ <h1 style="font-size:23px;font-weight:500;margin:0 0 10px;">${who} added you to ${params.storeName}</h1>
+ <p style="font-size:15px;line-height:1.6;color:rgba(93,15,23,0.7);margin:0 0 18px;">
+  You now have access to ${params.storeName} on VYA. Sign in with <strong>${params.email}</strong> — this address is
+  the key, so use it exactly as written here.
+ </p>
+ <p style="font-size:13px;line-height:1.6;color:rgba(93,15,23,0.55);margin:0 0 22px;">${what}</p>
+ <a href="${params.signInUrl}" style="display:inline-block;background:#5D0F17;color:#FFFDF8;text-decoration:none;padding:12px 24px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Open ${params.storeName}</a>
+ <p style="font-size:12px;color:rgba(93,15,23,0.4);margin:24px 0 0;">
+  Not expecting this? Ignore it — nothing happens until you sign in, and whoever added you can remove you again.
+ </p>
+ </div>
+</div>`;
+ await resend.emails.send({
+  from: FROM_EMAIL,
+  to: params.email,
+  subject: `You've been added to ${params.storeName} on VYA`,
+  html,
+ });
+}
+
 /** Sent to the customer when a store submits a sourcing offer */
 export async function sendSourcingOfferToCustomer(details: {
  customerEmail: string;

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, type LucideIcon } from "lucide-react";
+import { Home, Package, ShoppingBag, MessageCircle, Store, Plug, Users, Megaphone, Tag, CreditCard, BarChart3, Settings, Target, TrendingUp, Share2, Handshake, LayoutGrid, LogOut, Menu, X, Search, Gem, Camera, Plus, PlusCircle, Receipt, Boxes, ClipboardList, SlidersHorizontal, CalendarRange, CalendarClock, type LucideIcon, ChevronDown } from "lucide-react";
 import Sidekick from "@/app/store/Sidekick";
 import CommandBar from "./CommandBar";
 import { loginHref } from "@/app/store/auth-route";
@@ -58,7 +58,8 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
 
  useEffect(() => {
  if (isOnboarding) { setOk(true); return; }
- fetch("/api/infrastructure/whoami")
+ /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
+ fetch("/api/infrastructure/whoami", { cache: "no-store" })
  .then(async (r) => {
  if (!r.ok) { setOk(false); return; }
  const data = await r.json().catch(() => ({}));
@@ -69,7 +70,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  try { justOnboarded = sessionStorage.getItem("vya:just-onboarded"); } catch { /* storage off */ }
  if (justOnboarded) {
  await new Promise((res) => setTimeout(res, 1200));
- const retry = await fetch("/api/infrastructure/whoami").then((x) => (x.ok ? x.json() : null)).catch(() => null);
+ const retry = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  try { sessionStorage.removeItem("vya:just-onboarded"); } catch { /* */ }
  if (retry && !retry.needsOnboarding) { setIsOwner(retry.admin === true); setStoreSlug(retry.slug || null); setOk(true); return; }
  }
@@ -87,6 +88,27 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  })
  .catch(() => setOk(false));
  }, [isOnboarding, router]);
+
+ // WHICH SHOP THIS IS. store_users allows one person at two shops, and until now nothing on screen
+ // said which one she was in — the session resolved to one with a SQL LIMIT 1 and that was that.
+ const [myStores, setMyStores] = useState<{ slug: string; name: string; role: string }[]>([]);
+ const [currentStore, setCurrentStore] = useState<string | null>(null);
+ const [storeMenu, setStoreMenu] = useState(false);
+ useEffect(() => {
+  fetch("/api/store/my-stores").then((r) => (r.ok ? r.json() : null)).then((d) => {
+   if (!d?.ok) return;
+   setMyStores(d.stores || []);
+   setCurrentStore(d.current ?? null);
+  }).catch(() => {});
+ }, []);
+ async function switchStore(slug: string) {
+  setStoreMenu(false);
+  const r = await fetch("/api/store/my-stores", {
+   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug }),
+  }).catch(() => null);
+  // A hard reload, deliberately: every panel on screen was loaded for the other shop.
+  if (r?.ok) window.location.assign("/admin/home");
+ }
 
  // Rentals and Appointments are switches a seller flips in Settings, and this sidebar read them
  // exactly once on mount. Turning Rentals off left the row sitting there until a hard reload, and
@@ -242,6 +264,51 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </p>
  </div>
  </div>
+ {/* The shop whose numbers are on screen. Shown plainly — a seller reads her own shop's name, not
+     a word about sessions — and only turns into a menu when she actually has a second one. */}
+ {currentStore && (() => {
+  const here = myStores.find((m) => m.slug === currentStore);
+  const label = here?.name || currentStore;
+  if (myStores.length < 2) {
+   return (
+    <div className="mx-3 mb-3 rounded-xl border border-stone-200 bg-stone-50/70 px-3 py-2">
+     <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-stone-400">Your shop</p>
+     <p className="truncate text-[12.5px] font-medium text-stone-800">{label}</p>
+    </div>
+   );
+  }
+  return (
+   <div className="relative mx-3 mb-3">
+    <button
+     type="button"
+     onClick={() => setStoreMenu((o) => !o)}
+     className="flex w-full items-center justify-between rounded-xl border border-stone-200 bg-white px-3 py-2 text-left transition hover:border-stone-300"
+    >
+     <span className="min-w-0">
+      <span className="block font-mono text-[9px] uppercase tracking-[0.14em] text-stone-400">Your shop</span>
+      <span className="block truncate text-[12.5px] font-medium text-stone-800">{label}</span>
+     </span>
+     <ChevronDown size={13} className="shrink-0 text-stone-400" />
+    </button>
+    {storeMenu && (
+     <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg">
+      {myStores.map((m) => (
+       <button
+        key={m.slug}
+        type="button"
+        onClick={() => void switchStore(m.slug)}
+        className={`block w-full truncate px-3 py-2 text-left text-[12.5px] transition hover:bg-stone-50 ${m.slug === currentStore ? "font-medium text-stone-900" : "text-stone-600"}`}
+       >
+        {m.name}
+        {m.slug === currentStore && <span className="ml-1.5 text-[10px] text-stone-400">now</span>}
+       </button>
+      ))}
+     </div>
+    )}
+   </div>
+  );
+ })()}
+
  {/* The Market Mode switch — the one control that changes what this whole shell is for. */}
  <button
  type="button"

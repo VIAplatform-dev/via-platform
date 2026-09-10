@@ -8,8 +8,10 @@ import { applicationFeeCents } from "@/app/lib/payments-config";
 import { recordCheckoutAttempt } from "@/app/lib/checkout-attempts-db";
 import { getRedeemableBindingOffer } from "@/app/lib/offers-db";
 import { consignorCutToHold } from "@/app/lib/consignment-db";
-import { validateDiscount, computeDiscount } from "@/app/lib/store-discounts-db";
+import { validateDiscount, lastOrderAtForBuyer } from "@/app/lib/store-discounts-db";
+import { applyDiscountToOrder } from "@/app/lib/discount-scope";
 import { getCheckoutMethods } from "@/app/lib/store-checkout-db";
+import { calculateSalesTax } from "@/app/lib/sales-tax";
 
 export const dynamic = "force-dynamic";
 
@@ -70,10 +72,15 @@ export async function POST(request: NextRequest) {
  if (discountCode) {
  const d = await validateDiscount(seller.slug, discountCode);
  if (d) {
- const c = computeDiscount(d, effPriceCents);
+ // Scope and audience decided HERE too, not only in the quote box — the payment is the price that
+ // counts, and a code the buyer no longer qualifies for must not survive to it.
+ const lastOrderAt = d.audience === "all" ? null : await lastOrderAtForBuyer(seller.slug, buyerEmail);
+ const c = applyDiscountToOrder(d, [{ itemId, amountCents: effPriceCents }], { lastOrderAt, email: buyerEmail });
+ if (!c.refusal) {
  salePriceCents = Math.max(0, effPriceCents - c.offCents);
  if (c.freeShipping) effShippingCents = 0;
  appliedDiscount = { id: d.id, code: d.code, offCents: c.offCents + (c.freeShipping ? shippingCostCents : 0) };
+ }
  }
  }
 
@@ -85,7 +92,18 @@ export async function POST(request: NextRequest) {
 
  try {
  const currency = (item.currency || "usd").toLowerCase();
- const amount = salePriceCents + effShippingCents;
+ // Sales tax, on the path shoppers actually use. `automatic_tax` only exists on a hosted Checkout
+ // Session — the route that had it has no callers — so this asks Stripe to calculate against the
+ // seller's own registrations and adds the result. Null when tax is off or Stripe can't work it out,
+ // which charges exactly what it charged before. See app/lib/sales-tax.ts.
+ const tax = await calculateSalesTax({
+ slug: seller.slug, acctId, currency,
+ lines: [{ reference: itemId, amountCents: salePriceCents, title: item.title, category: item.category }],
+ shippingCents: effShippingCents,
+ ship: { line1: ship.line1, line2: ship.line2, city: ship.city, state: ship.state, zip: ship.zip, country: ship.country },
+ });
+ const taxCents = tax?.addCents ?? 0;
+ const amount = salePriceCents + effShippingCents + taxCents;
  // Consignment: route the consignor's cut into VYA's balance ONLY when they're paid by Stripe
  // direct-deposit. Cash / store-credit stores keep the full proceeds and pay the consignor
  // themselves — VYA holds nothing (0 here).
@@ -107,6 +125,10 @@ export async function POST(request: NextRequest) {
  shipping_paid_cents: String(effShippingCents),
  sale_price_cents: String(salePriceCents),
  };
+ // Carried so the webhook can file the Tax Transaction once the money is taken — collecting tax
+ // without reporting it is the half that matters at filing time.
+ if (taxCents > 0) meta.tax_cents = String(taxCents);
+ if (tax?.calculationId) meta.tax_calculation = tax.calculationId;
  if (offerToken) meta.offer_token = offerToken;
  if (appliedDiscount) {
  meta.discount_code = appliedDiscount.code;
@@ -141,7 +163,7 @@ export async function POST(request: NextRequest) {
  clientSecret: intent.client_secret,
  publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim(),
  stripeAccount: acctId,
- amountCents: amount, currency,
+ amountCents: amount, currency, taxCents,
  });
  } catch (e) {
  if ((await currentReservationRef(itemId)) === RESERVE_REF) await releaseReservation(itemId).catch(() => {});

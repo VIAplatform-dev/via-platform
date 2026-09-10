@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest, resolveStoreSlug } from "@/app/lib/storeAuth";
 import { auth } from "@/app/lib/auth";
+import { getStoreAccountByOwner } from "@/app/lib/store-accounts-db";
+import { addStoreUser } from "@/app/lib/store-users-db";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,24 @@ export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlug(request);
  if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug });
 
- // Authenticated but not attached to any store → send them through onboarding.
+ // SECOND PLACE TO LOOK, before declaring she has no shop.
+ //
+ // A store has two records of who owns it: the store_users row (access) and the store_accounts row
+ // (the account itself, written at signup). /api/store/onboarding checks BOTH before it will let
+ // anyone create a store — this gate checked only the first, so the two could disagree about the
+ // same person. When they did, the disagreement was invisible and total: whoami said "no store",
+ // the workspace sent her to the wizard, the wizard asked onboarding, onboarding found her account
+ // and refused to make a second one, and she was left circling a signup flow for a shop she
+ // already owned, unable to reach it.
+ //
+ // Found here, the missing access row is written back rather than reported: she owns the account,
+ // so the row should have existed, and repairing it costs one insert and ends the loop for good.
+ const account = await getStoreAccountByOwner(session.user.email).catch(() => null);
+ if (account?.slug) {
+  await addStoreUser(account.slug, session.user.email, "owner").catch(() => {}); /* allow-swallow: reporting the store matters more than repairing the row */
+  return NextResponse.json({ admin: false, slug: account.slug, repaired: true });
+ }
+
+ // Authenticated but genuinely attached to nothing → the signup wizard.
  return NextResponse.json({ admin: false, needsOnboarding: true, email: session.user.email });
 }

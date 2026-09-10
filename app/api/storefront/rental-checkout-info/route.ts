@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
    totalCents: rentCents + waiverCents,
    depositCents: settings.security === "deposit" ? settings.depositCents : null,
    fulfilment: settings.fulfilment,
+   // Whether this store takes codes on rentals at all — the checkout only offers the box when it does.
+   discountsAllowed: settings.discountApplies !== "none",
    termsText: settings.termsText,
   },
   item: { id: item.id, title: item.title, priceCents: item.priceCents, currency: item.currency, image: item.images?.[0] || null },

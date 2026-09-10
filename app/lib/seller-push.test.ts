@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pushSellerSale, pushSellerMessage, type SellerPushDeps } from "./seller-push.ts";
+import { pushSellerSale, pushSellerMessage, pushSellerOffer, pushSellerPayout, type SellerPushDeps } from "./seller-push.ts";
 import { DEFAULT_PREFS, mergePrefs } from "./notification-prefs-core.ts";
 import type { PushPayload } from "./push.ts";
 
@@ -60,4 +60,50 @@ test("a failure anywhere is swallowed — the sale already happened", async () =
  assert.deepEqual(await pushSellerSale("blummier", SALE, prefsDown.deps), { sent: false, reason: "error" });
  const sendDown = fakes({ send: async () => { throw new Error("expo down"); } });
  assert.deepEqual(await pushSellerMessage("blummier", MESSAGE, sendDown.deps), { sent: false, reason: "error" });
+});
+
+// ── the two events that had a switch and no sender ─────────────────────────────────────────────
+// "An offer comes in" and "A payout lands" were toggles on the Notifications screen that nothing
+// could ever satisfy: no code sent either push. These pin that they now go, and that they obey the
+// same gate as the two that already worked.
+
+test("an offer pushes, and says who and how much", async () => {
+ const { deps, sent } = fakes({ prefs: mergePrefs(DEFAULT_PREFS, { push: { offer: true } }) });
+ const r = await pushSellerOffer("s", { buyerName: "Ana", itemTitle: "Silk Slip Dress", amountCents: 18_000, currency: "usd", offerId: 7 }, deps);
+ assert.deepEqual(r, { sent: true });
+ assert.equal(sent[0].payload.title, "Offer on Silk Slip Dress");
+ assert.match(sent[0].payload.body, /180/);
+ assert.match(sent[0].payload.body, /Ana/);
+ assert.equal(sent[0].payload.data?.type, "offer");
+});
+
+test("an offer with no name or piece still says something true", async () => {
+ const { deps, sent } = fakes({ prefs: mergePrefs(DEFAULT_PREFS, { push: { offer: true } }) });
+ await pushSellerOffer("s", { buyerName: null, itemTitle: null, amountCents: 5_000, currency: "usd", offerId: 1 }, deps);
+ assert.equal(sent[0].payload.title, "You have an offer");
+});
+
+test("offers off means no offer push", async () => {
+ const { deps, sent } = fakes({ prefs: mergePrefs(DEFAULT_PREFS, { push: { offer: false } }) });
+ const r = await pushSellerOffer("s", { buyerName: "Ana", itemTitle: "A bag", amountCents: 100, currency: "usd", offerId: 1 }, deps);
+ assert.deepEqual(r, { sent: false, reason: "off" });
+ assert.equal(sent.length, 0);
+});
+
+test("a payout pushes when she asked to hear about it", async () => {
+ const { deps, sent } = fakes({ prefs: mergePrefs(DEFAULT_PREFS, { push: { payout: true } }) });
+ const r = await pushSellerPayout("s", { amountCents: 42_000, currency: "usd", payoutId: "po_1" }, deps);
+ assert.deepEqual(r, { sent: true });
+ assert.equal(sent[0].payload.title, "Payout on its way");
+ assert.equal(sent[0].payload.data?.type, "payout");
+});
+
+test("payout is off by default — money moving is not urgent enough to buzz unasked", async () => {
+ const { deps } = fakes();
+ assert.deepEqual(await pushSellerPayout("s", { amountCents: 1, currency: "usd", payoutId: "po" }, deps), { sent: false, reason: "off" });
+});
+
+test("a push failure never escapes — the payout already happened", async () => {
+ const { deps } = fakes({ prefs: mergePrefs(DEFAULT_PREFS, { push: { payout: true } }), send: async () => { throw new Error("expo down"); } });
+ assert.deepEqual(await pushSellerPayout("s", { amountCents: 1, currency: "usd", payoutId: "po" }, deps), { sent: false, reason: "error" });
 });

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => null);
  if (!body || !String(body.code || "").trim()) return NextResponse.json({ error: "Add a code." }, { status: 400 });
- const d = await addDiscount(slug, { code: body.code, label: body.label, kind: body.kind, value: body.value, endsAt: body.endsAt });
+ const d = await addDiscount(slug, { code: body.code, label: body.label, kind: body.kind, value: body.value, endsAt: body.endsAt, itemIds: body.itemIds, audience: body.audience, lapsedDays: body.lapsedDays });
  if (!d) return NextResponse.json({ error: "Invalid code." }, { status: 400 });
  const discounts = await withUsage(slug);
  return NextResponse.json({ ok: true, discounts });
@@ -46,6 +46,9 @@ export async function PATCH(request: NextRequest) {
  ...("kind" in body ? { kind: String(body.kind ?? "") } : {}),
  ...("value" in body ? { value: body.value === "" || body.value == null ? null : Number(body.value) } : {}),
  ...("endsAt" in body ? { endsAt: body.endsAt ? String(body.endsAt) : null } : {}),
+ ...("itemIds" in body ? { itemIds: Array.isArray(body.itemIds) ? body.itemIds.map(String) : [] } : {}),
+ ...("audience" in body ? { audience: body.audience == null ? "all" : String(body.audience) } : {}),
+ ...("lapsedDays" in body ? { lapsedDays: body.lapsedDays == null || body.lapsedDays === "" ? null : Number(body.lapsedDays) } : {}),
  }).catch(() => {});
  const discounts = await withUsage(slug);
  return NextResponse.json({ ok: true, discounts });

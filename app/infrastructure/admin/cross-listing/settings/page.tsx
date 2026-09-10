@@ -85,7 +85,8 @@ export default function CrossListingSettingsPage() {
  // (the status route is admin-gated, and a 401 leaves the block unrendered).
  useEffect(() => {
  let active = true;
- fetch("/api/infrastructure/whoami").then((r) => (r.ok ? r.json() : null)).then((d) => {
+ /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
+ fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
  if (!active || d?.admin !== true) return;
  return fetch("/api/admin/ebay-notifications/status").then((r) => (r.ok ? r.json() : null)).then((n) => { if (active && n?.ok) setNotify(n); });
  }).catch(() => {});

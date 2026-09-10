@@ -10,6 +10,8 @@
 export type BookingMode = "open" | "request" | "both";
 export type Security = "none" | "deposit" | "waiver";
 export type Fulfilment = "ship" | "pickup" | "both";
+/** rent = the hire fee only · rent_waiver = the hire fee and the damage waiver · none = codes off. */
+export type RentalDiscountScope = "none" | "rent" | "rent_waiver";
 
 export type RentalSettings = {
  enabled: boolean;
@@ -43,6 +45,18 @@ export type RentalSettings = {
  security: Security;
  depositCents: number | null;
  waiverPct: number;
+
+ /**
+  * What a discount code comes off on a rental.
+  *
+  * A rental is three numbers, not one — the rent, the damage waiver, and the deposit — so "15% off"
+  * has no obvious meaning until the store says which. The deposit is never one of them: it is the
+  * renter's own money coming back to her, so discounting it would refund more than she ever paid.
+  *
+  * "none" is the default because it is what rentals did before this existed: codes were simply not
+  * accepted, and a shop should opt in rather than discover it has been discounting.
+  */
+ discountApplies: RentalDiscountScope;
 
  showMarketValue: boolean;
  fulfilment: Fulfilment;
@@ -81,6 +95,7 @@ export const DEFAULT_SETTINGS: RentalSettings = {
  security: "waiver",
  depositCents: null,
  waiverPct: 10,
+ discountApplies: "none",
  showMarketValue: true,
  fulfilment: "ship",
  appointments: false,
@@ -95,6 +110,7 @@ export const DEFAULT_SETTINGS: RentalSettings = {
 const MODES: BookingMode[] = ["open", "request", "both"];
 const SECURITIES: Security[] = ["none", "deposit", "waiver"];
 const FULFILMENTS: Fulfilment[] = ["ship", "pickup", "both"];
+const DISCOUNT_SCOPES: RentalDiscountScope[] = ["none", "rent", "rent_waiver"];
 
 function bool(v: unknown, fallback: boolean): boolean {
  return typeof v === "boolean" ? v : fallback;
@@ -133,6 +149,7 @@ export function resolveSettings(
   maxDays: Math.max(1, count(s.maxDays, d.maxDays)),
   horizonDays: Math.max(1, count(s.horizonDays, d.horizonDays)),
   leadDays: count(s.leadDays, d.leadDays),
+  discountApplies: oneOf(s.discountApplies, DISCOUNT_SCOPES, d.discountApplies),
   shipOutDays: count(s.shipOutDays, d.shipOutDays, 60),
   shipBackDays: count(s.shipBackDays, d.shipBackDays, 60),
   turnaroundDays: count(s.turnaroundDays, d.turnaroundDays, 60),

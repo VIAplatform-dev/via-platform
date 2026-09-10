@@ -72,6 +72,9 @@ function TypeChips({ values, onChange }: { values: string[]; onChange: (v: strin
   setDraft("");
  };
  return (
+  // The input used to take `flex-1`, so with a few chips it wrapped onto a line of its own and left
+  // an empty band under them — the box read as broken rather than as somewhere to type. It now sits
+  // beside the chips at its own size, and says what it wants.
   <div className="flex w-72 flex-wrap items-center gap-1.5 rounded-lg border border-stone-200 p-1.5 focus-within:border-stone-400">
    {values.map((t) => (
     <span key={t} className="inline-flex items-center gap-1 rounded-full bg-stone-100 py-1 pl-2.5 pr-1.5 text-[12.5px] text-stone-700">
@@ -88,8 +91,8 @@ function TypeChips({ values, onChange }: { values: string[]; onChange: (v: strin
      if (e.key === "Backspace" && !draft && values.length) onChange(values.slice(0, -1));
     }}
     onBlur={() => add(draft)}
-    placeholder={values.length ? "" : "Try-on"}
-    className="min-w-[70px] flex-1 bg-transparent px-1 py-1 text-[13.5px] outline-none"
+    placeholder={values.length ? "Add…" : "Try-on"}
+    className="w-20 shrink-0 bg-transparent px-1 py-1 text-[13.5px] outline-none placeholder:text-stone-400"
    />
   </div>
  );
@@ -281,7 +284,7 @@ export default function AppointmentSettingsPage() {
       >
        <Toggle on={s.requireApproval} onClick={() => set("requireApproval", !s.requireApproval)} />
       </Row>
-      <Row label="Note shown above the times" hint="A short line about what to expect. Optional.">
+      <Row label="Note shown above the times" hint="Anything they should know before coming — where to find you, what the buzzer says, whether to bring anything. Optional.">
        <input
         value={s.intro ?? ""}
         onChange={(e) => set("intro", e.target.value || null)}

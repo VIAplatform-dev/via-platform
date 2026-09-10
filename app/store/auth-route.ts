@@ -48,12 +48,25 @@ export function loginHref(next?: string | null, mode: "login" | "signup" = "logi
  * sign-in page there would read as the sign-in having silently failed, which is the one thing this
  * flow must never do.
  */
+/**
+ * Why the sign-in didn't land, when it didn't.
+ *
+ * `signed-out` means whoami never saw a session: the browser is not sending one back on this host.
+ * That is the shape a cross-host cookie problem takes, and it used to be invisible — the seller was
+ * returned to the form with no message, which reads as "it didn't submit" and tells nobody anything.
+ */
+export type AuthStall = "signed-out" | "unreachable" | null;
+export let lastAuthStall: AuthStall = null;
+
 export async function destinationAfterAuth(next?: string | null, retryOn401 = false): Promise<string> {
  const attempts = retryOn401 ? 3 : 1;
+ let sawNoSession = false;
+ let sawNoAnswer = false;
  for (let i = 0; i < attempts; i++) {
   if (i) await new Promise((r) => setTimeout(r, 700));
   const res = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).catch(() => null);
-  if (!res || res.status === 401) continue;
+  if (!res) { sawNoAnswer = true; continue; }
+  if (res.status === 401) { sawNoSession = true; continue; }
   const who: StoreWhoAmI = await res.json().catch(() => ({}) as StoreWhoAmI);
   // On `next dev`, whoami answers "owner" from NODE_ENV alone, with no session behind it. The proxy
   // does not honour that shortcut, so acting on it here means redirecting into the workspace, being
@@ -63,7 +76,8 @@ export async function destinationAfterAuth(next?: string | null, retryOn401 = fa
   // Signed in with no store yet → the wizard, and NOT wherever they were originally headed.
   // Setting the shop up comes first; `next` would drop them into an empty workspace.
   if (who.needsOnboarding) return STORE_ONBOARDING;
-  if (who.slug || who.admin) return safeNext(next) || STORE_WORKSPACE;
+  if (who.slug || who.admin) { lastAuthStall = null; return safeNext(next) || STORE_WORKSPACE; }
  }
+ lastAuthStall = sawNoSession ? "signed-out" : sawNoAnswer ? "unreachable" : null;
  return STORE_LOGIN;
 }

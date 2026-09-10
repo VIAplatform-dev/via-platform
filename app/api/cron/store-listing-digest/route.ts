@@ -3,6 +3,8 @@ import { getBaseUrl } from "@/app/lib/base-url";
 import { storeContactEmails } from "@/app/lib/stores";
 import { getUnalertedFlaggedByStore, markListingsAlerted } from "@/app/lib/listing-quality-db";
 import { sendStoreListingDigest } from "@/app/lib/email";
+import { getNotificationPrefs } from "@/app/lib/notification-prefs-db";
+import { emailEnabled } from "@/app/lib/notification-prefs-core";
 
 // Weekly listing-quality email to each store partner. Each flagged listing is
 // emailed ONCE — we only send newly-flagged listings (those not yet alerted),
@@ -31,6 +33,10 @@ export async function GET(request: Request) {
  for (let i = 0; i < entries.length; i++) {
  const [slug, email] = entries[i];
  if (!email) { skipped++; continue; }
+ // Her own answer about being emailed. "Something needs you" is a switch on the Notifications
+ // screen that nothing read — every store on the list got this digest whether it wanted it or not.
+ const wants = await getNotificationPrefs(slug).then((p) => emailEnabled(p, "needs")).catch(() => true);
+ if (!wants) { skipped++; continue; }
  try {
  // Only listings not yet alerted (new or never emailed).
  const { storeName, products: flagged } = await getUnalertedFlaggedByStore(slug);

@@ -8,18 +8,20 @@ import { PUSH_EVENTS, EMAIL_EVENTS, DEFAULT_PREFS, normalizePrefs, mergePrefs, p
 
 test("the events, and the defaults the phone screen has always shown", () => {
  assert.deepEqual(PUSH_EVENTS, ["sold", "message", "offer", "payout"]);
- assert.deepEqual(EMAIL_EVENTS, ["daily", "weekly", "needs"]);
+ // "daily" and "weekly" were removed: no daily-summary or weekly-numbers email exists anywhere in
+ // the codebase, so both were switches a seller could flip forever with no effect.
+ assert.deepEqual(EMAIL_EVENTS, ["needs"]);
  assert.deepEqual(DEFAULT_PREFS, {
   push: { sold: true, message: true, offer: true, payout: false },
-  email: { daily: false, weekly: true, needs: true },
+  email: { needs: true },
  });
 });
 
 test("anything stored is read back over the defaults, and junk is ignored", () => {
  assert.deepEqual(normalizePrefs(null), DEFAULT_PREFS);
- assert.deepEqual(normalizePrefs({ push: { sold: false }, email: { daily: true } }), {
+ assert.deepEqual(normalizePrefs({ push: { sold: false }, email: { needs: false } }), {
   push: { sold: false, message: true, offer: true, payout: false },
-  email: { daily: true, weekly: true, needs: true },
+  email: { needs: false },
  });
  assert.deepEqual(normalizePrefs({ push: { sold: "no", bogus: true }, email: "x" }), DEFAULT_PREFS);
  // Never the same object as the defaults — a caller mutating its copy must not change them.
@@ -29,8 +31,8 @@ test("anything stored is read back over the defaults, and junk is ignored", () =
 
 test("a patch changes only what it names — one toggle is one key", () => {
  const next = mergePrefs(DEFAULT_PREFS, { push: { payout: true } });
- assert.deepEqual(next, { push: { sold: true, message: true, offer: true, payout: true }, email: { daily: false, weekly: true, needs: true } });
- assert.deepEqual(mergePrefs(next, { email: { weekly: false } }).email, { daily: false, weekly: false, needs: true });
+ assert.deepEqual(next, { push: { sold: true, message: true, offer: true, payout: true }, email: { needs: true } });
+ assert.deepEqual(mergePrefs(next, { email: { needs: false } }).email, { needs: false });
  assert.deepEqual(mergePrefs(next, {}), next);
  assert.deepEqual(mergePrefs(next, { push: { nope: false } as never }), next);
 });

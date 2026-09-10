@@ -5,6 +5,8 @@ import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { payableAccountId } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { applicationFeeCents } from "@/app/lib/payments-config";
+import { validateDiscount, lastOrderAtForBuyer } from "@/app/lib/store-discounts-db";
+import { applyDiscountToOrder } from "@/app/lib/discount-scope";
 import { getCheckoutMethods } from "@/app/lib/store-checkout-db";
 import { getBooking, rentalContext, ownerOfItem } from "@/app/lib/rentals/rentals-db";
 
@@ -65,12 +67,44 @@ export async function POST(request: NextRequest) {
  const rentCents = booking.priceCents ?? 0;
  if (rentCents <= 0) return NextResponse.json({ error: "This rental has no price." }, { status: 400 });
  const waiverCents = settings.security === "waiver" ? Math.round((rentCents * settings.waiverPct) / 100) : 0;
- const shippingCostCents = collecting ? 0 : Math.max(0, Math.round(Number(body?.shippingCostCents) || 0));
- const amount = rentCents + waiverCents + shippingCostCents;
+ let effShippingCents = collecting ? 0 : Math.max(0, Math.round(Number(body?.shippingCostCents) || 0));
+
+ // A DISCOUNT ON A RENTAL, on whatever this store decided it comes off.
+ //
+ // A rental is three numbers — the hire fee, the damage waiver, and the deposit — so "15% off" has
+ // no single meaning. The store answers that in Settings → Rentals (`discountApplies`), and the
+ // deposit is never an option: it is the renter's own money coming back to her, so discounting it
+ // would refund more than she ever paid. Stores that have not chosen take no codes at all, which is
+ // exactly what rentals did before.
+ const scope = settings.discountApplies;
+ let rentOff = 0, waiverOff = 0;
+ let appliedDiscount: { id: number; code: string; offCents: number } | null = null;
+ const rentalCode = scope !== "none" && typeof body?.discountCode === "string" ? body.discountCode.trim() : "";
+ if (rentalCode) {
+  const d = await validateDiscount(seller.slug, rentalCode).catch(() => null);
+  // A rental has no line items to scope against, so a piece-specific code is matched on the piece
+  // being rented — anything naming other pieces simply does not apply here.
+  if (d) {
+   const lastOrderAt = d.audience === "all" ? null : await lastOrderAtForBuyer(seller.slug, buyerEmail);
+   const base = scope === "rent_waiver" ? rentCents + waiverCents : rentCents;
+   const c = applyDiscountToOrder(d, [{ itemId: booking.itemId, amountCents: base }], { lastOrderAt, email: buyerEmail });
+   if (!c.refusal && (c.offCents > 0 || c.freeShipping)) {
+    // Taken off the hire fee first, and off the waiver only where the store included it.
+    rentOff = Math.min(rentCents, c.offCents);
+    waiverOff = scope === "rent_waiver" ? Math.min(waiverCents, c.offCents - rentOff) : 0;
+    if (c.freeShipping) effShippingCents = 0;
+    appliedDiscount = { id: d.id, code: d.code, offCents: rentOff + waiverOff + (c.freeShipping ? (collecting ? 0 : Math.max(0, Math.round(Number(body?.shippingCostCents) || 0))) : 0) };
+   }
+  }
+ }
+ const netRentCents = rentCents - rentOff;
+ const netWaiverCents = waiverCents - waiverOff;
+ const shippingCostCents = effShippingCents;
+ const amount = netRentCents + netWaiverCents + shippingCostCents;
 
  try {
   const currency = (item.currency || "usd").toLowerCase();
-  const appFee = applicationFeeCents(rentCents + waiverCents) + shippingCostCents;
+  const appFee = applicationFeeCents(netRentCents + netWaiverCents) + shippingCostCents;
 
   const meta: Record<string, string> = {
    rentalBookingId: booking.id,
@@ -78,8 +112,8 @@ export async function POST(request: NextRequest) {
    sellerId: seller.id,
    rental_start: booking.rented?.start ?? "",
    rental_end: booking.rented?.end ?? "",
-   rent_cents: String(rentCents),
-   waiver_cents: String(waiverCents),
+   rent_cents: String(netRentCents),
+   waiver_cents: String(netWaiverCents),
    shipping_paid_cents: String(shippingCostCents),
    delivery: collecting ? "pickup" : "ship",
    buyer_email: buyerEmail,
@@ -92,6 +126,12 @@ export async function POST(request: NextRequest) {
    ship_country: String(ship.country || "US"),
    buyer_phone: String(buyer.phone || ""),
   };
+  if (appliedDiscount) {
+   meta.discount_code = appliedDiscount.code;
+   meta.discount_off_cents = String(appliedDiscount.offCents);
+   meta.discount_id = String(appliedDiscount.id);
+   meta.discount_store = seller.slug;
+  }
 
   const methods = await getCheckoutMethods(seller.slug);
   const intentBody = (pmts: string[]) => ({
