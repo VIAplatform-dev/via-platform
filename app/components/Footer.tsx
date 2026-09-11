@@ -117,8 +117,6 @@ export default function Footer() {
  </h4>
  <ul className="space-y-4">
  {[
- { href: "/partner-with-vya", label: "Partner With Us" },
- { href: "/for-stores", label: "Already a Partner?" },
  { href: "/faqs", label: "FAQs" },
  { href: "/terms", label: "Terms & Conditions" },
  { href: "/privacy", label: "Privacy Policy" },
@@ -132,6 +130,16 @@ export default function Footer() {
  </Link>
  </li>
  ))}
+ <li>
+ <a
+ href="https://getvya.ai/#book"
+ target="_blank"
+ rel="noopener noreferrer"
+ className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
+ >
+ Partner With Us
+ </a>
+ </li>
  <li>
  <a
  href="https://form.typeform.com/to/ssrEgHZ1"

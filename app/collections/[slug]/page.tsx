@@ -40,21 +40,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  const BASE_URL = getBaseUrl();
  const curatedBy: string | null = collection.curatedBy ?? null;
  const description = curatedBy
- ? `Curated by ${curatedBy} — hand-selected vintage & secondhand pieces on VYA.`
- : `Hand-selected vintage & secondhand pieces — ${(collection as { name: string }).name} on VYA.`;
+ ? `Curated by ${curatedBy}, hand-selected vintage & secondhand pieces on VYA.`
+ : `Hand-selected vintage & secondhand pieces, ${(collection as { name: string }).name} on VYA.`;
  const ogImageUrl = `${BASE_URL}/collections/${slug}/opengraph-image`;
 
  return {
- title: `${collection.name} — VYA`,
+ title: `${collection.name} | VYA`,
  description,
  openGraph: {
- title: `${collection.name} — VYA`,
+ title: `${collection.name} | VYA`,
  description,
  images: [{ url: ogImageUrl, width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: `${collection.name} — VYA`,
+ title: `${collection.name} | VYA`,
  description,
  images: [ogImageUrl],
  },
@@ -140,11 +140,6 @@ export default async function CollectionPage({ params }: Props) {
  >
  &larr; All Collections
  </Link>
- {collection.curatedBy && (
- <p className="text-xs uppercase tracking-[0.15em] text-[#5D0F17]/50 mb-2 font-sans">
- Curated by {collection.curatedBy}
- </p>
- )}
  <h1 className="text-2xl sm:text-3xl font-serif mb-2">{collection.name}</h1>
  <p className="text-sm sm:text-base text-[#5D0F17]/60 max-w-2xl">
  {collection.description}
@@ -162,7 +157,7 @@ export default async function CollectionPage({ params }: Props) {
  showBrandFilter={true}
  showSizeFilter={true}
  from={`/collections/${slug}`}
- emptyMessage="No picks yet — check back soon."
+ emptyMessage="No picks yet, check back soon."
  />
  </div>
  </section>

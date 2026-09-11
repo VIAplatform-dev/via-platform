@@ -109,13 +109,13 @@ export default function HomePage() {
  <section data-section="collections" className="">
  <div className="flex flex-col sm:flex-row">
  <Link
- href="/collections/summer-edit"
+ href="/collections/for-fall"
  className="relative group overflow-hidden w-full sm:w-1/2"
  style={{ height: "60vw", minHeight: "320px", maxHeight: "100vh" }}
  >
  <Image
- src="/edit-summer-v2.jpg"
- alt="Summer Edit"
+ src="/edit-fall.jpg"
+ alt="For Fall"
  fill
  sizes="(min-width: 640px) 50vw, 100vw"
  className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
@@ -123,8 +123,7 @@ export default function HomePage() {
  />
  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
  <div className="absolute bottom-8 left-8 text-[#FFFDF8]">
- <p className="text-[10px] uppercase tracking-[0.2em] mb-1 font-sans opacity-60">Curated by Sophia Tiago</p>
- <h3 className="text-3xl sm:text-4xl font-serif mb-4 leading-none">Summer Edit</h3>
+ <h3 className="text-3xl sm:text-4xl font-serif mb-4 leading-none">For Fall</h3>
  <span className="text-xs uppercase tracking-[0.15em] border-b border-[#FFFDF8]/60 pb-0.5 font-sans">
  Discover
  </span>
@@ -132,13 +131,13 @@ export default function HomePage() {
  </Link>
 
  <Link
- href="/collections/y2k-girls"
+ href="/collections/the-office"
  className="relative group overflow-hidden w-full sm:w-1/2"
  style={{ height: "60vw", minHeight: "320px", maxHeight: "100vh" }}
  >
  <Image
- src="/edit-y2k.jpg"
- alt="Y2K Girls"
+ src="/edit-office.jpg"
+ alt="The Office"
  fill
  sizes="(min-width: 640px) 50vw, 100vw"
  className="object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
@@ -146,8 +145,7 @@ export default function HomePage() {
  />
  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
  <div className="absolute bottom-8 left-8 text-[#FFFDF8]">
- <p className="text-[10px] uppercase tracking-[0.2em] mb-1 font-sans opacity-60">Pure 2000s energy</p>
- <h3 className="text-3xl sm:text-4xl font-serif mb-4 leading-none">Y2K Girls</h3>
+ <h3 className="text-3xl sm:text-4xl font-serif mb-4 leading-none">The Office</h3>
  <span className="text-xs uppercase tracking-[0.15em] border-b border-[#FFFDF8]/60 pb-0.5 font-sans">
  Discover
  </span>
