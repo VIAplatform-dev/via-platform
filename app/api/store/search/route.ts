@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 // returns grouped, jump-to-detail results. Each entity is flattened to one searchable string so a
 // single query matches order #, SKU, name, email, item title, brand, status, etc. — "look up anything".
 const B = "/infrastructure/admin";
-type Hit = { id: string; label: string; sub: string; href: string };
+type Hit = { id: string; label: string; sub: string; href: string; /** The piece's cover photo, for the surfaces that show one. Null for non-item hits. */ image?: string | null };
 
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -52,7 +52,10 @@ export async function GET(request: NextRequest) {
  const itemHits: Hit[] = items
  .filter((it) => itemSearchText(it).includes(q))
  .slice(0, 6)
- .map((it) => ({ id: it.id, label: `${it.title}`, sub: `SKU-${1000 + it.sku} · ${money(it.priceCents)} · ${itemStatusWord(it.status, holds.has(it.id))}`, href: `${B}/inventory?item=${it.id}` }));
+ // The piece's own photo travels with the hit. A row of results that all say INVENTORY and a SKU
+ // is a row you have to read; a row of pictures is one you recognise. Searching BY sku still works
+ // — itemSearchText matches it — it just isn't the thing shown back.
+ .map((it) => ({ id: it.id, label: `${it.title}`, sub: `SKU-${1000 + it.sku} · ${money(it.priceCents)} · ${itemStatusWord(it.status, holds.has(it.id))}`, image: Array.isArray(it.images) ? it.images[0] ?? null : null, href: `${B}/inventory?item=${it.id}` }));
 
  const custHits: Hit[] = customers
  .filter((c) => has(`${c.name || ""} ${c.email} ${c.phone || ""} ${c.location || ""}`))

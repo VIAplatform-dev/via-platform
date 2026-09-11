@@ -17,8 +17,18 @@ export async function GET(request: NextRequest) {
  const raw = request.nextUrl.searchParams.get("status");
  const statuses = raw ? (raw.split(",").filter(Boolean) as BookingStatus[]) : undefined;
 
- // Never let a carrier outage cost the seller their screen.
+ // A CARRIER CALL, SO NOT ON EVERY SCREEN THAT WANTS A COUNT.
+ //
+ // Refreshing here rather than on a cron is right for the Rentals screen: it is rate-limited per
+ // booking, and opening the queue is exactly when the answer is wanted. It is wrong for the phone's
+ // Home, which fetches this only to say "2 back today" and is opened many times a day — that would
+ // put a carrier round-trip in front of the seller's first screen. `?tracking=0` asks for the rows
+ // without it.
+ //
+ // Never let a carrier outage cost the seller their screen either way.
+ if (request.nextUrl.searchParams.get("tracking") !== "0") {
  await refreshStoreTracking(acting.seller.id).catch(() => 0);
+ }
 
  const bookings = await listBookings(acting.seller.id, statuses);
  const where = locate(bookings);
