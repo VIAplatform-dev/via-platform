@@ -21,7 +21,7 @@ export default function StylingGuideSection() {
  const el = scrollRef.current;
  if (!el) return;
  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
- if (reduce) return; // honor reduced-motion — manual scroll still works
+ if (reduce) return; // honor reduced-motion, manual scroll still works
 
  let raf = 0;
  const speed = 0.4; // px/frame ≈ 24px/s

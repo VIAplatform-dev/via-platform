@@ -10,7 +10,7 @@ import { flyerBySlug } from "@/app/lib/flyers";
 export const dynamic = "force-dynamic"; // the gate depends on a cookie, so it can never be cached
 
 export const metadata = {
- title: "Are you a trendsetter? — VYA",
+ title: "Are you a trendsetter? | VYA",
  description: "We got you. One-of-one archive pieces you will not see on anyone else.",
 };
 

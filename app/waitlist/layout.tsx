@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Join VYA — The world's best vintage, all in one place.",
+  title: "Join VYA, The world's best vintage, all in one place.",
   description: "Shop vintage & secondhand from the best independent stores worldwide. Join the waitlist for early access to VYA.",
   openGraph: {
     title: "The world's best vintage, all in one place.",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
         url: "https://vyaplatform.com/og-image.png",
         width: 1200,
         height: 630,
-        alt: "VYA — The world's best vintage, all in one place.",
+        alt: "VYA, The world's best vintage, all in one place.",
       },
     ],
     type: "website",

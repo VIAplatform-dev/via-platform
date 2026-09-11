@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Bloda's Choice — The Story Behind the Selection | VYA",
+ title: "Bloda's Choice: The Story Behind the Selection | VYA",
  description:
  "Why we chose Bloda's Choice for VYA. A creative platform built around the vision of photographer and founder Anna Bloda.",
 };
@@ -45,7 +45,7 @@ export default function BlodasChoiceStory() {
 
  <div className="prose prose-lg max-w-none text-[#5D0F17]/70 leading-relaxed space-y-6">
  <p>
- Bloda&apos;s Choice is more than a vintage store — it&apos;s a creative platform
+ Bloda&apos;s Choice is more than a vintage store, it&apos;s a creative platform
  built around the vision of its founder, Anna Bloda. Born in Poland and now
  based in New York City, Anna is a renowned photographer whose creative work
  extends naturally into fashion, styling, and cultural curation. Through
@@ -63,7 +63,7 @@ export default function BlodasChoiceStory() {
  <p className="font-serif text-[#5D0F17] text-xl">
  At VYA, we aim to highlight independent vintage boutiques that bring something
  unique to the world of designer resale and curated vintage fashion.
- Bloda&apos;s Choice perfectly embodies that spirit — offering a distinctive
+ Bloda&apos;s Choice perfectly embodies that spirit, offering a distinctive
  taste shaped by Anna&apos;s singular point of view.
  </p>
  </div>

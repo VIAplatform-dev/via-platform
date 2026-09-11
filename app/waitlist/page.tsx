@@ -155,7 +155,7 @@ function WaitlistContent() {
  }
  }
 
- const message = `Check out VYA — vintage & secondhand. Enter the giveaway to win a $1,000 shopping spree: ${referralLink}`;
+ const message = `Check out VYA, vintage & secondhand. Enter the giveaway to win a $1,000 shopping spree: ${referralLink}`;
  const first = phone1.trim() || phone2.trim();
  const second = phone1.trim() && phone2.trim() ? phone2.trim() : "";
 
@@ -171,7 +171,7 @@ function WaitlistContent() {
  };
 
  const handleSendSecond = () => {
- const message = `Check out VYA — vintage & secondhand. Enter the giveaway to win a $1,000 shopping spree: ${referralLink}`;
+ const message = `Check out VYA, vintage & secondhand. Enter the giveaway to win a $1,000 shopping spree: ${referralLink}`;
  window.location.href = `sms:${pendingPhone}?&body=${encodeURIComponent(message)}`;
  setPendingPhone("");
  goToConfirmation();
@@ -220,7 +220,7 @@ function WaitlistContent() {
  <p className="text-sm sm:text-base text-[#5D0F17]/60 mb-10 leading-relaxed max-w-md">
  Join the waitlist for early access. VYA lets you browse independent
  vintage and secondhand stores across the country in one seamless
- experience — and enter our giveaway to win a $1,000 shopping spree.
+ experience, and enter our giveaway to win a $1,000 shopping spree.
  </p>
 
  <form onSubmit={handleSubmit}>

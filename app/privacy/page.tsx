@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
- title: "Privacy Policy — VYA",
+ title: "Privacy Policy | VYA",
  description: "How VYA Platform Corporation collects, uses, and protects your personal information.",
  openGraph: {
- title: "Privacy Policy — VYA",
+ title: "Privacy Policy | VYA",
  description: "How VYA Platform Corporation collects, uses, and protects your personal information.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },

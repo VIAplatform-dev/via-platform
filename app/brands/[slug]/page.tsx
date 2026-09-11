@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
  const { slug } = await params;
  const label = brandMap[slug];
  if (!label) return {};
- const title = `${label} Vintage & Secondhand — VYA`;
+ const title = `${label} Vintage & Secondhand | VYA`;
  const description = `Shop secondhand and vintage ${label} pieces from trusted independent stores on VYA.`;
  return {
  title,
@@ -107,7 +107,7 @@ export default async function BrandPage({
  <p className="text-sm sm:text-base text-[#5D0F17]/60 max-w-2xl">
  {products.length > 0
  ? `${products.length} ${products.length === 1 ? "piece" : "pieces"} available`
- : "No pieces available right now — check back soon."}
+ : "No pieces available right now, check back soon."}
  </p>
  </div>
  </section>

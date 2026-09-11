@@ -30,11 +30,11 @@ export async function generateMetadata({ params }: StorePageProps): Promise<Meta
  if (!store) return {};
 
  const BASE_URL = getBaseUrl();
- const description = `Shop ${store.name} on VYA — ${store.location}. ${store.description.slice(0, 120)}...`;
+ const description = `Shop ${store.name} on VYA, ${store.location}. ${store.description.slice(0, 120)}...`;
  const ogImageUrl = `${BASE_URL}/stores/${slug}/opengraph-image`;
 
  return {
- title: `${store.name} — VYA`,
+ title: `${store.name} | VYA`,
  description,
  openGraph: {
  title: store.name,

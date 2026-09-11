@@ -109,14 +109,14 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
  brandName ? `${brandName} ` : "",
  itemType ? `${itemType} ` : "",
  `${price}`,
- product.store_name ? ` — ${product.store_name}` : "",
+ product.store_name ? `, ${product.store_name}` : "",
  categorySlug ? `. Shop vintage ${categorySlug} on VYA.` : ". Shop vintage & secondhand on VYA.",
  ].join("").trim();
 
  const ogImageUrl = `${BASE_URL}/products/${compositeId}/opengraph-image`;
 
  return {
- title: `${product.title} — VYA`,
+ title: `${product.title} | VYA`,
  description: descParts,
  keywords: [
  product.title,
@@ -125,7 +125,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
  "vintage", "secondhand", "VYA", product.store_name,
  ].filter(Boolean),
  openGraph: {
- title: `${product.title} — VYA`,
+ title: `${product.title} | VYA`,
  description: descParts,
  url: `${BASE_URL}/products/${compositeId}`,
  type: "website",
@@ -133,7 +133,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
  },
  twitter: {
  card: "summary_large_image",
- title: `${product.title} — VYA`,
+ title: `${product.title} | VYA`,
  description: descParts,
  images: [ogImageUrl],
  },
@@ -274,7 +274,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  "name": product.title,
  "description": product.description
   ? product.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 500)
-  : `${product.title} — vintage & secondhand at VYA`,
+  : `${product.title}, vintage & secondhand at VYA`,
  "image": seoImages.length ? seoImages : productImages,
  "url": `${BASE_URL}/products/${compositeId}`,
  ...(brandName ? { "brand": { "@type": "Brand", "name": brandName } } : {}),
@@ -352,7 +352,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  <div key={i} className="relative aspect-[3/4] w-full overflow-hidden bg-[#D8CABD]/20">
  <img
  src={src}
- alt={`${product.title}${i > 0 ? ` — image ${i + 1}` : ""}`}
+ alt={`${product.title}${i > 0 ? `, image ${i + 1}` : ""}`}
  className="w-full h-full object-cover object-center"
  loading={i === 0 ? "eager" : "lazy"}
  />
@@ -434,7 +434,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
                           dangerouslySetInnerHTML={{ __html: descriptionHtml }}
                         />
                       ) : !displaySize ? (
-                        <p className="text-black/60 italic">No additional details — visit the store listing for more information.</p>
+                        <p className="text-black/60 italic">No additional details, visit the store listing for more information.</p>
                       ) : null}
                     </div>
                   ),
@@ -444,7 +444,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  content: (() => {
  // Standard authenticity statement shown on every product (replaces the
  // inconsistent per-store copy; stores.ts `authenticityPolicy` is now unused).
- const policyText = `Every piece at ${store.name} is personally sourced, authenticated, and inspected before listing, then accurately described — so you can shop with complete confidence.`;
+ const policyText = `Every piece at ${store.name} is personally sourced, authenticated, and inspected before listing, then accurately described, so you can shop with complete confidence.`;
  const paragraphs = policyText.split(/\n\n+/);
  return (
  <div className="space-y-3">

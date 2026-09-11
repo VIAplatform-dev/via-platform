@@ -183,7 +183,7 @@ export default function ProductDetailModal({
  {extractConditionFromDescription(product.description) ? (
  <span className="font-medium">{extractConditionFromDescription(product.description)}</span>
  ) : (
- <span className="italic text-[#5D0F17]/50">not described — please refer to the photos listed</span>
+ <span className="italic text-[#5D0F17]/50">not described, please refer to the photos listed</span>
  )}
  </p>
 

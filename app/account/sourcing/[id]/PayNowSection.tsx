@@ -62,7 +62,7 @@ export default function PayNowSection({ requestId }: { requestId: string }) {
  disabled={loading}
  className="w-full text-sm uppercase tracking-wide px-8 py-3 bg-[#5D0F17] text-[#FFFDF8] hover:bg-[#5D0F17]/85 disabled:opacity-50 disabled:cursor-not-allowed transition"
  >
- {loading ? "Loading…" : "Complete Payment — Send to Stores"}
+ {loading ? "Loading…" : "Complete Payment: Send to Stores"}
  </button>
  </div>
  );

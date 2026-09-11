@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Ascensio Vintage — The Story Behind the Selection | VYA",
+ title: "Ascensio Vintage: The Story Behind the Selection | VYA",
  description:
  "Why we chose Ascensio Vintage for VYA. Championing timeless style that transcends the decades.",
 };

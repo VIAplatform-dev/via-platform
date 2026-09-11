@@ -14,16 +14,16 @@ import { brandMap } from "@/app/lib/brandData";
 import { deriveSize } from "@/app/lib/inventory";
 
 export const metadata: Metadata = {
- title: "New Arrivals — VYA",
+ title: "New Arrivals | VYA",
  description: "Fresh vintage and secondhand pieces just landed. Be first to shop the newest additions from our curated stores.",
  openGraph: {
- title: "New Arrivals — VYA",
+ title: "New Arrivals | VYA",
  description: "Fresh vintage and secondhand pieces just landed. Be first to shop the newest additions from our curated stores.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: "New Arrivals — VYA",
+ title: "New Arrivals | VYA",
  description: "Fresh vintage and secondhand pieces just landed. Be first to shop the newest additions from our curated stores.",
  images: ["/og-image.png"],
  },

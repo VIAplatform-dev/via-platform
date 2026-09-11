@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Missi Archives — The Story Behind the Selection | VYA",
+ title: "Missi Archives: The Story Behind the Selection | VYA",
  description:
  "Why we chose Missi Archives for VYA. Designer secondhand with depth. Luxury resale with longevity.",
 };
@@ -47,7 +47,7 @@ export default function MissiArchivesStory() {
  <p>
  Missi Archives is a carefully curated vintage and designer resale store
  rooted in timeless fashion and archival luxury. Every piece feels selected,
- not stocked. There&apos;s a distinct sense of intention behind the edit —
+ not stocked. There&apos;s a distinct sense of intention behind the edit,
  from structured tailoring to iconic designer silhouettes that have already
  proven their place in fashion history.
  </p>

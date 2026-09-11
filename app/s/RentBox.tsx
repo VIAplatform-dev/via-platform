@@ -34,7 +34,7 @@ type Quote =
 const REFUSAL: Record<string, string> = {
  "too-short": "That's shorter than this store rents for.",
  "too-long": "That's longer than this store rents for.",
- "too-soon": "That's too soon — pick a later start date.",
+ "too-soon": "That's too soon. Pick a later start date.",
  "beyond-horizon": "That's further ahead than bookings are open.",
  "no-price": "There's no price for a rental that long.",
  unavailable: "Those dates have gone. Pick another window.",
@@ -269,7 +269,7 @@ export default function RentBox({ itemId, accent, alsoForSale }: { itemId: strin
      {busy ? "One moment…"
       : byRequest ? "Request to rent"
       : !start || !end ? "Add dates to rent"
-      : ready ? `${r.rentLabel} — ${usd(total)}`
+      : ready ? `${r.rentLabel}, ${usd(total)}`
       : r.rentLabel}
     </button>
    )}

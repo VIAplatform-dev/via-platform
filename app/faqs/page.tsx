@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import FAQAccordion from "@/app/components/FAQAccordion";
 
 export const metadata: Metadata = {
- title: "FAQs — VYA",
- description: "Answers to common questions about shopping on VYA — how it works, our stores, sourcing, and more.",
+ title: "FAQs | VYA",
+ description: "Answers to common questions about shopping on VYA, how it works, our stores, sourcing, and more.",
  openGraph: {
- title: "FAQs — VYA",
- description: "Answers to common questions about shopping on VYA — how it works, our stores, sourcing, and more.",
+ title: "FAQs | VYA",
+ description: "Answers to common questions about shopping on VYA, how it works, our stores, sourcing, and more.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: "FAQs — VYA",
- description: "Answers to common questions about shopping on VYA — how it works, our stores, sourcing, and more.",
+ title: "FAQs | VYA",
+ description: "Answers to common questions about shopping on VYA, how it works, our stores, sourcing, and more.",
  images: ["/og-image.png"],
  },
 };

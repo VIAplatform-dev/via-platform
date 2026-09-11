@@ -26,7 +26,7 @@ export default function NewsletterForm({ accent, label, placeholder, thanks }: {
  setBusy(false);
  }
 
- if (done) return <p className="mt-6 text-sm opacity-70">{thanks || "Thanks — you’re on the list."}</p>;
+ if (done) return <p className="mt-6 text-sm opacity-70">{thanks || "Thanks, you’re on the list."}</p>;
 
  return (
  <form onSubmit={submit} className="mx-auto mt-6 flex w-full max-w-sm flex-col gap-3">

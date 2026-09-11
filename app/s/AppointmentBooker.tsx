@@ -104,7 +104,7 @@ export default function AppointmentBooker({
    <div className="vya-round border border-current/15 px-5 py-6 text-center">
     <p className="text-[14px]">Requested</p>
     <p className="mx-auto mt-2 max-w-[38ch] text-[12.5px] leading-relaxed opacity-65">
-     {pretty(done.day, done.start)}. The shop will confirm — your time is held until they do.
+     {pretty(done.day, done.start)}. The shop will confirm, your time is held until they do.
     </p>
    </div>
   );

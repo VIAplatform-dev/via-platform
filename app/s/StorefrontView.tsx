@@ -368,7 +368,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <div className="px-4 py-2 text-center text-[11px] tracking-wide text-white" style={{ background: accent }}>{header.announcement}</div>
  )}
  {/* Header: brand · nav · utility icons, in the arrangement the seller chose (headerLayout).
-     Defined once as three parts so a layout change can never alter what the header CONTAINS —
+     Defined once as three parts so a layout change can never alter what the header CONTAINS,
      only where the parts sit. */}
  {(headerNav.length > 0 || logo) && (() => {
  const brand = (
@@ -425,7 +425,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const utils = (
  <div className="flex shrink-0 items-center gap-4 opacity-70">
  {/* Search is functional. Account + cart are hidden until VYA has buyer
- logins / a basket (revisit when we build payments) — header.hasAccount /
+ logins / a basket (revisit when we build payments), header.hasAccount /
  header.hasCart are still captured so we can switch them back on. */}
  {header.hasSearch && <SearchBox handle={sf.handle} preview={preview} />}
  </div>
@@ -467,7 +467,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
      length: a horizontally-scrollable strip slices the last label mid-word against the screen edge
      with nothing to say the row can be swiped, so a store with seven pages looks like a store whose
      header is cut off. The editor's chrome was changed to wrap; this, the renderer a shopper actually
-     meets, was left scrolling — so the phone preview and the phone disagreed. `whitespace-nowrap`
+     meets, was left scrolling, so the phone preview and the phone disagreed. `whitespace-nowrap`
      stays on each ITEM, so "Shipping & Returns" breaks between links rather than through one. */}
  {headerNav.length > 0 && (
  <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 border-b border-black/[0.06] px-6 py-2.5 text-[11px] uppercase tracking-[0.16em] opacity-70 md:hidden">
@@ -592,7 +592,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {emptyFiltered && (
  <p className="mb-10 text-center text-sm opacity-60">
- Nothing in <span className="capitalize">{collectionTitle || categoryLabel || (query ? `“${query}”` : "that")}</span> right now — here’s everything else.
+ Nothing in <span className="capitalize">{collectionTitle || categoryLabel || (query ? `“${query}”` : "that")}</span> right now, here’s everything else.
  </p>
  )}
  {gridItems.length === 0 ? (

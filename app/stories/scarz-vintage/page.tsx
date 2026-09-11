@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Scarz Vintage — The Story Behind the Selection | VYA",
+ title: "Scarz Vintage: The Story Behind the Selection | VYA",
  description:
  "Why we chose Scarz Vintage for VYA. Curated vintage at its best: thoughtful, refined, and intentional.",
 };
@@ -46,14 +46,14 @@ export default function ScarzVintageStory() {
  <div className="prose prose-lg max-w-none text-[#5D0F17]/70 leading-relaxed space-y-6">
  <p>
  Scarz Vintage is the kind of independent vintage store that understands
- that luxury fashion doesn&apos;t expire — it evolves. Built around a sharp
+ that luxury fashion doesn&apos;t expire; it evolves. Built around a sharp
  eye for designer resale and archival pieces, Scarz focuses on sourcing
  vintage designer clothing that feels as relevant now as it did decades ago.
  </p>
 
  <p>
  When we discovered Scarz, what stood out immediately wasn&apos;t just the
- brands — it was the edit. This is curated vintage at its best: thoughtful,
+ brands; it was the edit. This is curated vintage at its best: thoughtful,
  refined, and intentional. You&apos;ll find luxury labels, rare statement
  pieces, and timeless wardrobe staples that can be passed down to generations.
  </p>
@@ -67,7 +67,7 @@ export default function ScarzVintageStory() {
  <p className="font-serif text-[#5D0F17] text-xl">
  At VYA, our mission is to make it easier to discover the best independent
  vintage stores and designer secondhand boutiques in one place. Scarz Vintage
- is exactly why VYA exists — to connect shoppers with the finest online vintage
+ is exactly why VYA exists, to connect shoppers with the finest online vintage
  boutiques that prioritize authenticity, longevity, and style that lasts.
  </p>
  </div>

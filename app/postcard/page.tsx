@@ -10,8 +10,8 @@ import { flyerBySlug } from "@/app/lib/flyers";
 export const dynamic = "force-dynamic"; // the gate depends on a cookie, so it can never be cached
 
 export const metadata = {
- title: "You found us. — VYA",
- description: "Archive fashion from vintage stores around the world — skip the waitlist.",
+ title: "You found us. | VYA",
+ description: "Archive fashion from vintage stores around the world, skip the waitlist.",
 };
 
 export default async function Page() {

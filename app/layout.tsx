@@ -20,7 +20,7 @@ import FirebaseAnalyticsProvider from "./components/FirebaseAnalyticsProvider";
 
 export const metadata: Metadata = {
  metadataBase: new URL("https://vyaplatform.com"),
- title: "VYA — The world's best vintage, all in one place.",
+ title: "VYA, The world's best vintage, all in one place.",
  description: "Shop from the best independent vintage and secondhand stores worldwide. The pieces you've been dreaming of. All trusted and verified stores.",
  keywords: ["vintage", "secondhand", "vintage clothing", "vintage platform", "independent vintage stores", "VYA platform", "designer vintage", "pre-loved fashion"],
  icons: {

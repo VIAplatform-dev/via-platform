@@ -35,18 +35,18 @@ const placeholder = (ink: string, bg: string, i: number) =>
 // material, garment, size — because card anatomy is part of what's being reviewed: how a long title
 // wraps at 5-up versus 2-up is a real difference between these templates.
 const TITLES = [
- "Christian Dior F/W 1998 Croc-Embossed Pump — US 8",
+ "Christian Dior F/W 1998 Croc-Embossed Pump, US 8",
  "Chanel 1994 Quilted Lambskin Flap Bag",
- "Chanel Cruise 2000 Printed Silk Top — S",
- "Christian Dior Leather Ballet Flat — US 8",
+ "Chanel Cruise 2000 Printed Silk Top, S",
+ "Christian Dior Leather Ballet Flat, US 8",
  "Fendi 1999 Beaded Baguette",
- "Gucci Tom Ford Era Leather Heel — US 7",
- "Christian Dior Patent Slingback — US 7.5",
+ "Gucci Tom Ford Era Leather Heel, US 7",
+ "Christian Dior Patent Slingback, US 7.5",
  "Louis Vuitton Monogram Mini Speedy",
- "Ralph Lauren Hand-Knit Wool Cardigan — M",
+ "Ralph Lauren Hand-Knit Wool Cardigan, M",
  "Mulberry Darwin Leather Bayswater",
- "Gucci S/S 2004 Asymmetric Jersey Top — S",
- "Christian Dior Kitten Heel Mule — US 8.5",
+ "Gucci S/S 2004 Asymmetric Jersey Top, S",
+ "Christian Dior Kitten Heel Mule, US 8.5",
 ];
 const PRICES = ["$460", "$2,000", "$650", "$510", "$4,000", "$425", "$590", "$1,800", "$165", "$780", "$325", "$700"];
 
@@ -168,7 +168,7 @@ export default async function TemplateGallery({ searchParams }: Props) {
     </span>
    </div>
    <p className="border-t border-white/[0.07] px-4 py-2 text-[12px] leading-relaxed text-white/45">
-    <span className="text-white/70">{tpl.bestFor}</span> — {tpl.signature}
+    <span className="text-white/70">{tpl.bestFor}</span>, {tpl.signature}
    </p>
   </div>
 

@@ -61,7 +61,7 @@ export default function InviteButton({ label, referralCode, compact }: Props = {
  </div>
 
  <p className="text-sm text-[#5D0F17]/60 leading-relaxed">
- Share VYA with someone who&apos;d love it — vintage stores, all in one place.
+ Share VYA with someone who&apos;d love it, vintage stores, all in one place.
  </p>
 
  {/* Referral code */}

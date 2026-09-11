@@ -274,7 +274,7 @@ export default function GlobalPageTracker() {
  if (userId) {
  if (sentWithUser.current) return;
  sentWithUser.current = true;
- utmPayloadRef.current = null; // linked to the account now — safe to clear
+ utmPayloadRef.current = null; // linked to the account now, safe to clear
  try {
  sessionStorage.removeItem("via_utm_data");
  } catch {}

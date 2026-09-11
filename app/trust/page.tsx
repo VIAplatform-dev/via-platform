@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
- title: "Trust & Authenticity — VYA",
+ title: "Trust & Authenticity | VYA",
  description:
  "Every store on VYA is hand-vetted for authenticity, quality, and values. Learn how we verify sellers and protect buyers.",
 };
@@ -11,12 +11,12 @@ const STEPS = [
  {
  number: "01",
  title: "Every store owner is vetted personally",
- body: "Before any store joins VYA, we have a direct conversation with the founder. We learn who they are, how they source, and why they do this — because the people behind the pieces matter as much as the pieces themselves.",
+ body: "Before any store joins VYA, we have a direct conversation with the founder. We learn who they are, how they source, and why they do this, because the people behind the pieces matter as much as the pieces themselves.",
  },
  {
  number: "02",
  title: "We review their authentication process",
- body: "We ask every store how they verify authenticity — whether that's in-house inspection, third-party authenticators like Entrupy or CheckCheck, Certificates of Authenticity, or a combination. Stores that can't speak to their process don't make the cut.",
+ body: "We ask every store how they verify authenticity, whether that's in-house inspection, third-party authenticators like Entrupy or CheckCheck, Certificates of Authenticity, or a combination. Stores that can't speak to their process don't make the cut.",
  },
  {
  number: "03",
@@ -26,14 +26,14 @@ const STEPS = [
  {
  number: "04",
  title: "Ongoing accountability",
- body: "Being on VYA isn't a one-time approval. We stay in touch with every store, monitor feedback, and remove anyone who doesn't uphold our standards — no exceptions.",
+ body: "Being on VYA isn't a one-time approval. We stay in touch with every store, monitor feedback, and remove anyone who doesn't uphold our standards, no exceptions.",
  },
 ];
 
 const PILLARS = [
  {
  title: "Hand-Picked Sellers",
- body: "We don't accept every store that applies. Every seller on VYA is individually reviewed — we look at their inventory, sourcing practices, and track record before extending an invitation to the platform.",
+ body: "We don't accept every store that applies. Every seller on VYA is individually reviewed. We look at their inventory, sourcing practices, and track record before extending an invitation to the platform.",
  },
  {
  title: "Authentic Vintage & Secondhand",
@@ -49,11 +49,11 @@ const PILLARS = [
  },
  {
  title: "Community-Backed",
- body: "The Everyone's Favorites section is ranked purely by what our community has hearted most. No paid placement, no algorithm manipulation — just the pieces real people love.",
+ body: "The Everyone's Favorites section is ranked purely by what our community has hearted most. No paid placement, no algorithm manipulation, just the pieces real people love.",
  },
  {
  title: "Always Evolving",
- body: "Our verification standards grow as VYA grows. We regularly re-review sellers and retire listings that no longer meet our quality bar. If you ever spot something that feels off, reach out — we take every report seriously.",
+ body: "Our verification standards grow as VYA grows. We regularly re-review sellers and retire listings that no longer meet our quality bar. If you ever spot something that feels off, reach out. We take every report seriously.",
  },
 ];
 
@@ -69,7 +69,7 @@ export default function TrustPage() {
  </h1>
  <p className="text-sm sm:text-base text-[#5D0F17]/60 max-w-2xl">
  We don&apos;t list stores we haven&apos;t spoken to. Every seller on VYA has been personally
- vetted — their sourcing, their authentication process, and their track record.
+ vetted, their sourcing, their authentication process, and their track record.
  </p>
  </div>
  </section>
@@ -86,7 +86,7 @@ export default function TrustPage() {
  <h2 className="font-serif text-2xl sm:text-3xl">The VYA Verified badge</h2>
  </div>
  <p className="text-sm sm:text-base text-[#5D0F17]/60 max-w-xl leading-relaxed mb-10">
- You&apos;ll see this badge on every store page. It means we&apos;ve done the work —
+ You&apos;ll see this badge on every store page. It means we&apos;ve done the work,
  so you don&apos;t have to wonder.
  </p>
 
@@ -130,7 +130,7 @@ export default function TrustPage() {
  <p className="font-serif text-lg mb-2">Shop with confidence</p>
  <p className="text-sm text-[#5D0F17]/60 leading-relaxed">
  Every store on VYA has been screened. You&apos;re not rolling the dice on a random
- seller — you&apos;re buying from someone we know and trust.
+ seller, you&apos;re buying from someone we know and trust.
  </p>
  </div>
  <div>

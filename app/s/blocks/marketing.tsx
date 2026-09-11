@@ -166,7 +166,7 @@ function ContactFields({ kit }: { kit: EditKit }) {
    {fields.map((f, i) => (
     f.type === "long"
      ? <textarea key={i} disabled placeholder={f.label} rows={4} className={stub} />
-     : <input key={i} disabled placeholder={f.type === "choice" && f.options.length ? `${f.label} — ${f.options.join(", ")}` : f.label} className={stub} />
+     : <input key={i} disabled placeholder={f.type === "choice" && f.options.length ? `${f.label}, ${f.options.join(", ")}` : f.label} className={stub} />
    ))}
    <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta || "Send"} fullWidth className="vya-cta mt-1 grid place-items-center py-2.5 text-[12px] font-medium uppercase tracking-wide" style={{ background: ctx.colors.accent, color: "#fff" }} />
   </div>

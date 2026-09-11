@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Source Twenty Four — The Story Behind the Selection | VYA",
+ title: "Source Twenty Four: The Story Behind the Selection | VYA",
  description:
  "Why we chose Source Twenty Four for VYA. Authentic designer accessories, sustainable luxury fashion, and thoughtfully curated resale.",
 };
@@ -55,7 +55,7 @@ export default function SourceTwentyFourStory() {
  <p>
  The collection focuses heavily on luxury accessories from iconic fashion
  houses. You&apos;ll often find Burberry leather purses, Balenciaga archive bags,
- Bottega Veneta wallets, and classic Celine totes — pieces that represent the
+ Bottega Veneta wallets, and classic Celine totes, pieces that represent the
  enduring craftsmanship of European luxury design. These are items chosen for
  their longevity, designed to move seamlessly from one wardrobe to the next.
  </p>

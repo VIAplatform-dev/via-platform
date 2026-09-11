@@ -35,7 +35,7 @@ export default function DeleteDraftSection({ requestId }: { requestId: string })
  Delete Draft
  </p>
  <p className="text-sm text-[#5D0F17]/60 leading-relaxed mb-4">
- This draft hasn&apos;t been submitted yet. You can delete it at any time — no charge.
+ This draft hasn&apos;t been submitted yet. You can delete it at any time, no charge.
  </p>
 
  {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
