@@ -32,11 +32,9 @@ const DROP_FOOT = "border-t border-gray-100 px-4 py-2 text-[11px] uppercase trac
 
 export default function HeaderClient({
  categories,
- activeCollectionSlugs,
  topDesigners = [],
 }: {
  categories: { slug: string; label: string }[];
- activeCollectionSlugs: Set<string>;
  topDesigners?: { slug: string; label: string }[];
 }) {
 
@@ -90,6 +88,7 @@ export default function HeaderClient({
 
  // ── Search ───────────────────────────────────────────────────
  const [results, setResults] = useState<SearchResult[]>([]);
+ const [suggestion, setSuggestion] = useState<{ term: string; count: number } | null>(null);
  const [searchLoading, setSearchLoading] = useState(false);
  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
  const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -129,25 +128,35 @@ export default function HeaderClient({
  closeSearch(`/search?q=${encodeURIComponent(term.trim())}`);
  };
 
+ // Every keystroke starts a request, and they do NOT come back in order. Typing "bag"
+ // fires "b" (which the API answers with nothing — it needs 2 characters), then "ba",
+ // then "bag"; whichever settles LAST used to win, so a late "b" would wipe good results
+ // and the drawer said "No results found" for a query that had hundreds. The sequence
+ // number makes a response that is no longer the newest request a no-op.
+ const searchSeq = useRef(0);
  useEffect(() => {
  setActiveIndex(-1);
- if (!query.trim()) { setResults([]); return; }
+ if (!query.trim()) { searchSeq.current += 1; setResults([]); setSuggestion(null); setSearchLoading(false); return; }
  if (searchTimer.current) clearTimeout(searchTimer.current);
  searchTimer.current = setTimeout(async () => {
+ const seq = ++searchSeq.current;
  setSearchLoading(true);
  try {
- const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`);
+ const res = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}&limit=12&facets=0`);
+ if (seq !== searchSeq.current) return;
  if (res.ok) {
  const data = await res.json();
+ if (seq !== searchSeq.current) return;
+ setSuggestion(data.suggestion ?? null);
  setResults([
  ...(data.designers || []).map((d: { slug: string; label: string }) => ({ type: "designer" as const, name: d.label, href: `/brands/${d.slug}` })),
  ...(data.categories || []).map((c: { slug: string; label: string }) => ({ type: "category" as const, name: c.label, href: `/categories/${c.slug}` })),
  ...(data.stores || []).map((s: { slug: string; name: string; location: string }) => ({ type: "store" as const, name: s.name, href: `/stores/${s.slug}`, meta: s.location })),
  ...(data.products || []).slice(0, 8).map((p: { name: string; storeSlug: string; id: number; storeName: string; price: string; image?: string }) => ({ type: "product" as const, name: p.name, href: `/products/${p.storeSlug}-${p.id}`, meta: `${p.storeName} · ${p.price}`, image: p.image })),
  ]);
- } else setResults([]);
- } catch { setResults([]); }
- finally { setSearchLoading(false); }
+ } else { setResults([]); setSuggestion(null); }
+ } catch { if (seq === searchSeq.current) { setResults([]); setSuggestion(null); } }
+ finally { if (seq === searchSeq.current) setSearchLoading(false); }
  }, 250);
  return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
  }, [query]);
@@ -207,7 +216,10 @@ export default function HeaderClient({
  className={`fixed top-0 z-[60] w-full transition-colors duration-300 ${transparent ? "bg-gradient-to-b from-black/25 to-transparent border-b border-transparent" : "bg-[#FFFDF8] border-b border-[#5D0F17]/10"}`}
  style={{ height: HEADER_H }}
  >
- <div className="max-w-7xl mx-auto px-6 h-full flex items-center gap-6 relative">
+ {/* px-4, not px-6: the bar sits a touch wider than the content under it, which pushes the logo
+     out to the left and the nav and actions out to the right. A fixed header reading slightly
+     wider than the grid it floats over is deliberate, it stops the top of the page looking inset. */}
+ <div className="max-w-7xl mx-auto px-4 h-full flex items-center gap-6 relative">
 
  {/* Logo — always left on all screen sizes */}
  <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex-shrink-0 flex items-start gap-1.5">
@@ -227,8 +239,14 @@ export default function HeaderClient({
  <span className={`text-[10px] tracking-[0.08em] font-sans -mt-0.5 transition-colors duration-300 ${transparent ? "text-[#FFFDF8]/70" : "text-[#5D0F17]/50"}`}>pilot</span>
  </Link>
 
+ {/* Everything except the logo lives on the right.
+     ONE GROUP, not two right-aligned ones: the nav is hidden below md, and if it carried the
+     `ml-auto` itself the actions would fall back to the left on a phone the moment it disappeared.
+     The wrapper holds the alignment whether or not the nav is showing. */}
+ <div className="ml-auto flex items-center gap-6">
+
  {/* Desktop Nav */}
- <nav className="hidden md:flex items-center gap-7 flex-1" style={FONT} onMouseLeave={scheduleCloseNav}>
+ <nav className="hidden md:flex items-center gap-7" style={FONT} onMouseLeave={scheduleCloseNav}>
  {(["stores", "categories", "designers", "collections"] as const).map((key) => (
  <button
  key={key}
@@ -243,7 +261,7 @@ export default function HeaderClient({
 
 
  {/* Right actions */}
- <div className="flex items-center gap-2 ml-auto">
+ <div className="flex items-center gap-2">
 
  {/* Inline search — desktop */}
  <button
@@ -315,6 +333,7 @@ export default function HeaderClient({
  </div>
  </div>
  </div>
+ </div>
 
  {/* ── Mobile Menu ───────────────────────────────────────── */}
  <div className="md:hidden">
@@ -325,7 +344,7 @@ export default function HeaderClient({
  />
  {/* Left-side panel */}
  <nav
- className={`fixed left-0 top-0 bottom-0 z-[65] w-full max-w-sm bg-white shadow-2xl flex flex-col overflow-hidden transition-transform duration-300 ease-out ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+ className={`fixed right-0 top-0 bottom-0 z-[65] w-full max-w-sm bg-white shadow-2xl flex flex-col overflow-hidden transition-transform duration-300 ease-out ${mobileMenuOpen ? "translate-x-0" : "translate-x-full"}`}
  style={FONT}
  >
  {/* Panel header */}
@@ -406,7 +425,7 @@ export default function HeaderClient({
  </button>
  <div className={`overflow-hidden transition-all duration-300 ease-out ${mobileCols ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"}`}>
  <div className="pb-2 pl-4">
- {COLLECTIONS.filter((col, i) => activeCollectionSlugs.has(col.slug) || i === COLLECTIONS.length - 1).map((col) => (
+ {COLLECTIONS.map((col) => (
  <Link key={col.slug} href={col.href ?? `/collections/${col.slug}`} onClick={() => setMobileMenuOpen(false)} className="block py-2.5 text-[13px] text-[#5D0F17]/70">{col.name}</Link>
  ))}
  <Link href="/collections" onClick={() => setMobileMenuOpen(false)} className="block py-2.5 text-[11px] uppercase tracking-[0.08em] text-[#5D0F17]/40">View All</Link>
@@ -426,28 +445,26 @@ export default function HeaderClient({
  </nav>
  </div>
 
- {/* ── Desktop hover Nav Drawer — slides in from the left, full-height takeover ── */}
+ {/* ── Desktop hover Nav Drawer — slides in from the RIGHT, full-height takeover ──
+      It follows its trigger. The nav labels moved to the right of the bar, and a panel that
+      still flew in from the far side of a wide screen read as a different, unrelated thing
+      opening. The search and cart drawers were already right-anchored; this is now the same. ── */}
  {/* Dim scrim (sits below the header so the right-side nav labels stay crisp) */}
  <div
  className={`hidden md:block fixed inset-0 z-[55] bg-black/25 transition-opacity duration-300 ${navOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
  onMouseEnter={scheduleCloseNav}
  onClick={closeNavDrawer}
  />
+ {/* Starts BELOW the bar, not at top-0: the nav labels this panel belongs to sit on the right
+     of the header, so a full-height takeover landed straight on top of them, you could no longer
+     see or click Categories / Designers / Collections while Stores was open. */}
  <div
- className={`hidden md:flex fixed left-0 top-0 bottom-0 z-[70] w-full ${lastNav === "stores" ? "max-w-2xl" : "max-w-sm"} bg-white flex-col transition-transform duration-300 ease-out ${navOpen ? "translate-x-0 shadow-2xl" : "-translate-x-[102%] shadow-none"}`}
- style={{ ...FONT }}
+ className={`hidden md:flex fixed right-0 bottom-0 z-[70] w-full ${lastNav === "stores" ? "max-w-2xl" : "max-w-sm"} bg-white flex-col transition-transform duration-300 ease-out ${navOpen ? "translate-x-0 shadow-2xl" : "translate-x-[102%] shadow-none"}`}
+ style={{ ...FONT, top: HEADER_H }}
  onMouseEnter={keepNav}
  onMouseLeave={scheduleCloseNav}
  >
- <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
- <span className="text-[11px] uppercase tracking-[0.15em] text-[#5D0F17]">
- {lastNav.charAt(0).toUpperCase() + lastNav.slice(1)}
- </span>
- <button onClick={closeNavDrawer} aria-label="Close" className="text-[#5D0F17]/40 hover:text-[#5D0F17] transition-colors">
- <X size={16} strokeWidth={1.5} />
- </button>
- </div>
- <div className="overflow-y-auto flex-1">
+ <div className="overflow-y-auto flex-1 pt-4">
  {lastNav === "stores" && (
  <div className="py-2">
  <div className="grid grid-cols-2 gap-x-2">
@@ -492,7 +509,7 @@ export default function HeaderClient({
  )}
  {lastNav === "collections" && (
  <div className="py-2">
- {COLLECTIONS.filter((col, i) => activeCollectionSlugs.has(col.slug) || i === COLLECTIONS.length - 1).map((col) => (
+ {COLLECTIONS.map((col) => (
  <Link key={col.slug} href={col.href ?? `/collections/${col.slug}`} onClick={closeNavDrawer} className={DROP_LINK}>
  {col.name}
  {col.curatedBy && <span className="block text-[11px] text-[#5D0F17]/40 mt-0.5">by {col.curatedBy}</span>}
@@ -576,7 +593,16 @@ export default function HeaderClient({
     </div>
     ))}
     {searchLoading && results.length === 0 && <p className="text-[13px] text-gray-400 px-6 py-4">Searching...</p>}
-    {!searchLoading && query.trim().length >= 2 && results.length === 0 && <p className="text-[13px] text-gray-400 px-6 py-4">No results found</p>}
+    {!searchLoading && suggestion && (
+    <button
+     onClick={() => runSearch(suggestion.term)}
+     className="block w-full text-left px-6 py-3 text-[13px] text-[#5D0F17]/70 hover:text-[#5D0F17] border-b border-gray-100"
+    >
+     Did you mean <span className="italic underline underline-offset-2">{suggestion.term}</span>?{" "}
+     <span className="text-gray-400">({suggestion.count} items)</span>
+    </button>
+    )}
+    {!searchLoading && query.trim().length >= 2 && results.length === 0 && !suggestion && <p className="text-[13px] text-gray-400 px-6 py-4">No results found</p>}
     {(() => {
     const designers = results.filter((r) => r.type === "designer");
     const cats = results.filter((r) => r.type === "category");

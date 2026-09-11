@@ -350,29 +350,40 @@ export async function getEmailPickProducts(): Promise<DBProduct[]> {
  return rows as unknown as DBProduct[];
 }
 
+// Admin product search — deliberately NOT its own ranking.
+//
+// The curator types "runway" or "ysl" the way a shopper would, so this runs the SHOPPER'S
+// search (/api/search: brand aliases, category expansion, stemming, synonyms, description
+// matches, typo fallback) and then re-reads those ids out of `products` in the shape the
+// admin grid already consumes. One ranking, one place to improve it — a second copy here
+// would drift the moment either side changed.
+//
+// The public route returns ids in relevance order; that order is preserved on the way back.
 export async function searchProducts(q: string, storeSlug?: string): Promise<ProductResult[]> {
- const sql = neon(getDatabaseUrl());
+ const { GET: marketplaceSearch } = await import("@/app/api/search/route");
+ const res = await marketplaceSearch(
+ new Request(`https://vyaplatform.com/api/search?q=${encodeURIComponent(q)}&limit=200`)
+ );
+ const data = (await res.json()) as { products?: { id: number }[] };
+ const ids = (data.products ?? []).map((p) => p.id).filter((id) => Number.isFinite(id));
+ if (ids.length === 0) return [];
 
+ const sql = neon(getDatabaseUrl());
  const rows = storeSlug
  ? await sql`
  SELECT id, store_slug, store_name, title, price, image
  FROM products
- WHERE title ILIKE ${"%" + q + "%"}
+ WHERE id = ANY(${ids})
  AND store_slug = ${storeSlug}
- AND (shopify_product_id IS NULL OR collabs_link IS NOT NULL)
- AND (${DISABLED_STORE_SLUGS.length} = 0 OR store_slug != ALL(${DISABLED_STORE_SLUGS}))
- ORDER BY title
- LIMIT 50
  `
  : await sql`
  SELECT id, store_slug, store_name, title, price, image
  FROM products
- WHERE title ILIKE ${"%" + q + "%"}
- AND (shopify_product_id IS NULL OR collabs_link IS NOT NULL)
- AND (${DISABLED_STORE_SLUGS.length} = 0 OR store_slug != ALL(${DISABLED_STORE_SLUGS}))
- ORDER BY title
- LIMIT 50
+ WHERE id = ANY(${ids})
  `;
 
- return rows.map(mapProductRow);
+ const rank = new Map(ids.map((id, i) => [id, i]));
+ return rows
+ .map(mapProductRow)
+ .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
 }
