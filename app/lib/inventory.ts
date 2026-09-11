@@ -1,6 +1,8 @@
 import type { CategorySlug } from "./categoryMap";
 import { getAllProducts, type DBProduct } from "./db";
-import { inferCategoryFromTitle, inferBrandFromTitle } from "./loadStoreProducts";
+import { inferBrandFromTitle } from "./loadStoreProducts";
+import { inferCategoryFromTitle, categoryFor } from "./categorize-core.ts";
+import { getCategoryOverrideMap } from "./category-overrides-db";
 import { brandMap } from "./brandData";
 import { extractSizeFromTitle, extractSizeFromDescription, extractTaggedSizeFromDescription, extractFitSizeFromDescription, extractFitLetterFromDescription, extractUSConversionFromDescription, isValidSizeValue, GENERIC_CLOTHING_SIZE } from "./size-parse.ts";
 
@@ -185,12 +187,16 @@ export function deriveDisplaySize(product: DBProduct): string | null {
 }
 
 // Transform database products to InventoryItem format
-function transformDBProduct(product: DBProduct): InventoryItem {
+function transformDBProduct(product: DBProduct, overrideMap?: Map<string, string>): InventoryItem {
  const brandSlug = inferBrandFromTitle(product.title);
  return {
  id: `${product.store_slug}-${product.id}`,
  title: product.title,
- category: inferCategoryFromTitle(product.title),
+ // An AI/admin correction wins over the title inference — the same rule store pages and
+ // the public API already used. This path (category pages, brand pages, collections, the
+ // homepage) used to ignore the override table entirely, so a category fixed in the admin
+ // stayed wrong on every page built from getInventory().
+ category: categoryFor(product.title, overrideMap?.get(`${product.store_slug}-${product.id}`)),
  brand: brandSlug,
  brandLabel: brandSlug ? (brandMap[brandSlug] ?? null) : null,
  price: Number(product.price),
@@ -219,8 +225,11 @@ function transformDBProduct(product: DBProduct): InventoryItem {
  */
 export async function getInventory(): Promise<InventoryItem[]> {
  try {
- const products = await getAllProducts();
- return products.map(transformDBProduct);
+ const [products, overrideMap] = await Promise.all([
+ getAllProducts(),
+ getCategoryOverrideMap().catch(() => new Map<string, string>()),
+ ]);
+ return products.map((p) => transformDBProduct(p, overrideMap));
  } catch (error) {
  console.error("Failed to fetch inventory from database:", error);
  return [];

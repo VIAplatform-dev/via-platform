@@ -28,7 +28,7 @@ export const statusLabel = (s: ItemStatus): string => s.charAt(0).toUpperCase() 
 export const CATEGORY_GROUPS: { label: string; slugs: CategorySlug[] }[] = [
  { label: "Clothing", slugs: ["tops", "sweaters", "coats-jackets", "dresses", "skirts", "pants", "jeans", "shorts", "jumpsuits", "lingerie", "swimwear", "other-clothing"] },
  { label: "Shoes", slugs: ["boots", "heels", "sneakers", "sandals", "flats", "shoes"] },
- { label: "Bags", slugs: ["handbags", "totes", "clutches", "crossbody-bags", "bags"] },
+ { label: "Bags", slugs: ["handbags", "totes", "clutches", "crossbody-bags", "wallets", "bags"] },
  { label: "Accessories", slugs: ["jewelry", "belts", "scarves", "hats", "sunglasses", "accessories"] },
  { label: "Home", slugs: ["home"] },
 ];
@@ -63,6 +63,11 @@ const SYNONYMS: [RegExp, CategorySlug][] = [
  [/\b(clutch|clutches|minaudiere|wristlet|evening bag)\b/, "clutches"],
  [/\b(crossbody|cross-?body|satchel|belt bag|fanny pack)\b/, "crossbody-bags"],
  [/\b(handbag|handbags|purse|purses|top handle|shoulder bag)\b/, "handbags"],
+ // A wallet WITH a strap is a bag — checked before the wallet rule below.
+ [/\b(wallet on chain|chain wallet)\b/, "bags"],
+ // Wallets & small leather goods: a BAGS slug, not an accessory. Before the bags catch-all
+ // so "key pouch" isn't taken by \bpouch\b, and before "accessories" further down.
+ [/\b(wallet|wallets|billfold|bifold|bi-?fold|trifold|tri-?fold|card holder|cardholder|card case|key case|key pouch|key holder|cles)\b/, "wallets"],
  [/\b(bag|bags|backpack|backpacks|pouch|luggage|duffel|duffle)\b/, "bags"],
  // Shoes — subcategories before the catch-all.
  [/\b(boot|boots|bootie|booties)\b/, "boots"],

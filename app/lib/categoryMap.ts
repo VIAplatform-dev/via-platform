@@ -26,6 +26,7 @@ export const categoryMap = {
  clutches: "Clutches",
  "crossbody-bags": "Crossbody",
  handbags: "Handbags",
+ wallets: "Wallets",
  // Accessories
  accessories: "Accessories",
  jewelry: "Jewelry",
@@ -55,7 +56,7 @@ export const shoesSlugs = new Set<CategorySlug>([
 
 // Slugs that fall under the "Bags" display category (includes legacy "bags" catch-all)
 export const bagsSlugs = new Set<CategorySlug>([
- "bags", "totes", "clutches", "crossbody-bags", "handbags",
+ "bags", "totes", "clutches", "crossbody-bags", "handbags", "wallets",
 ]);
 
 // Slugs that fall under the "Accessories" display category (includes legacy "accessories" catch-all)
@@ -110,6 +111,7 @@ export const navCategoryGroups = [
  { slug: "totes", label: "Totes" },
  { slug: "clutches", label: "Clutches" },
  { slug: "crossbody-bags", label: "Crossbody" },
+ { slug: "wallets", label: "Wallets" },
  ],
  },
  {
