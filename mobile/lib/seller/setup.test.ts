@@ -19,13 +19,22 @@ test("the summary mirrors the web: required steps decide completeness, the domai
   assert.equal(s.next?.id, "payments");
 });
 
-test("a step the phone can do itself opens in the app; the rest open the web settings", () => {
+test("every setup step now opens a screen in the app", () => {
+  // This test used to assert the opposite for four of the six. Returns, domain and both shipping
+  // steps opened vyaplatform.com in a browser sheet, so the checklist that exists to get a store
+  // trading sent her out of the app four times out of six. If one of these goes back to null, the
+  // step it belongs to has lost its screen.
   assert.equal(phoneRouteFor(step("first_listing")), "/(seller)/list");
   assert.equal(phoneRouteFor(step("payments")), "/(seller)/payouts");
-  assert.equal(phoneRouteFor(step("ship_from")), null);
-  assert.equal(phoneRouteFor(step("shipping")), null);
-  assert.equal(phoneRouteFor(step("returns")), null);
-  assert.equal(phoneRouteFor(step("domain")), null);
+  assert.equal(phoneRouteFor(step("ship_from")), "/(seller)/shipping");
+  assert.equal(phoneRouteFor(step("shipping")), "/(seller)/shipping");
+  assert.equal(phoneRouteFor(step("returns")), "/(seller)/policy");
+  assert.equal(phoneRouteFor(step("domain")), "/(seller)/domain");
+});
+
+test("a step id the phone has never heard of falls back rather than guessing", () => {
+  // A newer server can add a step; an old app must not send her to an unrelated screen for it.
+  assert.equal(phoneRouteFor({ id: "something_new" as never }), null);
 });
 
 test("a server that predates setup steps answers with no list — the phone must neither crash nor show the block", () => {

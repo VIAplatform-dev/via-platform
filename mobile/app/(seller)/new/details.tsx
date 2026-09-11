@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, fonts } from "../../../lib/theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { publishListing, uploadPhoto } from "../../../lib/seller/intake";
+import { InlineField } from "../../../components/seller/Form";
 
 // Details — the same shape as the desktop: a form, with "Fill with AI" BESIDE it rather than in
 // front of it.
@@ -21,6 +22,7 @@ const FIELDS = [
   { key: "brand", label: "Brand", placeholder: "Prada", optional: false },
   { key: "era", label: "Era or year", placeholder: "Late 1990s", optional: false },
   { key: "material", label: "Material", placeholder: "Re-Nylon, leather trim", optional: true },
+  { key: "colour", label: "Colour", placeholder: "Chocolate brown", optional: true },
   { key: "size", label: "Size", placeholder: "One size", optional: true },
   { key: "cost", label: "Cost", placeholder: "what you paid", optional: false },
 ] as const;
@@ -66,6 +68,7 @@ export default function DetailsScreen() {
           brand: typed.brand,
           era: typed.era,
           material: typed.material,
+          colour: typed.colour,
           size: typed.size,
           cost: typed.cost,
         },
@@ -110,18 +113,19 @@ export default function DetailsScreen() {
 
       <View style={{ marginTop: spacing.lg }}>
         {FIELDS.map((f) => (
-          <View key={f.key} style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
-            <Text style={{ width: 110, fontSize: 14, color: colors.textMuted }}>{f.label}</Text>
-            <TextInput
-              value={typed[f.key] ?? ""}
-              onChangeText={(v) => set(f.key, v)}
-              placeholder={f.placeholder}
-              placeholderTextColor={colors.textDim}
-              keyboardType={f.key === "cost" ? "numeric" : "default"}
-              style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600", paddingVertical: spacing.sm }}
-            />
-            {f.optional ? <Text style={{ fontSize: 10, letterSpacing: 1, color: colors.textDim }}>OPTIONAL</Text> : null}
-          </View>
+          // InlineField, so tapping the LABEL puts the cursor in the box. It used to be a bare row:
+          // the label owned 110pt on the left and swallowed every tap that landed on it, which is
+          // where a thumb goes when the word names the thing you want to change.
+          <InlineField
+            key={f.key}
+            label={f.label}
+            labelWidth={110}
+            value={typed[f.key] ?? ""}
+            onChangeText={(v) => set(f.key, v)}
+            placeholder={f.placeholder}
+            keyboardType={f.key === "cost" ? "numeric" : "default"}
+            trailing={f.optional ? <Text style={{ fontSize: 10, letterSpacing: 1, color: colors.textDim }}>OPTIONAL</Text> : null}
+          />
         ))}
       </View>
 

@@ -1,10 +1,12 @@
 import { Pressable, Text, View } from "react-native";
 import { Link } from "expo-router";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, spacing } from "../../lib/theme";
-import { SellerScreen, Empty } from "../../components/seller/Screen";
+import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
+import { formatMoney } from "../../lib/seller/home";
 
 // Inbox — every buyer thread in one list.
 //
@@ -42,16 +44,45 @@ function ago(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+type Offer = {
+  id: number;
+  itemTitle: string | null;
+  buyerName: string | null;
+  buyerEmail: string | null;
+  listPriceCents: number;
+  amountCents: number;
+  status: string;
+  lastActor: string;
+  expiresAt: string;
+};
+
+const TABS: { key: "messages" | "offers"; label: string }[] = [
+  { key: "messages", label: "Messages" },
+  { key: "offers", label: "Offers" },
+];
+
 export default function InboxScreen() {
   const { storeSlug } = useAuth();
+  const [tab, setTab] = useState<"messages" | "offers">("messages");
   const q = useQuery({
     queryKey: ["store", "inbox"],
     queryFn: () => apiGet<{ conversations: Conversation[] }>("/api/store/inbox"),
     enabled: !!storeSlug,
   });
+  // Offers were only ever on the web. They are the half of the inbox that expires — a message can
+  // wait a day, an offer cannot — so they belong beside the messages rather than a screen away.
+  const offers = useQuery({
+    queryKey: ["store", "offers"],
+    queryFn: () => apiGet<{ offers: Offer[]; pending?: number }>("/api/store/offers"),
+    enabled: !!storeSlug,
+  });
+  const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<{ currency: string }>("/api/store/me"), enabled: !!storeSlug });
+  const currency = me.data?.currency ?? "USD";
 
   const threads = q.data?.conversations ?? [];
   const unanswered = threads.filter((c) => c.storeUnread > 0).length;
+  // Waiting on HER — the buyer moved last and it has not expired. That is the number worth a badge.
+  const openOffers = (offers.data?.offers ?? []).filter((o) => o.status === "pending" && o.lastActor === "buyer");
 
   return (
     <SellerScreen
@@ -60,7 +91,44 @@ export default function InboxScreen() {
       onRefresh={() => void q.refetch()}
       refreshing={q.isRefetching}
     >
-      {q.isError ? (
+      <Chips
+        options={TABS.map((t) => ({
+          key: t.key,
+          label: t.key === "offers" && openOffers.length ? `${t.label} · ${openOffers.length}` : t.label,
+        }))}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {tab === "offers" ? (
+        offers.isError ? (
+          <Empty>Couldn&apos;t load your offers.</Empty>
+        ) : (offers.data?.offers ?? []).length === 0 && !offers.isPending ? (
+          <Empty>No offers yet.</Empty>
+        ) : (
+          (offers.data?.offers ?? []).map((o) => {
+            const waiting = o.status === "pending" && o.lastActor === "buyer";
+            return (
+              <View key={o.id} style={{ paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>
+                    {o.itemTitle ?? "A piece"}
+                  </Text>
+                  <Text style={{ fontSize: 15, color: waiting ? colors.accent : colors.text, fontWeight: "700" }}>
+                    {formatMoney(o.amountCents, currency)}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+                  {o.buyerName || o.buyerEmail || "A buyer"} · asked {formatMoney(o.listPriceCents, currency)} listed
+                </Text>
+                <Text style={{ fontSize: 12.5, color: waiting ? colors.accent : colors.textDim, marginTop: 2 }}>
+                  {waiting ? "Waiting on you" : o.status === "pending" ? "Waiting on them" : o.status}
+                </Text>
+              </View>
+            );
+          })
+        )
+      ) : q.isError ? (
         <Empty>Couldn&apos;t load your inbox. Pull to try again.</Empty>
       ) : threads.length === 0 && !q.isPending ? (
         <Empty>No messages yet.</Empty>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { Link, useLocalSearchParams } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -55,6 +56,10 @@ function Dot({ status }: { status: string }) {
 export default function InventoryScreen() {
   const { storeSlug } = useAuth();
   const [filter, setFilter] = useState<InventoryFilter>("all");
+  // List or grid. A list answers "what is this and what does it cost"; a grid answers "which one
+  // was it" — and on a rail of forty vintage pieces the second question is the common one, because
+  // she remembers the garment, not the title she typed for it.
+  const [grid, setGrid] = useState(false);
   // Home's "Needs you" rows arrive here with ?missing=photo|price|cost|confidence — the web
   // Inventory's own keys. Seeded once from the URL; the chip clears it like any other filter.
   const params = useLocalSearchParams<{ missing?: string }>();
@@ -101,7 +106,19 @@ export default function InventoryScreen() {
     >
       <SearchBox />
       <View style={{ height: spacing.md }} />
-      <Chips options={CHIPS} value={filter} onChange={setFilter} />
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={{ flex: 1 }}>
+          <Chips options={CHIPS} value={filter} onChange={setFilter} />
+        </View>
+        <Pressable
+          hitSlop={10}
+          onPress={() => setGrid(!grid)}
+          accessibilityLabel={grid ? "Show as a list" : "Show as a grid"}
+          style={{ padding: spacing.sm }}
+        >
+          <Feather name={grid ? "list" : "grid"} size={20} color={colors.text} />
+        </Pressable>
+      </View>
       {missing ? (
         <Pressable onPress={() => setMissing(null)} style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: colors.chipActive, marginBottom: spacing.sm }}>
           <Text style={{ fontSize: 13, fontWeight: "600", color: colors.chipActiveText }}>{missingLabel(missing)}</Text>
@@ -113,6 +130,29 @@ export default function InventoryScreen() {
         <Empty>Couldn&apos;t load your inventory. Pull to try again.</Empty>
       ) : visible.length === 0 && !q.isPending ? (
         <Empty>{missing ? `Nothing with ${missingLabel(missing).toLowerCase()}.` : filter === "all" ? "Nothing listed yet. Tap + to add a piece." : `Nothing ${filter === "drafts" ? "in drafts" : filter}.`}</Empty>
+      ) : grid ? (
+        // Photos only, three across. No price, no title: the point of this view is the picture, and
+        // a caption under every tile turns it back into the list it is meant to be an alternative to.
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+          {visible.map((it) => (
+            <Link key={it.id} href={{ pathname: "/(seller)/piece/[id]", params: { id: it.id } }} asChild>
+              <Pressable style={{ width: `${(100 - 4) / 3}%`, aspectRatio: 1 }}>
+                {it.images?.[0] ? (
+                  <Image source={{ uri: it.images[0] }} style={{ width: "100%", height: "100%", borderRadius: 8, backgroundColor: colors.chip }} />
+                ) : (
+                  <View style={{ width: "100%", height: "100%", borderRadius: 8, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
+                    <Text style={{ fontSize: 11, color: colors.textDim, textAlign: "center", paddingHorizontal: 6 }} numberOfLines={2}>{it.title}</Text>
+                  </View>
+                )}
+                {/* The state dot still shows — a grid you cannot tell sold from live in is a grid
+                    she has to leave to answer the question she opened it with. */}
+                <View style={{ position: "absolute", top: 6, right: 6 }}>
+                  <Dot status={it.status} />
+                </View>
+              </Pressable>
+            </Link>
+          ))}
+        </View>
       ) : (
         visible.map((it) => {
           // Age only on a live piece: a sold one is finished, a draft has not started.

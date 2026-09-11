@@ -19,6 +19,9 @@ export type NeedsYouRow = {
   href: string;
   /** The in-app screen (with its filter), or null to open `href` in the browser. */
   route: RowRoute | null;
+  /** The server's own judgement of whether this needs her now. Carried through so the Notifications
+   *  screen can separate "needs you" from "when you have a moment" without re-deciding it here. */
+  urgent: boolean;
 };
 
 // The inventory rows open Inventory already filtered to the pieces in question (?missing=…, the
@@ -44,7 +47,7 @@ export function needsYouRows(rows: AttentionRow[], shown: { holdsShown: boolean;
     if (!shape) continue;
     if (r.id === "holdsToday" && shown.holdsShown) continue;
     if (r.id === "payoutsDue" && shown.payoutsShown) continue;
-    out.push({ key: r.id, icon: shape.icon, title: r.label, href: r.href, route: shape.route });
+    out.push({ key: r.id, icon: shape.icon, title: r.label, href: r.href, route: shape.route, urgent: Boolean(r.urgent) });
   }
   return out;
 }

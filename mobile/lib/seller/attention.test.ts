@@ -46,3 +46,16 @@ test("a row that opens in the app lands on the right filter; the rest open the w
   assert.deepEqual(out[5].route, { pathname: "/(seller)/inventory", params: { missing: "confidence" } });
   assert.equal(out[6].route, null);
 });
+
+test("urgency comes from the server, not from a second opinion here", () => {
+  // The Notifications screen splits "needs you" from "when you have a moment" on this flag; deciding
+  // it again on the phone would let the two screens disagree about the same row.
+  const rows = needsYouRows(
+    [
+      { id: "noPhoto", label: "2 pieces without a photo", count: 2, href: "/x", urgent: true },
+      { id: "costMissing", label: "3 pieces with no cost", count: 3, href: "/y", urgent: false },
+    ],
+    { holdsShown: false, payoutsShown: false },
+  );
+  assert.deepEqual(rows.map((r) => [r.key, r.urgent]), [["noPhoto", true], ["costMissing", false]]);
+});

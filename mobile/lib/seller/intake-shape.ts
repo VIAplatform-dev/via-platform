@@ -18,6 +18,8 @@ export type DraftFields = {
   brand?: string;
   era?: string;
   material?: string;
+  /** Accepted by /api/store/intake/publish and by the item PATCH; the phone simply never asked. */
+  colour?: string;
   condition?: string;
   conditionGrade?: string;
   category?: string;

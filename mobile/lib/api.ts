@@ -64,4 +64,7 @@ export const apiGet = <T>(path: string) => request<T>("GET", path);
 export const apiPost = <T>(path: string, body?: unknown) => request<T>("POST", path, body ?? {});
 export const apiPut = <T>(path: string, body?: unknown) => request<T>("PUT", path, body ?? {});
 export const apiPatch = <T>(path: string, body?: unknown) => request<T>("PATCH", path, body ?? {});
-export const apiDelete = <T>(path: string) => request<T>("DELETE", path);
+// A DELETE MAY CARRY A BODY. Most of ours name the row in the path, but /api/store/discounts takes
+// { id } in the body — so the parameter is optional rather than absent, and callers that don't send
+// one are unchanged (request only sets Content-Type when there is something to send).
+export const apiDelete = <T>(path: string, body?: unknown) => request<T>("DELETE", path, body);

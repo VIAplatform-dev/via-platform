@@ -14,6 +14,14 @@ import { uploadPhoto } from "../../lib/seller/intake";
 // Same route as the desktop: POST /api/store/market/quick-list/create makes a draft with a price
 // and, when asked, starts a cash checkout for it in the same call. The description, era and the
 // rest can be filled in later from Drafts; at a stall the price is the only thing that cannot wait.
+//
+// THREE TENDERS, LIKE THE DESKTOP. Card is the primary button because it is the common one; cash
+// and "just list" share the row beneath it. The phone used to offer cash or nothing, which at a
+// market means turning away anybody without notes on them.
+//
+// Card takes two calls, not one: quick-list/create only ever opens a CASH checkout (see its route),
+// so a card sale creates the piece first and then opens a `qr` checkout against it — the same two
+// steps the desktop takes when it hands the confirm screen `?go=qr`.
 
 export default function QuickList() {
   const insets = useSafeAreaInsets();
@@ -22,7 +30,7 @@ export default function QuickList() {
   const [price, setPrice] = useState("");
   const [brand, setBrand] = useState("");
   const [category, setCategory] = useState("");
-  const [busy, setBusy] = useState<"list" | "sell" | null>(null);
+  const [busy, setBusy] = useState<"list" | "sell" | "card" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function snap() {
@@ -32,22 +40,38 @@ export default function QuickList() {
     if (!r.canceled && r.assets[0]?.uri) setPhoto(r.assets[0].uri);
   }
 
-  async function submit(startCheckout: boolean) {
+  async function submit(tender: "card" | "cash" | null) {
     setError(null);
     const n = Number(price.replace(/[^0-9.]/g, ""));
     if (!(n > 0)) { setError("Enter a price."); return; }
-    setBusy(startCheckout ? "sell" : "list");
+    setBusy(tender === "cash" ? "sell" : tender === "card" ? "card" : "list");
     try {
       // Upload first: the route takes a hosted URL, not bytes.
       const imageUrl = photo ? await uploadPhoto(photo).catch(() => null) : null;
       const r = await apiPost<{ ok: boolean; item: { id: string }; checkout: { id: string } | null }>("/api/store/market/quick-list/create", {
         price: n, brand, category, imageUrl,
-        ...(startCheckout ? { startCheckout: "cash", clientKey: `phone-ql-${Date.now()}` } : {}),
+        ...(tender === "cash" ? { startCheckout: "cash", clientKey: `phone-ql-${Date.now()}` } : {}),
       });
       void qc.invalidateQueries({ queryKey: ["store", "items"] });
       void qc.invalidateQueries({ queryKey: ["market", "home"] });
-      if (startCheckout && r.checkout) router.replace({ pathname: "/market/checkout/[id]", params: { id: r.checkout.id } });
-      else router.back();
+
+      if (tender === "cash" && r.checkout) {
+        router.replace({ pathname: "/market/checkout/[id]", params: { id: r.checkout.id } });
+        return;
+      }
+      if (tender === "card") {
+        // Second call: the piece exists, now open a card checkout against it. The route refuses
+        // with `payments_disabled` when Stripe isn't finished, and that message is worth showing
+        // as-is — it names the fix.
+        const co = await apiPost<{ ok: boolean; checkout: { id: string } }>("/api/store/market/checkout", {
+          itemId: r.item.id,
+          clientKey: `phone-card-${Date.now()}`,
+          tender: "qr",
+        });
+        router.replace({ pathname: "/market/checkout/[id]", params: { id: co.checkout.id } });
+        return;
+      }
+      router.back();
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : "Couldn't list that.");
       setBusy(null);
@@ -93,21 +117,33 @@ export default function QuickList() {
 
         {error ? <Text style={{ fontSize: 13.5, color: colors.text, marginTop: spacing.md }}>{error}</Text> : null}
 
+        {/* Card on its own, cash and "just list" sharing the row under it — the desktop's shape.
+            The old buttons were two full-width slabs at 24pt of padding each, which ate the screen
+            and made the least common action as loud as the most. */}
         <Pressable
-          onPress={() => void submit(true)}
+          onPress={() => void submit("card")}
           disabled={busy !== null}
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, backgroundColor: colors.accent, borderRadius: 16, paddingVertical: spacing.xl, marginTop: spacing.xl, opacity: busy ? 0.6 : 1 }}
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: spacing.lg, marginTop: spacing.xl, opacity: busy ? 0.6 : 1 }}
         >
-          {busy === "sell" ? <ActivityIndicator color={colors.accentText} /> : null}
-          <Text style={{ fontSize: 17, fontWeight: "600", color: colors.accentText }}>List and sell for cash</Text>
+          {busy === "card" ? <ActivityIndicator color={colors.accentText} /> : null}
+          <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accentText }}>Card</Text>
         </Pressable>
-        <Pressable
-          onPress={() => void submit(false)}
-          disabled={busy !== null}
-          style={{ alignItems: "center", justifyContent: "center", backgroundColor: colors.chip, borderRadius: 16, paddingVertical: spacing.xl, marginTop: spacing.md, opacity: busy ? 0.6 : 1 }}
-        >
-          <Text style={{ fontSize: 17, fontWeight: "600", color: colors.text }}>{busy === "list" ? "Listing…" : "Just list it"}</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
+          <Pressable
+            onPress={() => void submit("cash")}
+            disabled={busy !== null}
+            style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.chip, borderRadius: 12, paddingVertical: spacing.md, opacity: busy ? 0.6 : 1 }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>{busy === "sell" ? "…" : "Cash"}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void submit(null)}
+            disabled={busy !== null}
+            style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bgAlt, borderRadius: 12, paddingVertical: spacing.md, opacity: busy ? 0.6 : 1 }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>{busy === "list" ? "…" : "Just list"}</Text>
+          </Pressable>
+        </View>
         <Text style={{ fontSize: 12.5, color: colors.textMuted, marginTop: spacing.md, lineHeight: 18 }}>
           It lands in Drafts with what you typed. Finish the details when the stall is quiet.
         </Text>

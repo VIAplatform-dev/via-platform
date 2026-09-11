@@ -12,10 +12,14 @@ import { SellerScreen } from "../../components/seller/Screen";
 // EVERY ROW OPENS SOMETHING. Nothing here is a label that goes nowhere. Market Mode is the one
 // exception and it is a switch rather than a link — it is how she starts a market, not a page.
 //
-// What is deliberately NOT here: shipping zones and duties, sales tax and registrations, policies,
-// domains, storefront editing, the full P&L, cost imports, bulk editing, people and seats. Those
-// are set once, fiddly, and wrong on a phone. A seller who opens this and finds six things she
-// recognises is better served than one who finds twenty-two and scrolls past all of them.
+// WHAT USED TO BE MISSING IS NOW HERE. Shipping, returns, domain, tax and consignors were left off
+// on the theory that they are set once, fiddly, and wrong on a phone. Two of those are true and one
+// is not: they ARE set once and they ARE fiddly, but "wrong on a phone" turned out to mean "wrong on
+// the desktop, reached from a phone" — a seller tapped Set your returns policy on Home and landed on
+// vyaplatform.com in a browser sheet. Set-once is an argument for a plain screen, not for no screen.
+//
+// What is still NOT here: storefront editing, the full P&L, cost imports, bulk editing, seats. Those
+// are genuinely table- and canvas-shaped, and a phone is the wrong instrument for them.
 
 type Me = { storeName: string; currency: string };
 type MarketMode = { enabled: boolean };
@@ -64,6 +68,17 @@ export default function SettingsScreen() {
     queryFn: () => apiGet<MarketMode>("/api/store/market/mode"),
     enabled: !!storeSlug,
   });
+  // The two opt-in modes. Null until loaded, which reads as off — the same rule the web sidebar uses.
+  const rentals = useQuery({
+    queryKey: ["store", "rentals", "settings"],
+    queryFn: () => apiGet<{ settings?: { enabled?: boolean } }>("/api/store/rentals/settings"),
+    enabled: !!storeSlug,
+  });
+  const appts = useQuery({
+    queryKey: ["store", "appointments", "settings"],
+    queryFn: () => apiGet<{ settings?: { enabled?: boolean } }>("/api/store/appointments/settings"),
+    enabled: !!storeSlug,
+  });
   const payments = useQuery({
     queryKey: ["store", "payments"],
     queryFn: () => apiGet<Payments>("/api/store/payments"),
@@ -79,6 +94,9 @@ export default function SettingsScreen() {
       if (enabled) router.push("/market");
     },
   });
+
+  const rentalsOn = Boolean(rentals.data?.settings?.enabled);
+  const apptsOn = Boolean(appts.data?.settings?.enabled);
 
   return (
     <SellerScreen title="Settings" back>
@@ -97,6 +115,18 @@ export default function SettingsScreen() {
           />
         </View>
         <Row icon="archive" label="Consignment" href="/(seller)/consignment" />
+        {/* Both are modes a store opts into, exactly as the web's sidebar treats them — a shop that
+            doesn't rent should not carry a Rentals row it can only find empty. */}
+        {rentalsOn ? <Row icon="repeat" label="Rentals" href="/(seller)/rentals" /> : null}
+        {apptsOn ? <Row icon="calendar" label="Appointments" href="/(seller)/appointments" /> : null}
+        <Row icon="users" label="Consignors" href="/(seller)/consignors" />
+      </Group>
+
+      <Group label="STORE">
+        <Row icon="truck" label="Shipping" href="/(seller)/shipping" />
+        <Row icon="rotate-ccw" label="Returns" href="/(seller)/policy" />
+        <Row icon="globe" label="Domain" href="/(seller)/domain" />
+        <Row icon="percent" label="Sales tax" href="/(seller)/tax" />
       </Group>
 
       <Group label="SHOP">
@@ -116,13 +146,21 @@ export default function SettingsScreen() {
       </Group>
 
       <Group label="ACCOUNT">
-        <Row icon="bell" label="Notifications" href="/(seller)/notifications" />
+        {/* BOTH WAYS BETWEEN THE TWO SIDES. She is a seller and a shopper on one login, and the only
+            route out of the workspace used to be a 36pt unlabelled bag icon on Home — findable if
+            you already knew, which is the definition of not findable. The way back is the "My store"
+            row on the marketplace's own Account tab, so the pair matches. */}
+        <Row icon="shopping-bag" label="Exit to Marketplace" value="Shop" onPress={() => router.push("/(tabs)")} />
+        {/* The SWITCHES, which is what she comes to Settings for. The bell on Home now opens the
+            actual outstanding list instead, which is what a bell should have meant all along. */}
+        <Row icon="bell" label="Notifications" href="/(seller)/notification-settings" />
         <Row icon="help-circle" label="Help" href="/(seller)/help" />
         <Row icon="log-out" label="Sign out" onPress={() => void signOut()} />
       </Group>
 
       <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
-        Shipping, tax, policies, domains and people are on the desktop.
+        Storefront design, the full profit report and bulk editing are on the desktop — they need a
+        canvas or a table, not a phone.
       </Text>
     </SellerScreen>
   );

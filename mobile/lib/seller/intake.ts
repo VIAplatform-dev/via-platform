@@ -85,10 +85,20 @@ export async function priceListing(imageUrls: string[], fields: DraftFields, ext
  * screen that publishes.
  */
 export async function publishListing(
-  fields: Omit<DraftFields, "cost"> & { imageUrls: string[]; priceCents?: number | null; cost?: string | number },
+  fields: Omit<DraftFields, "cost"> & {
+    imageUrls: string[];
+    priceCents?: number | null;
+    cost?: string | number;
+    /** ISO. A draft with this set is flipped live by the publish-scheduled cron, not by this call. */
+    publishAt?: string;
+    /** Whose piece it is; the split is resolved server-side from the consignor's record. */
+    consignment?: { consignorId: number };
+    /** Marketplaces to fan out to when it goes live. */
+    channels?: string[];
+  },
   status: "active" | "draft",
 ) {
-  const { priceCents, cost, ...rest } = fields;
+  const { priceCents, cost, imageUrls, ...rest } = fields;
   // Cost travels like price: major units, and only when she gave one — a blank must not be sent
   // as 0, which the margin report would read as free stock.
   const costMajor = costFromText(cost);
@@ -96,6 +106,13 @@ export async function publishListing(
   // top level, not a nested item object.
   return apiPost<{ ok: boolean; itemId?: string; status?: string }>("/api/store/intake/publish", {
     ...rest,
+    // `images`, NOT `imageUrls`. THIS DROPPED EVERY PHOTO TAKEN ON THE PHONE.
+    //
+    // The two intake routes before this one read `imageUrls`, so the name carried all the way
+    // through the flow and then quietly stopped matching at the last step: publish reads
+    // `body.images`, found nothing, and stored an empty array. Nothing errored. The piece arrived
+    // in Inventory with a blank square, which is what "Untitled piece" with no picture was.
+    images: imageUrls,
     ...(typeof priceCents === "number" && priceCents > 0 ? { price: priceCents / 100 } : {}),
     ...(costMajor !== undefined ? { cost: costMajor } : {}),
     status,

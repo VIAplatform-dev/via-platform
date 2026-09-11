@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPatch } from "../../lib/api";
+import { apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, spacing, fonts } from "../../lib/theme";
 import { formatMoney } from "../../lib/seller/home";
 import { allTags, filterByTag, withTag, withoutTag } from "../../lib/seller/customers";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
+import { Field, Button, Notice } from "../../components/seller/Form";
 
 // Customers, sorted by what they have spent — not alphabetically. The one line that matters is at
 // the bottom: how much of her business is repeat.
@@ -14,6 +15,12 @@ import { SellerScreen, Empty } from "../../components/seller/Screen";
 // Tap one and it opens in place: her note (saved when she leaves the box) and her tags (add one,
 // tap one to remove it). Tags are also the filter row along the top — "who did I tag market?" is
 // the counter question. Same route the web's customer page writes to, same shape.
+//
+// SHE CAN ALSO ADD ONE. The list only ever grew by itself — somebody bought something — so a shop
+// with no online orders yet opened this to "No customers yet" and no way to change that, which is
+// the wrong answer for a seller who just sold a coat across a counter to someone who left an email.
+// Adding by hand fires the store's new-customer automation, exactly as the web's does; a bulk
+// import deliberately does not, so bringing an old audience over never spams it.
 
 type Customer = { email: string; name: string | null; location: string | null; orders: number; spentCents: number; tags?: string[]; notes?: string | null };
 
@@ -34,6 +41,12 @@ export default function CustomersScreen() {
   const [note, setNote] = useState<string | null>(null); // what she is typing; null = untouched
   const [newTag, setNewTag] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ email: "", name: "" });
+  const [added, setAdded] = useState<string | null>(null);
+  // Its own, not the shared `error`: that one is displayed inside whichever customer card is open,
+  // so a failed add would have surfaced in two places at once and a failed tag-save in the wrong one.
+  const [addError, setAddError] = useState<string | null>(null);
 
   // One PATCH per change; the list refetches so the chips and the note line agree with the server.
   const save = useMutation({
@@ -57,6 +70,19 @@ export default function CustomersScreen() {
     if (note === null || note === (c.notes ?? "")) return;
     save.mutate({ email: c.email, notes: note });
   };
+  const add = useMutation({
+    mutationFn: () => apiPost("/api/store/customers", { email: form.email.trim(), name: form.name.trim() || null }),
+    onSuccess: () => {
+      setAdded(form.email.trim());
+      setForm({ email: "", name: "" });
+      setAdding(false);
+      setAddError(null);
+      void qc.invalidateQueries({ queryKey: ["store", "customers"] });
+    },
+    // The route's own words: it is the one that knows the address was malformed.
+    onError: (e) => setAddError(e instanceof Error && e.message ? e.message : "Couldn't add them."),
+  });
+
   const addTag = (c: Customer) => {
     const next = withTag(c.tags, newTag);
     setNewTag("");
@@ -77,6 +103,36 @@ export default function CustomersScreen() {
           })}
         </View>
       ) : null}
+
+      {adding ? (
+        <View style={{ marginBottom: spacing.md }}>
+          <Field
+            label="Email"
+            value={form.email}
+            onChangeText={(v) => setForm({ ...form, email: v })}
+            placeholder="them@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            hint="How they're recognised at checkout, and where anything you send goes."
+          />
+          <Field label="Name" value={form.name} onChangeText={(v) => setForm({ ...form, name: v })} placeholder="Optional" autoCapitalize="words" />
+          <Button
+            label="Add them"
+            busyLabel="Adding…"
+            busy={add.isPending}
+            disabled={!form.email.trim()}
+            onPress={() => add.mutate()}
+          />
+          <Pressable onPress={() => { setAdding(false); setAddError(null); }} hitSlop={8} style={{ paddingVertical: spacing.md, alignItems: "center" }}>
+            <Text style={{ fontSize: 13, color: colors.textMuted }}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Button label="Add a customer" kind="secondary" onPress={() => { setAdding(true); setAdded(null); setAddError(null); }} />
+      )}
+
+      {added ? <Notice tone="good">{added} added.</Notice> : null}
+      {addError ? <Notice>{addError}</Notice> : null}
 
       {q.isError ? (
         <Empty>Couldn&apos;t load your customers.</Empty>
