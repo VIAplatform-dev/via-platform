@@ -52,7 +52,9 @@ export default function InvitesPage() {
  const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400";
 
  return (
-  <AdminPage>
+  // The Settings layout already pads this column below lg; AdminPage's own padding on top of it
+  // cost a phone ~50px of width.
+  <AdminPage className="max-lg:px-0! max-lg:pt-0!">
    <AdminHeader
     eyebrow="Settings · VYA"
     title="Who can open a store"

@@ -184,6 +184,8 @@ export default function DomainPage() {
 
  const live = status?.verified && !status?.misconfigured;
  const renews = info?.expiresAt ? new Date(info.expiresAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null;
+ // The records to add at her provider — drawn as a table from tablet up and as blocks on a phone.
+ const dnsRows = [...(status?.records ?? []), ...(status?.verification ?? []).map((v) => ({ type: v.type as "A" | "CNAME", name: v.domain, value: v.value }))];
 
  return (
   <AdminPage className="max-w-3xl">
@@ -227,11 +229,23 @@ export default function DomainPage() {
        </div>
 
        {!live && (status?.records?.length || status?.verification?.length) ? (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-stone-200">
+        <>
+        {/* Phone: each record as a block. In a table the long values pushed Name and Value off the
+            side of the card — and those are the two things she has to copy. */}
+        <div className="mt-4 divide-y divide-stone-100 rounded-xl border border-stone-200 sm:hidden">
+         {dnsRows.map((r, i) => (
+          <div key={`${r.type}-${r.name}-${i}`} className="space-y-1.5 px-3 py-2.5">
+           <p className="font-mono text-[11px] uppercase text-stone-500">{r.type}</p>
+           <div className="flex items-center gap-2"><span className="w-10 shrink-0 text-[11px] text-stone-400">Name</span><div className="min-w-0 flex-1"><CopyField value={r.name || "@"} /></div></div>
+           <div className="flex items-center gap-2"><span className="w-10 shrink-0 text-[11px] text-stone-400">Value</span><div className="min-w-0 flex-1"><CopyField value={r.value} /></div></div>
+          </div>
+         ))}
+        </div>
+        <div className="mt-4 hidden overflow-x-auto rounded-xl border border-stone-200 sm:block">
          <table className="w-full">
           <thead><tr><TH>Type</TH><TH>Name</TH><TH>Value</TH></tr></thead>
           <tbody>
-           {[...(status?.records ?? []), ...(status?.verification ?? []).map((v) => ({ type: v.type as "A" | "CNAME", name: v.domain, value: v.value }))].map((r, i) => (
+           {dnsRows.map((r, i) => (
             <tr key={`${r.type}-${r.name}-${i}`}>
              <TD><span className="font-mono text-[12px] uppercase text-stone-500">{r.type}</span></TD>
              <TD><CopyField value={r.name || "@"} /></TD>
@@ -241,6 +255,7 @@ export default function DomainPage() {
           </tbody>
          </table>
         </div>
+        </>
        ) : null}
       </TechCard>
 
@@ -265,7 +280,21 @@ export default function DomainPage() {
          </div>
         )}
 
-        <div className="overflow-x-auto rounded-xl border border-stone-200">
+        {/* Phone: one block per record, the Remove (or the lock) beside it. */}
+        <div className="divide-y divide-stone-100 rounded-xl border border-stone-200 sm:hidden">
+         {records.length === 0 && <p className="px-3 py-2.5 text-[12px] text-stone-400">No records yet.</p>}
+         {records.map((r) => (
+          <div key={r.id} className="flex items-start gap-3 px-3 py-2.5">
+           <div className="min-w-0 flex-1">
+            <p className="truncate font-mono text-[12px]"><span className="uppercase text-stone-500">{r.type}{r.mxPriority != null ? ` ${r.mxPriority}` : ""}</span> {r.name || "@"}</p>
+            <p className="mt-0.5 truncate font-mono text-[12px] text-stone-600">{r.value}</p>
+            {r.locked && <StatusPill tone="neutral" className="mt-1.5">Keeps your shop online</StatusPill>}
+           </div>
+           {!r.locked && <button disabled={dnsBusy} onClick={() => removeRecord(r.id)} className="-my-1 h-8 shrink-0 text-[12px] text-stone-400 transition hover:text-rose-600 disabled:opacity-50">Remove</button>}
+          </div>
+         ))}
+        </div>
+        <div className="hidden overflow-x-auto rounded-xl border border-stone-200 sm:block">
          <table className="w-full">
           <thead><tr><TH>Type</TH><TH>Name</TH><TH>Value</TH><TH right>&nbsp;</TH></tr></thead>
           <tbody>

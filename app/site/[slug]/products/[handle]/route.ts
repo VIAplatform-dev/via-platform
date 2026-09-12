@@ -29,6 +29,13 @@ import { getShippingSettings, hasShippingRow } from "@/app/lib/store-shipping-db
 import { DEFAULT_ZONES } from "@/app/lib/shipping-zones";
 import { hostedProductDetails, renderHostedDetailsHtml, type HostedDetailItem } from "@/app/lib/hosted-product-details-core";
 import { injectHostedDetails } from "@/app/lib/hosted-product-details";
+import { prepareEditMode } from "@/app/lib/site-capture";
+import { productEditView, type EditPiece } from "@/app/lib/plan-b/product-page-edit";
+import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
+import { canEditCapture } from "@/app/lib/capture-edit-access";
+import { reviewGate, reviewGateNoticeHtml } from "@/app/lib/capture-review-gate";
+import { getReviewState } from "@/app/lib/store-health-db";
+import { applySiteBuilderForRequest } from "@/app/lib/site-builder/serve";
 
 /**
  * The details block for this piece — size, measurements, grade and note, flaws, where it ships —
@@ -107,6 +114,11 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string; handle: string }> }) {
  const { slug, handle } = await params;
  const path = `/products/${handle}`;
+ // The seller's own editing session is not a visit: no product view is recorded for it below.
+ const isEditRequest = req.nextUrl.searchParams.get("edit") === "1";
+ // Set only for a signed-in OWNER who opened ?edit=1 before finishing the side-by-side review;
+ // appended to her copy of the page. Never set for a shopper.
+ let ownerNotice = "";
 
  // PLAN B: on the store's own domain the seller's theme JavaScript is safe to keep, so the product
  // page keeps its accordions, gallery and its OWN add-to-cart button (which posts to /cart/add.js —
@@ -163,7 +175,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     const css0 = await getSiteCss(slug).catch(() => "");
     const stated = applyCartState(out, { inCart: false, soldOut: !storefrontAvailability(item).available, unavailableReason: storefrontAvailability(item).unavailableReason });
     // The facts the classic page prints, after the buy control — same words, same order.
-    const withState = injectHostedDetails(stated, await detailsBlockFor(slug, item));
+    // A product grid she added to her product page, filled live — same pass as every hosted page.
+    const withState = await applySiteBuilderForRequest(injectHostedDetails(stated, await detailsBlockFor(slug, item)), { slug, onStoreOrigin, path });
     const badged = await withCartDrawer(applyCartBadge(withState, await cartItemCount(req.cookies.get("via_cart")?.value || "", await bagSellerFor(slug))), slug, req.cookies.get("via_cart")?.value || "", isStoreHost(req.headers.get("host")));
     // VYA's cart on every origin — see the note in the catch-all route. On a store origin the
     // theme's scripts stay (its menus and galleries need them); only commerce is ours.
@@ -208,6 +221,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  return new Response("Couldn't load that product.", { status: 502, headers: { "Content-Type": "text/plain" } });
  }
  }
+
+ // ── EDIT MODE (?edit=1) ─────────────────────────────────────────────────────────────────────────
+ // The storefront editor's "Product page (all N)" loads THIS route with ?edit=1, and it had no edit
+ // mode: she chose the product page and got a shopper's page with no editor on it, while the save
+ // route stood ready to carry her changes to every product page. Placed here, once `html` is the
+ // stored page, and before any of the shopper's machinery below (her bag, the cart, the tracking).
+ // Same gate as the catch-all route: a visitor who is not allowed simply gets the shop.
+ if (isEditRequest) {
+  const edit = await editModeFor(req, slug, path, html);
+  if (edit.response) return edit.response;
+  ownerNotice = edit.notice;
+ }
+
  // Reflect THIS visitor's cart onto the page. A capture is frozen at "0 in cart" and never shows the
  // already-in-your-bag notice, so without this a shopper can add a one-of-one piece they already
  // hold and get no feedback at all.
@@ -247,6 +273,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
  } catch { /* allow-swallow: cart state is a display nicety — never fail the product page for it */ }
 
+ // A product grid she added to this page ("You may also like"), filled from live inventory — the same
+ // builder pass the catch-all route runs, so product pages are not the one place a grid stays empty.
+ html = await applySiteBuilderForRequest(html, { slug, onStoreOrigin, path });
+
  // The header badge, from the same count /cart.js reports. A product page is where a shopper adds
  // a piece, so a header still frozen at the crawler's cart is the most confusing place to leave it.
  html = await withCartDrawer(applyCartBadge(html, await cartItemCount(req.cookies.get("via_cart")?.value || "", await bagSellerFor(slug))), slug, req.cookies.get("via_cart")?.value || "", isStoreHost(req.headers.get("host")));
@@ -265,13 +295,60 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // The VYA item behind this page is encoded in its buy link — used to record a product view for
  // the store's analytics.
  const itemId = (out.match(/\/checkout\?item=([a-zA-Z0-9-]+)/) || [])[1] || null;
- if (itemId) {
+ if (itemId && !isEditRequest) {
  recordProductView(slug, itemId, req.cookies.get("via_sess")?.value || null).catch(() => {});
  }
  const setCookie = await captureStorefrontEntry(req, slug);
  const headers: Record<string, string> = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" };
  if (setCookie) headers["Set-Cookie"] = setCookie;
- return new Response(out, { headers });
+ // A function replacer, so nothing in the notice is read as a `$&` pattern.
+ return new Response(ownerNotice ? out.replace(/<\/body>/i, () => `${ownerNotice}</body>`) : out, { headers });
+}
+
+/**
+ * The product page in the seller's visual editor — or `response: null` for anyone who may not open it,
+ * and the caller serves the ordinary page.
+ *
+ * The same two checks, in the same order, as the catch-all route's edit mode. canEditCapture decides
+ * who may open an editor at all: this route is public, and a shopper who adds ?edit=1 must get the
+ * shop. The review gate asks an owner to compare her capture with her own site first (admins exempt);
+ * one stopped there gets the ordinary page with a line naming the step, never a page that silently
+ * won't edit. What she edits is built in plan-b/product-page-edit.ts.
+ */
+async function editModeFor(req: NextRequest, slug: string, path: string, stored: string): Promise<{ response: Response | null; notice: string }> {
+ const admin = isAdminRequest(req);
+ const actingSlug = await resolveStoreSlugAny(req).catch(() => null); /* allow-swallow: an auth blip must show the public page, never the editor */
+ if (!canEditCapture(slug, { slug: actingSlug, isAdmin: admin }).allowed) return { response: null, notice: "" };
+ const gate = admin
+  ? { passed: true as const, reason: "reviewed" as const }
+  : reviewGate(await getReviewState(slug).catch(() => null)); /* allow-swallow: fails OPEN on purpose, as on the catch-all route — a workflow step, not the security control (canEditCapture above is) */
+ if (!gate.passed) return { response: null, notice: reviewGateNoticeHtml(gate) };
+
+ // The piece this page shows, so its own name, price and description go to Inventory rather than to
+ // a text box. Best-effort: without it the page still opens, every word on it editable.
+ let piece: EditPiece | null = null;
+ try {
+  const id = await matchItemId(slug, "", path.slice("/products/".length));
+  const mine = id ? await getItem(id) : null;
+  if (mine) {
+   piece = {
+    id: mine.id, title: mine.title, description: mine.description,
+    priceCents: mine.priceCents, currency: mine.currency, compareAtCents: mine.compareAtCents,
+    detailsHtml: await detailsBlockFor(slug, mine),
+   };
+  }
+ } catch { /* allow-swallow: the editor opens on the stored page regardless */ }
+
+ let view: string;
+ try {
+  view = productEditView(stored, piece);
+ } catch {
+  view = productEditView(stored, null); // the stored page, numbered — never a page that won't open
+ }
+ // Grids she added, filled AFTER numbering (productEditView numbers the stored page), so their cards
+ // carry no numbers of their own — exactly as on the catch-all route.
+ view = await applySiteBuilderForRequest(view, { slug, onStoreOrigin: false, editor: true, path });
+ return { response: new Response(prepareEditMode(view, slug, path), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }), notice: "" };
 }
 
 /** Reserved cache key for a product's captured `?view=quickshop` alternate template — kept out of

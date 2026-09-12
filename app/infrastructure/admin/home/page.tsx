@@ -328,7 +328,8 @@ export default function WorkspaceHome() {
      (option B). Right: the ring and every step (option F); the optional domain can be skipped. */}
  {setup && !setup.complete && nextCopy && (
  <TechCard className="mb-4 overflow-hidden border-[var(--accent)]/35 p-0" data-testid="setup-card">
- <div className="grid lg:grid-cols-[5fr_4fr]">
+ {/* Side by side from md: stacked on an iPad the six-step list pushed every number below the fold. */}
+ <div className="grid md:grid-cols-[5fr_4fr]">
  <div className="bg-gradient-to-b from-[var(--accent-soft)] to-white p-5 sm:p-6">
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--accent-ink)]" data-testid="setup-eyebrow">{nextCopy.eyebrow}</p>
  <h2 className="mt-2 text-[24px] leading-[1.15] tracking-[-0.01em] text-stone-900" style={serif} data-testid="setup-headline">{nextCopy.headline}</h2>
@@ -399,7 +400,24 @@ export default function WorkspaceHome() {
  <StatusPill tone="live" dot>Live</StatusPill>
  </div>
  <p className="mb-2 mt-6 font-mono text-[9.5px] uppercase tracking-[0.12em] text-stone-400">{chartLabel}</p>
- <BarChart data={revBars} h={150} money showValues={revBars.length <= 8} />
+ {revBars.length > 8 ? (
+ <>
+ {/* 15 two-day (or 13 weekly) bars leave each label ~20px on a phone, so every one truncated to
+     "AUG …". Below xl the bars go unlabelled and a thinned axis names every third bar, each label
+     centred under its bar and free to run wider than it; xl keeps the full row. */}
+ <div className="xl:hidden">
+ <BarChart data={revBars.map((b) => ({ ...b, label: "" }))} h={150} money showValues={false} />
+ <div className="mt-1 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${revBars.length}, minmax(0, 1fr))` }} aria-hidden>
+ {revBars.map((b, i) => (
+ <span key={i} className="flex justify-center whitespace-nowrap font-mono text-[8.5px] uppercase tracking-[0.06em] text-stone-400">{i % 3 === 0 ? b.label : ""}</span>
+ ))}
+ </div>
+ </div>
+ <div className="hidden xl:block"><BarChart data={revBars} h={150} money showValues={false} /></div>
+ </>
+ ) : (
+ <BarChart data={revBars} h={150} money showValues />
+ )}
  </TechCard>
 
  <TechCard className="p-5">

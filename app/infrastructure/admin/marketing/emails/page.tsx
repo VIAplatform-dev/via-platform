@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AutomationPreviewButton } from "../AutomationPreview";
+import { CustomAutomations } from "../CustomAutomations";
 import { Clock, FileText, Send, Zap } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, Toggle } from "../../ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, Toggle } from "../../ui";
 
 // Every email a store sends, in one place.
 //
@@ -131,22 +133,15 @@ export default function EmailsPage() {
           <p className="mt-0.5 max-w-[64ch] text-[12px] leading-relaxed text-stone-500">{b.body}</p>
           <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.1em] text-stone-400">{b.cadence}</p>
          </div>
-         <Toggle on={b.enabled} onClick={() => toggleBuiltin(b.key, !b.enabled)} />
-        </div>
-       ))}
-       {automatic.custom.map((c) => (
-        <div key={c.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
-         <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-medium text-stone-900">{c.name}</p>
-          <p className="mt-0.5 truncate text-[12px] text-stone-500">{c.subject}</p>
-         </div>
-         <a href="/admin/marketing/automations" className="rounded-lg border border-stone-200 px-3 py-1.5 text-[12.5px] text-stone-600 transition hover:bg-stone-50">Edit</a>
-         <StatusPill tone={c.enabled ? "live" : "neutral"} dot={c.enabled}>{c.enabled ? "On" : "Off"}</StatusPill>
+         <div className="flex shrink-0 items-center gap-2.5"><AutomationPreviewButton flowKey={b.key} name={b.name} /><Toggle on={b.enabled} onClick={() => toggleBuiltin(b.key, !b.enabled)} /></div>
         </div>
        ))}
       </div>
-      <div className="border-t border-stone-100 px-5 py-3">
-       <a href="/admin/marketing/automations" className="text-[12.5px] text-stone-500 underline underline-offset-2 hover:text-stone-900">Write your own automatic email</a>
+      {/* The seller's own automatic emails, in the same card as VYA's — one list of what sends
+          without her. They lived on a separate page whose other half duplicated the rows above. */}
+      <div className="border-t border-stone-100 px-5 pb-4 pt-3">
+       <CustomAutomations />
+       <p className="mt-4 text-[11px] text-stone-400">Automatic emails honour each customer’s email-subscription status.</p>
       </div>
      </TechCard>
 

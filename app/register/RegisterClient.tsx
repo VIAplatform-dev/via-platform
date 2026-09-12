@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { getBaseUrl } from "@/app/lib/base-url";
 import { acquisitionSource } from "@/app/lib/capturedSource";
 import { signIn } from "next-auth/react";
@@ -92,7 +93,7 @@ export default function RegisterClient() {
         <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 py-12 max-w-xl w-full mx-auto">
           {/* Logo */}
           <div className="flex items-start gap-1.5 mb-8">
-            <img src="/vya-logo.png" alt="VYA" className="h-7 w-auto" />
+            <Image src="/vya-logo.png" alt="VYA" width={4612} height={2952} sizes="44px" className="h-7 w-auto" priority />
             <span className="text-[9px] uppercase tracking-[0.15em] text-[#5D0F17]/60 font-sans">pilot</span>
           </div>
 
@@ -191,10 +192,12 @@ export default function RegisterClient() {
                 {/* First + Last name */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-[#5D0F17]/60 mb-1.5">
+                    <label htmlFor="reg-first" className="block text-xs text-[#5D0F17]/60 mb-1.5">
                       First name <span className="text-[#5D0F17]">*</span>
                     </label>
                     <input
+                      id="reg-first"
+                      autoComplete="given-name"
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
@@ -203,10 +206,12 @@ export default function RegisterClient() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-[#5D0F17]/60 mb-1.5">
+                    <label htmlFor="reg-last" className="block text-xs text-[#5D0F17]/60 mb-1.5">
                       Last name
                     </label>
                     <input
+                      id="reg-last"
+                      autoComplete="family-name"
                       type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
@@ -217,10 +222,12 @@ export default function RegisterClient() {
 
                 {/* Email */}
                 <div>
-                  <label className="block text-xs text-[#5D0F17]/60 mb-1.5">
+                  <label htmlFor="reg-email" className="block text-xs text-[#5D0F17]/60 mb-1.5">
                     Email address <span className="text-[#5D0F17]">*</span>
                   </label>
                   <input
+                    id="reg-email"
+                    autoComplete="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -231,7 +238,7 @@ export default function RegisterClient() {
 
                 {/* Phone */}
                 <div>
-                  <label className="block text-xs text-[#5D0F17]/60 mb-1.5">
+                  <label htmlFor="reg-phone" className="block text-xs text-[#5D0F17]/60 mb-1.5">
                     Phone number
                   </label>
                   <div className="flex border border-[#5D0F17]/20 focus-within:border-[#5D0F17] transition">
@@ -240,6 +247,8 @@ export default function RegisterClient() {
                       <span>+1</span>
                     </div>
                     <input
+                      id="reg-phone"
+                      autoComplete="tel-national"
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -251,10 +260,12 @@ export default function RegisterClient() {
 
                 {/* Access code */}
                 <div>
-                  <label className="block text-xs text-[#5D0F17]/60 mb-1.5">
+                  <label htmlFor="reg-code" className="block text-xs text-[#5D0F17]/60 mb-1.5">
                     Access code <span className="text-[#5D0F17]/40">(optional)</span>
                   </label>
                   <input
+                    id="reg-code"
+                    autoComplete="off"
                     type="text"
                     value={accessCode}
                     onChange={(e) => setAccessCode(e.target.value)}

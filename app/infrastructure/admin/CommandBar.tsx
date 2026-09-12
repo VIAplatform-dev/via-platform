@@ -49,7 +49,7 @@ const PAGES: Hit[] = [
  { id: "p-emails", label: "Your emails", sub: "everything your shop sends, drafts, scheduled", href: `${B}/marketing/emails` },
  { id: "p-campaigns", label: "Campaigns", sub: "write and send an email", href: `${B}/marketing/campaigns` },
  { id: "p-emaildesign", label: "Email design", sub: "logo, colours and fonts for your emails", href: `${B}/marketing/design` },
- { id: "p-automations", label: "Automations", sub: "emails that send on their own", href: `${B}/marketing/automations` },
+ { id: "p-automations", label: "Automations", sub: "emails that send on their own", href: `${B}/marketing/emails` },
  { id: "p-sharelinks", label: "Share links", sub: "links for social media", href: `${B}/marketing/share-links` },
  { id: "p-esp", label: "Klaviyo & Mailchimp", sub: "connect your email tool", href: `${B}/apps/email` },
  { id: "p-recovery", label: "Cart recovery", sub: "people who didn't finish checkout", href: `${B}/customers/recovery` },
@@ -134,7 +134,7 @@ export default function CommandBar({ hidden }: { hidden?: string[] } = {}) {
 
  if (!open) return null;
  return (
- <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 px-4 pt-[12vh]" onClick={() => setOpen(false)}>
+ <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/30 px-4 pt-[8dvh] sm:pt-[12vh]" onClick={() => setOpen(false)}>
  <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
  <div className="flex items-center gap-2.5 border-b border-stone-100 px-4">
  <Search size={16} className="shrink-0 text-stone-400" />
@@ -145,7 +145,7 @@ export default function CommandBar({ hidden }: { hidden?: string[] } = {}) {
  />
  <kbd className="shrink-0 rounded border border-stone-200 px-1.5 py-0.5 font-mono text-[10px] text-stone-400">ESC</kbd>
  </div>
- <div className="max-h-[60vh] overflow-y-auto py-2">
+ <div className="max-h-[60dvh] overflow-y-auto py-2">
  {flat.length === 0 ? (
  <p className="px-4 py-8 text-center text-[13px] text-stone-400">{loading ? "Searching…" : ql ? "No matches." : "Type to search anything…"}</p>
  ) : (

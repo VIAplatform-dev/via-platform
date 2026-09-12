@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -47,7 +48,7 @@ export default function LoginClient() {
 
  {/* Logo */}
  <div className="flex items-center justify-center gap-1.5 mb-8">
- <img src="/vya-logo.png" alt="VYA" className="h-7 w-auto" />
+ <Image src="/vya-logo.png" alt="VYA" width={4612} height={2952} sizes="44px" className="h-7 w-auto" priority />
  <span className="text-[9px] uppercase tracking-[0.15em] text-[#5D0F17]/60 font-sans">pilot</span>
  </div>
 
@@ -85,12 +86,12 @@ export default function LoginClient() {
  </div>
 
  <div className="flex justify-center flex-wrap gap-5 mt-10">
- <Link href="/terms" className="text-xs text-[#5D0F17]/40 underline hover:no-underline">Terms</Link>
- <Link href="/privacy" className="text-xs text-[#5D0F17]/40 underline hover:no-underline">Privacy</Link>
- <Link href="/for-stores" className="text-xs text-[#5D0F17]/40 underline hover:no-underline">Partner with VYA</Link>
- <a href="https://www.instagram.com/vyaplatform" target="_blank" rel="noopener noreferrer" className="text-xs text-[#5D0F17]/40 underline hover:no-underline">Instagram</a>
- <a href="https://www.tiktok.com/@vyaplatform" target="_blank" rel="noopener noreferrer" className="text-xs text-[#5D0F17]/40 underline hover:no-underline">TikTok</a>
- <a href="https://vyaplatform.substack.com/" target="_blank" rel="noopener noreferrer" className="text-xs text-[#5D0F17]/40 underline hover:no-underline">Substack</a>
+ <Link href="/terms" className="inline-block py-3.5 text-xs text-[#5D0F17]/40 underline hover:no-underline">Terms</Link>
+ <Link href="/privacy" className="inline-block py-3.5 text-xs text-[#5D0F17]/40 underline hover:no-underline">Privacy</Link>
+ <Link href="/for-stores" className="inline-block py-3.5 text-xs text-[#5D0F17]/40 underline hover:no-underline">Partner with VYA</Link>
+ <a href="https://www.instagram.com/vyaplatform" target="_blank" rel="noopener noreferrer" className="inline-block py-3.5 text-xs text-[#5D0F17]/40 underline hover:no-underline">Instagram</a>
+ <a href="https://www.tiktok.com/@vyaplatform" target="_blank" rel="noopener noreferrer" className="inline-block py-3.5 text-xs text-[#5D0F17]/40 underline hover:no-underline">TikTok</a>
+ <a href="https://vyaplatform.substack.com/" target="_blank" rel="noopener noreferrer" className="inline-block py-3.5 text-xs text-[#5D0F17]/40 underline hover:no-underline">Substack</a>
  </div>
  </>
  )}

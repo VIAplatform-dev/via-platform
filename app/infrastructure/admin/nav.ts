@@ -127,7 +127,6 @@ export const GROUPS: NavGroup[] = [
   { href: `${B}/ai`, label: "AI accuracy", icon: "Target" },
   { href: `${B}/golden-review`, label: "Golden set", icon: "Gem" },
   // Owner-only, like the three above it: where stores stall on the way to their first sale.
-  // Lost in a merge — the comment at the top of this file promised it and the route exists.
   { href: `${B}/setup-funnel`, label: "Where stores get stuck", icon: "Filter" },
   // Who at VYA can sign in here. Owner-only for the obvious reason: a page that hands out admin
   // must never render for a store partner, and INTERNAL below is what keeps it out of their rail.

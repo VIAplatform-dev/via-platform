@@ -54,6 +54,31 @@ test("a product with no variants at all is unsellable, not missing", () => {
  assert.equal(classifyMissing([p({ handle: "none", variants: [] })], new Set()).missing.length, 0);
 });
 
+// ── Rental options are never a buy price (see variant-pricing.ts) ──────────────────────────────────
+// Before this, `buyable` read ANY priced+available variant as a real purchase option. On Venus
+// Vintage — a rental shop — that made every one of its 51 rent-only pieces (available, and priced at
+// their RENTAL rate) look "missing from our copy", when in truth VYA correctly does not sell them.
+// Rolled fleet-wide, this would have put every rental-only piece on every rental store on the
+// blocking list, the exact false-alarm class catalog-parity.ts already exists to rule out.
+test("a rental option, however priced and available, is never a buy price — not missing, not blocking", () => {
+ const rentOnly = p({ handle: "boots", variants: [
+  { available: true, price: "0.00", title: "3 Day Rental" },
+  { available: true, price: "150.00", title: "7 Day Rental" },
+  { available: true, price: "0.00", title: "Purchase" },
+ ] });
+ const got = classifyMissing([rentOnly], new Set());
+ assert.equal(got.missing.length, 0);
+ assert.deepEqual(got.unsellable.map((x) => x.handle), ["boots"]);
+});
+
+test("a piece that both rents AND sells is still missing when we don't hold it — priced by its Purchase option", () => {
+ const both = p({ handle: "slingbacks", variants: [
+  { available: true, price: "22.00", title: "3 Day Rental" },
+  { available: true, price: "540.00", title: "Purchase" },
+ ] });
+ assert.deepEqual(classifyMissing([both], new Set()).missing.map((x) => x.handle), ["slingbacks"]);
+});
+
 test("missing pieces come back with enough to act on", () => {
  // A count is not actionable. "9 products missing" cost an afternoon precisely because nothing
  // recorded WHICH, so every reader had to re-derive it from the seller's feed.

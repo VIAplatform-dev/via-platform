@@ -134,9 +134,70 @@ export async function setSiteCss(slug: string, css: string): Promise<void> {
  await saveCapturePage(slug, CSS_PATH, css, "");
 }
 
-export async function deleteCaptures(slug: string): Promise<void> {
+/** The custom CSS, or a THROW when it can't be read. getSiteCss turns a database error into "", which
+ *  is right for serving a page and wrong for an editor: an editor that believes "" will save "" over
+ *  the seller's real design. */
+export async function readSiteCss(slug: string): Promise<string> {
+ return (await getCapturePage(slug, CSS_PATH)) ?? "";
+}
+
+/** Write the custom CSS only if it still holds exactly `base` — what the writer last read. Atomic, so an
+ *  editor that loaded stale (or failed) content, or that raced the VYA assistant, gets `false` instead of
+ *  quietly erasing what it never saw. A missing row counts as "". */
+export async function setSiteCssIfUnchanged(slug: string, base: string, css: string): Promise<boolean> {
  await ensure();
- await sql()`DELETE FROM site_captures WHERE store_slug = ${slug}`;
+ await keepCurrent(slug, CSS_PATH, "crawl");
+ const r = base === ""
+  ? ((await sql()`INSERT INTO site_captures (store_slug, path, html, source_url) VALUES (${slug}, ${CSS_PATH}, ${css}, '')
+   ON CONFLICT (store_slug, path) DO UPDATE SET html = EXCLUDED.html, captured_at = now() WHERE site_captures.html = ''
+   RETURNING store_slug`) as unknown[])
+  : ((await sql()`UPDATE site_captures SET html = ${css}, captured_at = now()
+   WHERE store_slug = ${slug} AND path = ${CSS_PATH} AND html = ${base} RETURNING store_slug`) as unknown[]);
+ return r.length > 0;
+}
+
+/**
+ * Drop ONE page. Used by the Pages panel's "Delete permanently", which is the second, confirmed
+ * choice next to hiding a page (the reversible one).
+ *
+ * A version is kept first, exactly as every other write to this table does — so a page deleted by
+ * mistake is still in the history and the operator's recovery view can put it back. Deleting a row
+ * without that would be the only unrecoverable write in the file.
+ */
+export async function deleteCapturePage(slug: string, path: string): Promise<boolean> {
+ await ensure();
+ await keepCurrent(slug, path, "edit");
+ const r = (await sql()`DELETE FROM site_captures WHERE store_slug = ${slug} AND path = ${path} RETURNING store_slug`) as unknown[];
+ return r.length > 0;
+}
+
+/**
+ * Discard a store's capture.
+ *
+ * PAGES SHE ADDED HERE ARE SPARED (owner's decision, 2026-09-11). A re-import re-crawls her site,
+ * and her site has never heard of the Shipping page she wrote in the builder — so wiping the lot
+ * would delete work that no crawl can bring back, every time she re-syncs. Pages of the CAPTURE are
+ * replaced by the crawl that follows, which is the point.
+ *
+ * `keepAdded: false` is the owner's explicit full reset ("use the simple design instead"), which
+ * means the whole hosted site including anything built on top of it.
+ */
+export async function deleteCaptures(slug: string, opts: { keepAdded?: boolean } = {}): Promise<void> {
+ await ensure();
+ if (opts.keepAdded === false) {
+  await sql()`DELETE FROM site_captures WHERE store_slug = ${slug}`;
+  return;
+ }
+ /* allow-swallow: the builder's tables may not exist yet (they are created by an admin endpoint, never on
+    first request) — a store with no added pages is every store until one is added, and the delete below is
+    then exactly what it always was. */
+ const { listAddedPaths } = await import("./site-builder/pages-db.ts");
+ const added = await listAddedPaths(slug).catch(() => [] as string[]);
+ if (!added.length) {
+  await sql()`DELETE FROM site_captures WHERE store_slug = ${slug}`;
+  return;
+ }
+ await sql()`DELETE FROM site_captures WHERE store_slug = ${slug} AND NOT (path = ANY(${added}))`;
 }
 
 /**

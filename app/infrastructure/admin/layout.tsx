@@ -243,14 +243,17 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  } as React.CSSProperties}
  >
  {/* Mobile top bar — hamburger opens the drawer */}
- <div className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-stone-200 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
- <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="text-stone-600"><Menu size={20} /></button>
+ {/* h-14 matches main's pt-14. The hamburger is the only way into navigation below lg, so it gets a
+     full 44px target rather than the bare 20px icon it was. */}
+ <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-1 border-b border-stone-200 bg-white/90 px-2 backdrop-blur lg:hidden">
+ <button onClick={() => setNavOpen(true)} aria-label="Open menu" className="grid h-11 w-11 place-items-center rounded-lg text-stone-600 active:bg-stone-100"><Menu size={20} /></button>
  <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-500">{marketMode ? "Market Mode" : "Infrastructure"}</span>
  </div>
  {/* Backdrop when the mobile drawer is open */}
- {navOpen && <div onClick={() => setNavOpen(false)} className="fixed inset-0 z-40 bg-black/30 md:hidden" aria-hidden="true" />}
- <aside className={`fixed left-0 top-0 z-50 flex h-screen w-[228px] flex-col overflow-y-auto border-r border-stone-200/70 bg-white px-3 py-5 transition-transform duration-200 md:translate-x-0 ${navOpen ? "translate-x-0" : "-translate-x-full"}`}>
- <button onClick={() => setNavOpen(false)} aria-label="Close menu" className="absolute right-3 top-4 text-stone-400 hover:text-stone-600 md:hidden"><X size={18} /></button>
+ {navOpen && <div onClick={() => setNavOpen(false)} className="fixed inset-0 z-40 bg-black/30 lg:hidden" aria-hidden="true" />}
+ <aside className={`fixed left-0 top-0 z-50 flex h-dvh w-[228px] flex-col overflow-y-auto border-r border-stone-200/70 bg-white px-3 py-5 transition-transform duration-200 lg:translate-x-0 ${navOpen ? "translate-x-0" : "-translate-x-full"}`}>
+ {/* h-dvh, not h-screen: 100vh on iOS runs under the browser toolbar, which hid Sign out at the bottom. */}
+ <button onClick={() => setNavOpen(false)} aria-label="Close menu" className="absolute right-1 top-2 grid h-11 w-11 place-items-center text-stone-400 hover:text-stone-600 lg:hidden"><X size={18} /></button>
  <div className="flex items-center gap-2.5 px-3 pb-5">
  <span className="grid h-8 w-8 place-items-center rounded-lg bg-stone-900">
  {/* VYA mark — the maroon asset flipped to white for the dark badge. */}
@@ -398,10 +401,10 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </aside>
  {/* min-w-0: a flex child's min-width defaults to its content's, which let a long unbreakable row push
  the whole page wider than a phone; clipping the root stops any stray overflow from adding a sideways scroll. */}
- <main className={`ml-0 min-w-0 flex-1 pt-14 md:ml-[228px] md:pt-0 ${marketMode && inMarketArea ? "pb-16 md:pb-0" : ""}`}>{children}</main>
+ <main className={`ml-0 min-w-0 flex-1 pt-14 lg:ml-[228px] lg:pt-0 ${marketMode && inMarketArea ? "pb-16 lg:pb-0" : ""}`}>{children}</main>
  {/* Phone bottom tab bar — Market Mode is used one-handed at a table, so the core loop is thumb-reachable. */}
  {marketMode && inMarketArea && (
- <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+ <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
  {MARKET_TABS.map((t) => {
  const on = t.href === M ? pathname === M : within(t.href);
  const Icon = ICONS[t.icon] ?? Package;

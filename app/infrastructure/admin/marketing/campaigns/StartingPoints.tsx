@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "../../ui";
+import { EmailFrame } from "../EmailFrame";
 
 // The gallery a seller sees before the blank box.
 //
@@ -60,12 +61,14 @@ export default function StartingPoints() {
       ))}
      </div>
 
-     <div className="mt-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+     {/* On a phone, a swipeable row rather than twenty-odd cards stacked one per screen, which
+         pushed the composer itself 12,000px down the page. From sm up it's the grid it always was. */}
+     <div className="-mx-5 mt-3 flex snap-x snap-mandatory scroll-px-5 gap-2.5 overflow-x-auto px-5 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3">
       {shown.map((t) => (
        <button
         key={t.id} type="button"
         onClick={() => setPreview(t)}
-        className="group overflow-hidden rounded-xl border border-stone-200 bg-white text-left transition hover:border-stone-400"
+        className="group w-[240px] shrink-0 snap-start overflow-hidden rounded-xl border border-stone-200 bg-white text-left transition hover:border-stone-400 sm:w-auto"
        >
         {/* The card IS the email: a real render, scaled down. A sketch is a guess at what you'd
             get — this is what would arrive, in your colours, with your pieces in it.
@@ -77,8 +80,8 @@ export default function StartingPoints() {
           tabIndex={-1}
           sandbox=""
           scrolling="no"
-          className="pointer-events-none absolute left-0 top-0 origin-top-left border-0"
-          style={{ width: 600, height: 700, transform: "scale(0.52)" }}
+          className="pointer-events-none absolute left-0 top-0 origin-top-left scale-[0.4] border-0 sm:scale-[0.52]"
+          style={{ width: 600, height: 700 }}
          />
          {/* Fades the clip rather than cutting a line through a word. */}
          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent" />
@@ -104,8 +107,8 @@ export default function StartingPoints() {
      role="dialog"
      aria-label={`${preview.name} preview`}
     >
-     <div className="flex max-h-[88vh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-      <div className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-5 py-3.5">
+     <div className="flex max-h-[88dvh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-3.5 sm:px-5">
        <div className="min-w-0 flex-1">
         <p className="text-[13.5px] font-medium text-stone-900">{preview.name}</p>
         <p className="mt-0.5 truncate text-[12px] text-stone-500">Subject: {preview.subject}</p>
@@ -117,7 +120,7 @@ export default function StartingPoints() {
         className="rounded-lg bg-stone-900 px-3.5 py-2 text-[13px] font-medium text-white transition hover:opacity-90"
        >Edit this email</button>
       </div>
-      <iframe srcDoc={preview.preview} title={preview.name} sandbox="" className="h-[560px] w-full border-0 bg-white" />
+      <EmailFrame html={preview.preview} title={preview.name} height={560} className="min-h-0 shrink" />
       <p className="border-t border-stone-100 px-5 py-3 text-[11.5px] leading-relaxed text-stone-400">
        Editing opens this as a draft you can change: the words, the layout, the pieces and the button.
       </p>

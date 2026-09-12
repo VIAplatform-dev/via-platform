@@ -13,13 +13,20 @@
  * Photos are separated out rather than lumped in. A piece that is in stock and priced but has no
  * image on her own site cannot be rendered as a card by anyone — that is hers to fix, and saying so
  * is more use to her than calling it a product we dropped.
+ *
+ * A RENTAL price is never a buy price (see variant-pricing.ts): a piece priced only for hire is not
+ * "missing from our copy" just because that hire price is real and in stock. Without this, every
+ * rent-only piece on a rental shop — priced at its rental rate, genuinely available — read as a
+ * product we silently dropped, which is the exact false-alarm class this file exists to rule out.
  */
-type FeedVariant = { available: boolean; price: string };
+import { isRentalOption } from "./variant-pricing.ts";
+
+type FeedVariant = { available: boolean; price: string; title?: string };
 export type FeedProduct = { handle: string; title: string; variants: FeedVariant[]; images?: { src?: string }[] };
 
-/** Could a shopper buy this today? */
+/** Could a shopper BUY this today — not merely rent it? */
 export const buyable = (p: FeedProduct): boolean =>
- (p.variants || []).some((v) => v.available && Number(v.price) > 0);
+ (p.variants || []).some((v) => v.available && Number(v.price) > 0 && !isRentalOption(v.title));
 
 const hasPhoto = (p: FeedProduct): boolean => (p.images?.length ?? 0) > 0;
 

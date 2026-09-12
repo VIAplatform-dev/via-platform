@@ -245,7 +245,11 @@ export async function DELETE(request: NextRequest) {
  // Owner/admin only — this is a destructive reset, not a per-seller feature.
  if (!isOwner(request, slug)) return NextResponse.json({ error: "Owner only" }, { status: 403 });
  try {
-  await deleteCaptures(slug);
+  // `keepAdded: false`: this is the owner's full reset ("use the simple design instead"), which means
+  // the whole hosted site — including pages she built here. A re-import, which is the other caller,
+  // spares those by default. See deleteCaptures.
+  await deleteCaptures(slug, { keepAdded: false });
+  await (await import("@/app/lib/site-builder/pages-db")).clearStoreBuilderRows(slug);
   // Also wipe the inventory the capture imported, for a true clean slate.
   const seller = await getSellerBySlug(slug);
   const itemsDeleted = seller ? await deleteAllItems(seller.id) : 0;

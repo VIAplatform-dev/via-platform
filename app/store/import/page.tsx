@@ -37,10 +37,29 @@ function liveLine(job: Job | null): string {
  if (!job) return "Starting…";
  const running = job.steps.find((s) => s.status === "running");
  const pages = job.counts?.pages || 0;
- if (running?.name === "crawl") return `Copying your pages — ${pages} so far`;
+ const left = job.remaining || 0;
+ // "596 so far" is a number with no end in sight. The queue is the only denominator we have, and it
+ // is honest: it GROWS as the crawl finds more links, hence "about". A seller who can see 596 of
+ // about 2,200 knows to go and do something else; one who only sees 596 concludes it is stuck.
+ if (running?.name === "crawl") return left > 0 ? `Copying your pages — ${pages} of about ${pages + left}` : `Copying your pages — ${pages} so far`;
  if (running) return STEP_LABEL[running.name] || "Working…";
  if (job.status === "paused") return `Picking up where it stopped — ${pages} pages so far`;
  return "Working…";
+}
+
+// How long to say it will take, which depends entirely on the site.
+//
+// "This takes a minute or two" is true of a 39-page shop and a flat lie for a 2,200-page one — and a
+// seller on hour two of a promised two minutes doesn't wait, she presses import again. On a store
+// that already has a capture, that is the destructive path. So the estimate follows the queue.
+const BIG_SITE_PAGES = 200; // roughly where "a minute or two" stops being true
+
+function durationLine(job: Job | null): string {
+ const total = (job?.counts?.pages || 0) + (job?.remaining || 0);
+ if (total > BIG_SITE_PAGES) {
+  return `That's a big site — ${total.toLocaleString()} pages or so, which takes a while. You can leave this page: it keeps going, and picks itself up if it stops.`;
+ }
+ return "Copying every page and importing your products — this takes a minute or two. You can leave this page; it keeps going.";
 }
 
 const MAX_RESUMES = 40; // a hard stop, so a job that can't progress can't loop forever
@@ -191,7 +210,7 @@ export default function BringYourSitePage() {
       <div className="mt-2.5">
        {/* Live, not a static "this takes a minute" — a stalled import used to look identical to a working one. */}
        <p className="text-[12px] text-stone-600">{liveLine(job)}</p>
-       <p className="mt-0.5 text-[11px] text-stone-400">Copying every page and importing your products — this takes a minute or two. You can leave this page; it keeps going.</p>
+       <p className="mt-0.5 text-[11px] text-stone-400">{durationLine(job)}</p>
       </div>
      )}
      {capErr && <p className="mt-2.5 text-xs text-red-600">{capErr}</p>}

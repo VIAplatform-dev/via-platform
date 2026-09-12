@@ -16,13 +16,9 @@
 // and no request object.
 import * as cheerio from "cheerio";
 import type { CartPageLine } from "./site-capture.ts";
-
-/** Where the theme's main content sits, most specific first. Covers Dawn and its forks, plus the
- *  generic containers older themes use. */
-const MAIN_SELECTORS = ["#MainContent", "main", '[role="main"]', ".main-content", "#main", "#content"].join(", ");
-
-/** The chrome worth keeping when there is no main container to swap out. */
-const CHROME_SELECTORS = ["header", "#shopify-section-header", "footer", "#shopify-section-footer"].join(", ");
+// Borrowing a page's header and footer is now shared with the builder: a page she ADDS in the Pages
+// panel is built the same way (app/lib/site-builder/pages.ts), and this was the only copy of it.
+import { borrowChrome } from "./site-builder/borrow-chrome.ts";
 
 function escHtml(s: string): string {
  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -105,23 +101,9 @@ export function buildFallbackCartPage(
 
  const cart = `<div data-vya-fallback-cart style="${S.wrap}"><h1 style="${S.head}">Your cart</h1>${body}</div>`;
 
- // Prefer swapping the theme's main container: header and footer stay exactly as captured, and only
- // the borrowed page's content is replaced.
- const $main = $(MAIN_SELECTORS).first();
- if ($main.length) {
-  $main.empty().append(cart);
- } else {
-  // No main container. Keep whatever chrome we can identify, drop the rest of the borrowed page's
-  // content — otherwise the home page's hero would sit above the cart — and insert the cart between.
-  // cheerio.load() synthesises html/head/body even for junk input, but guard anyway — the stores
-  // that reach this path are the ones whose captures have already proven unreliable.
-  if (!$("body").length) $.root().append("<body></body>");
-  const $body = $("body");
-  const keep = $body.children(CHROME_SELECTORS).toArray();
-  for (const el of $body.children().toArray()) if (!keep.includes(el)) $(el).remove();
-  const $header = $body.children("header, #shopify-section-header").first();
-  if ($header.length) $header.after(cart); else $body.prepend(cart);
- }
+ // Her header and footer, around VYA's cart. Same swap a page she ADDS gets — see borrow-chrome.ts
+ // for why it prefers the theme's main container and what it falls back to.
+ borrowChrome($, cart);
 
  // Only the remove control needs script; checkout is an anchor and works without it.
  if (lines.length && interactive) {

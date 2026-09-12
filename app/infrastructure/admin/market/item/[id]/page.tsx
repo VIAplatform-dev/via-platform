@@ -68,7 +68,7 @@ function ItemInner() {
  {item && (
  <>
  <div className="overflow-hidden rounded-3xl border border-stone-200 bg-white">
- <div className="flex max-h-[36vh] items-center justify-center overflow-hidden bg-stone-100"><Thumb src={item.image} alt={item.title} fill className="!max-h-[36vh]" /></div>
+ <div className="flex max-h-[36dvh] items-center justify-center overflow-hidden bg-stone-100"><Thumb src={item.image} alt={item.title} fill className="!max-h-[36dvh]" /></div>
  <div className="p-4">
  <div className="flex items-start justify-between gap-3">
  <h2 className="text-[18px] font-semibold leading-snug text-stone-900">{item.title}</h2>
