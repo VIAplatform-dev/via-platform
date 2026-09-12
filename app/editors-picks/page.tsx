@@ -14,16 +14,16 @@ import { deriveSize } from "@/app/lib/inventory";
 import { stores } from "@/app/lib/stores";
 
 export const metadata: Metadata = {
- title: "Everyone's Favorites — VYA",
+ title: "Everyone's Favorites | VYA",
  description: "The most-loved vintage and secondhand pieces from our community of tastemakers.",
  openGraph: {
- title: "Everyone's Favorites — VYA",
+ title: "Everyone's Favorites | VYA",
  description: "The most-loved vintage and secondhand pieces from our community of tastemakers.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: "Everyone's Favorites — VYA",
+ title: "Everyone's Favorites | VYA",
  description: "The most-loved vintage and secondhand pieces from our community of tastemakers.",
  images: ["/og-image.png"],
  },
@@ -109,7 +109,7 @@ export default async function EditorsPicksPage() {
  <p className="text-xs uppercase tracking-[0.15em] text-[#5D0F17]/50 mb-2 font-sans">Curated by the community</p>
  <h1 className="text-2xl sm:text-3xl font-serif mb-2">Everyone&apos;s Favorites</h1>
  <p className="text-sm sm:text-base text-[#5D0F17]/60 max-w-2xl">
- The most-loved pieces from our community of tastemakers — ranked by the people with the best taste.
+ The most-loved pieces from our community of tastemakers, ranked by the people with the best taste.
  </p>
  </div>
  </section>
@@ -125,7 +125,7 @@ export default async function EditorsPicksPage() {
  showSizeFilter={true}
  from="/editors-picks"
  initialFilters={{ sort: "newest" }}
- emptyMessage="No favorites yet — start hearting pieces to see them here."
+ emptyMessage="No favorites yet. Start hearting pieces to see them here."
  />
  </div>
  </section>

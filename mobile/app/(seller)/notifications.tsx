@@ -1,111 +1,87 @@
-import { useEffect, useState } from "react";
-import { Linking, Pressable, Switch, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
-import { apiGet, apiPut } from "../../lib/api";
+import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, spacing } from "../../lib/theme";
-import { SellerScreen } from "../../components/seller/Screen";
-import { PREF_ROWS, DEFAULT_PREFS, normalizePrefs, toggled, applyPatch, type Prefs } from "../../lib/seller/notifications";
-import { registerForPush, lastPushStatus, type PushStatus } from "../../lib/push";
+import { SellerScreen, Empty } from "../../components/seller/Screen";
+import { Loading } from "../../components/seller/Form";
+import { needsYouRows, type AttentionRow } from "../../lib/seller/attention";
 
-// Sales and messages default ON; everything else opts in.
+// What is actually outstanding — not what she'd like to be told about.
 //
-// A phone that buzzes for nothing gets silenced, and then the two that matter — a piece sold, a
-// buyer replied — are lost with it.
+// This screen used to be the PREFERENCES: a list of push and email switches. That is a settings
+// page wearing a bell, and a seller who taps a bell expecting "what needs me" and gets a column of
+// toggles has been answered a question she did not ask. The switches moved to
+// notification-settings.tsx, reached from Settings → Notifications, which is where she went looking
+// for them anyway.
 //
-// Preferences live on the server (/api/store/notification-prefs), one row per store, so every
-// device and the web agree. A toggle flips at once and sends a patch naming only that key; if the
-// save fails it flips back and says so. Whether THIS phone can receive a push at all is a separate
-// question (lib/push.ts), answered at the top of the push group.
+// The feed is /api/store/attention — the same rows Home draws under "Needs you", except Home hides
+// the two it already shows in more detail (holds by name, the payouts line) and this does not. Here
+// the whole list is the point.
 
 export default function NotificationsScreen() {
   const { storeSlug } = useAuth();
   const q = useQuery({
-    queryKey: ["store", "notification-prefs"],
-    queryFn: () => apiGet<{ prefs: unknown }>("/api/store/notification-prefs"),
+    queryKey: ["store", "attention"],
+    queryFn: () => apiGet<{ rows: AttentionRow[] }>("/api/store/attention"),
     enabled: !!storeSlug,
   });
-  // Local wins once she has touched something; until then the server's answer, and before that
-  // the defaults — which are also what the server would say for a store with no row.
-  const [local, setLocal] = useState<Prefs | null>(null);
-  const prefs = local ?? (q.data ? normalizePrefs(q.data.prefs) : DEFAULT_PREFS);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
 
-  const [push, setPush] = useState<PushStatus | null>(lastPushStatus());
-  useEffect(() => {
-    let live = true;
-    registerForPush().then((s) => { if (live) setPush(s); });
-    return () => { live = false; };
-  }, []);
+  // Nothing is hidden here, unlike Home — this IS the list.
+  const rows = needsYouRows(q.data?.rows ?? [], { holdsShown: false, payoutsShown: false });
+  const urgent = rows.filter((r) => r.urgent);
+  const rest = rows.filter((r) => !r.urgent);
 
-  async function flip(group: "push" | "email", key: string) {
-    const before = prefs;
-    const patch = toggled(before, group, key);
-    setLocal(applyPatch(before, patch));
-    setSaveErr(null);
-    try {
-      const r = await apiPut<{ prefs: unknown }>("/api/store/notification-prefs", patch);
-      setLocal(normalizePrefs(r.prefs));
-    } catch {
-      setLocal(before);
-      setSaveErr("Couldn't save — try again");
-    }
-  }
-
-  const pushUnavailable = push === "unavailable";
+  const open = (r: (typeof rows)[number]) => {
+    if (r.route) router.push({ pathname: r.route.pathname as never, params: r.route.params });
+  };
 
   return (
-    <SellerScreen title="Notifications" back>
-      {saveErr ? (
-        <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginTop: spacing.lg }}>
-          <Text style={{ fontSize: 13, color: colors.text }}>{saveErr}</Text>
-        </View>
-      ) : null}
-
-      {(["push", "email"] as const).map((group) => (
-        <View key={group} style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginBottom: spacing.sm }}>{group.toUpperCase()}</Text>
-
-          {group === "push" && push === "denied" ? (
-            <Pressable
-              onPress={() => void Linking.openSettings()}
-              style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginBottom: spacing.sm }}
-            >
-              <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>Push is off for this phone</Text>
-              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
-                Notifications are blocked in your phone&apos;s settings. Tap to open them.
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {group === "push" && pushUnavailable ? (
-            // No dead toggles: a switch that can never buzz this phone is a promise the app can't keep.
-            <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md }}>
-              <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>Push isn&apos;t available in this build</Text>
-              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
-                Your choices are saved for the store; they take effect on a phone running the App Store build.
-              </Text>
-            </View>
-          ) : (
-            PREF_ROWS.filter((p) => p.group === group).map((p) => (
-              <View key={p.key} style={{ flexDirection: "row", alignItems: "center", paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>{p.label}</Text>
-                <Switch
-                  value={p.group === "push" ? prefs.push[p.key] : prefs.email[p.key]}
-                  onValueChange={() => void flip(p.group, p.key)}
-                  disabled={q.isPending && !!storeSlug}
-                  trackColor={{ true: colors.positive, false: colors.chip }}
-                />
+    <SellerScreen
+      title="Notifications"
+      back
+      onRefresh={() => void q.refetch()}
+      refreshing={q.isRefetching}
+    >
+      {q.isError ? (
+        <Empty>Couldn&apos;t load what needs you.</Empty>
+      ) : q.isPending ? (
+        <Loading />
+      ) : rows.length === 0 ? (
+        <Empty>Nothing needs you right now.</Empty>
+      ) : (
+        <>
+          {[
+            { label: "NEEDS YOU", items: urgent },
+            { label: "WHEN YOU HAVE A MOMENT", items: rest },
+          ].map((group) =>
+            group.items.length ? (
+              <View key={group.label} style={{ marginTop: spacing.lg }}>
+                <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginBottom: spacing.xs }}>
+                  {group.label}
+                </Text>
+                {group.items.map((r) => (
+                  <Pressable
+                    key={r.key}
+                    onPress={() => open(r)}
+                    style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                  >
+                    <Feather name={r.icon as never} size={18} color={r.urgent ? colors.accent : colors.textMuted} />
+                    <Text style={{ flex: 1, fontSize: 15, color: colors.text }} numberOfLines={2}>{r.title}</Text>
+                    {r.route ? <Feather name="chevron-right" size={18} color={colors.textDim} /> : null}
+                  </Pressable>
+                ))}
               </View>
-            ))
+            ) : null,
           )}
-        </View>
-      ))}
+        </>
+      )}
 
-      <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
-        Sales and messages are on by default. Everything else you opt into — a phone that buzzes for
-        nothing gets silenced.
-      </Text>
+      <Pressable onPress={() => router.push("/(seller)/notification-settings")} hitSlop={8} style={{ paddingVertical: spacing.xl, alignItems: "center" }}>
+        <Text style={{ fontSize: 13, color: colors.textMuted }}>Choose what you&apos;re told about</Text>
+      </Pressable>
     </SellerScreen>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
+import { onboardingGate } from "../onboarding-gate";
 import { useRouter } from "next/navigation";
 import { Globe, Hammer, ArrowRight, Loader2 } from "lucide-react";
 import { BuildWizardInner } from "./build/page";
@@ -51,22 +52,26 @@ export default function OnboardingWizard() {
  // "sign in first" came from on a page that never offered a sign-in. If there's no session she
  // goes to /login now and comes straight back here afterwards.
  const [checking, setChecking] = useState(true);
+ // An ADDITIONAL store for one of VYA's own people, rather than their first. Read from the URL
+ // before the gate runs, so the gate can decide whether to let them stay.
+ const [again, setAgain] = useState(false);
  useEffect(() => {
   let active = true;
   (async () => {
    /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
    const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
    if (!active) return;
-   // Nobody signed in at all → the seller sign-in.
-   if (!me || (!me.needsOnboarding && !me.slug && me.admin !== true)) {
+   // The decision itself lives in onboarding-gate.ts, with a case table — it has been wrong twice
+   // and both times the mistake was invisible here and obvious to whoever hit it.
+   const decision = onboardingGate(me);
+   if (decision.go === "sign-in") {
+    // NOT a dead end: this page bouncing a signed-in seller to /store/login was an infinite loop
+    // once — login asked whoami, got a valid identity, honoured ?next and returned her here.
     window.location.href = "/store/login?next=%2Fadmin%2Fonboarding";
     return;
    }
-   // The OWNER is not signed out — she is signed in as VYA, and already has a workspace. Sending
-   // her to the seller sign-in was an infinite loop: this page bounced her to /store/login, which
-   // asked whoami, got a perfectly valid identity back, honoured ?next and returned her here.
-   // Onboarding builds a SELLER's store; the owner's destination is her workspace.
-   if (me.admin === true || me.slug) { window.location.href = "/admin/home"; return; }
+   if (decision.go === "home") { window.location.href = "/admin/home"; return; }
+   setAgain(decision.again);
    setChecking(false);
   })();
   return () => { active = false; };
@@ -106,21 +111,45 @@ export default function OnboardingWizard() {
   * it's the only place that can wait for it rather than guess. ~8s is far longer than the write
   * needs and still finite, so a genuine failure surfaces instead of hanging.
   */
- async function waitForStore(): Promise<boolean> {
+ async function waitForStore(expected?: string): Promise<boolean> {
   for (let i = 0; i < 10; i++) {
    const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null)).catch(() => null);
-   if (me?.slug) return true;
+   // On a REPEAT run "any store" is already true before we start — she owns the one from last time —
+   // so waiting on that would return instantly and the next screen would open the wrong shop.
+   // Naming the slug makes this wait for the store actually just made.
+   if (expected ? me?.slug === expected : me?.slug) return true;
    await new Promise((r) => setTimeout(r, 300 + i * 120));
   }
   return false;
+ }
+
+ /**
+  * Make the store we just created the one the workspace is acting as.
+  *
+  * WITHOUT THIS, A TEST RUN EDITS HER REAL SHOP. resolveStoreSlug() answers with the OLDEST store an
+  * email owns (store_users, ORDER BY created_at ASC), so on a repeat run every screen after this one
+  * — the storefront editor, and worse, /api/store/capture — would resolve to the store she already
+  * had. The import path would have crawled a test URL straight over her live storefront's captured
+  * pages. Switching pins the new one, and the endpoint re-checks membership, so this can only ever
+  * move her between shops she genuinely owns.
+  *
+  * Harmless on a first signup: there is only one store and it is this one.
+  */
+ async function switchTo(slug: string): Promise<void> {
+  if (!slug) return;
+  await fetch("/api/store/my-stores", {
+   method: "POST",
+   headers: { "Content-Type": "application/json" },
+   body: JSON.stringify({ slug }),
+  }).catch(() => null);
  }
 
  async function createStore(name: string): Promise<boolean> {
   const res = await fetch("/api/store/onboarding", {
    method: "POST",
    headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ name, hasWebsite: false, websiteUrl: null }),
+   body: JSON.stringify({ name, hasWebsite: false, websiteUrl: null, startOver: again }),
   }).catch(() => null);
   const data = res ? await res.json().catch(() => ({})) : {};
   if (!res || !res.ok) {
@@ -140,7 +169,8 @@ export default function OnboardingWizard() {
   }
   // Breadcrumb for the layout's own retry, and then WAIT here until the gate sees the store.
   try { sessionStorage.setItem("vya:just-onboarded", String(data?.slug || "1")); } catch { /* storage off */ }
-  if (!(await waitForStore())) {
+  await switchTo(String(data?.slug || ""));
+  if (!(await waitForStore(String(data?.slug || "") || undefined))) {
    setError("Your store was created, but it’s taking a moment to appear. Refresh in a few seconds.");
    return false;
   }
@@ -155,7 +185,7 @@ export default function OnboardingWizard() {
    const res = await fetch("/api/store/onboarding", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: finalName, hasWebsite: true, websiteUrl: websiteUrl.trim() }),
+    body: JSON.stringify({ name: finalName, hasWebsite: true, websiteUrl: websiteUrl.trim(), startOver: again }),
    });
    const data = await res.json().catch(() => ({}));
    if (!res.ok) {
@@ -172,9 +202,12 @@ export default function OnboardingWizard() {
    // The workspace gate (whoami) reads store_users; the row was written a moment ago. Leave a
    // breadcrumb so the gate retries instead of bouncing a brand-new seller back into this wizard.
    try { sessionStorage.setItem("vya:just-onboarded", String(data?.slug || "1")); } catch { /* storage off */ }
+   // BEFORE the capture below, not after: /api/store/capture writes into whichever store the
+   // request resolves to, and on a repeat run that is her existing shop until this switch lands.
+   await switchTo(String(data?.slug || ""));
    // Same wait as the build path — the import screen lives inside the workspace, so the gate has
    // to see the store before we go there or she lands back on this wizard.
-   await waitForStore();
+   await waitForStore(String(data?.slug || "") || undefined);
 
    // Her whole shop was brought over before she ever signed up — every page of her site AND her
    // inventory — and she's just been handed it. There is nothing left to import, so skip the scrape
@@ -278,6 +311,18 @@ export default function OnboardingWizard() {
      </span>
      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">Set up your store</p>
     </div>
+
+    {/* Said before anything is filled in, not after: this run makes a whole extra store and moves
+        her into it, which is not what "set up your store" implies when she already has one. */}
+    {again && (
+     <div className="mt-4 rounded-lg border border-stone-200 bg-white px-3.5 py-3">
+      <p className="text-[13px] leading-relaxed text-stone-600">
+       <span className="font-medium text-stone-900">Test run.</span> You already have a store, so this
+       makes a separate one to try the flow on, and switches you into it. Your real store is untouched
+       — switch back any time from the shop name at the top of the sidebar.
+      </p>
+     </div>
+    )}
 
     <div className={`mt-12 flex-1 ${leaving ? "vya-step-out-left" : "vya-step-in-up"}`}>
      <Section title="Do you already have a website?" sub="We’ll either bring your existing site over, or build you a new one.">

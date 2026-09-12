@@ -59,7 +59,7 @@ export default function FeedbackModal() {
  Help us improve.
  </h2>
  <p className="text-sm text-[#5D0F17]/60 leading-relaxed mb-7">
- You&apos;re one of our first pilot users. We&apos;d love to hear your feedback — it takes less than 2 minutes.
+ You&apos;re one of our first pilot users. We&apos;d love to hear your feedback. It takes less than 2 minutes.
  </p>
 
  <div className="flex flex-col sm:flex-row gap-3">

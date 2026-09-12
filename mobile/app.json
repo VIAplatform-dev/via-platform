@@ -45,6 +45,13 @@
         {
           "photosPermission": "VYA uses your photos so you can list pieces you have already shot."
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "",
+          "enableGooglePay": false
+        }
       ]
     ],
     "extra": {

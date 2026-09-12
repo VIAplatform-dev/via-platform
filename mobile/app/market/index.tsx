@@ -205,7 +205,11 @@ export default function MarketHome() {
               <Text style={{ fontSize: 12, color: colors.positive, fontWeight: "600" }}>Ready</Text>
             </View>
           ) : q.data ? (
-            <Text style={{ fontSize: 12, color: colors.textMuted }}>Set up cards on the desktop</Text>
+            // Was "Set up cards on the desktop". Connecting Stripe is a button on Payouts now, so
+            // this points at it — a market is exactly when she notices she can't take a card.
+            <Pressable hitSlop={8} onPress={() => router.push("/(seller)/payouts")}>
+              <Text style={{ fontSize: 12, color: colors.accent, fontWeight: "600" }}>Set up cards</Text>
+            </Pressable>
           ) : null}
         </View>
       </ScrollView>

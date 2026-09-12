@@ -126,7 +126,7 @@ function Tile({ kit, t, i, setLabel, setImg, ratio, rounded }: { kit: EditKit; t
 function CollectionsGrid({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const { tiles, setLabel, setImg } = useTiles(kit);
- if (!tiles.length) return emptyHint(ctx, "Shop by category — add tiles");
+ if (!tiles.length) return emptyHint(ctx, "Shop by category: add tiles");
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
@@ -144,7 +144,7 @@ function CollectionsGrid({ kit }: { kit: EditKit }) {
 function CollectionsRow({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const { tiles, setLabel, setImg } = useTiles(kit);
- if (!tiles.length) return emptyHint(ctx, "Shop by category — add tiles");
+ if (!tiles.length) return emptyHint(ctx, "Shop by category: add tiles");
  const w = Math.min(40, Math.max(10, Number(p.cardW) || 15));
  return (
   <section className="vya-free-canvas relative py-10 @lg:py-16 @xl:py-24">
@@ -169,7 +169,7 @@ function CollectionsRow({ kit }: { kit: EditKit }) {
 function CollectionsDuo({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { tiles, setLabel, setImg } = useTiles(kit);
- if (!tiles.length) return emptyHint(ctx, "Shop by category — add two tiles");
+ if (!tiles.length) return emptyHint(ctx, "Shop by category: add two tiles");
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
@@ -186,7 +186,7 @@ function CollectionsDuo({ kit }: { kit: EditKit }) {
 function CollectionsCircles({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { tiles, setLabel, setImg, clearImg, removeTile, setPos } = useTiles(kit);
- if (!tiles.length) return emptyHint(ctx, "Shop by category — add tiles");
+ if (!tiles.length) return emptyHint(ctx, "Shop by category: add tiles");
  const canEdit = ctx.edit && ctx.onPickImage;
  return (
   <section className="vya-free-canvas relative mx-auto max-w-5xl px-5 @xl:px-8 py-8 @lg:py-14 @xl:py-20">
@@ -226,7 +226,7 @@ function CollectionsCircles({ kit }: { kit: EditKit }) {
 function CollectionsList({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { tiles, setLabel } = useTiles(kit);
- if (!tiles.length) return emptyHint(ctx, "Shop by category — add categories");
+ if (!tiles.length) return emptyHint(ctx, "Shop by category: add categories");
  return (
   <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-8 text-3xl @xl:text-[2.4rem] leading-tight" />

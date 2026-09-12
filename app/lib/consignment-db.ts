@@ -413,6 +413,26 @@ export async function getConsignmentItemByProduct(productId: string): Promise<Co
  return rows.length ? toItem(rows[0]) : null;
 }
 
+/**
+ * Unassign a piece from its consignor — "this one is mine after all".
+ *
+ * ONLY WHILE THE ROW IS STILL `active`. Once a consigned piece sells, the sale is ledgered against
+ * that consignor (creditConsignedSale) and may already be part of a balance or a payout; dropping
+ * the link would leave that money owed to nobody and the statement unable to explain itself. The
+ * caller is told rather than silently ignored.
+ */
+export async function removeConsignmentItemByProduct(productId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+ await ensureConsignmentTables();
+ const sql = db();
+ const existing = await getConsignmentItemByProduct(productId);
+ if (!existing) return { ok: true };
+ if (existing.status !== "active") {
+ return { ok: false, reason: "This piece has already sold as a consignment — its record has to stay with the sale." };
+ }
+ await sql`DELETE FROM consignment_items WHERE product_id = ${productId} AND status = 'active'`;
+ return { ok: true };
+}
+
 /** The consignor cut to ROUTE INTO VYA's balance at checkout (added to the Stripe application fee).
  *  Nonzero ONLY when the consignor is paid by Stripe direct-deposit — then VYA holds the cut and
  *  disburses it. For cash / check / store credit the store keeps the FULL proceeds and settles with

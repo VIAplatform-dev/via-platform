@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Lovergirl Vintage — The Story Behind the Selection | VYA",
+ title: "Lovergirl Vintage: The Story Behind the Selection | VYA",
  description:
  "Why we chose Lovergirl Vintage for VYA. A curated vintage denim & blazer destination, hand-picked by Lexi.",
 };
@@ -62,7 +62,7 @@ export default function LovergirlVintageStory() {
  <p className="font-serif text-[#5D0F17] text-xl">
  At vya, our mission is to make it easier to discover the best independent vintage
  boutiques and designer resale stores in one place. Lover Girl Vintage is exactly why
- vya exists — to connect shoppers with stores that elevate everyday staples through
+ vya exists, to connect shoppers with stores that elevate everyday staples through
  thoughtful, focused curation.
  </p>
  </div>

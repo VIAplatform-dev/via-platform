@@ -12,7 +12,7 @@ const METHOD_LABEL: Record<string, string> = { cash: "cash", check: "a check", s
 // the store hands it over in person, so tell them where + when to collect it.
 function collectNote(con: Consignment): { text: string; tone: "ready" | "pending" | "none" } {
  const label = METHOD_LABEL[con.payoutMethod] || "store credit";
- if (con.payableCents > 0) return { text: `${money(con.payableCents)} in ${label} is ready — stop by ${con.storeName} to collect it.`, tone: "ready" };
+ if (con.payableCents > 0) return { text: `${money(con.payableCents)} in ${label} is ready, stop by ${con.storeName} to collect it.`, tone: "ready" };
  if (con.balanceCents > 0) return { text: `${money(con.balanceCents)} is clearing the return window. Once it’s ready, you can collect it in ${label} at ${con.storeName}.`, tone: "pending" };
  return { text: `You’re paid in ${label} at ${con.storeName}.`, tone: "none" };
 }
@@ -72,7 +72,7 @@ export default function ConsignorPortal() {
  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-stone-400">Consignment</p>
  <h1 className="mt-1 text-[24px] font-semibold tracking-tight text-stone-900">View your statement</h1>
  {sent ? (
- <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-[13px] text-emerald-800">Check your email — if you consign with us, a sign-in link is on its way. It works once and expires in 15 minutes.</div>
+ <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-[13px] text-emerald-800">Check your email. If you consign with us, a sign-in link is on its way. It works once and expires in 15 minutes.</div>
  ) : (
  <form onSubmit={requestLink} className="mt-6">
  <p className="mb-3 text-[13px] text-stone-500">Enter the email your consignor account is under, and we&rsquo;ll send you a sign-in link.</p>
@@ -107,7 +107,7 @@ export default function ConsignorPortal() {
  {con.payoutMethod === "stripe" ? (
  con.connected ? (
  <div className="mt-2.5 flex items-center gap-3">
- <p className="text-[12px] text-emerald-600">✓ Direct deposit connected — payouts go to your bank.</p>
+ <p className="text-[12px] text-emerald-600">✓ Direct deposit connected, payouts go to your bank.</p>
  <button onClick={() => setBank((b) => (b?.id === con.consignorId && b.mode === "manage" ? null : { id: con.consignorId, mode: "manage" }))} className="text-[12px] text-stone-400 underline underline-offset-2 hover:text-stone-700">{bank?.id === con.consignorId && bank.mode === "manage" ? "Hide" : "Manage"}</button>
  </div>
  ) : (
@@ -143,7 +143,7 @@ export default function ConsignorPortal() {
  <tr key={i} className="border-b border-stone-50 last:border-0">
  <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${st.cls}`}>{st.label}</span></td>
  <td className="px-4 py-3 text-stone-500">Your {it.splitPct}%</td>
- <td className="px-4 py-3 text-right tabular-nums text-stone-800">{price != null ? money(price) : "—"}{it.soldPriceCents != null && <span className="ml-1 text-[11px] text-emerald-600">→ {money(Math.round(it.soldPriceCents * it.splitPct / 100))}</span>}</td>
+ <td className="px-4 py-3 text-right tabular-nums text-stone-800">{price != null ? money(price) : "-"}{it.soldPriceCents != null && <span className="ml-1 text-[11px] text-emerald-600">→ {money(Math.round(it.soldPriceCents * it.splitPct / 100))}</span>}</td>
  <td className="px-4 py-3 text-right text-[12px] text-stone-400">{day(it.soldAt ?? it.intakeDate)}</td>
  </tr>
  );

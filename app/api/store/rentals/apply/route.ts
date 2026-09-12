@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRequest, takenBands } from "@/app/lib/rentals/rentals-db";
+import { getItem } from "@/app/lib/db/inventory";
+import { openEnquiryThread, rentalEnquiryBody } from "@/app/lib/enquiry-inbox";
 import { quote } from "@/app/lib/rentals/availability-core";
 import { rentableItem, spanFrom, today, notFound, bad } from "../_shared";
 
@@ -45,6 +47,27 @@ export async function POST(request: NextRequest) {
   message: str(body.message, 2000),
  });
  if (!made) return NextResponse.json({ ok: false, reason: "unavailable" }, { status: 200 });
+
+ // INTO THE INBOX AS WELL AS THE REQUESTS QUEUE. A rental application is somebody asking the store
+ // a question; the seller looks in the inbox for those. Best-effort — the request is already made,
+ // and a messaging hiccup must not turn a successful application into an error the renter sees.
+ void getItem(itemId)
+  .then((item) =>
+   openEnquiryThread({
+    storeSlug: ctx.storeSlug,
+    name: str(body.name, 120),
+    email,
+    subject: `Rental · ${item?.title ?? "a piece"}`,
+    body: rentalEnquiryBody({
+     title: item?.title ?? null,
+     start: q.rented?.start ?? null,
+     end: q.rented?.end ?? null,
+     affiliation: str(body.affiliation, 200),
+     message: str(body.message, 2000),
+    }),
+   }),
+  )
+  .catch(() => {});
 
  return NextResponse.json({
   ok: true,

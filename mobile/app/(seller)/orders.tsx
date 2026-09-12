@@ -8,10 +8,17 @@ import { colors, spacing } from "../../lib/theme";
 import { formatMoney } from "../../lib/seller/home";
 import { groupIntoParcels, parcelsToCollect, type Parcel } from "../../lib/seller/parcels";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
+import { labelQuoteLine, type LabelQuote } from "../../lib/seller/labels";
 
 // Orders — the most time-critical thing a seller does, often standing in a post office queue.
 //
-// VYA has already bought the label, so her job is print, post, confirm. Orders are per piece, but
+// BUYING THE LABEL HAPPENS HERE NOW. It used to say "Label not bought yet — do it on the desktop",
+// which is the worst place in the app to be sent away from: she is holding the parcel. It is two
+// taps rather than one on purpose — a quote, then the purchase — because the quote is where she
+// finds out what it costs and, more to the point, WHETHER SHE IS PAYING. On a free-shipping order
+// the label comes off her card, and a one-tap button would spend her money before she saw a number.
+//
+// Once bought, her job is print, post, confirm. Orders are per piece, but
 // she posts PARCELS: three things bought together are one row here, one label, one "Mark as
 // posted" that flips every piece on the server (lib/seller/parcels.ts). A collection order says so
 // instead, because there is no label to look for — the API tells us via deliveryMethod.
@@ -61,6 +68,41 @@ export default function OrdersScreen() {
     queryFn: () => apiGet<{ orders: Order[] }>("/api/store/orders"),
     enabled: !!storeSlug,
   });
+
+  // The quote for whichever parcel she is looking at, keyed by parcel so two rows can't cross.
+  const [quote, setQuote] = useState<{ key: string; quote: LabelQuote } | null>(null);
+  const [labelBusy, setLabelBusy] = useState<string | null>(null);
+  const [labelError, setLabelError] = useState<string | null>(null);
+
+  // A parcel is several orders but ONE label, bought against the first — the same order the
+  // server files the label on, which is why parcels.ts reads labelUrl off the first that has one.
+  async function getQuote(p: Parcel<Order>) {
+    setLabelError(null);
+    setLabelBusy(p.key);
+    try {
+      const r = await apiPost<LabelQuote>(`/api/store/orders/${p.orders[0].id}`, { action: "label_quote" });
+      setQuote({ key: p.key, quote: r });
+    } catch (e) {
+      setLabelError(e instanceof Error ? e.message : "Couldn't get a shipping price.");
+    } finally {
+      setLabelBusy(null);
+    }
+  }
+
+  async function buyLabel(p: Parcel<Order>, rateId: string) {
+    setLabelError(null);
+    setLabelBusy(p.key);
+    try {
+      await apiPost(`/api/store/orders/${p.orders[0].id}`, { action: "buy_label", rateId });
+      setQuote(null);
+      await qc.invalidateQueries({ queryKey: ["store", "orders"] });
+      await q.refetch();
+    } catch (e) {
+      setLabelError(e instanceof Error ? e.message : "The label didn't go through. Nothing was charged.");
+    } finally {
+      setLabelBusy(null);
+    }
+  }
 
   // One call for the whole bag — every piece flips together, and the buyer gets one email.
   const act = useMutation({
@@ -118,7 +160,7 @@ export default function OrdersScreen() {
                     {p.buyerEmail ? ` · ${p.buyerEmail}` : ""}
                   </Text>
                   <Text style={{ fontSize: 13, color: pickup ? colors.textMuted : colors.positive, marginTop: 3 }}>
-                    {pickup ? "Collection — no label needed" : p.labelUrl ? "Label sent to you" : "Label not bought yet — do it on the desktop"}
+                    {pickup ? "Collection — no label needed" : p.labelUrl ? "Label sent to you" : "No label yet"}
                   </Text>
                 </View>
               </View>
@@ -138,6 +180,16 @@ export default function OrdersScreen() {
                     <Pressable onPress={() => void Linking.openURL(p.labelUrl!)} style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: 10, backgroundColor: colors.bgAlt }}>
                       <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Label</Text>
                     </Pressable>
+                  ) : !pickup && quote?.key !== p.key ? (
+                    <Pressable
+                      disabled={labelBusy !== null}
+                      onPress={() => void getQuote(p)}
+                      style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: 10, backgroundColor: colors.bgAlt, opacity: labelBusy ? 0.6 : 1 }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
+                        {labelBusy === p.key ? "…" : "Buy label"}
+                      </Text>
+                    </Pressable>
                   ) : null}
                 </View>
               ) : tab === "transit" ? (
@@ -149,6 +201,38 @@ export default function OrdersScreen() {
                   <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>{busy ? "…" : "Mark delivered"}</Text>
                 </Pressable>
               ) : null}
+
+              {/* The quote. Shown only for the parcel she asked about, and it says who pays before
+                  it offers to spend anything. */}
+              {quote?.key === p.key ? (
+                <View style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: 10, padding: spacing.md }}>
+                  <Text style={{ fontSize: 13, color: colors.text, lineHeight: 18 }}>
+                    {labelQuoteLine(quote.quote, p.currency ?? first.currency)}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.md }}>
+                    <Pressable
+                      disabled={labelBusy !== null}
+                      onPress={() => void buyLabel(p, quote.quote.rate.rateId)}
+                      style={{ flex: 1, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.md, alignItems: "center", opacity: labelBusy ? 0.6 : 1 }}
+                    >
+                      <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: "600" }}>
+                        {labelBusy === p.key ? "Buying…" : "Buy this label"}
+                      </Text>
+                    </Pressable>
+                    <Pressable onPress={() => setQuote(null)} style={{ paddingHorizontal: spacing.xl, justifyContent: "center" }}>
+                      <Text style={{ color: colors.textMuted, fontSize: 14 }}>Not now</Text>
+                    </Pressable>
+                  </View>
+                  {(quote.quote.customsWarnings ?? []).map((w: { note: string }, i: number) => (
+                    <Text key={i} style={{ fontSize: 12, color: colors.text, marginTop: spacing.sm, lineHeight: 17 }}>{w.note}</Text>
+                  ))}
+                </View>
+              ) : null}
+
+              {labelError && (quote?.key === p.key || labelBusy === p.key) ? (
+                <Text style={{ fontSize: 12, color: colors.text, marginTop: spacing.sm }}>{labelError}</Text>
+              ) : null}
+
               {act.isError && act.variables?.parcel.key === p.key ? (
                 <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.sm }}>Couldn&apos;t update that parcel. Try again.</Text>
               ) : null}

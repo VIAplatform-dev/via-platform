@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Vintage Archives LA — The Story Behind the Selection | VYA",
+ title: "Vintage Archives LA: The Story Behind the Selection | VYA",
  description:
  "Why we chose Vintage Archives LA for VYA. Dedicated to the art of curation, specializing in exceptional vintage designer shoes.",
 };

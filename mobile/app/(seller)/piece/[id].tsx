@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost, ApiError } from "../../../lib/api";
+import { uploadPhoto } from "../../../lib/seller/intake";
 import { useAuth } from "../../../lib/auth";
 import { colors, spacing, fonts } from "../../../lib/theme";
 import { formatMoney } from "../../../lib/seller/home";
@@ -11,6 +13,9 @@ import { describeHold, HOLD_LENGTHS } from "../../../lib/seller/holds";
 import { flawsFromLine, flawsToLine } from "../../../lib/seller/intake-shape";
 import { templateFor, unitFor, measurementsFromForm, measurementsToForm, formatMeasurements, MEASUREMENT_LABELS, type MeasurementKey, type Measurement } from "../../../lib/seller/measurements";
 import { SellerScreen } from "../../../components/seller/Screen";
+import { FIELDS, PARCEL_KEYS, MAX_PHOTOS, type FieldKey } from "../../../lib/seller/listing-fields";
+import { schedulePresets, parseScheduleInput, describeSchedule } from "../../../lib/seller/schedule";
+import { InlineField } from "../../../components/seller/Form";
 
 // One piece, reached by tapping anything in Inventory.
 //
@@ -31,7 +36,22 @@ type Item = {
   condition?: string | null;
   conditionNote?: string | null;
   category?: string | null;
+  description?: string | null;
+  era?: string | null;
+  material?: string | null;
+  colour?: string | null;
+  weightOz?: number | null;
+  lengthIn?: number | null;
+  widthIn?: number | null;
+  heightIn?: number | null;
   measurementsJson?: Measurement[] | null;
+  /** Titles, as /api/store/items attaches them. The PATCH takes titles too and creates any new one. */
+  collections?: string[] | null;
+  /** Set on a scheduled draft; the publish-scheduled cron flips it live at this time. */
+  publishAt?: string | null;
+  /** Marketplaces this piece is meant for. Stored here, pushed at publish — never from the phone. */
+  crossListChannels?: string[] | null;
+  consignorId?: number | null;
   flaws?: string[] | null;
   createdAt?: string;
   views?: number;
@@ -40,21 +60,6 @@ type Item = {
 
 type Hold = { itemId: string; name: string; expiresAt: string };
 
-type FieldKey = "title" | "price" | "cost" | "brand" | "size" | "condition" | "conditionNote" | "flaws";
-const FIELDS: { key: FieldKey; label: string; numeric?: boolean; placeholder?: string }[] = [
-  { key: "title", label: "Title" },
-  { key: "price", label: "Price", numeric: true },
-  // What she paid — the one number the margin report can't do without.
-  { key: "cost", label: "Cost", numeric: true, placeholder: "what you paid" },
-  { key: "brand", label: "Brand" },
-  { key: "size", label: "Size" },
-  { key: "condition", label: "Condition" },
-  // Beyond the grade — her words on the wear, the same note Review and the web editor take.
-  { key: "conditionNote", label: "Condition note", placeholder: "light wear to the sole, tiny mark inside…" },
-  // As the web editor has it. Flaws are typed as one comma-separated line, like Review, and stored
-  // as the list the product page prints under Condition.
-  { key: "flaws", label: "Flaws", placeholder: "scuffed toe, light pilling — comma-separated" },
-];
 
 function Button({ label, onPress, disabled, primary }: { label: string; onPress?: () => void; disabled?: boolean; primary?: boolean }) {
   return (
@@ -80,6 +85,20 @@ export default function PieceScreen() {
   // Measurements: null until she touches the template, so an untouched Save never rewrites them.
   const [measureForm, setMeasureForm] = useState<Partial<Record<MeasurementKey, string>> | null>(null);
   const [measuring, setMeasuring] = useState(false);
+  // Photos: null until she touches them, so an untouched Save never rewrites the set. Same rule as
+  // measurements — the difference between "she left them alone" and "she cleared them" matters here
+  // more than anywhere else, because the images ARE the listing.
+  const [photos, setPhotos] = useState<string[] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  // Collections: null until touched, like photos and measurements.
+  const [cols, setCols] = useState<string[] | null>(null);
+  const [newCol, setNewCol] = useState("");
+  // undefined = untouched; null = "clear it"; a Date = this time. Three states, because clearing a
+  // schedule and never touching one must not look the same to the route.
+  const [when, setWhen] = useState<Date | null | undefined>(undefined);
+  const [whenTyped, setWhenTyped] = useState("");
+  const [channels, setChannels] = useState<string[] | null>(null);
+  const [consignor, setConsignor] = useState<number | null | undefined>(undefined);
 
   const q = useQuery({
     queryKey: ["store", "items"],
@@ -92,6 +111,21 @@ export default function PieceScreen() {
     enabled: !!storeSlug,
   });
   // The store's unit for measurements — inches for a US ship-from, cm elsewhere (as Review reads it).
+  const collections = useQuery({
+    queryKey: ["store", "collections"],
+    queryFn: () => apiGet<{ collections: { id: string; title: string }[] }>("/api/store/collections?all=1"),
+    enabled: !!storeSlug,
+  });
+  const consignors = useQuery({
+    queryKey: ["store", "consignors"],
+    queryFn: () => apiGet<{ consignors: { id: number; name: string }[] }>("/api/store/consignment/consignors"),
+    enabled: !!storeSlug,
+  });
+  const crossList = useQuery({
+    queryKey: ["store", "cross-listing"],
+    queryFn: () => apiGet<{ platforms: { key: string; name: string }[] }>("/api/store/cross-listing"),
+    enabled: !!storeSlug,
+  });
   const shipping = useQuery({
     queryKey: ["store", "shipping"],
     queryFn: () => apiGet<{ currency?: string; shipFrom?: { country?: string | null } | null }>("/api/store/shipping"),
@@ -125,13 +159,21 @@ export default function PieceScreen() {
         // Cost may be cleared: an empty box means "I don't know", which the route stores as null.
         else if (f.key === "cost") { const t = v.replace(/[^0-9.]/g, ""); const n = Number(t); body.cost = t === "" ? null : (Number.isFinite(n) && n >= 0 ? n : undefined); if (body.cost === undefined) delete body.cost; }
         else if (f.key === "flaws") body.flaws = flawsFromLine(v);
+        // Blank means "unknown" and the route stores null; a non-number is dropped rather than
+        // sent, so a stray character can't wipe a weight that was right.
+        else if (PARCEL_KEYS.includes(f.key)) { const t = v.replace(/[^0-9]/g, ""); if (t === "") body[f.key] = null; else { const n = Number(t); if (Number.isFinite(n) && n > 0) body[f.key] = n; } }
         else body[f.key] = v;
       }
       // The template's numbers as the list the route stores (empties omitted), only once touched.
       if (measureForm) body.measurements = measurementsFromForm(measureForm, unit);
+      if (photos) body.images = photos;
+      if (cols) body.collections = cols;
+      if (when !== undefined) body.publishAt = when === null ? null : when.toISOString();
+      if (channels) body.channels = channels;
+      if (consignor !== undefined) body.consignorId = consignor;
       return apiPatch(`/api/store/items/${id}`, body);
     },
-    onSuccess: () => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); refresh(); },
+    onSuccess: () => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); refresh(); },
     onError: (e) => fail(e, "Couldn't save that. Try again."),
   });
   const placeHold = useMutation({
@@ -168,6 +210,8 @@ export default function PieceScreen() {
     key === "price" ? String(item.priceCents / 100)
     : key === "cost" ? (item.costCents == null ? "" : String(item.costCents / 100))
     : key === "flaws" ? flawsToLine(Array.isArray(item.flaws) ? item.flaws.filter(Boolean) : [])
+    : PARCEL_KEYS.includes(key)
+      ? (() => { const n = (item as unknown as Record<string, unknown>)[key]; return n == null ? "" : String(n); })()
     : String((item as unknown as Record<string, unknown>)[key] ?? ""));
   const flaws = Array.isArray(item.flaws) ? item.flaws.filter(Boolean) : [];
   // Measurements: the category's template, the stored numbers as its strings until she edits them.
@@ -175,12 +219,53 @@ export default function PieceScreen() {
   const measureValues = measureForm ?? measurementsToForm(item.measurementsJson);
   const measurementsLine = formatMeasurements(measurementsFromForm(measureValues, unit));
   const storedMeasurementsLine = formatMeasurements(item.measurementsJson);
-  const dirty = Object.keys(form).length > 0 || measureForm !== null;
+  const dirty = Object.keys(form).length > 0 || measureForm !== null || photos !== null || cols !== null
+    || when !== undefined || channels !== null || consignor !== undefined;
+  // The three that can be set here but only ACT at publish.
+  const scheduledAt = when !== undefined ? when : (item.publishAt ? new Date(item.publishAt) : null);
+  const chosenChannels = channels ?? (Array.isArray(item.crossListChannels) ? item.crossListChannels : []);
+  const chosenConsignor = consignor !== undefined ? consignor : (item.consignorId ?? null);
+  const isDraft = item.status === "draft";
+  const chosen = cols ?? (Array.isArray(item.collections) ? item.collections : []);
+  const toggleCol = (t: string) => setCols(chosen.includes(t) ? chosen.filter((c) => c !== t) : [...chosen, t]);
+  const shots = photos ?? (Array.isArray(item.images) ? item.images : []);
+
+  /** Add from the library. Uploaded immediately — the route stores URLs, never bytes. */
+  async function addPhotos() {
+    const r = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: MAX_PHOTOS,
+      quality: 0.85,
+    });
+    if (r.canceled) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const a of r.assets) urls.push(await uploadPhoto(a.uri));
+      // One definition of the cap (listing-fields.ts), matching what the routes actually store.
+      setPhotos([...shots, ...urls].slice(0, MAX_PHOTOS));
+    } catch (e) {
+      fail(e, "Couldn't upload those photos.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   return (
     <SellerScreen title="Piece" back>
-      {item.images?.[0] ? (
-        <Image source={{ uri: item.images[0] }} style={{ width: "100%", height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
+      {/* EVERY photo, not just the first. A piece shot from eight angles on the web showed up here
+          as one picture, which reads as photos that failed to upload. Horizontal, so the cover
+          stays the size it was and the rest are a swipe away. */}
+      {shots.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.lg }} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
+          {shots.map((src, i) => (
+            <Image key={`${src}-${i}`} source={{ uri: src }} style={{ width: 300, height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
+          ))}
+        </ScrollView>
+      ) : shots[0] ? (
+        <Image source={{ uri: shots[0] }} style={{ width: "100%", height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
       ) : (
         <View style={{ width: "100%", height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
       )}
@@ -210,18 +295,54 @@ export default function PieceScreen() {
 
       {mode === "edit" ? (
         <View style={{ marginTop: spacing.lg }}>
+          {/* Photos first, because they are the listing. Tap one to make it the cover — the first
+              image is what every grid, the storefront and the shopper's search result show, and it
+              was previously only changeable on the web. ✕ removes. */}
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.md }}>
+            <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: spacing.sm }}>Photos</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
+              {shots.map((src, i) => (
+                <View key={`${src}-${i}`}>
+                  <Pressable onPress={() => setPhotos([src, ...shots.filter((_, j) => j !== i)])}>
+                    <Image source={{ uri: src }} style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: colors.chip }} />
+                  </Pressable>
+                  {i === 0 ? (
+                    <View style={{ position: "absolute", bottom: 4, left: 4, backgroundColor: colors.accent, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                      <Text style={{ fontSize: 9, letterSpacing: 0.8, fontWeight: "700", color: colors.accentText }}>COVER</Text>
+                    </View>
+                  ) : null}
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => setPhotos(shots.filter((_, j) => j !== i))}
+                    style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.text, alignItems: "center", justifyContent: "center" }}
+                  >
+                    <Text style={{ color: colors.accentText, fontSize: 12, fontWeight: "700" }}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+              <Pressable
+                onPress={() => void addPhotos()}
+                disabled={uploading}
+                style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}
+              >
+                <Text style={{ fontSize: 13, color: colors.text, fontWeight: "600" }}>{uploading ? "…" : "+ Add"}</Text>
+              </Pressable>
+            </ScrollView>
+            {shots.length > 1 ? (
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm }}>Tap a photo to make it the cover.</Text>
+            ) : null}
+          </View>
           {FIELDS.map((f) => (
-            <View key={f.key} style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
-              <Text style={{ width: 92, fontSize: 14, color: colors.textMuted }}>{f.label}</Text>
-              <TextInput
-                value={current(f.key)}
-                onChangeText={(v) => setForm({ ...form, [f.key]: v })}
-                keyboardType={f.numeric ? "decimal-pad" : "default"}
-                placeholder={f.placeholder}
-                placeholderTextColor={colors.textDim}
-                style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}
-              />
-            </View>
+            <InlineField
+              key={f.key}
+              label={f.label}
+              labelWidth={92}
+              value={current(f.key)}
+              onChangeText={(v) => setForm({ ...form, [f.key]: v })}
+              keyboardType={f.numeric ? "decimal-pad" : "default"}
+              multiline={f.multiline}
+              placeholder={f.placeholder}
+            />
           ))}
           {/* Measurements: the category's template, kept compact — one row, opening the fields (as Review). */}
           {measureKeys.length > 0 ? (
@@ -255,9 +376,142 @@ export default function PieceScreen() {
               ) : null}
             </View>
           ) : null}
+          {/* Collections — the same grouping the storefront and the web editor use. Titles, not ids:
+              the route creates one that doesn't exist yet, so "Add" is both pick and create. */}
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+            <Text style={{ fontSize: 14, color: colors.textMuted }}>Collections</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+              {Array.from(new Set([...(collections.data?.collections ?? []).map((c) => c.title), ...chosen])).map((t) => {
+                const on = chosen.includes(t);
+                return (
+                  <Pressable
+                    key={t}
+                    onPress={() => toggleCol(t)}
+                    style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{t}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm }}>
+              <TextInput
+                value={newCol}
+                onChangeText={setNewCol}
+                placeholder="New collection"
+                placeholderTextColor={colors.textDim}
+                autoCapitalize="words"
+                onSubmitEditing={() => { const t = newCol.trim(); if (t && !chosen.includes(t)) { setCols([...chosen, t]); setNewCol(""); } }}
+                style={{ flex: 1, fontSize: 15, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.xs }}
+              />
+              <Pressable
+                hitSlop={8}
+                disabled={!newCol.trim()}
+                onPress={() => { const t = newCol.trim(); if (t && !chosen.includes(t)) { setCols([...chosen, t]); setNewCol(""); } }}
+              >
+                <Text style={{ fontSize: 14, color: colors.accent, fontWeight: "600", opacity: newCol.trim() ? 1 : 0.4 }}>Add</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* WHEN IT GOES LIVE. Drafts only — the cron that flips a schedule looks at drafts, so
+              offering this on a live piece would be offering something that cannot happen. */}
+          {isDraft ? (
+            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+              <Text style={{ fontSize: 14, color: colors.textMuted }}>Goes live</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+                <Pressable
+                  onPress={() => { setWhen(null); setWhenTyped(""); }}
+                  style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: !scheduledAt ? colors.chipActive : colors.chip }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: !scheduledAt ? colors.chipActiveText : colors.text }}>When I say</Text>
+                </Pressable>
+                {schedulePresets().map((pr) => {
+                  const on = Boolean(scheduledAt && scheduledAt.getTime() === pr.at.getTime());
+                  return (
+                    <Pressable
+                      key={pr.key}
+                      onPress={() => { setWhen(pr.at); setWhenTyped(""); }}
+                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{pr.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <TextInput
+                value={whenTyped}
+                onChangeText={(v) => { setWhenTyped(v); const d = parseScheduleInput(v); if (d) setWhen(d); }}
+                placeholder="or 2026-09-15 18:00"
+                placeholderTextColor={colors.textDim}
+                keyboardType="numbers-and-punctuation"
+                style={{ fontSize: 15, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.xs, marginTop: spacing.sm }}
+              />
+              <Text style={{ fontSize: 12, color: scheduledAt ? colors.positive : colors.textDim, marginTop: spacing.xs }}>
+                {describeSchedule(scheduledAt) ?? "It stays a draft until you list it."}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* WHOSE PIECE IT IS. */}
+          {(consignors.data?.consignors ?? []).length > 0 ? (
+            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+              <Text style={{ fontSize: 14, color: colors.textMuted }}>Consignor</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+                <Pressable
+                  onPress={() => setConsignor(null)}
+                  style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: chosenConsignor == null ? colors.chipActive : colors.chip }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: chosenConsignor == null ? colors.chipActiveText : colors.text }}>Mine</Text>
+                </Pressable>
+                {(consignors.data?.consignors ?? []).map((c) => {
+                  const on = chosenConsignor === c.id;
+                  return (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => setConsignor(c.id)}
+                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{c.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
+                Their cut comes from the split on their record. A piece that has already sold keeps
+                the consignor it sold under.
+              </Text>
+            </View>
+          ) : null}
+
+          {/* CROSS-LISTING. Stored here, pushed when the piece publishes — never from the phone. */}
+          {(crossList.data?.platforms ?? []).length > 0 ? (
+            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+              <Text style={{ fontSize: 14, color: colors.textMuted }}>Also list on</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+                {(crossList.data?.platforms ?? []).map((pl) => {
+                  const on = chosenChannels.includes(pl.key);
+                  return (
+                    <Pressable
+                      key={pl.key}
+                      onPress={() => setChannels(on ? chosenChannels.filter((k) => k !== pl.key) : [...chosenChannels, pl.key])}
+                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{pl.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
+                Saved against the piece. The actual posting runs from the computer — connecting a
+                marketplace needs a sign-in the phone can&apos;t complete.
+              </Text>
+            </View>
+          ) : null}
+
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
             <Button label={save.isPending ? "Saving…" : "Save"} primary disabled={busy || !dirty} onPress={() => save.mutate()} />
-            <Button label="Cancel" disabled={busy} onPress={() => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setError(null); }} />
+            <Button label="Cancel" disabled={busy} onPress={() => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); setError(null); }} />
           </View>
         </View>
       ) : mode === "hold" ? (

@@ -5,16 +5,16 @@ import Link from "next/link";
 import { getActiveBrands } from "@/app/lib/getActiveBrands";
 
 export const metadata: Metadata = {
- title: "Shop by Brand — VYA",
+ title: "Shop by Brand | VYA",
  description: "Browse vintage and secondhand pieces by designer and brand, all from trusted independent stores.",
  openGraph: {
- title: "Shop by Brand — VYA",
+ title: "Shop by Brand | VYA",
  description: "Browse vintage and secondhand pieces by designer and brand, all from trusted independent stores.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: "Shop by Brand — VYA",
+ title: "Shop by Brand | VYA",
  description: "Browse vintage and secondhand pieces by designer and brand, all from trusted independent stores.",
  images: ["/og-image.png"],
  },

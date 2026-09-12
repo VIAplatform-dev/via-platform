@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
  if (!sf) return { title: "Storefront" };
  const name = storeDisplayName(sf, handle);
- const description = sf.tagline || (sf.about ? sf.about.slice(0, 160) : `Shop ${name} — vintage and one-of-a-kind pieces.`);
+ const description = sf.tagline || (sf.about ? sf.about.slice(0, 160) : `Shop ${name}, vintage and one-of-a-kind pieces.`);
  const image = sf.heroImage || undefined;
  // Index a LIVE storefront so it's findable on Google. If the store connected a custom
  // domain, that domain is canonical — noindex this /s/{handle} mirror and point canonical

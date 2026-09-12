@@ -157,7 +157,7 @@ function Player({ url, caption, ratio = "16 / 9" }: { url: string; caption?: str
   </div>
  );
 }
-const NoVideo = ({ kit }: { kit: EditKit }) => emptyHint(kit.ctx, "Video — paste a YouTube, Vimeo, or .mp4 link");
+const NoVideo = ({ kit }: { kit: EditKit }) => emptyHint(kit.ctx, "Video: paste a YouTube, Vimeo, or .mp4 link");
 
 function VideoFramed({ kit }: { kit: EditKit }) {
  const { p } = kit;

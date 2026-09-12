@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
- title: "For Stores — VYA",
+ title: "For Stores | VYA",
  description: "List your vintage or secondhand store on VYA and reach thousands of shoppers looking for exactly what you sell.",
  openGraph: {
- title: "For Stores — VYA",
+ title: "For Stores | VYA",
  description: "List your vintage or secondhand store on VYA and reach thousands of shoppers looking for exactly what you sell.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: "For Stores — VYA",
+ title: "For Stores | VYA",
  description: "List your vintage or secondhand store on VYA and reach thousands of shoppers looking for exactly what you sell.",
  images: ["/og-image.png"],
  },

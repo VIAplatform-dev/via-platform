@@ -81,7 +81,7 @@ export default function BigCartelSetupPage() {
  </h1>
  <p className="text-[#5D0F17]/60 text-base sm:text-lg">
  Follow these steps to connect your Big Cartel store to VYA.
- No coding knowledge needed — just copy, paste, and save.
+ No coding knowledge needed. Just copy, paste, and save.
  </p>
  </div>
  </section>
@@ -125,7 +125,7 @@ export default function BigCartelSetupPage() {
  </div>
  <div>
  <label className="block text-sm font-medium mb-2">
- Store ID <span className="text-[#5D0F17]/40 font-normal">(lowercase, dashes instead of spaces — this will be your VYA URL)</span>
+ Store ID <span className="text-[#5D0F17]/40 font-normal">(lowercase, dashes instead of spaces; this will be your VYA URL)</span>
  </label>
  <input
  type="text"
@@ -157,7 +157,7 @@ export default function BigCartelSetupPage() {
  {!isFilled && (
  <div className="bg-amber-50 border border-amber-200 p-4 mb-6">
  <p className="text-sm text-amber-800">
- Fill in your store info in Step 1 first — the code will include your store details automatically.
+ Fill in your store info in Step 1 first, the code will include your store details automatically.
  </p>
  </div>
  )}
@@ -224,7 +224,7 @@ export default function BigCartelSetupPage() {
  <h2 className="text-xl sm:text-2xl font-serif mb-6">Questions</h2>
  <div className="space-y-6">
  <div>
- <h3 className="font-medium mb-2">I can&apos;t find Shop Designer or the Code tab — what plan do I need?</h3>
+ <h3 className="font-medium mb-2">I can&apos;t find Shop Designer or the Code tab, what plan do I need?</h3>
  <p className="text-[#5D0F17]/60 text-sm">
  The Integration Code section is available on Big Cartel&apos;s paid plans (Platinum and Diamond).
  If you&apos;re on the free plan or don&apos;t see the Code tab, email us and we&apos;ll help you out.
@@ -239,7 +239,7 @@ export default function BigCartelSetupPage() {
  <div>
  <h3 className="font-medium mb-2">Does this track all my customers?</h3>
  <p className="text-[#5D0F17]/60 text-sm">
- No — only customers who came from VYA. We never collect customer names, emails, or personal info.
+ No, only customers who came from VYA. We never collect customer names, emails, or personal info.
  </p>
  </div>
  <div>

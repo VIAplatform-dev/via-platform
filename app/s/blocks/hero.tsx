@@ -71,7 +71,7 @@ function HeroSlides({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { head, shopHref } = ctx;
  const slides = kit.items(ITEM_SCHEMAS.slides);
- if (!slides.length) return emptyHint(ctx, "Slideshow — add your first slide");
+ if (!slides.length) return emptyHint(ctx, "Slideshow: add your first slide");
  const set = (i: number, key: string, val: string) => kit.setItems(ITEM_SCHEMAS.slides, slides.map((s, j) => (j === i ? { ...s, [key]: val } : s)));
  return (
   <div className="vya-fill vya-slides relative w-full overflow-hidden" style={{ minHeight: "84vh" }}>
@@ -169,7 +169,7 @@ function HeroStack({ kit }: { kit: EditKit }) {
     {p.cta && <FreeField b={b} ctx={ctx} fieldKey="cta" tag="a" value={p.cta} href={p.ctaHref || shopHref} className="vya-cta mt-8 inline-block px-10 py-3.5 text-[11px] uppercase tracking-[0.24em] transition hover:opacity-85" style={{ background: colors.accent, color: "#fff" }} />}
    </div>
    {/* No photo, no box. A 46vh tinted rectangle with nothing in it doesn't read as "a picture goes
-       here" — it reads as a rendering fault, which is exactly how it looked on Heirloom. The editor
+       here", it reads as a rendering fault, which is exactly how it looked on Heirloom. The editor
        still shows the empty slot, because that is where a seller clicks to add one. */}
    {(p.image || ctx.edit) && (
     <PhotoFrame kit={kit} className="relative w-full flex-1 overflow-hidden" style={{ minHeight: "46vh", background: `${fg}0d` }}>

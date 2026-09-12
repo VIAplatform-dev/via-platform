@@ -97,7 +97,7 @@ export default function CollectionsTab({ userId: _userId }: { userId: string }) 
  </div>
  <p className="font-serif text-lg mb-1">No collections yet</p>
  <p className="text-sm text-[#5D0F17]/50 mb-6">
- Create boards to organize your saves — for every occasion.
+ Create boards to organize your saves, for every occasion.
  </p>
  <button
  onClick={() => setShowInput(true)}

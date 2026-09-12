@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ category:
  const display = displayCategories.find((d) => d.slug === category);
  const label = display?.label ?? categoryMap[category as CategorySlug] ?? category;
  const capitalised = label.charAt(0).toUpperCase() + label.slice(1);
- const title = `Vintage ${capitalised} — VYA`;
+ const title = `Vintage ${capitalised} | VYA`;
  const description = `Shop secondhand and vintage ${label.toLowerCase()} from the world's best independent stores on VYA.`;
  const ogImage = display?.image ? display.image : "/og-image.png";
  return {

@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // If buyable > 0 but the nav still hides it → caching, not data.
 export async function GET(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const slug = new URL(request.url).searchParams.get("slug") || "office-edit";
+ const slug = new URL(request.url).searchParams.get("slug") || "for-fall";
  const sql = neon(process.env.DATABASE_URL || process.env.POSTGRES_URL || "");
  try {
  const picks = (await sql`SELECT COUNT(*)::int AS n FROM editors_picks WHERE collection_slug = ${slug}`) as { n: number }[];

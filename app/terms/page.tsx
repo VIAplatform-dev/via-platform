@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
- title: "Terms of Service — VYA",
+ title: "Terms of Service | VYA",
  description: "VYA Platform Corporation's terms of service governing your use of the VYA platform.",
  openGraph: {
- title: "Terms of Service — VYA",
+ title: "Terms of Service | VYA",
  description: "VYA Platform Corporation's terms of service governing your use of the VYA platform.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
@@ -176,7 +176,7 @@ export default function TermsPage() {
  information you provide is correct, current, and complete.
  </p>
  <p className="text-xs uppercase tracking-[0.15em] text-[#5D0F17]/50 mb-3">
- Representations and Warranties — Sourcing Program
+ Representations and Warranties: Sourcing Program
  </p>
  <p className="text-xs leading-relaxed text-[#5D0F17]/60">
  YOU HEREBY ACKNOWLEDGE THAT YOU ARE USING THE SOURCING PROGRAM AT YOUR OWN RISK. THE

@@ -106,7 +106,7 @@ function Split({ kit }: { kit: EditKit }) {
  return (
   <section className={`vya-free-canvas vya-arrange-box relative mx-auto grid max-w-5xl gap-10 px-6 py-10 @lg:py-16 @xl:items-start @xl:gap-16 @xl:py-24 ${kit.p.splitRatio ? "@xl:grid-cols-[var(--vya-split)]" : "@xl:grid-cols-2"}`} style={kit.p.splitRatio ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}>
    {/* This layout has advertised a draggable split since it shipped and never read the prop, so the
-       control moved a number that changed nothing. Wide layout only — the columns stack below @lg. */}
+       control moved a number that changed nothing. Wide layout only, the columns stack below @lg. */}
    <span className="hidden @xl:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>
    <div>
     <Heading kit={kit} className="text-2xl leading-tight @xl:text-3xl" />

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { flattenHits, hitTarget, searchPlaceholder } from "./search.ts";
+import { isPiece, flattenHits, hitTarget, searchPlaceholder } from "./search.ts";
 
 // The web's /api/store/search answers { groups: [{ group, hits: [{ id, label, sub, href }] }] } with
 // the status already written into `sub` ("SKU-1042 · $180 · active"). The phone shows the same rows
@@ -28,4 +28,13 @@ test("a tap lands on the phone screen for that kind of thing", () => {
 
 test("the placeholder says what she can type", () => {
   assert.equal(searchPlaceholder(), "Search a piece, order, SKU or customer");
+});
+
+test("a piece is recognised whatever case the route sends", () => {
+  // The route says "Inventory"; this side thinks in lowercase keys. A strict compare fails silently
+  // — every row keeps its text label and the photos simply never appear.
+  assert.equal(isPiece("Inventory"), true);
+  assert.equal(isPiece("inventory"), true);
+  assert.equal(isPiece("Orders"), false);
+  assert.equal(isPiece(undefined), false);
 });

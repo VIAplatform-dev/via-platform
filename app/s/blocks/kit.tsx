@@ -766,7 +766,7 @@ export function ArrangeHandle({ kit, prop, title, at = "right", style }: {
    style={style}
   >
    {/* A wide invisible hit box with a slim visible pill inside it, so a slightly-off grab still
-       lands — the same shape the section's own height handles use. */}
+       lands, the same shape the section's own height handles use. */}
    <span className={`pointer-events-none absolute inset-0 m-auto rounded-full border border-white bg-[#5D0F17] shadow ${at === "right" ? "h-10 w-2" : "h-full w-1"}`} />
   </span>
  );

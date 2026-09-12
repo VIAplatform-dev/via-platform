@@ -15,8 +15,13 @@ export default function OnboardingPage() {
  const [result, setResult] = useState<Result | null>(null);
  // The one-time fork: do they already have a site to bring over, or build from scratch?
  const [path, setPath] = useState<null | "import" | "build">(null);
+ // True only for VYA's own people who already have a store: this run makes an ADDITIONAL one, and
+ // the screen has to say so before they fill anything in.
+ const [again, setAgain] = useState(false);
 
- // Already set up? Skip straight to the dashboard.
+ // Already set up? Skip straight to the dashboard — unless you are one of VYA's own people, who
+ // are allowed to walk this flow again to test or demo it. Bouncing them out was the whole reason
+ // it could only ever be seen once per email address.
  useEffect(() => {
  (async () => {
  try {
@@ -24,7 +29,8 @@ export default function OnboardingPage() {
  if (r.ok) {
  const d = await r.json();
  setStoreName(d.storeName || "");
- if (d.onboarded) {
+ if (d.canRepeatOnboarding) setAgain(Boolean(d.onboarded));
+ if (d.onboarded && !d.canRepeatOnboarding) {
  router.replace("/store/dashboard");
  return;
  }
@@ -78,6 +84,12 @@ export default function OnboardingPage() {
  Welcome{storeName ? `, ${storeName}` : ""}
  </p>
  <h1 className="font-serif text-3xl sm:text-4xl mb-3">Let’s set up your store.</h1>
+ {again && (
+ <p className="mb-6 border border-[#5D0F17]/15 bg-white px-3.5 py-3 text-sm text-[#5D0F17]/70">
+  <span className="font-medium text-[#5D0F17]">Test run.</span> Your store is already set up — you
+  are seeing this because you are VYA. Anyone else lands on the dashboard from here.
+ </p>
+ )}
  <p className="text-sm text-[#5D0F17]/55 mb-8">
  {path === "import"
   ? "Paste your existing site and VYA hosts it — every page, exactly as it looks — then switches the backend to VYA commerce. One step, then you’re live."

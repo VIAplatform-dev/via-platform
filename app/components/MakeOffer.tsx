@@ -47,7 +47,7 @@ export default function MakeOffer({ storeSlug, itemId, itemTitle, listPriceCents
  }
 
  if (token) {
- return <p className="mt-1.5 text-[11px] opacity-60">Offer sent — <a href={`/offer/${token}`} className="underline hover:opacity-100">track it →</a></p>;
+ return <p className="mt-1.5 text-[11px] opacity-60">Offer sent. <a href={`/offer/${token}`} className="underline hover:opacity-100">track it →</a></p>;
  }
  if (!open) {
  return <button onClick={() => setOpen(true)} className="mt-1.5 text-[11px] underline opacity-50 hover:opacity-100">Make an offer</button>;

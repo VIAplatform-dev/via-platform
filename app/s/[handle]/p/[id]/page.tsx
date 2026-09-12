@@ -73,7 +73,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
  // sentence built from the real attributes — never stuffed, just descriptive.
  const desc = item.description
   ? clean(item.description)
-  : clean(`${[item.brand, item.era, item.title].filter(Boolean).join(" ")}${item.size ? `, size ${item.size}` : ""}${item.condition ? ` — ${item.condition}` : ""}. ${price} at ${storeName}. One-of-one vintage, secure checkout.`);
+  : clean(`${[item.brand, item.era, item.title].filter(Boolean).join(" ")}${item.size ? `, size ${item.size}` : ""}${item.condition ? `, ${item.condition}` : ""}. ${price} at ${storeName}. One-of-one vintage, secure checkout.`);
  const title = `${item.title} | ${storeName}`;
  const url = `${STOREFRONT_BASE}/s/${handle}/p/${id}`;
  const image = (item.images || []).filter(Boolean)[0];
@@ -360,7 +360,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
         ? "vya-cta mt-3 block w-full border border-current/25 py-4 text-center text-[11px] uppercase tracking-[0.2em] transition hover:opacity-70"
         : "vya-cta block w-full py-4 text-center text-[11px] uppercase tracking-[0.2em] text-white transition hover:opacity-90"}
        style={rentable ? undefined : { background: c.accent }}
-      >Buy {rentable ? "outright" : "now"} — {price}</a>
+      >Buy {rentable ? "outright" : "now"}, {price}</a>
      )}
     </>
    )}
@@ -417,7 +417,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  {fams && <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?${fams}&display=swap`} />}
 
  {/* The store's corner style and skin. This page renders its own markup rather than blocks, so it
-     never got the stylesheet the block canvas emits — meaning `vya-round` / `vya-cta` / `vya-field`
+     never got the stylesheet the block canvas emits, meaning `vya-round` / `vya-cta` / `vya-field`
      were sitting on the rent box, the gallery frames and the ask/offer buttons doing nothing, and a
      store set to round corners had square ones on every product it sells. */}
  <style dangerouslySetInnerHTML={{ __html: storefrontCss(theme.radius, theme.skin) + buttonCss(pageCopy.buttons, c.accent) }} />

@@ -25,7 +25,7 @@ const href = (kit: EditKit, a: Item) => (kit.ctx.edit ? undefined : a.link || "#
 function BlogRow({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { posts, set } = usePosts(kit);
- if (!posts.length) return emptyHint(ctx, "Blog — add posts");
+ if (!posts.length) return emptyHint(ctx, "Blog: add posts");
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-10 text-center text-3xl @xl:text-[2.4rem] leading-tight" />
@@ -48,7 +48,7 @@ function BlogRow({ kit }: { kit: EditKit }) {
 function BlogFeature({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { posts, set } = usePosts(kit);
- if (!posts.length) return emptyHint(ctx, "Blog — add posts");
+ if (!posts.length) return emptyHint(ctx, "Blog: add posts");
  const [lead, ...rest] = posts;
  return (
   <section className="vya-free-canvas relative mx-auto max-w-6xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
@@ -77,7 +77,7 @@ function BlogFeature({ kit }: { kit: EditKit }) {
 function BlogList({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { posts, set } = usePosts(kit);
- if (!posts.length) return emptyHint(ctx, "Blog — add posts");
+ if (!posts.length) return emptyHint(ctx, "Blog: add posts");
  return (
   <section className="vya-free-canvas relative mx-auto max-w-4xl px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24">
    <Heading kit={kit} className="mb-8 text-3xl @xl:text-[2.4rem] leading-tight" />
@@ -115,7 +115,7 @@ function SpotlightHalf({ kit }: { kit: EditKit }) {
  return (
   <section className={`vya-arrange-box relative mx-auto grid max-w-6xl items-center gap-8 px-5 @xl:px-8 py-10 @lg:py-16 @xl:py-24 @lg:gap-14 ${kit.p.splitRatio ? "@lg:grid-cols-[var(--vya-split)]" : "@lg:grid-cols-2"}`} style={kit.p.splitRatio ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}>
    {/* This layout has advertised a draggable split since it shipped and never read the prop, so the
-       control moved a number that changed nothing. Wide layout only — the columns stack below @lg. */}
+       control moved a number that changed nothing. Wide layout only, the columns stack below @lg. */}
    <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>
    <ImageSlot kit={kit} src={kit.p.image} onPick={pickImage(kit)} pos={kit.p.imagePos} onPos={(v) => kit.ctx.onEditField?.(kit.b.id, "imagePos", v)} zoom={kit.p.imageZoom} ratio="aspect-square" rounded="vya-img" />
    <div className="vya-free-canvas relative"><SpotlightBody kit={kit} /></div>

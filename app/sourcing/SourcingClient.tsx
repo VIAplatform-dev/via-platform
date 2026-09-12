@@ -239,7 +239,7 @@ export default function SourcingClient() {
  >
  ← Back
  </button>
- <h1 className="font-serif text-xl">Pay Sourcing Fee — $20</h1>
+ <h1 className="font-serif text-xl">Pay Sourcing Fee ($20)</h1>
  </div>
  <p className="text-sm text-[#5D0F17]/60 mb-8 leading-relaxed">
  Your $20 fee is refundable if we can&apos;t find a match within 21 business days.
@@ -258,12 +258,12 @@ export default function SourcingClient() {
  <h1 className="font-serif text-2xl sm:text-3xl mb-2">Sourcing Request</h1>
  <p className="text-sm text-[#5D0F17]/60 mb-6 leading-relaxed">
  Can&apos;t find what you&apos;re looking for? Tell us what you want and we&apos;ll source it from our network of stores.
- A <strong>$20 sourcing request</strong> applies — fully refunded if we can&apos;t find a match in 21 business days.
+ A <strong>$20 sourcing request</strong> applies, fully refunded if we can&apos;t find a match in 21 business days.
  </p>
  <div className="border border-[#5D0F17]/15 bg-[#D8CABD]/15 px-5 py-4 mb-10">
  <p className="text-xs uppercase tracking-[0.15em] text-[#5D0F17]/50 mb-1">How it works</p>
  <p className="text-sm text-[#5D0F17]/70 leading-relaxed">
- Stores in our network will review your request and submit offers — each with their own <strong>sourcing fee</strong>,
+ Stores in our network will review your request and submit offers, each with their own <strong>sourcing fee</strong>,
  timeline, and notes. You choose which offer to accept. The store&apos;s sourcing fee is separate from
  your $20 VYA fee and is only paid when you agree to proceed.
  </p>
@@ -298,7 +298,7 @@ export default function SourcingClient() {
  className="w-full aspect-[4/3] border-2 border-dashed border-[#5D0F17]/20 flex flex-col items-center justify-center cursor-pointer hover:border-[#5D0F17]/40 transition"
  >
  <p className="text-sm text-[#5D0F17]/40">Drop image here or click to upload</p>
- <p className="text-xs text-[#5D0F17]/25 mt-1">JPG, PNG, WEBP — max 10MB</p>
+ <p className="text-xs text-[#5D0F17]/25 mt-1">JPG, PNG, WEBP, max 10MB</p>
  <input
  ref={fileInputRef}
  type="file"
@@ -545,8 +545,8 @@ export default function SourcingClient() {
  : submitting
  ? "Setting up checkout…"
  : session
- ? "Continue to Payment — $20"
- : "Continue — Sign In to Submit"}
+ ? "Continue to Payment ($20)"
+ : "Continue: Sign In to Submit"}
  </button>
  </div>
  </form>

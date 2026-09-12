@@ -41,7 +41,7 @@ export default function ContactForm({ accent, storeSlug, topic, cta = "Send", co
   setBusy(false);
  }
 
- if (done) return <p className="mt-8 text-sm opacity-70">Thanks — your message has been sent. We’ll be in touch.</p>;
+ if (done) return <p className="mt-8 text-sm opacity-70">Thanks, your message has been sent. We’ll be in touch.</p>;
 
  // `currentColor` rather than black-on-white: the form inherits the storefront's ink and ground, so
  // it belongs to the page instead of looking pasted onto it. `vya-field` picks up the template's

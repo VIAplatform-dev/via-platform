@@ -24,7 +24,7 @@ export default function Countdown({ target, accent, headingFontFamily, paused }:
  s: Math.floor(diff / 1_000) % 60,
  };
 
- if (live) return <p className="text-2xl @xl:text-3xl" style={{ color: accent, fontFamily: headingFontFamily }}>The drop is live — shop now →</p>;
+ if (live) return <p className="text-2xl @xl:text-3xl" style={{ color: accent, fontFamily: headingFontFamily }}>The drop is live. Shop now →</p>;
 
  const cell = (v: number | null, label: string) => (
  <div className="flex flex-col items-center">

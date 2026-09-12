@@ -379,7 +379,7 @@ function StoreDashboard() {
  <section className="py-12 sm:py-16">
  <div className="max-w-5xl mx-auto px-6">
  <h2 className="text-xl sm:text-2xl font-serif mb-2">Top Searches on VYA</h2>
- <p className="text-sm text-neutral-500 mb-8">What shoppers across VYA are searching for right now — use this to source what&apos;s in demand.</p>
+ <p className="text-sm text-neutral-500 mb-8">What shoppers across VYA are searching for right now, use this to source what&apos;s in demand.</p>
  {data.topSearches.length === 0 ? (
  <div className="border border-dashed border-neutral-300 p-8 text-center">
  <p className="text-neutral-500">No search data yet for this period.</p>

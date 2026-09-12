@@ -3,6 +3,7 @@ import { isAdminRequest, resolveStoreSlug } from "@/app/lib/storeAuth";
 import { auth } from "@/app/lib/auth";
 import { getStoreAccountByOwner } from "@/app/lib/store-accounts-db";
 import { addStoreUser } from "@/app/lib/store-users-db";
+import { isAdminEmail } from "@/app/lib/admin-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -28,14 +29,21 @@ export async function GET(request: NextRequest) {
  }
 
  // Owner / break-glass admin: full workspace as the synthetic via-admin store.
- if (isAdminRequest(request)) return NextResponse.json({ admin: true, slug: "via-admin" });
+ if (isAdminRequest(request)) return NextResponse.json({ admin: true, slug: "via-admin", staff: true });
 
  const session = await auth();
  if (!session?.user?.email) return NextResponse.json({ admin: false }, { status: 401 });
 
+ // `staff` is a WEAKER claim than `admin`, and separate on purpose. `admin` means this request
+ // carries the admin cookie and may drive the owner workspace. `staff` only means the signed-in
+ // address belongs to one of VYA's own people (admin-emails.ts), which is enough to be allowed to
+ // walk the seller signup flow a second time and nothing else. Gianna testing the flow while
+ // signed in as a seller is staff, not admin.
+ const staff = isAdminEmail(session.user.email);
+
  // Signed-in partner: resolve their store (session email → store_users / static map).
  const slug = await resolveStoreSlug(request);
- if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug });
+ if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug, staff });
 
  // SECOND PLACE TO LOOK, before declaring she has no shop.
  //
@@ -52,9 +60,13 @@ export async function GET(request: NextRequest) {
  const account = await getStoreAccountByOwner(session.user.email).catch(() => null);
  if (account?.slug) {
   await addStoreUser(account.slug, session.user.email, "owner").catch(() => {}); /* allow-swallow: reporting the store matters more than repairing the row */
-  return NextResponse.json({ admin: false, slug: account.slug, repaired: true });
+  // `staff` belongs on THIS answer too. Leaving it off was a real bug: a VYA person whose access
+  // row had gone missing came back through the repair path with staff undefined, so the onboarding
+  // gate read her as an ordinary seller with a shop and bounced her to Home — the exact symptom
+  // reported. Every path that can describe a signed-in person has to describe them the same way.
+  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff });
  }
 
  // Authenticated but genuinely attached to nothing → the signup wizard.
- return NextResponse.json({ admin: false, needsOnboarding: true, email: session.user.email });
+ return NextResponse.json({ admin: false, needsOnboarding: true, email: session.user.email, staff });
 }

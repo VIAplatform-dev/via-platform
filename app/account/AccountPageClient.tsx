@@ -114,7 +114,7 @@ export default function AccountPageClient({
  <div className="mb-6 px-5 py-4 border border-[#5D0F17]/20 bg-[#5D0F17]/[0.03] flex items-center justify-between gap-4 flex-wrap">
  <div>
  <p className="text-xs uppercase tracking-widest text-[#5D0F17]/50 mb-0.5">✦ VYA Insider</p>
- <p className="text-sm text-[#5D0F17]/70">You're on our bimonthly newsletter — inside scoops, styling tips, and trend breakdowns, just for you.</p>
+ <p className="text-sm text-[#5D0F17]/70">You're on our bimonthly newsletter, inside scoops, styling tips, and trend breakdowns, just for you.</p>
  </div>
  </div>
  ) : (
@@ -123,7 +123,7 @@ export default function AccountPageClient({
  <p className="text-xs uppercase tracking-widest text-[#5D0F17]/40 mb-1">✦ Become a VYA Insider</p>
  <p className="text-sm text-[#5D0F17]/70 leading-relaxed">
  {referralCount === 0
- ? "Invite 2 friends and unlock our bimonthly newsletter — inside scoops, styling tips, and trend breakdowns."
+ ? "Invite 2 friends and unlock our bimonthly newsletter, inside scoops, styling tips, and trend breakdowns."
  : "Invite 1 more friend to unlock Insider access and our bimonthly newsletter."}
  </p>
  <div className="flex items-center gap-2 mt-3">

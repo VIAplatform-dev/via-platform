@@ -39,6 +39,21 @@ export function SellerScreen({
       refreshControl={
         onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.textDim} /> : undefined
       }
+      // THE ONE LINE THAT MADE EVERY FORM IN HERE FEEL BROKEN.
+      //
+      // A ScrollView defaults to keyboardShouldPersistTaps="never", which means that while the
+      // keyboard is up the FIRST tap anywhere is spent dismissing it and never reaches the child.
+      // So on every screen in this frame — the piece editor, returns, shipping, consignors, the lot
+      // — moving from one field to the next took two taps, and so did Save, which sits under the
+      // keyboard. It reads exactly like a screen that has stopped responding, which is what was
+      // reported: "I can't edit these fields."
+      //
+      // "handled" keeps the dismiss-on-background-tap behaviour and lets a tap that a child WILL
+      // handle through on the first try. The new-listing screens set this from the start; the frame
+      // every other seller screen is built in never did.
+      keyboardShouldPersistTaps="handled"
+      // The keyboard no longer sits on top of the field being typed into.
+      automaticallyAdjustKeyboardInsets
     >
       {back ? (
         <View style={{ flexDirection: "row", alignItems: "center", marginBottom: spacing.lg }}>

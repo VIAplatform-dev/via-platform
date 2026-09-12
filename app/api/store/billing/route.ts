@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { stripeGet, stripeConfigured } from "@/app/lib/stripe";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorePlan } from "@/app/lib/store-plans-db";
 import {
@@ -55,16 +56,29 @@ export async function GET(request: NextRequest) {
  }),
  );
 
+ // Whether she has already asked to cancel. This lives on the Stripe subscription, not in our
+ // table, because it is a fact about the schedule rather than about entitlement — she keeps the
+ // tier until the period ends either way. Best-effort: a Stripe hiccup must not blank the screen,
+ // it just means the "cancels on…" line is absent for one load.
+ let cancelAtPeriodEnd = false;
+ if (plan.stripeSubscriptionId && stripeConfigured()) {
+ const sub = await stripeGet(`subscriptions/${plan.stripeSubscriptionId}`).catch(() => null);
+ cancelAtPeriodEnd = Boolean(sub?.cancel_at_period_end);
+ }
+
  return NextResponse.json({
  configured: plansConfigured(),
  trialDays: TRIAL_DAYS,
  annualDiscountPct: ANNUAL_DISCOUNT_PCT,
+ // The phone mounts Stripe's native payment sheet, which needs this before any card is entered.
+ publishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim() || null,
  current: {
   tier: plan.tier,
   interval: plan.interval,
   status: plan.status,
   plan: plan.plan,
   currentPeriodEnd: plan.currentPeriodEnd,
+  cancelAtPeriodEnd,
  },
  tiers,
  });

@@ -42,7 +42,7 @@ export default function ShopifySetupPage() {
  <h2 className="text-xl sm:text-2xl font-serif mb-4">What is Shopify Collabs?</h2>
  <p className="text-[#5D0F17]/60 mb-4">
  Shopify Collabs is Shopify&apos;s built-in affiliate and creator management tool.
- It handles all affiliate tracking, commission calculation, and payouts automatically—no
+ It handles all affiliate tracking, commission calculation, and payouts automatically, with no
  custom code or pixels required.
  </p>
  <div className="bg-green-50 border border-green-200 p-4 text-sm">
@@ -98,28 +98,28 @@ export default function ShopifySetupPage() {
  <h3 className="text-lg font-medium">Create Your Tiered Commission Collections</h3>
  </div>
  <div className="text-[#5D0F17]/60 space-y-4">
- <p>VYA uses tiered commission rates based on product price. You&apos;ll create three <strong>Smart collections</strong> in Shopify — one per price tier — using price conditions to automatically include the right products, then assign each collection its rate in Collabs.</p>
+ <p>VYA uses tiered commission rates based on product price. You&apos;ll create three <strong>Smart collections</strong> in Shopify, one per price tier, using price conditions to automatically include the right products, then assign each collection its rate in Collabs.</p>
 
  <div className="bg-[#5D0F17]/5 border border-[#5D0F17]/10 p-4 text-sm">
  <p className="font-medium text-[#5D0F17] mb-3">Commission rate tiers:</p>
  <div className="space-y-0">
  <div className="flex justify-between items-center py-2">
- <span><strong>TIER 1</strong> — products under $1,000</span>
+ <span><strong>TIER 1</strong>: products under $1,000</span>
  <span className="font-medium bg-[#5D0F17] text-[#FFFDF8] px-3 py-1">7%</span>
  </div>
  <div className="flex justify-between items-center py-2">
- <span><strong>TIER 2</strong> — products $1,000–$5,000</span>
+ <span><strong>TIER 2</strong>: products $1,000–$5,000</span>
  <span className="font-medium bg-[#5D0F17]/50 text-white px-3 py-1">5%</span>
  </div>
  <div className="flex justify-between items-center py-2">
- <span><strong>TIER 3</strong> — products above $5,000</span>
+ <span><strong>TIER 3</strong>: products above $5,000</span>
  <span className="font-medium bg-[#5D0F17]/40 text-[#FFFDF8] px-3 py-1">3%</span>
  </div>
  </div>
  </div>
 
  <div>
- <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 2a — Create the three Smart collections:</p>
+ <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 2a: Create the three Smart collections:</p>
  <ol className="list-decimal list-inside space-y-2 text-sm">
  <li>In your Shopify Admin, go to <strong>Products → Collections</strong></li>
  <li>Click <strong>Create collection</strong></li>
@@ -132,7 +132,7 @@ export default function ShopifySetupPage() {
  </div>
 
  <div>
- <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 2b — Set commission rates per collection in Collabs:</p>
+ <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 2b: Set commission rates per collection in Collabs:</p>
  <ol className="list-decimal list-inside space-y-2 text-sm">
  <li>Open <strong>Shopify Collabs</strong> from your Apps</li>
  <li>Click <strong>Programs</strong> in the left sidebar, then open your program (or click <strong>Create program</strong>)</li>
@@ -180,19 +180,19 @@ export default function ShopifySetupPage() {
  <div className="text-[#5D0F17]/60 space-y-4">
  <p>
  A webhook lets VYA receive your order data automatically the moment a payment
- is confirmed — so we always have the right order total, items, and customer
+ is confirmed, so we always have the right order total, items, and customer
  info without any manual work.
  </p>
 
  <div>
- <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 4a — Create the webhook:</p>
+ <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 4a: Create the webhook:</p>
  <ol className="list-decimal list-inside space-y-2 text-sm">
  <li>In your Shopify Admin, click <strong>Settings</strong> (bottom-left)</li>
  <li>Click <strong>Notifications</strong></li>
  <li>Scroll to the bottom and click <strong>Create webhook</strong></li>
  <li>Set <strong>Event</strong> to <strong>Order payment</strong></li>
  <li>Set <strong>Format</strong> to <strong>JSON</strong></li>
- <li>Paste the webhook URL into the <strong>URL</strong> field — enter your store name below to generate it:</li>
+ <li>Paste the webhook URL into the <strong>URL</strong> field, enter your store name below to generate it:</li>
  </ol>
  <div className="mt-3">
  <WebhookUrlInput />
@@ -201,9 +201,9 @@ export default function ShopifySetupPage() {
  </div>
 
  <div>
- <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 4b — Send us your signing secret:</p>
+ <p className="text-sm font-medium text-[#5D0F17] mb-2">Step 4b: Send us your signing secret:</p>
  <p className="text-sm">
- After saving, Shopify displays a <strong>signing secret</strong> — a long string of letters and numbers on the webhooks page.
+ After saving, Shopify displays a <strong>signing secret</strong>, a long string of letters and numbers on the webhooks page.
  Copy it and email it to{" "}
  <a href="mailto:partnerships@vyaplatform.com" className="text-[#5D0F17] underline">
  partnerships@vyaplatform.com
@@ -212,7 +212,7 @@ export default function ShopifySetupPage() {
  </p>
  <div className="bg-amber-50 border border-amber-200 p-3 text-sm mt-3">
  <p className="text-amber-800">
- <strong>Keep this secret private.</strong> Don&apos;t share it publicly — treat it like a password. Only send it directly to VYA.
+ <strong>Keep this secret private.</strong> Don&apos;t share it publicly, treat it like a password. Only send it directly to VYA.
  </p>
  </div>
  </div>
@@ -241,7 +241,7 @@ export default function ShopifySetupPage() {
  <p className="text-sm">
  When a customer clicks a product on VYA, they&apos;re routed through that
  product&apos;s link. Shopify Collabs registers the visit and sets a tracking
- cookie automatically — no theme changes or app embeds needed on your store.
+ cookie automatically, no theme changes or app embeds needed on your store.
  </p>
  </div>
  </div>
@@ -328,7 +328,7 @@ export default function ShopifySetupPage() {
  <div>
  <h3 className="font-medium mb-2">Where do I find my signing secret after I save the webhook?</h3>
  <p className="text-[#5D0F17]/60 text-sm">
- Go to <strong>Settings → Notifications → Webhooks</strong> in your Shopify Admin. Your signing secret is shown at the top of the webhooks page, above the list of webhooks. It stays the same for all webhooks on your store — you only need to send it to us once.
+ Go to <strong>Settings → Notifications → Webhooks</strong> in your Shopify Admin. Your signing secret is shown at the top of the webhooks page, above the list of webhooks. It stays the same for all webhooks on your store, you only need to send it to us once.
  </p>
  </div>
  <div>
@@ -342,7 +342,7 @@ export default function ShopifySetupPage() {
  </p>
  </div>
  <div>
- <h3 className="font-medium mb-2">Shopify Collabs says &quot;no collections&quot; when I try to set rates — why?</h3>
+ <h3 className="font-medium mb-2">Shopify Collabs says &quot;no collections&quot; when I try to set rates, why?</h3>
  <p className="text-[#5D0F17]/60 text-sm mb-2">
  Make sure your Smart collections are set to <strong>Active</strong> (not Draft) and have at least one product matching the price condition. Collections that are empty or in Draft won&apos;t appear in Collabs.
  </p>

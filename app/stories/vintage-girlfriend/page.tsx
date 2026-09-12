@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "Vintage Girlfriend — The Story Behind the Selection | VYA",
+ title: "Vintage Girlfriend: The Story Behind the Selection | VYA",
  description:
  "Why we chose Vintage Girlfriend Luxury for VYA. Anna's mission to make preowned luxury accessible without compromise.",
 };
@@ -66,7 +66,7 @@ export default function VintageGirlfriendStory() {
  <p className="font-serif text-[#5D0F17] text-xl">
  At vya, our mission is to make it easier to discover the best independent vintage
  boutiques and designer resale stores in one place. Vintage Girlfriend is exactly
- why vya exists — a founder who genuinely believes in what she sells, and holds
+ why vya exists, a founder who genuinely believes in what she sells, and holds
  herself to a standard that makes shopping secondhand feel safe.
  </p>
  </div>

@@ -31,7 +31,7 @@ export default function BookingEmbedFrame({
    <div className="vya-round overflow-hidden border border-current/12" style={inert ? { pointerEvents: "none" } : undefined}>
     <iframe
      src={embed.src}
-     title={`Book a time — ${providerLabel(embed.provider)}`}
+     title={`Book a time, ${providerLabel(embed.provider)}`}
      loading="lazy"
      onError={() => setFailed(true)}
      className="w-full"

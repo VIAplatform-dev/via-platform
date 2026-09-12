@@ -71,6 +71,11 @@ const nextConfig: NextConfig = {
       // Sellers are told "getvya.ai/store/signup" out loud, and people type the hyphen.
       { source: "/store/sign-up", destination: "/store/signup", permanent: false },
       { source: "/store/register", destination: "/store/signup", permanent: false },
+      // "/onboarding" is what people actually type — it is what the flow is CALLED, and there has
+      // never been a route at it. Typing it landed on a 404 (or, worse, looked like a silent bounce)
+      // while the real page sat at /admin/onboarding. Straight to the workspace path, which works on
+      // both hosts because /infrastructure is rewritten by the proxy rather than by host.
+      { source: "/onboarding", destination: "/infrastructure/admin/onboarding", permanent: false },
       { source: "/store/intake", destination: "/infrastructure/admin/add-listing", permanent: false },
       { source: "/store/items", destination: "/infrastructure/admin/inventory", permanent: false },
       { source: "/store/customers", destination: "/infrastructure/admin/customers", permanent: false },

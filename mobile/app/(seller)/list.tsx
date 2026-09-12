@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import { MAX_PHOTOS } from "../../lib/seller/listing-fields";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing } from "../../lib/theme";
 import { useDraft } from "../../lib/seller/draft";
@@ -37,13 +38,16 @@ export default function CaptureScreen() {
   }
 
   async function pick() {
+    // 20, because that is what the routes store (items PATCH and intake/publish both cap there).
+    // Six was a number this screen invented, and it meant a piece could carry more photos on the
+    // web than the phone would let her pick — on the one device she actually shoots them with.
     const r = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
-      selectionLimit: 6,
+      selectionLimit: MAX_PHOTOS,
       quality: 0.85,
     });
-    if (!r.canceled) setPhotos([...photos, ...r.assets.map((a) => a.uri)].slice(0, 6));
+    if (!r.canceled) setPhotos([...photos, ...r.assets.map((a) => a.uri)].slice(0, MAX_PHOTOS));
   }
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: "#141210" }} />;

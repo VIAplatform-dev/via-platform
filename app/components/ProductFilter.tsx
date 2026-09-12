@@ -10,14 +10,14 @@ const SIZE_PICKER_GROUPS: { label: string; items: { value: string; display: stri
     items: ["XS", "S", "M", "L", "XL", "XXL", "XXXL", "One Size"].map((v) => ({ value: v, display: v })),
   },
   {
-    label: "Shoes — US",
+    label: "Shoes (US)",
     items: ["5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9", "9.5", "10", "10.5", "11", "12"].map((v) => ({
       value: v,
       display: `US ${v}`,
     })),
   },
   {
-    label: "Shoes — EU",
+    label: "Shoes (EU)",
     items: ["EU 35", "EU 36", "EU 37", "EU 38", "EU 39", "EU 40", "EU 41", "EU 42"].map((v) => ({
       value: v,
       display: v,
@@ -645,7 +645,7 @@ export default function ProductFilter({
                 {savedSizes?.length === 0 ? "Pick Your Sizes" : "My Sizes"}
               </h2>
               <p className="text-xs text-[#5D0F17]/50 mt-0.5">
-                Select all sizes you typically wear — clothing and shoes
+                Select all sizes you typically wear (clothing and shoes)
               </p>
             </div>
             <button onClick={() => setShowSizePicker(false)} className="text-[#5D0F17]/40 hover:text-[#5D0F17] p-1 mt-0.5">

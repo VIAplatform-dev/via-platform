@@ -9,7 +9,7 @@ import type { CSSProperties } from "react";
 export const dynamic = "force-static";
 
 const ACCENT = "#5D0F17";
-const STORE = { name: "In a Past Life", location: "New York, NY", tagline: "Curated vintage — one-of-one, archival, forever." };
+const STORE = { name: "In a Past Life", location: "New York, NY", tagline: "Curated vintage, one-of-one, archival, forever." };
 
 type P = { name: string; price: string; image: string; size?: string };
 const PRODUCTS: P[] = [

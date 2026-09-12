@@ -7,6 +7,7 @@ import { payableAccountId } from "@/app/lib/stripe-mode";
 import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { bookingEmbed } from "@/app/lib/appointments/embed-core";
 import { notifyAppointmentBooked } from "@/app/lib/appointments/notify";
+import { openEnquiryThread, appointmentEnquiryBody } from "@/app/lib/enquiry-inbox";
 import { publicContext, bad, notFound, today } from "../_shared";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +104,20 @@ export async function POST(request: NextRequest) {
   status: deposit > 0 ? "pending" : ctx.settings.requireApproval ? "pending" : "booked",
   depositCents: deposit,
  });
+
+ // INTO THE INBOX AS WELL AS THE DIARY. An appointment is somebody asking the store for time, and
+ // the inbox is where the seller looks for "who wants something from me" — an email alone means she
+ // has to remember to check a second screen. Swallowed: the booking is made either way.
+ void openEnquiryThread({
+  storeSlug: ctx.storeSlug,
+  name: appointment.customerName,
+  email: appointment.customerEmail,
+  subject: `Appointment · ${appointment.kind}`,
+  body: appointmentEnquiryBody({
+   kind: appointment.kind, day: appointment.day, start: appointment.start, end: appointment.end,
+   note: appointment.note, pending: appointment.status === "pending",
+  }),
+ }).catch(() => {});
 
  if (deposit <= 0) {
   // Fire-and-forget: the booking is already in the diary, and a mail outage must not turn a

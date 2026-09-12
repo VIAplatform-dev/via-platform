@@ -31,7 +31,7 @@ const stories = [
  slug: "ascensio-vintage",
  store: "Ascensio Vintage",
  teaser:
- "Championing timeless style that transcends the decades — authentic, high-quality vintage designer clothes sourced with intention.",
+ "Championing timeless style that transcends the decades: authentic, high-quality vintage designer clothes sourced with intention.",
  logo: "/stores/ascensio-vintage-logo.jpg",
  logoBg: "#ffffff",
  logoFit: "contain" as const,
@@ -40,7 +40,7 @@ const stories = [
  slug: "scarz-vintage",
  store: "Scarz Vintage",
  teaser:
- "Luxury fashion doesn't expire — it evolves. Curated vintage at its best: thoughtful, refined, and intentional.",
+ "Luxury fashion doesn't expire; it evolves. Curated vintage at its best: thoughtful, refined, and intentional.",
  logo: "/stores/scarz-vintage-logo.jpg",
  logoBg: "#ffffff",
  logoFit: "contain" as const,
@@ -59,7 +59,7 @@ const stories = [
  slug: "blodas-choice",
  store: "Bloda's Choice",
  teaser:
- "A creative platform built around the vision of photographer and founder Anna Bloda — vintage fashion, original design, and a singular point of view.",
+ "A creative platform built around the vision of photographer and founder Anna Bloda: vintage fashion, original design, and a singular point of view.",
  logo: "/stores/blodas-choice-logo.png",
  logoBg: "#ffffff",
  logoFit: "contain" as const,
@@ -77,7 +77,7 @@ const stories = [
  slug: "lover-girl-vintage",
  store: "Lovergirl Vintage",
  teaser:
- "A curated vintage denim & blazer destination — every piece handpicked by Lexi for quality, fit, and everyday wearability.",
+ "A curated vintage denim & blazer destination. Every piece handpicked by Lexi for quality, fit, and everyday wearability.",
  logo: "/stores/lover-girl-vintage-logo.jpg",
  logoBg: "#F2EDE6",
  logoFit: "contain" as const,
@@ -87,7 +87,7 @@ const stories = [
  slug: "the-objects-of-affection",
  store: "The Objects of Affection",
  teaser:
- "A collector's archive of vintage heels, handbags, and rare designer finds — chosen for history, craftsmanship, and lasting value.",
+ "A collector's archive of vintage heels, handbags, and rare designer finds, chosen for history, craftsmanship, and lasting value.",
  logo: "/stores/the-objects-of-affection-brand.jpg",
  logoBg: "#8B2257",
  logoFit: "cover" as const,

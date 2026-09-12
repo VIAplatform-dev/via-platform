@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "LEI Vintage — The Story Behind the Selection | VYA",
+ title: "LEI Vintage: The Story Behind the Selection | VYA",
  description:
  "Why we chose LEI Vintage for VYA. A brand built on the idea that the best style already exists.",
 };

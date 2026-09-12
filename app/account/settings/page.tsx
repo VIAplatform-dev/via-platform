@@ -58,7 +58,7 @@ export default async function SettingsPage() {
             <div>
               <h3 className="font-serif text-base mb-1">Have feedback for us?</h3>
               <p className="text-xs text-[#5D0F17]/50 leading-relaxed">
-                Submit your recommendations — we&apos;d love to hear from you.
+                Submit your recommendations, we&apos;d love to hear from you.
               </p>
             </div>
             <div className="shrink-0 sm:w-44">

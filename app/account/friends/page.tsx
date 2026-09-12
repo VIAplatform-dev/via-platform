@@ -168,7 +168,7 @@ export default function FriendsPage() {
  }
 
  function handleInvite() {
- const text = "Join me on VYA — vintage & secondhand from independent stores across the country, all in one place! https://vyaplatform.com";
+ const text = "Join me on VYA, vintage & secondhand from independent stores across the country, all in one place! https://vyaplatform.com";
  if (navigator.share) {
  navigator.share({ title: "Join VYA", text }).catch(() => {});
  } else {

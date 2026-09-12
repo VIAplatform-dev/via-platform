@@ -51,7 +51,7 @@ function PayBox({ deposit, accent, cta, onPaid }: { deposit: Deposit; accent: st
     type="button" disabled={busy || !stripe} onClick={pay}
     className="vya-cta w-full py-4 text-center text-[11px] uppercase tracking-[0.2em] text-white transition disabled:opacity-35"
     style={{ background: accent }}
-   >{busy ? "Paying…" : `${cta} — ${money(deposit.amountCents)}`}</button>
+   >{busy ? "Paying…" : `${cta}, ${money(deposit.amountCents)}`}</button>
    {err && <p className="text-[12.5px]" role="alert" style={{ color: accent }}>{err}</p>}
   </div>
  );
@@ -72,7 +72,7 @@ export default function DepositForm({ deposit, accent, cta = "Pay deposit", onPa
    <div className="vya-round border border-current/15 px-5 py-6 text-center">
     <p className="text-[13px]">Your time is held.</p>
     <p className="mx-auto mt-2 max-w-[38ch] text-[12.5px] leading-relaxed opacity-65">
-     We couldn&rsquo;t open card payment just now — the shop will be in touch about the {money(deposit.amountCents)} deposit.
+     We couldn&rsquo;t open card payment just now, the shop will be in touch about the {money(deposit.amountCents)} deposit.
     </p>
    </div>
   );

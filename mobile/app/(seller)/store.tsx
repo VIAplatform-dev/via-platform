@@ -31,7 +31,7 @@ export default function StoreScreen() {
   const insets = useSafeAreaInsets();
   const webRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<null | "unreachable" | "missing">(null);
 
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<Me>("/api/store/me"), enabled: !!storeSlug });
 
@@ -65,9 +65,19 @@ export default function StoreScreen() {
 
       {failed ? (
         <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
-          <Text style={{ fontSize: 15, color: colors.text, textAlign: "center" }}>Couldn&apos;t reach {host}.</Text>
+          <Text style={{ fontSize: 15, color: colors.text, textAlign: "center", lineHeight: 21 }}>
+            {failed === "missing"
+              ? `Your storefront isn't answering at ${host} yet.`
+              : `Couldn't reach ${host}.`}
+          </Text>
+          {failed === "missing" ? (
+            <Text style={{ fontSize: 13, color: colors.textMuted, textAlign: "center", marginTop: spacing.sm, lineHeight: 19 }}>
+              The address is reserved for you and the site is built — it just isn&apos;t switched on at
+              our end. Nothing is wrong with your store, and nothing you can do here fixes it.
+            </Text>
+          ) : null}
           <Pressable
-            onPress={() => { setFailed(false); setLoading(true); webRef.current?.reload(); }}
+            onPress={() => { setFailed(null); setLoading(true); webRef.current?.reload(); }}
             style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}
           >
             <Text style={{ color: colors.accentText, fontWeight: "600" }}>Try again</Text>
@@ -80,7 +90,20 @@ export default function StoreScreen() {
             source={{ uri: url }}
             style={{ flex: 1, backgroundColor: colors.bg }}
             onLoadEnd={() => setLoading(false)}
-            onError={() => { setLoading(false); setFailed(true); }}
+            onError={() => { setLoading(false); setFailed("unreachable"); }}
+            // A 404 IS NOT AN onError. onError fires when the page cannot be fetched at all — no DNS,
+            // no route, TLS refused. A server that answers 404 has answered, so the WebView renders
+            // whatever came back, which is how a seller opening her own Store tab was shown Next.js's
+            // black-on-white "404 This page could not be found" sitting inside her app. Her storefront
+            // being switched off at our end should be said in our words, not the framework's.
+            onHttpError={(e) => {
+              const { statusCode, url: failedUrl } = e.nativeEvent;
+              // Only the page she asked for. A theme's missing font or a 404 on one image must not
+              // replace a storefront that is otherwise rendering perfectly well.
+              if (failedUrl !== url) return;
+              setLoading(false);
+              setFailed(statusCode === 404 ? "missing" : "unreachable");
+            }}
             // Her storefront is a normal site — let it behave like one.
             allowsBackForwardNavigationGestures
             decelerationRate="normal"

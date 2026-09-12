@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { colors, spacing } from "../../lib/theme";
-import { flattenHits, hitTarget, searchPlaceholder, type SearchGroup } from "../../lib/seller/search";
+import { flattenHits, hitTarget, isPiece, searchPlaceholder, type SearchGroup } from "../../lib/seller/search";
+import { imageUrl } from "../../lib/imageUrl";
 
 // The search box — the same "look up anything" the desktop has, on Home and Inventory.
 //
@@ -64,9 +65,21 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
                 onPress={() => { const t = hitTarget(r.group, r.id); router.push({ pathname: t.pathname as never, params: t.params }); }}
                 style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.border }}
               >
-                <Text style={{ width: 74, fontSize: 11, letterSpacing: 0.8, color: colors.textDim, fontWeight: "700" }} numberOfLines={1}>
-                  {r.group.toUpperCase()}
-                </Text>
+                {/* THE PIECE, NOT THE WORD "INVENTORY". A column of identical grey category labels
+                    is something you have to read; a column of photographs is something you
+                    recognise. Anything that isn't a piece — an order, a customer — keeps its label,
+                    because there is no picture of a customer and a blank square would be worse. */}
+                {isPiece(r.group) ? (
+                  r.image ? (
+                    <Image source={{ uri: imageUrl(r.image) }} style={{ width: 44, height: 44, borderRadius: 6, backgroundColor: colors.chip }} />
+                  ) : (
+                    <View style={{ width: 44, height: 44, borderRadius: 6, backgroundColor: colors.chip }} />
+                  )
+                ) : (
+                  <Text style={{ width: 44, fontSize: 10, letterSpacing: 0.8, color: colors.textDim, fontWeight: "700" }} numberOfLines={2}>
+                    {r.group.toUpperCase()}
+                  </Text>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{r.label}</Text>
                   {/* the status rides in here already — "SKU-1042 · $420 · active" */}

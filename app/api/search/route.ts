@@ -7,11 +7,16 @@ import { categoryMap } from "@/app/lib/categoryMap";
 import { DISABLED_STORE_SLUGS } from "@/app/lib/db";
 import { formatPrice } from "@/app/lib/formatPrice";
 
+let unaccentReady = false;
+
 const getDatabaseUrl = () => {
   const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
   if (!url) throw new Error("DATABASE_URL or POSTGRES_URL is not set.");
   return url;
 };
+
+// A search that already found this much is working; second-guessing it is noise.
+const SUGGEST_BELOW = 50;
 
 const STOP_WORDS = new Set([
   "and", "or", "the", "a", "an", "in", "of", "for", "with", "by",
@@ -352,6 +357,80 @@ function toSafeTsQuery(q: string): string {
   return q.replace(/[^\w\s'\-]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// ── "Did you mean …?" ────────────────────────────────────────────────────────
+//
+// The vocabulary is the one the search ALREADY knows: every brand alias, every category
+// alias, every fashion stem. No new list to keep in sync — a brand added to brandData is
+// spellable the day it lands.
+//
+// Corrections are offered per word, so "balencaga bag" becomes "balenciaga bag" and the
+// words that were already right are left alone.
+const SPELL_VOCAB: string[] = (() => {
+  const v = new Set<string>();
+  for (const b of brands) {
+    v.add(stripAccents(b.label.toLowerCase()));
+    for (const kw of b.keywords) v.add(stripAccents(kw));
+  }
+  for (const a of Object.keys(categoryAliases)) v.add(a);
+  for (const [pl, sg] of FASHION_STEM_PAIRS) { v.add(pl); v.add(sg); }
+  for (const [k, syns] of Object.entries(SYNONYMS)) { v.add(k); for (const sy of syns) v.add(sy); }
+  // One- and two-letter entries can't be usefully corrected to and only add noise.
+  return [...v].filter(t => t.length >= 3);
+})();
+
+// Damerau-Levenshtein, bounded: it stops as soon as the best possible score exceeds
+// `max`, so scanning the whole vocabulary per word stays cheap.
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  let prevPrev: number[] = [];
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let d = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + cost);
+      // Transposition: "chanel" vs "chanle"
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d = Math.min(d, prevPrev[j - 2] + 1);
+      }
+      row.push(d);
+      if (d < best) best = d;
+    }
+    if (best > max) return max + 1;
+    prevPrev = prev;
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+// The nearest vocabulary word, or null when nothing is close enough. The tolerance scales
+// with length so "bag" can't become "bra" but "balencaga" can become "balenciaga".
+function nearestWord(word: string): string | null {
+  if (word.length < 4) return null;
+  const max = word.length <= 5 ? 1 : word.length <= 8 ? 2 : 3;
+  let best: string | null = null;
+  let bestD = max + 1;
+  for (const cand of SPELL_VOCAB) {
+    if (cand === word) return null; // spelled correctly — nothing to suggest
+    const d = editDistance(word, cand, max);
+    if (d < bestD) { bestD = d; best = cand; }
+  }
+  return bestD <= max ? best : null;
+}
+
+// Correct the words that are wrong, keep the ones that are right. Returns null when the
+// query needs no help.
+function spellSuggest(words: string[]): string | null {
+  let changed = false;
+  const out = words.map(w => {
+    const fix = nearestWord(w);
+    if (fix && fix !== w) { changed = true; return fix; }
+    return w;
+  });
+  return changed ? out.join(" ") : null;
+}
+
 // Returns the best-matching brand for this query, or null
 function detectBrand(q: string, words: string[]): (typeof brands)[0] | null {
   for (const b of brands) {
@@ -382,16 +461,39 @@ export async function GET(request: Request) {
   // table with prefix fragments ("dr", "dre", "dres") and make Top Searches junk.
   const shouldLog = searchParams.get("log") === "1";
 
+  // Paging. The old handler had a hard LIMIT 200 and no total, so a query like "bag"
+  // (706 matches) silently showed 200 and called it the answer. Now the count is the
+  // truth and the caller walks the rest a page at a time — returning all 706 in one
+  // response is ~780KB, nearly all of it the per-product `images` JSON.
+  const limit = Math.min(Math.max(Number(searchParams.get("limit")) || 96, 1), 200);
+  const offset = Math.max(Number(searchParams.get("offset")) || 0, 0);
+  // Filter and sort run in SQL, over EVERY match — not over whatever page happens to be
+  // loaded. Client-side filtering of a paged list quietly lies about what it searched.
+  const storeFilter = searchParams.get("store") ?? "";
+  const sortParam = searchParams.get("sort") ?? "relevance";
+
   if (!q || q.length < 2) {
-    return NextResponse.json({ products: [], designers: [], categories: [], stores: [] });
+    return NextResponse.json({ products: [], designers: [], categories: [], stores: [], storeFacets: [], total: 0, hasMore: false });
   }
 
   try {
     const sql = neon(getDatabaseUrl());
-    sql`CREATE EXTENSION IF NOT EXISTS unaccent`.catch(() => {});
+    // Once per process, not once per search. This fired a round trip on every keystroke
+    // of the header autocomplete to re-assert an extension that was already there.
+    if (!unaccentReady) {
+      unaccentReady = true;
+      sql`CREATE EXTENSION IF NOT EXISTS unaccent`.catch(() => { unaccentReady = false; });
+    }
 
     // ── 1. Parse query ────────────────────────────────────────────────────────
     const words = parseWords(q);
+
+    // A query that parses to nothing — punctuation, or two single letters — used to match
+    // EVERYTHING: `LIKE ALL('{}')` is TRUE in Postgres, so the "all typed words present"
+    // clause passed every row. Searching ".." returned the whole catalogue.
+    if (words.length === 0) {
+      return NextResponse.json({ products: [], designers: [], categories: [], stores: [], storeFacets: [], total: 0, hasMore: false, suggestion: null });
+    }
 
     // Original word patterns — used for "all words present" scoring bonus.
     // Only the exact words typed (no expansion), so "leather jacket" ALL check
@@ -456,11 +558,17 @@ export async function GET(request: Request) {
     const useCategoryExpansion = categoryRegexes.length > 0;
 
     // ── 3. Quick-links: designers, categories, stores ─────────────────────────
+    // Chips are suggestions, so they have to be RIGHT. The old test accepted an alias
+    // appearing anywhere in the query as a plain substring, which made "silver" suggest
+    // Louis Vuitton (it contains "lv") and "at" suggest Kate Spade, Ferragamo and Issey
+    // Miyake. Short aliases are whole-worded by aliasMatches, exactly as detectBrand does,
+    // and a typed query only prefix-matches a label — "at" is not the start of anything.
     const matchedDesigners = brands
       .filter(b => {
         const bLabel = stripAccents(b.label.toLowerCase());
-        if (bLabel.includes(q)) return true;
-        if (b.keywords.some(kw => kw.includes(q) || q.includes(kw))) return true;
+        if (bLabel.startsWith(q)) return true;
+        if (bLabel.split(/[\s&-]+/).some(part => part.startsWith(q)) && q.length >= 3) return true;
+        if (b.keywords.some(kw => aliasMatches(q, kw, WHOLE_WORD_ALIASES.has(kw)))) return true;
         if (words.length > 1 && words.every(w => bLabel.includes(w))) return true;
         return false;
       })
@@ -483,8 +591,12 @@ export async function GET(request: Request) {
       const vAlias = categoryAliases[v];
       if (vAlias) addCatChip(vAlias);
     }
+    // Same problem as the designer chips: "at" is a substring of "coats-jackets",
+    // "flats" and "sweaters". Match the START of the slug or of a word in the label.
+    const startsAWord = (text: string) =>
+      text.split(/[\s&/-]+/).some(part => part.startsWith(q));
     for (const [slug, label] of Object.entries(categoryMap)) {
-      if (!seenCatSlugs.has(slug) && (slug.includes(q) || label.toLowerCase().includes(q))) {
+      if (!seenCatSlugs.has(slug) && q.length >= 3 && (startsAWord(slug) || startsAWord(label.toLowerCase()))) {
         matchedCategories.push({ slug, label });
         seenCatSlugs.add(slug);
       }
@@ -574,16 +686,56 @@ export async function GET(request: Request) {
             OR (${useCategoryExpansion} AND unaccent(LOWER(title)) ~* ANY(${categoryRegexes}::text[]))
           )
       )
-      SELECT * FROM scored WHERE relevance > 0
-      ORDER BY relevance DESC, created_at DESC NULLS LAST
-      LIMIT 200
+      , matched AS (
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM scored
+        WHERE relevance > 0
+          AND (${storeFilter} = '' OR store_slug = ${storeFilter})
+      )
+      SELECT * FROM matched
+      ORDER BY
+        CASE WHEN ${sortParam} = 'price-asc'  THEN price END ASC  NULLS LAST,
+        CASE WHEN ${sortParam} = 'price-desc' THEN price END DESC NULLS LAST,
+        relevance DESC, created_at DESC NULLS LAST
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    // Store facets over the WHOLE match set, so the filter chips are complete on page 1
+    // and their counts don't change as you load more. It is a second pass over the same
+    // predicate, so it runs ONCE — on page one, unfiltered, and never for the header's
+    // autocomplete (facets=0), which fires on every keystroke and shows no chips.
+    const wantFacets = offset === 0 && !storeFilter && searchParams.get("facets") !== "0";
+    const facetRows = !wantFacets ? [] : await sql`
+      WITH scored AS (
+        SELECT store_slug, store_name
+        FROM products
+        WHERE
+          (shopify_product_id IS NULL OR collabs_link IS NOT NULL)
+          AND (${DISABLED_STORE_SLUGS.length} = 0 OR store_slug != ALL(${DISABLED_STORE_SLUGS}))
+          AND (
+            unaccent(LOWER(title)) LIKE ANY(${phrasePatterns})
+            OR unaccent(LOWER(title)) LIKE ALL(${originalWordPatterns})
+            OR to_tsvector('english', unaccent(COALESCE(title, '')))
+               @@ plainto_tsquery('english', unaccent(${safeQ}))
+            OR (product_type IS NOT NULL
+                AND LOWER(product_type) LIKE ${brandPtPattern})
+            OR (description IS NOT NULL
+                AND unaccent(LOWER(description)) LIKE ANY(${phrasePatterns}))
+            OR (${useBrandExpansion}
+                AND (unaccent(LOWER(title)) ~* ANY(${brandAliasRegexes}::text[])
+                     OR (product_type IS NOT NULL AND unaccent(LOWER(product_type)) ~* ANY(${brandAliasRegexes}::text[]))))
+            OR (${useCategoryExpansion} AND unaccent(LOWER(title)) ~* ANY(${categoryRegexes}::text[]))
+          )
+      )
+      SELECT store_slug, MIN(store_name) AS store_name, COUNT(*)::int AS n
+      FROM scored GROUP BY store_slug ORDER BY n DESC
     `;
 
     // ── 5. Fuzzy trigram fallback for typos ───────────────────────────────────
     // Kicks in when main search returns fewer than 5 results. Uses pg_trgm
     // similarity to catch misspellings ("chanell" → Chanel items).
     let allProducts = products as Array<Record<string, unknown>>;
-    if (allProducts.length < 5 && words.length > 0) {
+    if (offset === 0 && allProducts.length < 5 && words.length > 0) {
       const anchor = words.reduce((a, b) => (a.length >= b.length ? a : b));
       try {
         const fuzzy = await sql`
@@ -592,6 +744,7 @@ export async function GET(request: Request) {
           WHERE
             (shopify_product_id IS NULL OR collabs_link IS NOT NULL)
             AND (${DISABLED_STORE_SLUGS.length} = 0 OR store_slug != ALL(${DISABLED_STORE_SLUGS}))
+            AND (${storeFilter} = '' OR store_slug = ${storeFilter})
             AND similarity(unaccent(LOWER(title)), ${anchor}) > 0.25
           ORDER BY similarity(unaccent(LOWER(title)), ${anchor}) DESC, created_at DESC NULLS LAST
           LIMIT 50
@@ -603,6 +756,46 @@ export async function GET(request: Request) {
         ];
       } catch {
         // pg_trgm not available — graceful no-op
+      }
+    }
+
+    // Fuzzy rows are appended after the fact and carry no total_count, so the window
+    // value can undercount what we are actually returning. Never report fewer than we send.
+    const total = allProducts.length > 0
+      ? Math.max(
+          Number((allProducts[0] as { total_count?: number }).total_count ?? 0),
+          offset + allProducts.length,
+        )
+      : 0;
+
+    // ── 6. "Did you mean …?" ──────────────────────────────────────────────────
+    // Only when the result set is thin — a query returning plenty of what was asked for
+    // does not need second-guessing — and only on the first page. The candidate is then
+    // CHECKED against the catalogue: suggesting a correction that also finds nothing is
+    // worse than saying nothing at all.
+    let suggestion: { term: string; count: number } | null = null;
+    if (offset === 0 && total < SUGGEST_BELOW) {
+      const candidate = spellSuggest(words);
+      if (candidate && candidate !== q) {
+        try {
+          // Every corrected word present, in any order — the same "all words" rule the
+          // main search uses. A phrase LIKE would undercount "leather jacket" against
+          // titles that read "jacket, leather".
+          const candPatterns = candidate.split(" ").map(w => `%${w}%`);
+          const [{ n }] = await sql`
+            SELECT COUNT(*)::int AS n
+            FROM products
+            WHERE (shopify_product_id IS NULL OR collabs_link IS NOT NULL)
+              AND (${DISABLED_STORE_SLUGS.length} = 0 OR store_slug != ALL(${DISABLED_STORE_SLUGS}))
+              AND unaccent(LOWER(title)) LIKE ALL(${candPatterns})
+          ` as { n: number }[];
+          // Only worth interrupting someone for if the correction finds a lot more. This
+          // is also the guard against "correcting" a word that is simply not in the
+          // vocabulary but perfectly well spelled.
+          if (n >= total * 1.5 && n >= total + 15) suggestion = { term: candidate, count: n };
+        } catch {
+          // Counting failed — just don't suggest.
+        }
       }
     }
 
@@ -628,14 +821,25 @@ export async function GET(request: Request) {
       ).catch(() => {});
     }
 
+    // The window function rides on every row; with zero rows there is nothing to read it
+    // from, and a short page IS the last page.
     return NextResponse.json({
       designers: matchedDesigners,
       categories: matchedCategories,
       stores: matchedStores,
+      storeFacets: (facetRows as Array<Record<string, unknown>>).map(r => ({
+        slug: r.store_slug as string,
+        name: r.store_name as string,
+        count: r.n as number,
+      })),
+      total,
+      suggestion,
+      hasMore: offset + allProducts.length < total,
       products: allProducts.map(p => {
         let parsedImages: string[] | undefined;
         try {
-          parsedImages = p.images ? JSON.parse(p.images as string) : undefined;
+          const all = p.images ? JSON.parse(p.images as string) : undefined;
+          parsedImages = Array.isArray(all) ? all.slice(0, 4) : all;
         } catch {
           // malformed JSON — skip
         }

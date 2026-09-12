@@ -150,7 +150,7 @@ function CheckoutInner() {
  // The SERVER says which it is. If it disagrees with her (the seller switched collection off
  // while she was deciding), follow the server — and the postage comes back with it.
  if (d.delivery === "pickup") setCollect({ address: d.collectFrom ?? null, instructions: d.instructions ?? null });
- else { setCollect(null); if (collecting) { setDelivery("ship"); setErr("This store has stopped offering collection — you’ll need a delivery address."); preparedKey.current = ""; return; } }
+ else { setCollect(null); if (collecting) { setDelivery("ship"); setErr("This store has stopped offering collection, you’ll need a delivery address."); preparedKey.current = ""; return; } }
  }
  setShipCents(ship);
  // Create the PaymentIntent for BOTH cart and single item, so the card mounts inline either way
@@ -294,7 +294,7 @@ function CheckoutInner() {
  <div className="border border-[#111111]/12 bg-white px-4 py-6 text-center text-[13px] text-[#111111]/50">{err ? "" : "Preparing secure payment…"}</div>
  )}
  {err && <p className="mt-3 text-xs text-red-700">{err}</p>}
- <p className="mt-4 flex items-center gap-1.5 text-[11px] text-[#111111]/40"><Lock /> Payments are processed securely by Stripe — VYA never sees your card details.</p>
+ <p className="mt-4 flex items-center gap-1.5 text-[11px] text-[#111111]/40"><Lock /> Payments are processed securely by Stripe | VYA never sees your card details.</p>
  </section>
  </div>
 

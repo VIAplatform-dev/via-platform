@@ -566,7 +566,7 @@ export default function CollectionsAdminPage() {
  type="text"
  value={query}
  onChange={(e) => setQuery(e.target.value)}
- placeholder="Filter by name…"
+ placeholder="Search like a shopper — runway, ysl, leather boots…"
  className="flex-1 px-4 py-2.5 text-sm outline-none"
  style={{ border: "1px solid #e4e4e7", borderRadius: 6, background: "#fff", color: "#09090b" }}
  />

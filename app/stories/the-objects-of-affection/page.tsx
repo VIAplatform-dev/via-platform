@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export const metadata = {
- title: "The Objects of Affection — The Story Behind the Selection | VYA",
+ title: "The Objects of Affection: The Story Behind the Selection | VYA",
  description:
  "Why we chose The Objects of Affection for VYA. A curated archive of vintage heels, handbags, and rare designer finds.",
 };
@@ -63,7 +63,7 @@ export default function TheObjectsOfAffectionStory() {
  <p>
  From iconic Jimmy Choo heels and handbags to standout Fendi shoes, the collection
  reflects a focus on craftsmanship, legacy, and timeless design. When we discovered
- The Objects of Affection, what stood out was its collector mindset — each piece feels
+ The Objects of Affection, what stood out was its collector mindset, each piece feels
  intentional, rare, and chosen for its place within fashion history rather than
  fleeting trends.
  </p>

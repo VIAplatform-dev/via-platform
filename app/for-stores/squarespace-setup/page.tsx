@@ -104,7 +104,7 @@ export default function SquarespaceSetupPage() {
  </h1>
  <p className="text-[#5D0F17]/60 text-base sm:text-lg">
  Follow these steps to connect your Squarespace store to VYA.
- No coding knowledge needed — just copy, paste, and save.
+ No coding knowledge needed. Just copy, paste, and save.
  </p>
  </div>
  </section>
@@ -200,7 +200,7 @@ export default function SquarespaceSetupPage() {
  {!isFilled && (
  <div className="bg-amber-50 border border-amber-200 p-4">
  <p className="text-sm text-amber-800">
- Fill in your store name and store ID in Step 1 first — the code will
+ Fill in your store name and store ID in Step 1 first, the code will
  automatically include your store info.
  </p>
  </div>
@@ -241,7 +241,7 @@ export default function SquarespaceSetupPage() {
  </div>
 
  <p className="text-[#5D0F17]/40 text-xs">
- If you previously installed two VYA code blocks, replace your existing Header code with this one and delete the Order Confirmation code — this single block handles everything.
+ If you previously installed two VYA code blocks, replace your existing Header code with this one and delete the Order Confirmation code. This single block handles everything.
  </p>
  </div>
  </div>
@@ -256,7 +256,7 @@ export default function SquarespaceSetupPage() {
  </div>
  <p className="text-[#5D0F17]/60">
  Click the <strong>Save</strong> button at the top of the Squarespace Code Injection page.
- That&apos;s it — you&apos;re all set!
+ That&apos;s it, you&apos;re all set!
  </p>
  <div className="bg-green-50 border border-green-200 p-4 mt-4">
  <p className="text-sm text-green-800">
@@ -282,7 +282,7 @@ export default function SquarespaceSetupPage() {
  <div>
  <h3 className="font-medium mb-2">Does this track all my customers?</h3>
  <p className="text-[#5D0F17]/60 text-sm">
- No — only customers who came from VYA. If someone finds your store on their own,
+ No, only customers who came from VYA. If someone finds your store on their own,
  nothing happens. We never collect customer names, emails, or personal info.
  </p>
  </div>

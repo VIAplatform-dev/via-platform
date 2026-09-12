@@ -154,7 +154,7 @@ const S_MARQ = ITEM_SCHEMAS.marquee;
 function MarqueeScroll({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const items = kit.items(S_MARQ);
- if (!items.length) return emptyHint(ctx, "Marquee — add the names you carry");
+ if (!items.length) return emptyHint(ctx, "Marquee: add the names you carry");
  const labels = items.map((i) => i.label);
  const sep = p.sep ?? "✦";
  const set = (i: number, v: string) => kit.setItems(S_MARQ, items.map((x, j) => (j === i ? { label: v } : x)));
@@ -177,7 +177,7 @@ function MarqueeScroll({ kit }: { kit: EditKit }) {
 function MarqueeStatic({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const items = kit.items(S_MARQ);
- if (!items.length) return emptyHint(ctx, "Marquee — add the names you carry");
+ if (!items.length) return emptyHint(ctx, "Marquee: add the names you carry");
  const sep = p.sep ?? "✦";
  const set = (i: number, v: string) => kit.setItems(S_MARQ, items.map((x, j) => (j === i ? { label: v } : x)));
  return (
@@ -197,9 +197,9 @@ function MarqueeStatic({ kit }: { kit: EditKit }) {
 function MarqueeDisplay({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const items = kit.items(S_MARQ);
- if (!items.length) return emptyHint(ctx, "Marquee — add the names you carry");
+ if (!items.length) return emptyHint(ctx, "Marquee: add the names you carry");
  const labels = items.map((i) => i.label);
- const sep = p.sep ?? "—";
+ const sep = p.sep ?? "-";
  const set = (i: number, v: string) => kit.setItems(S_MARQ, items.map((x, j) => (j === i ? { label: v } : x)));
  return (
   <div className="vya-fill vya-marquee flex items-center overflow-hidden whitespace-nowrap py-10">

@@ -19,7 +19,7 @@ function Heading({ kit, className }: { kit: EditKit; className: string }) {
 function TestimonialsCards({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const items = kit.items(S);
- if (!items.length) return emptyHint(ctx, "Reviews — add customer quotes");
+ if (!items.length) return emptyHint(ctx, "Reviews: add customer quotes");
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  return (
   <section className="vya-free-canvas relative mx-auto max-w-5xl px-6 @xl:px-8 py-10 @lg:py-16 @xl:py-24" style={{ borderTop: `1px solid ${ctx.fg}14`, borderBottom: `1px solid ${ctx.fg}14` }}>
@@ -43,7 +43,7 @@ function TestimonialsCards({ kit }: { kit: EditKit }) {
 function TestimonialsSingle({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const items = kit.items(S);
- if (!items.length) return emptyHint(ctx, "Reviews — add a customer quote");
+ if (!items.length) return emptyHint(ctx, "Reviews: add a customer quote");
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  const t = items[0];
  return (
@@ -52,7 +52,7 @@ function TestimonialsSingle({ kit }: { kit: EditKit }) {
    <Stars accent={ctx.colors.accent} className="mb-6 flex justify-center" />
    <p className="text-2xl leading-[1.4] @xl:text-[2rem]" style={{ fontFamily: ctx.head }}>“<span {...kit.txtItem(t.quote, (v) => set(0, { quote: v }))} />”</p>
    {(t.name || ctx.edit) && <p {...kit.txtItem(t.name, (v) => set(0, { name: v }))} className="mt-7 text-[11px] uppercase tracking-[0.2em] opacity-55" />}
-   {items.length > 1 && ctx.edit && <p className="mt-6 text-[10px] uppercase tracking-[0.2em] opacity-35">This layout shows the first review — the rest stay saved</p>}
+   {items.length > 1 && ctx.edit && <p className="mt-6 text-[10px] uppercase tracking-[0.2em] opacity-35">This layout shows the first review, the rest stay saved</p>}
   </section>
  );
 }
@@ -63,7 +63,7 @@ function TestimonialsSingle({ kit }: { kit: EditKit }) {
 function TestimonialsPlain({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const items = kit.items(S);
- if (!items.length) return emptyHint(ctx, "Reviews — add customer quotes");
+ if (!items.length) return emptyHint(ctx, "Reviews: add customer quotes");
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  return (
   <section className="vya-free-canvas relative mx-auto max-w-2xl px-6 py-10 @lg:py-16 @xl:py-24">
@@ -90,7 +90,7 @@ function TestimonialsPlain({ kit }: { kit: EditKit }) {
 function TestimonialsMarquee({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const items = kit.items(S);
- if (!items.length) return emptyHint(ctx, "Reviews — add customer quotes");
+ if (!items.length) return emptyHint(ctx, "Reviews: add customer quotes");
  const set = (i: number, patch: Record<string, string>) => kit.setItems(S, items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
  const row = ctx.edit ? items : [...items, ...items];
  return (

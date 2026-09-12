@@ -8,7 +8,14 @@ import { cn } from "./ui";
 const B = "/admin";
 import { SETTINGS_SECTIONS } from "./settings/sections";
 
-type Hit = { id: string; label: string; sub?: string; href: string };
+type Hit = {
+ id: string;
+ label: string;
+ sub?: string;
+ href: string;
+ /** The piece's cover photo. Only inventory hits carry one — a page or a customer has none. */
+ image?: string | null;
+};
 type Group = { group: string; hits: Hit[] };
 
 // Static quick-nav + actions, filtered locally alongside the live entity search.
@@ -148,14 +155,31 @@ export default function CommandBar({ hidden }: { hidden?: string[] } = {}) {
  {g.hits.map((h) => {
  const i = flat.indexOf(h);
  const on = i === activeIdx;
+ // Lowercased: the route labels this group "Inventory" and a strict compare would fail
+ // silently — every row keeps the plain layout and the pictures never arrive.
+ const isPiece = g.group.toLowerCase() === "inventory";
  return (
  <button
  key={h.id} onMouseEnter={() => setActive(i)} onClick={() => go(h)}
  className={cn("flex w-full items-center justify-between gap-3 px-4 py-2 text-left transition", on ? "bg-[var(--accent-soft,#eafaf3)]" : "hover:bg-stone-50")}
  >
+ <span className="flex min-w-0 items-center gap-2.5">
+ {/* The piece itself. Only under Inventory, and with a placeholder for a piece that has no
+     photo yet — a thumbnail on some rows of a group and nothing on others makes the titles
+     jump left and right as you arrow down it. Pages and customers have no picture to show,
+     so they keep the plain layout rather than gaining an empty square. */}
+ {isPiece ? (
+ h.image ? (
+ // eslint-disable-next-line @next/next/no-img-element
+ <img src={h.image} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />
+ ) : (
+ <span className="h-8 w-8 shrink-0 rounded bg-stone-100" />
+ )
+ ) : null}
  <span className="min-w-0">
  <span className="block truncate text-[13.5px] font-medium text-stone-800">{h.label}</span>
  {h.sub && <span className="block truncate text-[12px] text-stone-400">{h.sub}</span>}
+ </span>
  </span>
  {on && <CornerDownLeft size={13} className="shrink-0 text-[var(--accent,#0e9f76)]" />}
  </button>

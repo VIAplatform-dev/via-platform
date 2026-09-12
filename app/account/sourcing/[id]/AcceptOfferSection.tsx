@@ -92,7 +92,7 @@ export default function AcceptOfferSection({
     return (
       <div className="mt-8 border border-[#5D0F17]/10 p-5 bg-[#D8CABD]/10">
         <p className="text-sm text-[#5D0F17]/60 leading-relaxed">
-          Stores in our network are reviewing your request. Offers will appear here when a store responds — you can choose which one to accept.
+          Stores in our network are reviewing your request. Offers will appear here when a store responds, and you can choose which one to accept.
         </p>
       </div>
     );
@@ -179,7 +179,7 @@ export default function AcceptOfferSection({
 
       <p className="text-xs text-[#5D0F17]/40 mt-4 leading-relaxed">
         The sourcing fee is charged by the store on top of the item price. Your $20 VYA sourcing fee is separate.
-        Accepting an offer does not charge you — the store will contact you to arrange payment and delivery.
+        Accepting an offer does not charge you. The store will contact you to arrange payment and delivery.
       </p>
     </div>
   );

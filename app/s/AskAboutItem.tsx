@@ -33,7 +33,7 @@ export default function AskAboutItem({ storeSlug, itemTitle, accent }: { storeSl
  if (token) {
  return (
  <p className="mt-1.5 text-[11px] opacity-60">
- Sent —{" "}
+ Sent.{" "}
  <a href={`/thread/${token}`} className="underline hover:opacity-100">follow the reply →</a>
  </p>
  );

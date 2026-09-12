@@ -129,7 +129,7 @@ export default function CollectionDetailPage() {
  id={compositeId}
  dbId={item.productId}
  name={title}
- price={snap?.price ? formatPrice(snap.price) : "—"}
+ price={snap?.price ? formatPrice(snap.price) : "-"}
  category={categoryLabel}
  storeName={snap?.store ?? storeSlug}
  storeSlug={storeSlug}

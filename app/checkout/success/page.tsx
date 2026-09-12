@@ -36,7 +36,7 @@ export default async function CheckoutSuccess({ searchParams }: { searchParams: 
  <p className="mb-3 font-serif text-3xl sm:text-4xl">Thank you for your order</p>
  <p className="text-sm leading-relaxed text-black/55">
  Your payment went through and your order is confirmed.{" "}
- {storeName ? <><span className="font-medium text-[#1a1a1a]">{storeName}</span> will be shipping it to you soon</> : "The seller will be in touch about shipping soon"} — your confirmation email is on its way, with a link to track it. Since it’s one-of-one, it’s now off the shelf.
+ {storeName ? <><span className="font-medium text-[#1a1a1a]">{storeName}</span> will be shipping it to you soon</> : "The seller will be in touch about shipping soon"}, your confirmation email is on its way, with a link to track it. Since it’s one-of-one, it’s now off the shelf.
  </p>
  </div>
  </main>

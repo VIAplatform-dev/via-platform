@@ -462,12 +462,12 @@ function blockBody(b: Block, ctx: Ctx) {
  // markup rendered inline: sanitized on save, indexable, and inheriting the store's styles.
  if (p.mode === "sandbox" || (p.js && p.js.trim())) {
  if (!(p.html && p.html.trim()) && !(p.js && p.js.trim())) {
- return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Interactive section — ask VYA to build it</div> : null;
+ return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Interactive section: ask VYA to build it</div> : null;
  }
  return <SandboxEmbed html={p.html || ""} css={p.css} js={p.js} vars={{ bg: colors.bg, text: fg, accent: colors.accent, heading: head, body: ctx.body }} />;
  }
  const html = inlineHtml(p.html);
- if (!html) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Custom section — ask VYA to build it</div> : null;
+ if (!html) return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">Custom section: ask VYA to build it</div> : null;
  return <div className="vya-custom-inner" dangerouslySetInnerHTML={html} />;
  }
 
@@ -776,7 +776,7 @@ export default function Blocks({
   draggable={false}
   {...bgPan}
   className={`absolute inset-0 h-full w-full select-none object-cover ${edit ? "cursor-grab touch-none" : ""}`}
-  title={edit ? "Drag to reposition — zoom is in the section toolbar" : undefined}
+  title={edit ? "Drag to reposition, zoom is in the section toolbar" : undefined}
  />
  <div className="pointer-events-none absolute inset-0" style={{ background: scrim }} />
  </div>

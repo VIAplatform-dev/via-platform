@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 import { colors } from "../../lib/theme";
+import { SellerConnectProvider } from "../../lib/seller/connect";
 
 // The seller's five tabs: Home · Inventory · List (+) · Inbox · Store.
 //
@@ -50,7 +51,19 @@ function ListButton({ onPress }: BottomTabBarButtonProps) {
 
 export default function SellerTabsLayout() {
   return (
+    // Wrapped once, here, rather than per screen: Stripe's embedded components share one session,
+    // and mounting the provider inside Payouts would mint a fresh one every time she opened it.
+    <SellerConnectProvider>
     <Tabs
+      // BACK FOLLOWS WHERE SHE ACTUALLY CAME FROM, not the first tab.
+      //
+      // Every screen below marked `href: null` is still a TAB — hidden from the bar, but a sibling
+      // of Home in this navigator, not a card pushed on top of it. React Navigation's tab router
+      // defaults to backBehavior "firstRoute", so `router.back()` from any of them went to the first
+      // tab, which is Home: opening Settings → Analytics and pressing back landed on Home instead of
+      // Settings, and the drawer had to be found again from the ☰. "history" walks the tabs she
+      // actually visited, in order, which is what the chevron appears to promise.
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: colors.bg },
@@ -88,8 +101,16 @@ export default function SellerTabsLayout() {
       <Tabs.Screen name="payouts" options={{ href: null }} />
       <Tabs.Screen name="billing" options={{ href: null }} />
       <Tabs.Screen name="notifications" options={{ href: null }} />
+      <Tabs.Screen name="notification-settings" options={{ href: null }} />
       <Tabs.Screen name="help" options={{ href: null }} />
       <Tabs.Screen name="consignment" options={{ href: null }} />
+      <Tabs.Screen name="consignors" options={{ href: null }} />
+      <Tabs.Screen name="policy" options={{ href: null }} />
+      <Tabs.Screen name="domain" options={{ href: null }} />
+      <Tabs.Screen name="shipping" options={{ href: null }} />
+      <Tabs.Screen name="tax" options={{ href: null }} />
+      <Tabs.Screen name="appointments" options={{ href: null }} />
+      <Tabs.Screen name="rentals" options={{ href: null }} />
       <Tabs.Screen name="new/details" options={{ href: null }} />
       <Tabs.Screen name="new/bulk" options={{ href: null }} />
       <Tabs.Screen name="new/loading" options={{ href: null }} />
@@ -97,5 +118,6 @@ export default function SellerTabsLayout() {
       <Tabs.Screen name="piece/[id]" options={{ href: null }} />
       <Tabs.Screen name="message/[id]" options={{ href: null }} />
     </Tabs>
+    </SellerConnectProvider>
   );
 }

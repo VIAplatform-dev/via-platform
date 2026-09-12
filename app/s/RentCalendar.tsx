@@ -131,7 +131,7 @@ export default function RentCalendar({
    </div>
 
    <p className="mt-4 text-[11.5px] opacity-55">
-    {start && !end ? `Now pick the return date — ${minDays}–${maxDays} days.`
+    {start && !end ? `Now pick the return date, ${minDays}–${maxDays} days.`
      : len ? `${len} ${len === 1 ? "day" : "days"} selected.`
      : `Struck-through dates are already booked. ${minDays}–${maxDays} days.`}
    </p>
