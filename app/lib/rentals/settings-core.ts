@@ -175,6 +175,27 @@ export function resolveSettings(
  return out;
 }
 
+/**
+ * What a shopper is offered for one piece: rent, buy, both, or (rarely) neither.
+ *
+ * `rentable` is gated on the STORE's rentals toggle — a piece with tiers means nothing to a shopper
+ * until the seller turns rentals on. `buyable` is NOT gated on that toggle: whether a piece is FOR
+ * SALE is a fact about this item, from `alsoForSale`, and must hold whether or not the store's rental
+ * *booking flow* happens to be switched on yet. Getting this backwards is exactly how a rent-only
+ * piece — priced at $0 because it has no buy price at all — ended up with a live Buy button: the
+ * store hadn't enabled rentals, so `rentable` was false, and the old rule read that as "so buyable
+ * must be true," ignoring what the item's own terms said.
+ */
+export function resolveOffer(
+ rentalsEnabledForStore: boolean,
+ terms: { tiersCount: number; alsoForSale: boolean } | null,
+): { rentable: boolean; buyable: boolean } {
+ const hasTiers = (terms?.tiersCount ?? 0) > 0;
+ const rentable = rentalsEnabledForStore && hasTiers;
+ const buyable = !(hasTiers && terms?.alsoForSale === false);
+ return { rentable, buyable };
+}
+
 export type SettingsWarning =
  | "deposit-outlives-authorisation"
  | "pickup-with-prepaid-label"

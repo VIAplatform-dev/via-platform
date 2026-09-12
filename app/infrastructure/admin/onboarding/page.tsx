@@ -159,9 +159,13 @@ export default function OnboardingWizard() {
    });
    const data = await res.json().catch(() => ({}));
    if (!res.ok) {
-    // Same two failures as the build path — an owner with no seller session, or no session at all.
+    // The same THREE failures as the build path. This branch used to handle two and say so, which
+    // meant an owner refused by the invite gate here got the bare "VYA is invite-only" — no address,
+    // no way to switch — while the identical refusal on the build path named her account and offered
+    // to change it. Same route, same 403, same payload; only this caller ignored it.
     setBusy(false);
     if (data?.needsSignIn) { window.location.href = "/store/login?next=%2Fadmin%2Fonboarding"; return; }
+    if (data?.notInvited && data?.email) { setWrongAccount(String(data.email)); setError(null); return; }
     setError(data?.error || "Something went wrong — try again.");
     return;
    }

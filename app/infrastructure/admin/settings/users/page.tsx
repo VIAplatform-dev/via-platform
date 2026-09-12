@@ -174,7 +174,8 @@ export default function UsersSettingsPage() {
       ) : (
        <>
         <div className="flex flex-wrap items-end gap-2">
-         <label className="min-w-0 flex-1 text-[11px] text-stone-500">
+         {/* Its own full-width row on a phone — flex-1 alone let the select and button squeeze it. */}
+         <label className="min-w-0 flex-1 text-[11px] text-stone-500 max-sm:basis-full">
           <span className="mb-1 block">Email</span>
           <input
            value={email}

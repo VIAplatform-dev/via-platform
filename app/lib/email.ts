@@ -3439,6 +3439,45 @@ export async function sendReturnRejectedEmail(p: {
  * headline — it's the sentence the store actually wants read — and the rest sits underneath in
  * small text. That keeps a store's own words while giving every automatic email the same shape.
  */
+/**
+ * The HTML for one automation email. Exported so the Automations page can PREVIEW a flow with the
+ * same function that sends it — the campaign composer shipped for months with a preview drawn by
+ * different code than the send, and the difference only ever showed up in a shopper's inbox.
+ */
+export function automationEmailHtml(opts: {
+ storeName: string;
+ subject: string;
+ body: string;
+ link?: string | null;
+ products?: { title: string; image: string | null; priceCents: number; currency: string; url: string }[];
+ brand?: EmailBrand;
+ unsubscribeUrl?: string | null;
+}): string {
+ const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
+ const b = opts.brand;
+ const lines = String(opts.body || "").split(/\n+/).map((l) => l.trim()).filter(Boolean);
+ const headline = lines[0] || opts.subject;
+ const rest = lines.slice(1).join(" ");
+
+ return storeEmailHtml({
+  storeName: cleanName,
+  logo: b?.logo ?? null,
+  headline,
+  subhead: rest || null,
+  button: opts.link ? { label: b?.buttonLabel || "Shop now", url: withUtm(opts.link, "automation") } : null,
+  products: (opts.products || []).map((p) => ({
+   title: p.title, image: p.image,
+   priceLabel: formatEmailPrice(p.priceCents / 100, p.currency),
+   url: withUtm(p.url, "automation"),
+  })),
+  footerNote: b?.footerText?.trim()
+   ? b.footerText.trim().replace(/\{store\}/g, cleanName)
+   : `You're receiving this because you shopped with ${cleanName}.`,
+  unsubscribeUrl: opts.unsubscribeUrl ?? null,
+  brand: b ? { accent: b.accent, text: b.text, bg: b.bg, headingFont: b.headingFont, bodyFont: b.bodyFont, buttonLabel: b.buttonLabel, buttonStyle: b.buttonStyle, headerAlign: b.headerAlign, showAccentBar: b.showAccentBar } : null,
+ });
+}
+
 export async function sendStoreAutomationEmail(opts: {
  storeSlug: string;
  storeName: string;
@@ -3458,27 +3497,7 @@ export async function sendStoreAutomationEmail(opts: {
  const from = `${cleanName} <${sender}>`;
  const b = opts.brand;
 
- const lines = String(opts.body || "").split(/\n+/).map((l) => l.trim()).filter(Boolean);
- const headline = lines[0] || opts.subject;
- const rest = lines.slice(1).join(" ");
-
- const html = storeEmailHtml({
-  storeName: cleanName,
-  logo: b?.logo ?? null,
-  headline,
-  subhead: rest || null,
-  button: opts.link ? { label: b?.buttonLabel || "Shop now", url: withUtm(opts.link, "automation") } : null,
-  products: (opts.products || []).map((p) => ({
-   title: p.title, image: p.image,
-   priceLabel: formatEmailPrice(p.priceCents / 100, p.currency),
-   url: withUtm(p.url, "automation"),
-  })),
-  footerNote: b?.footerText?.trim()
-   ? b.footerText.trim().replace(/\{store\}/g, cleanName)
-   : `You're receiving this because you shopped with ${cleanName}.`,
-  unsubscribeUrl: opts.unsubscribeUrl ?? null,
-  brand: b ? { accent: b.accent, text: b.text, bg: b.bg, headingFont: b.headingFont, bodyFont: b.bodyFont, buttonLabel: b.buttonLabel, buttonStyle: b.buttonStyle, headerAlign: b.headerAlign, showAccentBar: b.showAccentBar } : null,
- });
+ const html = automationEmailHtml({ ...opts, storeName: cleanName });
 
  let sent = 0, failed = 0;
  for (let i = 0; i < opts.recipients.length; i += 100) {

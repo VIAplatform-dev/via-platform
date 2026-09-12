@@ -135,6 +135,30 @@ export default function ShippingSettingsPage() {
 
  const chosen = carriers.find((c) => c.type === carrierType);
 
+ // One parcel-size price box. The table (tablet and up) and the stacked cards (phone) both draw it,
+ // so the two can never disagree about what a keystroke does.
+ const rateInput = (z: { id: ZoneId; label: string }, t: Tier, className: string) => {
+  if (!s) return null;
+  const cfg = s.zones[z.id] || { enabled: true };
+  const rates = cfg.rates || {};
+  return (
+   <input
+    aria-label={`${z.label} ${t.label} price`}
+    value={rates[t.id] != null ? String((rates[t.id] as number) / 100) : ""}
+    placeholder={String(t.priceCents / 100)}
+    onChange={(e) => {
+     const v = e.target.value.replace(/[^\d.]/g, "");
+     const next = { ...rates };
+     if (v === "") delete next[t.id]; else next[t.id] = Math.round(Number(v) * 100);
+     setS({ ...s, zones: { ...s.zones, [z.id]: { ...cfg, enabled: true, rates: next } } });
+    }}
+    onBlur={() => save({})}
+    inputMode="decimal"
+    className={cn(className, "rounded border border-stone-300 px-1.5 py-1 text-[12.5px] tabular-nums outline-none placeholder:text-stone-300 focus:border-stone-500")}
+   />
+  );
+ };
+
  return (
   <>
    <AdminHeader eyebrow="Settings" title="Shipping & duties" subtitle="Who pays for postage, and who pays customs charges on orders going abroad." />
@@ -225,7 +249,39 @@ export default function ShippingSettingsPage() {
        <h2 className="text-[13px] font-semibold text-stone-800">Your prices</h2>
        <span className="text-[11px] text-stone-400">in {s.currency}</span>
       </div>
-      <div className="overflow-x-auto">
+      {/* Phone: one block per region, its parcel sizes two to a row. The table needs ~460px, and a
+          price box you have to scroll sideways to find is one nobody fills in. */}
+      <div className="divide-y divide-stone-100 sm:hidden">
+       {ZONES.filter((z) => z.id === "domestic" || s.zones[z.id]?.enabled).map((z) => {
+        const cfg = s.zones[z.id] || { enabled: true };
+        const rates = cfg.rates || {};
+        const anyOwn = tiers.some((t) => rates[t.id] != null);
+        return (
+         <div key={z.id} className="px-5 py-3.5">
+          <div className="mb-2 flex items-center justify-between gap-3">
+           <p className="text-[13px] font-medium text-stone-700">{z.label}</p>
+           {anyOwn && (
+            <button type="button" onClick={() => save({ zones: { ...s.zones, [z.id]: { enabled: cfg.enabled } } })} disabled={busy} className="whitespace-nowrap py-1 text-[11.5px] text-stone-400 hover:text-stone-700">
+             Reset to VYA’s
+            </button>
+           )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+           {tiers.map((t) => (
+            <label key={t.id} className="block min-w-0">
+             <span className="mb-1 block text-[11px] uppercase tracking-[0.06em] text-stone-400">{t.label}</span>
+             <span className="flex items-center gap-1">
+              <span className="text-[12.5px] text-stone-400">{currencySymbol(s.currency)}</span>
+              {rateInput(z, t, "h-10 w-full min-w-0")}
+             </span>
+            </label>
+           ))}
+          </div>
+         </div>
+        );
+       })}
+      </div>
+      <div className="hidden overflow-x-auto sm:block">
        <table className="w-full text-[12.5px]">
         <thead>
          <tr className="border-b border-stone-100 text-left text-[11px] uppercase tracking-[0.06em] text-stone-400">
@@ -246,20 +302,7 @@ export default function ShippingSettingsPage() {
              <td key={t.id} className="px-3 py-2">
               <label className="flex items-center gap-1">
                <span className="text-stone-400">{currencySymbol(s.currency)}</span>
-               <input
-                aria-label={`${z.label} ${t.label} price`}
-                value={rates[t.id] != null ? String((rates[t.id] as number) / 100) : ""}
-                placeholder={String(t.priceCents / 100)}
-                onChange={(e) => {
-                 const v = e.target.value.replace(/[^\d.]/g, "");
-                 const next = { ...rates };
-                 if (v === "") delete next[t.id]; else next[t.id] = Math.round(Number(v) * 100);
-                 setS({ ...s, zones: { ...s.zones, [z.id]: { ...cfg, enabled: true, rates: next } } });
-                }}
-                onBlur={() => save({})}
-                inputMode="decimal"
-                className="w-20 rounded border border-stone-300 px-1.5 py-1 text-[12.5px] tabular-nums outline-none placeholder:text-stone-300 focus:border-stone-500"
-               />
+               {rateInput(z, t, "w-20")}
               </label>
              </td>
             ))}

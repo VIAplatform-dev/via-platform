@@ -10,7 +10,7 @@ import Sidekick from "../Sidekick";
 import { useStoreBase } from "../nav-base";
 import { RotateCw, Globe, ChevronDown, ChevronLeft, ChevronRight, Home as HomeIcon, Copy, Check, ExternalLink, SlidersHorizontal, GripVertical, ChevronUp, X as XIcon, Plus, Monitor, Tablet, Smartphone, AlignLeft, AlignCenter, AlignRight, Palette, Sparkles, Undo2, Redo2, Trash2, Layers, Shapes, Type, Upload as UploadIcon, Image as ImageIcon, Minus, MousePointerClick } from "lucide-react";
 import { makeBlock, pageSlugify, type Block, type BlockDef, type BlockType, type BlockStyle, type BlockScale, type StorePage } from "@/app/lib/storefront-blocks";
-import { parseDesign, buildDesignCss, type DesignSettings, type Radius } from "@/app/lib/captured-design";
+import { parseDesign, buildDesignCss, type DesignSettings, type Radius, type ThemeModel } from "@/app/lib/captured-design";
 import { STOREFRONT_PALETTES } from "@/app/lib/storefront-templates";
 import { ColorSwatch, ColorDot } from "@/app/store/storefront/ColorPicker";
 import SectionThumb from "@/app/store/storefront/SectionThumb";
@@ -18,6 +18,12 @@ import { resolveLinkTarget } from "@/app/lib/link-target";
 import { ProductFieldsEditor } from "./ProductFieldsEditor";
 import { resolveProductPage, reorderFields, type ProductPageConfig, type ProductFieldKey, type ProductField } from "@/app/lib/storefront-product-page";
 import { orderFieldsForPanel, splitFocusedFields } from "@/app/lib/panel-field-order";
+// Imported-site builder, Step 2: product grids, hide/show, undo that survives save.
+import { Eye, EyeOff, Files } from "lucide-react";
+import GridPanel, { type GridCollection } from "./GridPanel";
+import { parseGridConfig, type GridConfig } from "@/app/lib/site-builder/grid-config";
+// Step 3: the Pages rail — menu order, rename, hide, add.
+import PagesPanel, { type PageEntryView } from "./PagesPanel";
 
 type Template = { id: string; name: string; description: string; colors: { bg: string; text: string; accent: string }; fonts: { heading: string; body: string }; heroStyle: string };
 type Colors = { bg: string; text: string; accent: string };
@@ -51,7 +57,7 @@ export default function StorefrontEditor() {
  const [loading, setLoading] = useState(true);
  const [tab, setTab] = useState<"design" | "sections" | "assets" | "details" | "domain">("sections");
  const [storeName, setStoreName] = useState("Your Store");
- const [capTab, setCapTab] = useState<"design" | "sections" | "elements" | "text" | "uploads" | "assist">("design"); // captured-mode left rail — 1:1 with the from-scratch studio
+ const [capTab, setCapTab] = useState<"design" | "sections" | "pages" | "elements" | "text" | "uploads" | "assist">("design"); // captured-mode left rail — 1:1 with the from-scratch studio
  const [capPanelOpen, setCapPanelOpen] = useState(true); // collapse the side panel (Canva-style), keeping the icon rail
  const [showControls, setShowControls] = useState(true); // block-mode: the Customize slide-over
  const [copiedUrl, setCopiedUrl] = useState(false);
@@ -151,10 +157,15 @@ export default function StorefrontEditor() {
  // The selected piece of text, reported by the page. Its controls live in the SAME floating bar as
  // the section's — there used to be a second bar drawn inside the page, sitting on top of the very
  // words you were editing.
- const [txtSel, setTxtSel] = useState<{ eid: number; color: string; align: string; top: number } | null>(null);
+ // `btn`: the fill of the button this text is the label of ("" for an outline button), or null when it
+ // isn't a button's label — which is what decides whether Button colour is offered.
+ const [txtSel, setTxtSel] = useState<{ eid: number; color: string; align: string; top: number; btn: string | null } | null>(null);
  // The element last clicked ON THE PAGE. It does two jobs: the panel opens on that element's
  // fields rather than the whole section, and the field is scrolled to and focused once.
  const [focusEid, setFocusEid] = useState<number | null>(null);
+ // Where she clicked inside that text, as an offset into its field's value, so the cursor lands in the
+ // box where it landed on the page. Null = unknown, which puts it at the end, never at the front.
+ const focusCaret = useRef<number | null>(null);
  const [scrollEid, setScrollEid] = useState<number | null>(null);
  // Everything in this section, not just the clicked element — opened on demand.
  const [showAllFields, setShowAllFields] = useState(false);
@@ -169,6 +180,28 @@ export default function StorefrontEditor() {
  // regenerates its name, price and photo from Inventory on every page load, so a text box over them
  // is a box that lies — she gets the piece instead. See plan-b/product-card-identity.ts.
  const [focusItem, setFocusItem] = useState<{ id: string; title: string } | null>(null);
+ // What the selected section IS, reported by the builder's script: a block she added, or one of her
+ // captured sections (which Hide rather than delete), and whether it is hidden. `gridSel` is the product
+ // grid the Grid panel is editing. See app/lib/site-builder/editor-additions.ts.
+ const [secInfo, setSecInfo] = useState<{ block: boolean; hidden: boolean } | null>(null);
+ const [gridSel, setGridSel] = useState<{ id: string; config: GridConfig; kit: "theme" | "simple" | null; empty: boolean } | null>(null);
+ const [gridCollections, setGridCollections] = useState<GridCollection[] | null>(null);
+ const [gridRefresh, setGridRefresh] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
+ // ── HER PAGES (Step 3) — the Pages rail and the ✕ on each thumbnail ───────────────────────────
+ const [pagesList, setPagesList] = useState<PageEntryView[]>([]);
+ const [pagesMenu, setPagesMenu] = useState<{ items: { id: string; label: string; href: string; hidden?: boolean }[]; signature: string } | null>(null);
+ const [pagesReady, setPagesReady] = useState(true); // false until the owner has run the migration
+ const [pagesDrifted, setPagesDrifted] = useState(false);
+ const [pagesBusy, setPagesBusy] = useState(false);
+ const [pagesNote, setPagesNote] = useState<string | null>(null);
+ const [pagesStale, setPagesStale] = useState(0); // bump to re-read the list after a change
+ const pageDrag = useRef<string | null>(null);
+ // Which page the ✕ is asking about. Hiding is reversible and is the first choice; deleting for good
+ // is the second, and is why this is a small dialog of its own rather than a plain confirm.
+ const [removeAsk, setRemoveAsk] = useState<PageEntryView | null>(null);
+ // A short word next to Undo after it stepped back through a SAVED version (the page's own undo stack is
+ // gone once a save reloads it).
+ const [undoNote, setUndoNote] = useState<string | null>(null);
  // Her own arrangement of the strip. Housekeeping — it moves thumbnails in HER editor and nothing
  // on her site — so it saves immediately with no draft or publish step attached.
  const [pageOrder, setPageOrder] = useState<string[] | null>(null);
@@ -191,7 +224,9 @@ export default function StorefrontEditor() {
  const [selImg, setSelImg] = useState<{ id: number; src: string; linkId: number | null; href: string; linkLabel: string; tile: boolean } | null>(null);
  const [assetsBusy, setAssetsBusy] = useState(false);
  const [capStatus, setCapStatus] = useState<"saved" | "unsaved" | "saving">("saved"); // captured-editor save state (from the iframe)
- const [secStyle, setSecStyle] = useState<{ bg?: string; color?: string; align?: string }>({}); // selected captured section's style
+ // `btn`: the section's own button colour ("" = buttons with no fill), or null/absent when it has no
+ // buttons. `btnSet`: she chose one in this session, which is when "reset" is offered.
+ const [secStyle, setSecStyle] = useState<{ bg?: string; color?: string; align?: string; btn?: string | null; btnSet?: boolean }>({}); // selected captured section's style
  const [secRect, setSecRect] = useState<{ top: number; cx: number } | null>(null); // selected section position (iframe coords) → floating bar
 
  // Global design for a captured site: accent + fonts, layered over the theme via custom CSS.
@@ -202,6 +237,15 @@ export default function StorefrontEditor() {
  const [cssBusy, setCssBusy] = useState(false);
  const [cssSaved, setCssSaved] = useState(false);
  const [designSaved, setDesignSaved] = useState(false);
+ // What the store's custom-CSS row holds, as this editor last read or wrote it: the only base a design save
+ // may replace (the server refuses any other). null = it never loaded, so nothing here may be saved.
+ const designBase = useRef<string | null>(null);
+ const designTouched = useRef(false); // she changed something here — opening the editor alone never writes
+ const designCss = useRef<string | null>(null); // what the preview shows; re-sent whenever the frame reloads
+ const designQueue = useRef<Promise<void>>(Promise.resolve());
+ const [capTheme, setCapTheme] = useState<ThemeModel | null>(null); // how the captured theme sets its colours
+ const [designNote, setDesignNote] = useState<string | null>(null);
+ const [designOutdated, setDesignOutdated] = useState(false); // saved before the design could reach her theme's colours
 
  useEffect(() => {
  let cancelled = false;
@@ -219,7 +263,11 @@ export default function StorefrontEditor() {
  if (cancelled) return;
  if (capR.ok) { const c = await capR.json(); setIsAdmin(!!c.isAdmin); if (c.captured > 0) setCaptured({ count: c.captured, url: c.url, slug: c.slug || null, origin: c.origin, pages: c.pages || [], unlinked: c.unlinked || [], productTemplate: c.productTemplate || null, productCount: c.productCount || 0 }); }
    fetch(withStore("/api/store/storefront/page-order")).then((r) => (r.ok ? r.json() : null)).then((d) => setPageOrder(Array.isArray(d?.order) ? d.order : [])).catch(() => setPageOrder([]));
- if (cssR.ok) { const { css } = await cssR.json(); const { settings, rest } = parseDesign(css || ""); setDesign(settings); setDesignRest(rest); }
+ if (cssR.ok) {
+  const { css, theme } = await cssR.json(); const { settings, rest } = parseDesign(css || "");
+  setDesign(settings); setDesignRest(rest); setCapTheme(theme || null); designBase.current = css || "";
+  setDesignOutdated(!!theme && Object.values(settings).some(Boolean) && buildDesignCss(settings, rest, theme) !== String(css).trim());
+ } else setDesignNote("Couldn’t load your site’s design, so changes here can’t be saved. Reload the page to try again.");
  setDesignLoaded(true);
  if (asR.ok) { const a = await asR.json(); setAssets(a.assets || []); }
  if (meR.ok) { const m = await meR.json(); setStoreName(m.storeName || "Your Store"); }
@@ -289,6 +337,18 @@ export default function StorefrontEditor() {
   };
  }, []);
 
+ // On a phone the 1280px canvas opened at 100%, which is a quarter of the page and a sideways scroll.
+ // Start it zoomed to the width of the surface instead. Presentation only, once, and only under 768 —
+ // the slider and pinch still reach anywhere from 20% to 130%.
+ const phoneFitted = useRef(false);
+ useEffect(() => {
+  const surface = surfaceRef.current;
+  if (phoneFitted.current || !surface || window.innerWidth >= 768) return;
+  phoneFitted.current = true;
+  const id = requestAnimationFrame(() => setZoom(Math.max(20, Math.min(100, Math.floor(((surface.clientWidth - 32) / 1280) * 100)))));
+  return () => cancelAnimationFrame(id);
+ });
+
  // The Sidekick can change the design — refresh the editor + preview when it does.
  useEffect(() => {
  function onUpdate() {
@@ -298,6 +358,9 @@ export default function StorefrontEditor() {
  const [sfR, dsR] = await Promise.all([fetch(withStore("/api/store/storefront")), fetch(withStore("/api/store/storefront/design"))]);
  if (sfR.ok) { const d = await sfR.json(); setTagline(d.settings.tagline || ""); setHeroImage(d.settings.heroImage || ""); }
  if (dsR.ok) { const d = await dsR.json(); setTemplate(d.template); setColors(d.colors); setFonts(d.fonts); setBlocks(d.blocks || []); setShopBlocks(d.shopBlocks || []); setExtraPages(d.extraPages || []); setCustomCss(d.customCss || ""); }
+ // VYA may have restyled the captured site. Take its CSS unless she has unsaved design changes — then
+ // her save is refused as a conflict and loads it instead of erasing it.
+ if (!designTouched.current) { const cR = await fetch(withStore("/api/store/capture/css")); const c = cR.ok ? await cR.json() : null; if (c && typeof c.css === "string" && !designTouched.current) loadDesignCss(c.css); }
  } catch { /* ignore */ }
  })();
  }
@@ -338,18 +401,64 @@ export default function StorefrontEditor() {
  // preserving any other custom CSS, then reload the preview to show it.
  // Live design like the studio: the moment a colour/font/corner changes, inject it into the preview
  // instantly (postMessage → a <style> in the iframe) AND auto-save (debounced) — no Apply button, no reload.
+ //
+ // Only what SHE changes is saved. This used to post the loaded design straight back on every open, so a
+ // load that came back empty wrote "" over the store's CSS; now nothing is written until a control moves.
  const designSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
  useEffect(() => {
- if (!captured || !designLoaded) return; // never auto-save the empty mount state over the server's design
- const css = buildDesignCss(design, designRest);
+ if (!captured || !designLoaded) return;
+ const base = designBase.current;
+ // Until she edits, the preview shows exactly what shoppers get: the stored CSS, not a rebuild of it.
+ const css = designTouched.current ? buildDesignCss(design, designRest, capTheme) : (base ?? "");
+ designCss.current = css;
  postToPreview({ vya: "css", css });
+ if (!designTouched.current || base === null) return;
  setDesignSaved(false);
  if (designSaveTimer.current) clearTimeout(designSaveTimer.current);
- designSaveTimer.current = setTimeout(() => {
- fetch(withStore("/api/store/capture/css"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ css }) }).then(() => setDesignSaved(true)).catch(() => {});
- }, 650);
+ designSaveTimer.current = setTimeout(() => { designQueue.current = designQueue.current.then(saveDesignCss); }, 650);
  // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [design, designRest, captured, designLoaded]);
+ }, [design, designRest, captured, designLoaded, capTheme]);
+ // One save at a time, each against the base the previous one left: overlapping saves would race, and
+ // the second would be refused as a conflict with the first.
+ async function saveDesignCss() {
+ const css = designCss.current, base = designBase.current;
+ if (css === null || base === null) return;
+ if (css === base) { setDesignSaved(true); return; }
+ try {
+  const r = await fetch(withStore("/api/store/capture/css"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ css, base }) });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) {
+   designBase.current = css;
+   if (designCss.current === css) designTouched.current = false;
+   setDesignSaved(true); setDesignNote(null); setDesignOutdated(false);
+  } else if (r.status === 409 && typeof d.css === "string") {
+   // Changed elsewhere (VYA, another tab) since this editor read it: show that version, never save over it.
+   loadDesignCss(d.css);
+   setDesignNote("Your design was changed somewhere else (maybe by VYA), so we loaded that version instead of saving over it. Make your change again.");
+  } else setDesignNote(d.error || "Couldn’t save your design. Try again.");
+ } catch { setDesignNote("Couldn’t save your design. Check your connection and try again."); }
+ }
+ function loadDesignCss(css: string) {
+ if (designSaveTimer.current) clearTimeout(designSaveTimer.current);
+ designTouched.current = false; designBase.current = css;
+ const p = parseDesign(css); setDesign(p.settings); setDesignRest(p.rest); setDesignSaved(false);
+ }
+ // The preview is served WITHOUT the stored CSS (edit mode), so the design is in the frame only once sent,
+ // and every reload (a page switch, Reload, a save) starts a new document. The frame's load event was too
+ // late: it waits on every image and theme pixel, and after a reload the design came back late or never.
+ // Send it as soon as each new document's editor script has run (#vya-save exists).
+ useEffect(() => {
+ let sentTo: Document | null = null;
+ const id = window.setInterval(() => {
+  try {
+   const doc = editIframe.current?.contentDocument;
+   if (!doc || doc === sentTo || designCss.current === null || !doc.getElementById("vya-save")) return;
+   sentTo = doc;
+   postToPreview({ vya: "css", css: designCss.current });
+  } catch { /* allow-swallow: frame mid-navigation — the next tick tries again */ }
+ }, 300);
+ return () => window.clearInterval(id);
+ }, []);
  // Undo/redo shortcuts for the captured editor — forwarded into the preview iframe. (When you're typing
  // in the iframe the browser handles ⌘Z natively; this covers the rest + the top-bar buttons.)
  useEffect(() => {
@@ -359,14 +468,15 @@ export default function StorefrontEditor() {
  const t = e.target as HTMLElement | null;
  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
  e.preventDefault();
- postToPreview({ vya: e.shiftKey ? "redo" : "undo" });
+ // "undoany": the page's own undo while it has anything, else the last SAVE is undone (see undoempty below).
+ postToPreview({ vya: e.shiftKey ? "redo" : "undoany" });
  };
  window.addEventListener("keydown", onKey);
  return () => window.removeEventListener("keydown", onKey);
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [captured]);
  // Studio-parity Design handlers, wired to the captured CSS layer.
- const setDesignField = (patch: Partial<DesignSettings>) => { setDesign((d) => ({ ...d, ...patch })); setDesignSaved(false); };
+ const setDesignField = (patch: Partial<DesignSettings>) => { designTouched.current = true; setDesign((d) => ({ ...d, ...patch })); setDesignSaved(false); };
  const applyCapPalette = (c: { bg: string; text: string; accent: string }) => setDesignField({ bg: c.bg, text: c.text, accent: c.accent });
  const capPaletteActive = (c: { bg: string; text: string; accent: string }) => design.bg === c.bg && design.text === c.text && design.accent === c.accent;
 
@@ -375,14 +485,15 @@ export default function StorefrontEditor() {
  function onMsg(e: MessageEvent) {
  const d = e.data as { vya?: string; index?: number; fields?: PanelField[]; path?: string; id?: number; src?: string; style?: { bg?: string; color?: string; align?: string }; rect?: { top: number; cx: number } };
  if (!d || !d.vya) return;
- if (d.vya === "section") { setPanel({ index: d.index ?? -1, fields: d.fields || [] }); setSelImg(null); setSecStyle(d.style || {}); setSecRect(d.rect || null); setPanelDirty(false); setPanelSaving(false); }
+ if (d.vya === "section") { setPanel({ index: d.index ?? -1, fields: d.fields || [] }); setSelImg(null); setSecStyle(d.style || {}); setSecRect(d.rect || null); setPanelDirty(false); setPanelSaving(false); setSecInfo(null); setGridSel(null); }
  else if (d.vya === "secrect") setSecRect({ top: (d as { top: number }).top, cx: (d as { cx: number }).cx });
  // Escape inside the page backs out of everything — the panel here has to follow, or the rail goes
  // on editing a section the page no longer thinks is selected.
- else if (d.vya === "deselect") { setPanel(null); setSelImg(null); setSecRect(null); setTxtSel(null); }
+ else if (d.vya === "deselect") { setPanel(null); setSelImg(null); setSecRect(null); setTxtSel(null); setSecInfo(null); setGridSel(null); }
  else if (d.vya === "textsel") {
-  const t = d as unknown as { eid: number; color?: string; align?: string; top?: number };
-  setTxtSel(t.eid >= 0 ? { eid: t.eid, color: t.color || "", align: t.align || "", top: t.top ?? 0 } : null);
+  const t = d as unknown as { eid: number; color?: string; align?: string; top?: number; caret?: unknown; btn?: unknown };
+  setTxtSel(t.eid >= 0 ? { eid: t.eid, color: t.color || "", align: t.align || "", top: t.top ?? 0, btn: typeof t.btn === "string" ? t.btn : null } : null);
+  focusCaret.current = typeof t.caret === "number" && t.caret >= 0 ? t.caret : null;
   // …and take the panel to that field. The canvas has always reported which element was clicked;
   // the panel just never used it, so finding the words you'd tapped meant scrolling a list where
   // every link is labelled the same. Clicking "Make an appointment here." on the page now puts
@@ -409,6 +520,51 @@ export default function StorefrontEditor() {
  else if (d.vya === "unsaved") { setPanelDirty(true); setCapStatus("unsaved"); }
  else if (d.vya === "saved") { setPanelDirty(false); setPanelSaving(false); setCapStatus("saved"); }
  else if (d.vya === "status") { const s = (d as { text?: string }).text; setCapStatus(s === "Saving…" ? "saving" : s === "Unsaved changes" ? "unsaved" : "saved"); }
+ // ── The builder's own messages (app/lib/site-builder/editor-additions.ts) ──
+ // Sent right after "section": what the selected section is, and its grid settings when it is a grid.
+ else if (d.vya === "secinfo") {
+  const s = d as unknown as { block?: unknown; hidden?: unknown; grid?: { id?: unknown; config?: unknown } | null; item?: unknown; itemTitle?: unknown };
+  setSecInfo({ block: s.block === true, hidden: s.hidden === true });
+  const gid = s.grid && typeof s.grid.id === "string" ? s.grid.id : null;
+  if (gid) {
+   const config = parseGridConfig(s.grid!.config);
+   setGridSel((g) => (g && g.id === gid ? { ...g, config } : { id: gid, config, kit: null, empty: false }));
+   setFocusItem(typeof s.item === "string" && s.item ? { id: s.item, title: typeof s.itemTitle === "string" ? s.itemTitle : "" } : null);
+  } else setGridSel(null);
+ }
+ // A grid finished rendering: which card it got, and whether its collection is empty.
+ else if (d.vya === "gridstate") {
+  const g = d as unknown as { id?: unknown; config?: unknown; kit?: unknown; empty?: unknown };
+  if (typeof g.id === "string") setGridSel((cur) => (cur && cur.id === g.id ? { ...cur, config: parseGridConfig(g.config), kit: g.kit === "theme" || g.kit === "simple" ? g.kit : null, empty: g.empty === true } : cur));
+ }
+ // Undo with nothing left in the page's own stack: step back through her saved versions instead.
+ else if (d.vya === "undoempty") {
+  const p = (d as { path?: unknown }).path;
+  if (typeof p === "string") {
+   setCapStatus("saving");
+   fetch(withStore("/api/store/capture/undo"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: p }) })
+    .then(async (r) => {
+     const j = await r.json().catch(() => ({})); /* allow-swallow: an unreadable answer reads as "nothing to undo" */
+     setCapStatus("saved");
+     if (r.ok && j.ok) { setUndoNote("Undid your last save"); setPreviewKey((k) => k + 1); }
+     else setUndoNote(typeof j.error === "string" ? j.error : "Nothing left to undo on this page.");
+    })
+    .catch(() => { setCapStatus("saved"); setUndoNote("Couldn’t undo just now."); })
+    .finally(() => { setTimeout(() => setUndoNote(null), 4000); });
+  }
+ }
+ // "More layouts…" from the + between sections: the Layout rail's next pick lands in that seam.
+ else if (d.vya === "openlayout") { setPanel(null); setSelImg(null); setCapTab("sections"); setCapPanelOpen(true); }
+ // The bar on a hidden page's own editor — "Show" puts it back for shoppers. Written straight from
+ // here rather than through the Pages panel, because she is standing on the page she means.
+ else if (d.vya === "showpage") {
+  const p = (d as { path?: unknown }).path;
+  if (typeof p === "string") {
+   fetch(withStore("/api/store/capture/pages"), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: p, hidden: false }) })
+    .then((r) => { if (r.ok) { setPagesStale((n) => n + 1); setPreviewKey((k) => k + 1); } })
+    .catch(() => { /* allow-swallow: the bar stays where it is, and she can press it again */ });
+  }
+ }
  }
  window.addEventListener("message", onMsg);
  return () => window.removeEventListener("message", onMsg);
@@ -471,6 +627,161 @@ export default function StorefrontEditor() {
  const goToPage = (path: string) => { setSelPath(path); setPanel(null); setSelImg(null); setFocusEid(null); setPreviewKey((k) => k + 1); };
 
  const postToPreview = (msg: unknown) => editIframe.current?.contentWindow?.postMessage(msg, "*");
+ // Her collections, for the Grid panel's picker — read once, the first time she opens a grid.
+ useEffect(() => {
+  if (!gridSel || gridCollections !== null) return;
+  fetch(withStore("/api/store/collections?all=1"))
+   .then((r) => (r.ok ? r.json() : { collections: [] }))
+   .then((d) => setGridCollections((Array.isArray(d.collections) ? d.collections : []).map((c: { slug: string; title: string; itemCount?: number }) => ({ slug: c.slug, title: c.title, itemCount: c.itemCount ?? 0 }))))
+   .catch(() => setGridCollections([]));
+ }, [gridSel, gridCollections]);
+ // "Refresh card look": read her theme's product card again from her collection pages, then re-render every grid.
+ const refreshCardLook = async () => {
+  setGridRefresh({ busy: true, note: null });
+  const r = await fetch(withStore("/api/store/capture/grid-kit"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh: true }) }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {}; /* allow-swallow: reported below */
+  setGridRefresh({ busy: false, note: r && r.ok ? (j.kit === "theme" ? "Updated from your collection page." : "Your site’s card couldn’t be read, so grids use the simple card.") : (typeof j.error === "string" ? j.error : "Couldn’t refresh just now.") });
+  postToPreview({ vya: "gridrefresh" });
+ };
+ // ── HER PAGES ──────────────────────────────────────────────────────────────────────────────────
+ // One read: her pages, her menu order, what nothing links to, and how many links point at each.
+ // Read-only — opening the editor never writes a page row.
+ const loadPages = useCallback(async () => {
+  // `no-store`: this is re-read straight after a rename or a hide, to the same URL. Left to the
+  // browser's own judgement it can answer from its cache and hand back the page list as it was
+  // before her change — which reads as the change not having happened.
+  const r = await fetch(withStore("/api/store/capture/pages"), { cache: "no-store" }).catch(() => null);
+  const j = r && r.ok ? await r.json().catch(() => null) : null; /* allow-swallow: reported below */
+  if (!j) { setPagesNote("Couldn’t load your pages just now."); return; }
+  setPagesList(Array.isArray(j.pages) ? j.pages : []);
+  setPagesMenu(j.menu || null);
+  setPagesReady(j.ready !== false);
+  setPagesDrifted(!!j.drifted);
+ }, []);
+ const hasCapture = !!captured;
+ useEffect(() => { if (hasCapture) void loadPages(); }, [hasCapture, pagesStale, loadPages]);
+
+ /** One page changed: re-read the list, and reload the canvas when it was the page on screen. */
+ const patchPage = async (path: string, patch: Record<string, unknown>): Promise<boolean> => {
+  setPagesBusy(true); setPagesNote(null);
+  // The rail changes the moment she acts, the same way reordering already does. Waiting for the round
+  // trip reads as nothing having happened — she renamed a page, saw the old name, and refreshed.
+  const before = pagesList;
+  setPagesList((list) => list.map((e) => {
+   if (e.path !== path) return e;
+   const next = { ...e };
+   if (typeof patch.title === "string") next.title = patch.title;
+   if (typeof patch.navLabel === "string") next.navLabel = patch.navLabel;
+   if (typeof patch.hidden === "boolean") next.hidden = patch.hidden;
+   // The rule the server labels by (pageLabel in site-builder/pages.ts), so the row she sees now and
+   // the one that comes back cannot disagree.
+   next.label = (next.navLabel || next.title || "").trim() || next.label;
+   return next;
+  }));
+  const r = await fetch(withStore("/api/store/capture/pages"), {
+   method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path, ...patch }),
+  }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {}; /* allow-swallow: reported below */
+  setPagesBusy(false);
+  // Put the rail back rather than leaving her looking at a change that was never saved.
+  if (!r || !r.ok) { setPagesList(before); setPagesNote(typeof j.error === "string" ? j.error : "Couldn’t save that just now."); return false; }
+  setPagesStale((n) => n + 1);
+  // ALWAYS, not just when she is looking at the page she changed. Renaming or hiding a page changes
+  // the MENU, and the menu is on every page — so the canvas is out of date whichever one is open.
+  setPreviewKey((k) => k + 1);
+  return true;
+ };
+
+ /** Rename: what the page is called, in her menu and in the browser tab. Never its address — so no
+  *  link anyone is holding, and nothing Google has indexed, breaks. */
+ const renamePage = async (p: PageEntryView) => {
+  const name = await dialog.prompt({
+   title: `Rename “${p.label}”`,
+   body: `Changes what this page is called — in your menu and in the browser tab. Its web address stays ${p.path}, so every link to it still works.`,
+   defaultValue: p.navLabel || p.title || p.label,
+   confirmLabel: "Rename", maxLength: 60,
+  });
+  if (!name || !name.trim()) return;
+  await patchPage(p.path, { title: name.trim(), navLabel: name.trim() });
+ };
+
+ /** The ✕ on a thumbnail, and the eye in the Pages rail. Showing again needs no confirmation. */
+ const askRemovePage = async (p: PageEntryView) => {
+  if (p.refusal) { setPagesNote(p.refusal); return; }
+  if (p.hidden) { await patchPage(p.path, { hidden: false }); return; }
+  setRemoveAsk(p);
+ };
+ const deletePageForGood = async (p: PageEntryView) => {
+  setRemoveAsk(null); setPagesBusy(true); setPagesNote(null);
+  const r = await fetch(withStore(`/api/store/capture/pages?path=${encodeURIComponent(p.path)}`), { method: "DELETE" }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {}; /* allow-swallow: reported below */
+  setPagesBusy(false);
+  if (!r || !r.ok) { setPagesNote(typeof j.error === "string" ? j.error : "Couldn’t delete that page."); return; }
+  setPagesStale((n) => n + 1);
+  setCaptured((c) => (c ? { ...c, pages: c.pages.filter((x) => x !== p.path), count: Math.max(0, c.count - 1) } : c));
+  if (p.path === selPath) { setSelPath("/"); setPreviewKey((k) => k + 1); }
+ };
+
+ /** In or out of the menu, without touching the page itself. */
+ const togglePageInMenu = async (p: PageEntryView) => {
+  if (!pagesMenu) { setPagesNote("We couldn’t find a menu on your header to change."); return; }
+  const items = p.inMenu
+   ? pagesMenu.items.filter((it) => it.href !== p.path)
+   : [...pagesMenu.items, { id: `m${pagesMenu.items.length}`, label: p.label, href: p.path }];
+  await saveMenu(items);
+ };
+
+ /** Her order, dragged in the rail. This is the order shoppers see — on desktop AND on a phone. */
+ const reorderMenu = async (from: string, to: string) => {
+  if (!pagesMenu) return;
+  const items = [...pagesMenu.items];
+  const i = items.findIndex((x) => x.href === from), j = items.findIndex((x) => x.href === to);
+  if (i < 0 || j < 0 || i === j) return;
+  const [moved] = items.splice(i, 1);
+  items.splice(j, 0, moved);
+  await saveMenu(items);
+ };
+
+ async function saveMenu(items: { id: string; label: string; href: string; hidden?: boolean }[]) {
+  const prev = pagesMenu;
+  setPagesMenu((m) => (m ? { ...m, items } : m)); // the rail moves now; the save follows it
+  setPagesBusy(true); setPagesNote(null);
+  const r = await fetch(withStore("/api/store/capture/menu"), {
+   method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ menu: "main", items, signature: prev?.signature || "" }),
+  }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {}; /* allow-swallow: reported below */
+  setPagesBusy(false);
+  if (!r || !r.ok) {
+   setPagesMenu(prev); // put it back where she left it rather than showing an order we did not save
+   if (j && j.drifted && j.menu) { setPagesMenu(j.menu); setPagesDrifted(true); }
+   setPagesNote(typeof j.error === "string" ? j.error : "Couldn’t save your menu just now.");
+   return;
+  }
+  setPagesStale((n) => n + 1);
+  setPreviewKey((k) => k + 1);
+ }
+
+ /** A new page, in her own header and footer, with a starter text block in the middle. */
+ const addCapturedPage = async () => {
+  const title = await dialog.prompt({ title: "Name the new page", body: "It opens with your own header and footer, and a block of text to edit.", placeholder: "Shipping, FAQ, Visit us…", confirmLabel: "Add page", maxLength: 60 });
+  if (!title || !title.trim()) return;
+  setPagesBusy(true); setPagesNote(null);
+  const r = await fetch(withStore("/api/store/capture/pages"), {
+   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim() }),
+  }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {}; /* allow-swallow: reported below */
+  setPagesBusy(false);
+  if (!r || !r.ok || typeof j.path !== "string") { setPagesNote(typeof j.error === "string" ? j.error : "Couldn’t add that page."); return; }
+  setPagesStale((n) => n + 1);
+  setCaptured((c) => (c ? { ...c, pages: [...c.pages, j.path as string], count: c.count + 1 } : c));
+  goToPage(j.path as string);
+ };
+
+ // Hide or show a captured section for shoppers; a block she added is deleted outright.
+ const hideOrDeleteSection = () => {
+  if (secInfo && !secInfo.block) { postToPreview({ vya: secInfo.hidden ? "showsec" : "hidesec" }); setSecInfo({ ...secInfo, hidden: !secInfo.hidden }); return; }
+  postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); setGridSel(null);
+ };
  // Asset library (Canva-style uploads) — the store's own photos, reusable across the whole site.
  async function loadAssets() {
  setAssetsBusy(true);
@@ -706,6 +1017,10 @@ export default function StorefrontEditor() {
  // + conversational edits via VYA), not the block builder.
  if (captured) {
  const pageLabel = (p: string) => {
+ // Her own name for the page wins. This picker is built from the captured PATHS, so without this it
+ // keeps calling a page by the name its address implies — "Faq" for a page she renamed.
+ const named = (pagesList.find((x) => x.path === p)?.label || "").trim();
+ if (named) return named;
  if (p === "/") return "Home";
  const seg = p.split("/").filter(Boolean).pop() || p;
  return seg.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -804,20 +1119,64 @@ export default function StorefrontEditor() {
  return (
  <div className="fixed inset-x-0 bottom-0 z-[60] flex flex-col bg-[#fbf9f5] text-stone-900" style={{ top: "var(--vya-banner, 0px)" }}>
  {dialog.node}
+ {/* THE ✕ ON A PAGE CARD asks before it does anything, and offers both answers: hide it (reversible,
+     and what the ✕ means by default) or delete it for good. Its own small dialog rather than a plain
+     confirm, because a two-button box cannot offer two different destructive answers. */}
+ {removeAsk && (
+  <div
+   className="fixed inset-0 z-[80] grid place-items-center bg-black/40 px-4"
+   role="dialog"
+   aria-modal="true"
+   aria-label={`Remove ${removeAsk.label}`}
+   onKeyDown={(e) => { if (e.key === "Escape") setRemoveAsk(null); }}
+  >
+   <div className="w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-5 shadow-[0_30px_80px_-20px_rgba(43,36,29,0.6)]">
+    <p className="text-[15px] font-semibold text-stone-900">Remove &ldquo;{removeAsk.label}&rdquo;?</p>
+    <p className="mt-2 text-[12.5px] leading-relaxed text-stone-600">
+     Hiding it is the reversible one: shoppers get &ldquo;Page not found&rdquo;, it disappears from your menu, and it stays here so you can bring it back whenever you like.
+    </p>
+    {!!removeAsk.linkedFrom && (
+     <p className="mt-2.5 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
+      {removeAsk.linkedFrom === 1 ? "One link on your site still points here" : `${removeAsk.linkedFrom} links on your site still point here`} — anyone following one will get &ldquo;Page not found&rdquo;.
+     </p>
+    )}
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+     <button type="button" autoFocus onClick={() => { const p = removeAsk; setRemoveAsk(null); void patchPage(p.path, { hidden: true }); }}
+      className="rounded-lg bg-[#5D0F17] px-3.5 py-2 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">Hide from shoppers</button>
+     <button type="button" onClick={() => setRemoveAsk(null)}
+      className="rounded-lg border border-black/15 px-3.5 py-2 text-[13px] font-medium text-stone-600 transition hover:bg-stone-100">Cancel</button>
+     <button
+      type="button"
+      onClick={async () => {
+       const p = removeAsk;
+       setRemoveAsk(null); // closed first, so the confirmation below is not a box on top of a box
+       if (!(await dialog.confirm({ title: `Delete “${p.label}” for good?`, body: "The page itself goes. Hide it instead if there is any chance you want it back.", confirmLabel: "Delete permanently" }))) return;
+       await deletePageForGood(p);
+      }}
+      className="ml-auto text-[12px] text-stone-500 underline underline-offset-2 transition hover:text-red-600"
+     >
+      Delete permanently
+     </button>
+    </div>
+   </div>
+  </div>
+ )}
  <HideGlobalChat />
  {/* Top bar — matches the studio */}
  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
  <div className="flex min-w-0 items-center gap-2.5">
  <a href={`${base}/home`} title="Back to admin" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronDown size={16} className="rotate-90" /></a>
  <span className="truncate text-[15px] font-semibold tracking-tight">{storeName}</span>
- <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
+ {/* Hidden on a phone: the Live/Off switch on the right says the same thing, and the bar needs the room. */}
+ <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] max-sm:hidden ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
  <span className="hidden shrink-0 rounded-full bg-[#5D0F17]/[0.07] px-2 py-0.5 text-[10px] font-semibold text-[#5D0F17] sm:inline">Imported site</span>
- <span className="mx-0.5 h-5 w-px bg-black/10" />
+ <span className="mx-0.5 h-5 w-px shrink-0 bg-black/10 max-sm:hidden" />
  <div className="flex overflow-hidden rounded-lg border border-black/10 bg-[#f4f1ec]">
- <button type="button" onClick={() => postToPreview({ vya: "undo" })} title="Undo (⌘Z)" aria-label="Undo" className="grid h-7 w-8 place-items-center text-stone-500 transition hover:bg-white hover:text-stone-800"><Undo2 size={15} strokeWidth={1.9} /></button>
+ <button type="button" onClick={() => postToPreview({ vya: "undoany" })} title="Undo (⌘Z)" aria-label="Undo" className="grid h-7 w-8 place-items-center text-stone-500 transition hover:bg-white hover:text-stone-800"><Undo2 size={15} strokeWidth={1.9} /></button>
  <span className="w-px bg-black/10" />
  <button type="button" onClick={() => postToPreview({ vya: "redo" })} title="Redo (⌘⇧Z)" aria-label="Redo" className="grid h-7 w-8 place-items-center text-stone-500 transition hover:bg-white hover:text-stone-800"><Redo2 size={15} strokeWidth={1.9} /></button>
  </div>
+ {undoNote && <span role="status" className="shrink-0 text-[11px] text-stone-500 max-sm:hidden">{undoNote}</span>}
  </div>
  <div className="hidden rounded-lg border border-black/10 bg-[#f4f1ec] p-0.5 md:flex">{capDbtn("desktop", Monitor)}{capDbtn("tablet", Tablet)}{capDbtn("phone", Smartphone)}</div>
  <div className="flex shrink-0 items-center gap-2">
@@ -832,13 +1191,15 @@ export default function StorefrontEditor() {
  </div>
  </div>
 
- <div className="flex min-h-0 flex-1">
+ <div className="relative flex min-h-0 flex-1">
  {/* Canva-style shell: a vertical icon rail (always visible) + a collapsible content panel — 1:1 with the from-scratch studio */}
- <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-white transition-[width] duration-200 ${capPanelOpen ? "w-[430px]" : "w-[70px]"}`}>
+ {/* Below 768 the open panel floats OVER the preview instead of pushing it: a 430px column on a 390px
+     phone pushed itself off the screen and crushed the preview to nothing. Collapse it to see the page. */}
+ <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-white transition-[width] duration-200 ${capPanelOpen ? "w-[430px] max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[calc(100vw-2.5rem)] max-md:shadow-[8px_0_24px_-12px_rgba(0,0,0,0.25)]" : "w-[70px]"}`}>
  <button type="button" onClick={() => setCapPanelOpen((o) => !o)} title={capPanelOpen ? "Collapse panel" : "Expand panel"} className="absolute -right-3 top-1/2 z-30 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-black/10 bg-white text-stone-500 shadow-sm transition hover:text-[#5D0F17]">{capPanelOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}</button>
  {/* Vertical icon rail */}
  <div className="flex w-[70px] shrink-0 flex-col items-center gap-1 overflow-y-auto py-3">
- {([["design", "Design", Palette], ["sections", "Layout", Layers], ["elements", "Elements", Shapes], ["text", "Text", Type], ["uploads", "Uploads", UploadIcon], ["assist", "VYA", Sparkles]] as const).map(([id, label, Icon]) => (
+ {([["design", "Design", Palette], ["sections", "Layout", Layers], ["pages", "Pages", Files], ["elements", "Elements", Shapes], ["text", "Text", Type], ["uploads", "Uploads", UploadIcon], ["assist", "VYA", Sparkles]] as const).map(([id, label, Icon]) => (
  <button key={id} type="button" onClick={() => { if (!(selImg || panel) && capTab === id && capPanelOpen) { setCapPanelOpen(false); } else { setCapTab(id); setCapPanelOpen(true); } }} className={`flex w-[58px] flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-medium transition ${!(selImg || panel) && capTab === id && capPanelOpen ? "bg-[#5D0F17]/[0.08] text-[#5D0F17]" : "text-stone-500 hover:bg-stone-100"}`}>
  <Icon size={19} strokeWidth={1.8} />{label}
  </button>
@@ -846,7 +1207,7 @@ export default function StorefrontEditor() {
  </div>
  {/* Active panel — hidden when the side bar is collapsed */}
  {capPanelOpen && (
- <div className="flex min-h-0 flex-1 flex-col border-l border-black/10 bg-white">
+ <div className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-black/10 bg-white">
  {(selImg || panel) ? (
  /* ── Contextual editor — selecting an image/section replaces the rail (like the studio) ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -906,6 +1267,22 @@ export default function StorefrontEditor() {
  )}
  </>}
  </>
+ ) : panel && gridSel ? (
+ /* A product grid she added: its settings, instead of text fields (it has none of its own). */
+ <GridPanel
+  config={gridSel.config}
+  kit={gridSel.kit}
+  empty={gridSel.empty}
+  collections={gridCollections}
+  refreshing={gridRefresh.busy}
+  refreshNote={gridRefresh.note}
+  onChange={(next) => { setGridSel({ ...gridSel, config: next }); postToPreview({ vya: "gridset", id: gridSel.id, config: next }); }}
+  onRefresh={refreshCardLook}
+  onDone={() => { postToPreview({ vya: "deselect" }); setPanel(null); setSecRect(null); setGridSel(null); }}
+  onDelete={() => { postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); setGridSel(null); }}
+  piece={focusItem}
+  piecePanel={focusItem ? piecePanel : undefined}
+ />
  ) : panel ? (
  <>
  <div className="mb-3 flex items-center justify-between">
@@ -920,8 +1297,19 @@ export default function StorefrontEditor() {
  {inlineKind && <p className="mb-1.5 text-[11px] text-stone-400">This {inlineKind === "image" ? "image" : inlineKind === "button" ? "button" : "text box"} is selected — use the arrows on it to move it.</p>}
  <div className="mb-4 flex gap-2">
  <button onClick={() => postToPreview({ vya: inlineKind ? "dupinline" : "dupsec" })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Copy size={13} /> Duplicate{inlineKind ? " this" : ""}</button>
+ {!inlineKind && secInfo && !secInfo.block ? (
+ /* One of her captured sections: hidden from shoppers, not deleted, so it can come back. */
+ <button onClick={hideOrDeleteSection} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">{secInfo.hidden ? <><Eye size={13} /> Show section</> : <><EyeOff size={13} /> Hide section</>}</button>
+ ) : (
  <button onClick={() => { if (inlineKind) { postToPreview({ vya: "delinline" }); setInlineKind(null); } else { postToPreview({ vya: "delsec" }); setPanel(null); } }} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-red-300 hover:bg-red-50 hover:text-red-600"><Trash2 size={13} /> Delete{inlineKind ? " this" : " section"}</button>
+ )}
  </div>
+ {!inlineKind && secInfo && !secInfo.block && (
+ <p className="-mt-2 mb-4 text-[11.5px] leading-snug text-stone-400">
+  {secInfo.hidden ? "Hidden from shoppers — it stays here so you can bring it back." : "Hiding keeps it on your page for later."}{" "}
+  <button type="button" onClick={async () => { if (!(await dialog.confirm({ title: "Delete this section for good?", body: "It comes off this page. Hide it instead if you might want it back.", confirmLabel: "Delete section" }))) return; postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); setSecInfo(null); }} className="underline underline-offset-2 hover:text-red-600">Delete permanently</button>
+ </p>
+ )}
  {/* Adding INTO the section she has open. The left rail's Text tab can only add a new band, because
      reaching that tab means dismissing this panel — and dismissing it deselects the section, so by
      the time she clicks "Paragraph" there is no "here" left to put anything in. Here there is. */}
@@ -992,6 +1380,12 @@ export default function StorefrontEditor() {
   if (!el || scrollEid === null || f.eid !== scrollEid) return;
   el.scrollIntoView({ block: "center", behavior: "smooth" });
   el.focus();
+  // Where she clicked, not the front. A focused box starts with its cursor at 0, so clicking at the
+  // END of "Out In Nature" on the page and typing wrote at the START of the box — measured: typing
+  // "Z" gave "ZOur Story", Delete ate its first letter — and a header/footer edit then carried that
+  // damage to every page.
+  const at = focusCaret.current === null ? el.value.length : Math.min(focusCaret.current, el.value.length);
+  try { el.setSelectionRange(at, at); } catch { /* allow-swallow: a box that can't take a selection keeps the browser's */ }
   setScrollEid(null);
  }}
  value={f.value}
@@ -1046,14 +1440,24 @@ export default function StorefrontEditor() {
  {secStyle.color && <button onClick={() => setSec("color", "")} title="Clear" className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">reset</button>}
  <ColorSwatch value={secStyle.color || "#1a1a1a"} onChange={(v) => setSec("color", v)} />
  </div>
+ {/* The section's buttons. Background and Text recolour the section and its words, but every button
+     keeps its own fill — so from here, no button that came with the site could change colour. */}
+ {typeof secStyle.btn === "string" && (
  <div className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2">
- <span className="flex-1 text-[13px] text-stone-700">Align</span>
- <div className="flex overflow-hidden rounded-md border border-black/10">
- {(["left", "center", "right"] as const).map((a) => (
- <button key={a} onClick={() => setSec("align", a)} className={`grid h-7 w-8 place-items-center transition ${secStyle.align === a ? "bg-[#5D0F17] text-white" : "text-stone-500 hover:bg-stone-100"}`}>{a === "left" ? <AlignLeft size={14} /> : a === "center" ? <AlignCenter size={14} /> : <AlignRight size={14} />}</button>
- ))}
+ <span className="flex-1 text-[13px] text-stone-700">Buttons</span>
+ {secStyle.btnSet && <button onClick={() => { setSecStyle((s) => ({ ...s, btn: "", btnSet: false })); postToPreview({ vya: "secbtn", value: "" }); }} title="Clear" className="text-[11px] text-stone-400 underline hover:text-[#5D0F17]">reset</button>}
+ <input
+  type="color"
+  value={/^#[0-9a-fA-F]{6}$/.test(secStyle.btn) ? secStyle.btn : "#000000"}
+  onChange={(e) => { const v = e.target.value; setSecStyle((s) => ({ ...s, btn: v, btnSet: true })); postToPreview({ vya: "secbtn", value: v }); }}
+  aria-label="Buttons colour for this section"
+  className="h-7 w-7 cursor-pointer rounded-md border border-black/10 bg-white p-0"
+ />
  </div>
- </div>
+ )}
+ {/* No section "Align": it wrote text-align on the section's wrapper, and a theme aligns its own
+     headings, text and buttons, so nothing on the page moved (measured on thenicheshop-2). Aligning one
+     piece of text still works from the text toolbar. */}
  </div>
  </div>
  </>
@@ -1063,6 +1467,23 @@ export default function StorefrontEditor() {
  <>
  {capTab === "assist" ? (
  <div className="min-h-0 flex-1"><Sidekick docked /></div>
+ ) : capTab === "pages" ? (
+ /* ── Pages — her menu order, renaming, hiding, and adding a page ── */
+ <PagesPanel
+  pages={pagesList}
+  ready={pagesReady}
+  busy={pagesBusy}
+  note={pagesNote}
+  drifted={pagesDrifted}
+  selPath={selPath}
+  onOpen={goToPage}
+  onRename={renamePage}
+  onToggleHidden={askRemovePage}
+  onToggleMenu={togglePageInMenu}
+  onReorder={reorderMenu}
+  onAdd={addCapturedPage}
+  dragRef={pageDrag}
+ />
  ) : capTab === "sections" ? (
  /* ── Layout — the same word, grouping and names as the Studio's Layout rail.
     It read "Sections" here and "Layout" there for the same job, which is how one product starts
@@ -1074,7 +1495,13 @@ export default function StorefrontEditor() {
     worse lie than one honest layout. ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add a layout</p>
- <p className="mb-3 text-[12px] leading-snug text-stone-400">Drops it at the bottom of your page — then click its text or images to edit, or drag it into place.</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Drops it after the section you have selected (or the one in the middle of your screen). To put it exactly somewhere, hover between two sections on the page and press +.</p>
+ {/* Product grid — live pieces in her theme's own card. First, because it is the one layout that sells. */}
+ <button type="button" onClick={() => postToPreview({ vya: "addgrid" })} className="group mb-4 flex w-full items-center gap-3 rounded-xl border border-[#5D0F17]/25 bg-[#5D0F17]/[0.03] p-3 text-left transition hover:-translate-y-px hover:border-[#5D0F17]/50 hover:shadow-[0_10px_26px_-14px_rgba(43,36,29,0.5)]">
+  <span className="grid h-10 w-10 shrink-0 grid-cols-2 gap-0.5 rounded-md border border-black/5 bg-white p-1.5" aria-hidden>{[0, 1, 2, 3].map((i) => <span key={i} className="rounded-[2px] bg-[#5D0F17]/25" />)}</span>
+  <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold text-stone-800">Product grid</span><span className="block text-[11.5px] leading-snug text-stone-500">Live pieces, in your site&rsquo;s own product card</span></span>
+  <Plus size={14} className="shrink-0 text-stone-300 transition group-hover:text-[#5D0F17]" />
+ </button>
  <input value={secQ} onChange={(e) => setSecQ(e.target.value)} placeholder="Search layouts…" className="mb-3 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[12px] outline-none focus:border-[#5D0F17]/50" />
  {(() => {
   const ALL: [string, string][] = [["hero", "Hero"], ["announcement", "Announcement"], ["faq", "FAQ"], ["gallery", "Gallery"], ["split", "Split"], ["columns", "Columns"], ["testimonials", "Reviews"], ["blog", "Blog"], ["contact", "Contact"], ["statement", "Statement"], ["newsletter", "Newsletter"]];
@@ -1148,7 +1575,14 @@ export default function StorefrontEditor() {
  ) : (
  /* ── Design tab — 1:1 with the studio: palettes / colours / corners / fonts ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
- <p className="mb-2 rounded-lg bg-[#5D0F17]/[0.05] px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">Your imported site keeps its own layout — these set its palette, fonts and corners on top. <b>Apply</b> to preview.</p>
+ <p className="mb-2 rounded-lg bg-[#5D0F17]/[0.05] px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">Your imported site keeps its own layout — these set its palette and fonts on top. Changes show in the preview straight away and save on their own.</p>
+ {designNote && <p className="mb-2 rounded-lg border border-[#5D0F17]/25 bg-white px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">{designNote}</p>}
+ {designOutdated && (
+ <p className="mb-2 rounded-lg border border-[#5D0F17]/25 bg-white px-3 py-2 text-[11px] leading-relaxed text-stone-600">
+  Your saved colours and fonts were set before they could reach every part of your theme, so your live site may show only some of them.{" "}
+  <button type="button" onClick={() => { designTouched.current = true; setDesignOutdated(false); setDesign((d) => ({ ...d })); }} className="font-semibold text-[#5D0F17] underline">Update my live site</button>
+ </p>
+ )}
 
  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Colour palette</p>
  <div className="grid grid-cols-3 gap-2">
@@ -1243,7 +1677,7 @@ export default function StorefrontEditor() {
  <details className="mt-4">
  <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Custom CSS</summary>
  <p className="mb-1.5 mt-2 text-[12px] leading-snug text-stone-400">Advanced — layered over your site. Or just ask VYA.</p>
- <textarea value={designRest} onChange={(e) => { setDesignRest(e.target.value); setDesignSaved(false); }} spellCheck={false} placeholder=".site-header { background: #111; }" className="min-h-[100px] w-full resize-y rounded-lg border border-black/10 bg-white px-2.5 py-2 font-mono text-[11px] leading-relaxed outline-none focus:border-[#5D0F17]/50" />
+ <textarea value={designRest} onChange={(e) => { designTouched.current = true; setDesignRest(e.target.value); setDesignSaved(false); }} spellCheck={false} placeholder=".site-header { background: #111; }" className="min-h-[100px] w-full resize-y rounded-lg border border-black/10 bg-white px-2.5 py-2 font-mono text-[11px] leading-relaxed outline-none focus:border-[#5D0F17]/50" />
  </details>
 
  {isAdmin && (
@@ -1270,7 +1704,7 @@ export default function StorefrontEditor() {
  {/* Canvas */}
  <div className="flex min-w-0 flex-1 flex-col">
  {/* Page selector chrome */}
- <div className="flex items-center gap-2 border-b border-black/10 bg-white px-3 py-2">
+ <div className="flex flex-wrap items-center gap-2 border-b border-black/10 bg-white px-3 py-2">
  <button onClick={() => setPreviewKey((k) => k + 1)} title="Reload preview" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"><RotateCw size={14} strokeWidth={2} /></button>
  <div className="relative shrink-0">
  <HomeIcon size={13} strokeWidth={2} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -1297,7 +1731,11 @@ export default function StorefrontEditor() {
  </div>
 
  {/* Preview surface — the pixel-perfect captured site */}
- <div ref={surfaceRef} className="relative flex min-h-0 flex-1 justify-center overflow-auto bg-[#eeece7] p-4">
+ {/* The canvas is often wider than this surface — at ANY window width, not just below 1280: a 1440
+     laptop minus the 430px panel leaves ~1000px for a 1280px canvas. Plain centring pushed its left
+     edge out where no scrollbar reaches; safe centring starts it at the left instead, and still
+     centres it when it fits. */}
+ <div ref={surfaceRef} className="relative flex min-h-0 flex-1 justify-center-safe overflow-auto bg-[#eeece7] p-4">
  {/* Zooming out means seeing MORE PAGE, not a narrower page.
      The frame stays exactly canvasW wide at every zoom — so the theme never reflows — and grows
      TALLER by 100/scale, which is what puts more of the page on screen. The outer box reserves the
@@ -1309,7 +1747,7 @@ export default function StorefrontEditor() {
  </div>
  </div>
  {/* Floating section bar — the SAME bar as the from-scratch builder, positioned over the selected section */}
- {panel && secRect && editIframe.current && (() => {
+ {panel && secRect && editIframe.current && !gridSel && (() => {
  const ir = editIframe.current.getBoundingClientRect();
  // secRect is measured INSIDE the frame, so it is in the page's own pixels. The frame is scaled,
  // so those have to be scaled too or the bar drifts further from its section the further you zoom.
@@ -1334,11 +1772,7 @@ export default function StorefrontEditor() {
  <label className="shrink-0 cursor-pointer rounded-md bg-[#5D0F17] px-3 py-1 text-[12px] font-medium text-white transition hover:bg-[#4a0c12]">{assetsBusy ? "Uploading…" : "Photo"}<input type="file" accept="image/*" className="hidden" disabled={assetsBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (!f) return; const url = await uploadAsset(f); if (url) setSecPhoto(url); }} /></label>
  <span className="h-5 w-px shrink-0 bg-black/10" />
  <ColorDot value={secStyle.color && /^#/.test(secStyle.color) ? secStyle.color : "#111111"} onChange={(v) => setSec("color", v)} title="Text colour" />
- <div className="flex shrink-0 overflow-hidden rounded-md border border-black/10">
- {(["left", "center", "right"] as const).map((a) => (
- <button key={a} type="button" onClick={() => setSec("align", secStyle.align === a ? "" : a)} className={chip(secStyle.align === a)}>{a[0].toUpperCase()}</button>
- ))}
- </div>
+ {typeof secStyle.btn === "string" && <ColorDot value={/^#[0-9a-fA-F]{6}$/.test(secStyle.btn) ? secStyle.btn : "#111111"} onChange={(v) => { setSecStyle((s) => ({ ...s, btn: v, btnSet: true })); postToPreview({ vya: "secbtn", value: v }); }} title="Buttons colour" />}
  <div className="flex shrink-0 items-center gap-1">
  <span className="text-[10px] uppercase tracking-wide text-stone-400">Space</span>
  <div className="flex overflow-hidden rounded-md border border-black/10">
@@ -1357,6 +1791,20 @@ export default function StorefrontEditor() {
     title="Text colour"
     className="h-6 w-6 shrink-0 cursor-pointer rounded-md border border-black/10 bg-white p-0"
    />
+   {/* An existing button's own colour. Its label took Text colour, but nothing reached its fill, so no
+       button that came with the site could change colour at all. */}
+   {txtSel.btn !== null && (
+    <label className="flex shrink-0 items-center gap-1 text-[10px] uppercase tracking-wide text-stone-400" title="Button colour">
+     Button
+     <input
+      type="color"
+      value={/^#[0-9a-fA-F]{6}$/.test(txtSel.btn) ? txtSel.btn : "#000000"}
+      onChange={(e) => { setTxtSel({ ...txtSel, btn: e.target.value }); postToPreview({ vya: "btnstyle", value: e.target.value }); }}
+      aria-label="Button colour"
+      className="h-6 w-6 cursor-pointer rounded-md border border-black/10 bg-white p-0"
+     />
+    </label>
+   )}
    <button type="button" onClick={() => postToPreview({ vya: "txtstyle", prop: "font-size", dir: "dec" })} title="Smaller text" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[13px] font-semibold text-stone-500 transition hover:bg-stone-100 hover:text-stone-800">A−</button>
    <button type="button" onClick={() => postToPreview({ vya: "txtstyle", prop: "font-size", dir: "inc" })} title="Bigger text" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[13px] font-semibold text-stone-500 transition hover:bg-stone-100 hover:text-stone-800">A+</button>
    {(["left", "center", "right"] as const).map((a, i) => (
@@ -1370,7 +1818,7 @@ export default function StorefrontEditor() {
  <button type="button" onClick={() => postToPreview({ vya: "movesec", dir: "up" })} title="Move up" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"><ChevronUp size={15} /></button>
  <button type="button" onClick={() => postToPreview({ vya: "movesec", dir: "down" })} title="Move down" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"><ChevronDown size={15} /></button>
  <button type="button" onClick={() => postToPreview({ vya: "dupsec" })} title="Duplicate" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-500 transition hover:bg-stone-100 hover:text-[#5D0F17]"><Copy size={14} /></button>
- <button type="button" onClick={() => { postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); }} title="Delete" className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+ <button type="button" onClick={hideOrDeleteSection} title={secInfo && !secInfo.block ? (secInfo.hidden ? "Show to shoppers" : "Hide from shoppers") : "Delete"} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-stone-400 transition hover:bg-red-50 hover:text-red-600">{secInfo && !secInfo.block ? (secInfo.hidden ? <Eye size={14} /> : <EyeOff size={14} />) : <Trash2 size={14} />}</button>
  </div>
  );
  })()}
@@ -1404,6 +1852,11 @@ export default function StorefrontEditor() {
   };
   const Thumb = ({ p }: { p: string }) => {
    const off = unlinked.has(p);
+   // What she has said about this page: hidden from shoppers, renamed, or one of the few that can
+   // never be removed at all (home, the cart, the product template) — see site-builder/pages.ts.
+   const meta = pagesList.find((x) => x.path === p) ?? null;
+   const isHidden = !!meta?.hidden;
+   const name = meta?.label || pageLabel(p);
    return (
     <div
      className="flex shrink-0 flex-col items-center gap-1.5"
@@ -1413,27 +1866,46 @@ export default function StorefrontEditor() {
      onDrop={(e) => { e.preventDefault(); onDrop(p); }}
      onDragEnd={() => { dragFrom.current = null; }}
     >
-     <button
-      type="button"
-      onClick={() => { setSelPath(p); setPanel(null); setSelImg(null); setPreviewKey((k) => k + 1); }}
-      title={off ? `${pageLabel(p)} — came over fine, but nothing on your site links to it` : pageLabel(p)}
-      className={`relative grid h-[68px] w-[52px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${selPath === p ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"} ${off ? "opacity-45" : ""}`}
-     >
-      <div className="absolute inset-0 flex flex-col gap-1 p-1.5">
-       <div className="h-1.5 w-3/4 rounded-full bg-stone-200" />
-       <div className="h-1 w-full rounded-full bg-stone-100" />
-       <div className="h-1 w-5/6 rounded-full bg-stone-100" />
-       <div className="mt-auto h-3 w-full rounded-sm bg-stone-100" />
-      </div>
-     </button>
-     <span className={`max-w-[60px] truncate text-[10px] ${selPath === p ? "font-semibold text-[#5D0F17]" : off ? "text-stone-400" : "text-stone-500"}`}>{pageLabel(p)}</span>
-     {off && <span className="rounded-full bg-stone-100 px-1.5 py-px text-[9px] uppercase tracking-wide text-stone-500">Not live</span>}
+     {/* The card and its ✕ are SIBLINGS, not nested: a ✕ inside the card's button would fire the
+         card's own "open this page" on every click. */}
+     <div className="group relative">
+      <button
+       type="button"
+       onClick={() => { setSelPath(p); setPanel(null); setSelImg(null); setPreviewKey((k) => k + 1); }}
+       title={isHidden ? `${name} — hidden from shoppers` : off ? `${name} — came over fine, but nothing on your site links to it` : name}
+       className={`relative grid h-[68px] w-[52px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${selPath === p ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"} ${off || isHidden ? "opacity-45" : ""}`}
+      >
+       <div className="absolute inset-0 flex flex-col gap-1 p-1.5">
+        <div className="h-1.5 w-3/4 rounded-full bg-stone-200" />
+        <div className="h-1 w-full rounded-full bg-stone-100" />
+        <div className="h-1 w-5/6 rounded-full bg-stone-100" />
+        <div className="mt-auto h-3 w-full rounded-sm bg-stone-100" />
+       </div>
+      </button>
+      {/* Hidden pages keep a permanently visible control, because it is the way back. Everything else
+          shows it on hover or keyboard focus, so the strip stays a strip. */}
+      {meta?.refusal ? null : (
+       <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); void askRemovePage(meta ?? { path: p, label: name, title: null, navLabel: null, hidden: isHidden, kind: "captured", group: "other", inMenu: false, canHide: true, refusal: null }); }}
+        title={isHidden ? `Show “${name}” to shoppers again` : `Remove “${name}”`}
+        aria-label={isHidden ? `Show ${name} to shoppers again` : `Remove ${name}`}
+        className={`absolute -right-1.5 -top-1.5 grid h-[18px] w-[18px] place-items-center rounded-full border border-black/10 bg-white text-stone-500 shadow-sm transition hover:border-red-300 hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100 ${isHidden ? "opacity-100" : "opacity-0"}`}
+       >
+        {isHidden ? <Eye size={10} /> : <XIcon size={11} />}
+       </button>
+      )}
+     </div>
+     <span className={`max-w-[60px] truncate text-[10px] ${selPath === p ? "font-semibold text-[#5D0F17]" : off || isHidden ? "text-stone-400" : "text-stone-500"}`}>{name}</span>
+     {isHidden
+      ? <span className="rounded-full bg-[#5D0F17]/[0.08] px-1.5 py-px text-[9px] uppercase tracking-wide text-[#5D0F17]">Hidden</span>
+      : off && <span className="rounded-full bg-stone-100 px-1.5 py-px text-[9px] uppercase tracking-wide text-stone-500">Not live</span>}
     </div>
    );
   };
   return (
    <div className="shrink-0 border-t border-black/10 bg-white">
-    <div className="flex items-center gap-3 px-4 pt-2 text-[11px] text-stone-500">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 text-[11px] text-stone-500">
      <button type="button" onClick={() => setPagesOpen((o) => !o)} className="rounded-md px-2 py-1 font-semibold text-stone-600 transition hover:bg-stone-100">
       {pagesOpen ? "Collapse" : `All ${byDefault.length} pages`}
      </button>

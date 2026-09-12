@@ -9,6 +9,7 @@ import { PriceScale } from "../PriceScale";
 import { ConditionChips, MeasurementFields, measurementsFromForm, measurementsToForm, useStoreUnits } from "../ListingStructure";
 import { normalizeCondition } from "@/app/lib/condition-core";
 import type { MeasurementKey } from "@/app/lib/measurements-core";
+import PhotoCropper from "../PhotoCropper";
 
 // Admin preview: `?store=<slug>` on the page URL is carried onto every store call, as the other
 // listing pages do. Without it an admin drafting "for" a store drafted into via-admin.
@@ -102,6 +103,7 @@ export default function BulkUploadPage() {
  const [editGi, setEditGi] = useState<number | null>(null);
  const [editForm, setEditForm] = useState<EditForm>(EMPTY_EDIT);
  const [editImages, setEditImages] = useState<string[]>([]);
+ const [cropping, setCropping] = useState<string | null>(null); // cover photo mid-reposition — the card's crop, not a full editor
  // Flaws as a list, edited the way the inventory editor edits them; the store's unit for measurements.
  const [editFlaws, setEditFlaws] = useState<string[]>([]);
  const [newFlaw, setNewFlaw] = useState("");
@@ -584,7 +586,7 @@ export default function BulkUploadPage() {
 
    {itemCount > 0 && (
     <div className="mt-6">
-     <div className="mb-3 flex items-center justify-between gap-3">
+     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
       {saved ? (
        <p className="text-sm font-medium text-stone-700">
         <span className="text-emerald-600">✓ Saved {saved.drafted} draft{saved.drafted === 1 ? "" : "s"}</span>
@@ -596,13 +598,13 @@ export default function BulkUploadPage() {
       )}
 
       {saved ? (
-       <div className="flex shrink-0 items-center gap-3">
+       <div className="flex flex-wrap items-center gap-3 sm:shrink-0">
         {pendingPublish && <TechButton onClick={publishAll}>Publish all</TechButton>}
         <a href="/admin/inventory/drafts" className="text-[13px] font-medium text-stone-500 hover:text-stone-800">Inventory →</a>
         <TechButton variant="ghost" onClick={() => { setGroups([]); setDrafted({}); setSaved(null); setProgress({ done: 0, total: 0 }); try { sessionStorage.removeItem(RUN_KEY); } catch { /* private mode */ } }}>New batch</TechButton>
        </div>
       ) : (
-       <TechButton onClick={draftAll} disabled={busy}>{busy ? `Drafting ${progress.done}/${progress.total}…` : `Draft ${itemCount} item${itemCount === 1 ? "" : "s"}`}</TechButton>
+       <TechButton className="h-11 sm:h-auto" onClick={draftAll} disabled={busy}>{busy ? `Drafting ${progress.done}/${progress.total}…` : `Draft ${itemCount} item${itemCount === 1 ? "" : "s"}`}</TechButton>
       )}
      </div>
 
@@ -644,7 +646,7 @@ export default function BulkUploadPage() {
            {/* eslint-disable-next-line @next/next/no-img-element */}
            <img src={url} alt="" className="h-full w-full object-cover" />
            {!locked && (
-            <div className="absolute inset-x-0 bottom-0 hidden justify-center gap-1 bg-black/45 py-0.5 group-hover:flex">
+            <div className="absolute inset-x-0 bottom-0 hidden justify-center gap-1 bg-black/45 py-0.5 group-hover:flex [@media(hover:none)]:flex">
              <button type="button" title="Split into its own item" onClick={() => moveTo({ g: gi, i }, -1)} className="text-[10px] text-white/90 hover:text-white">split</button>
              <span className="text-[10px] text-white/40">·</span>
              <button type="button" title="Remove photo" onClick={() => removePhoto(gi, i)} className="text-[10px] text-white/90 hover:text-white">remove</button>
@@ -725,8 +727,8 @@ export default function BulkUploadPage() {
    {/* Edit-draft popup — tweak what the AI wrote and save it right here. */}
    {editGi != null && (() => { const it = drafted[editGi]; if (!isItem(it)) return null; return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => { if (!savingEdit) setEditGi(null); }}>
-     <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-      <div className="mb-4 flex items-center justify-between">
+     <div className="max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl sm:p-6" onClick={(e) => e.stopPropagation()}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
        <div>
         <h2 className="text-base font-semibold text-stone-900">{it.status === "draft" ? "Edit draft" : "Edit listing"}</h2>
         <p className="text-[11px] text-stone-400">Item {editGi + 1} of this batch</p>
@@ -742,7 +744,13 @@ export default function BulkUploadPage() {
          {/* eslint-disable-next-line @next/next/no-img-element */}
          <img src={src} alt="" className="h-full w-full object-cover" />
          {i === 0 && <span className="absolute left-0 top-0 rounded-br bg-[var(--accent,#0e9f76)] px-1 text-[8px] font-bold text-white">COVER</span>}
-         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/50 px-1 py-0.5 text-[12px] leading-none text-white opacity-0 transition group-hover:opacity-100">
+         {i === 0 && (
+          <button type="button" aria-label="Reposition cover photo" title="Reposition — this is the crop the product card shows"
+           onClick={() => setCropping(src)}
+           className="absolute right-0 top-0 rounded-bl bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+          >⤢</button>
+         )}
+         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/50 px-1 py-0.5 text-[12px] leading-none text-white opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100">
           <button type="button" aria-label="Move left" onClick={() => moveEditImage(i, -1)} disabled={i === 0} className="disabled:opacity-30">‹</button>
           <button type="button" aria-label="Remove" onClick={() => setEditImages((a) => a.filter((_, k) => k !== i))} className="hover:text-rose-300">✕</button>
           <button type="button" aria-label="Move right" onClick={() => moveEditImage(i, 1)} disabled={i === editImages.length - 1} className="disabled:opacity-30">›</button>
@@ -890,9 +898,9 @@ export default function BulkUploadPage() {
       {(() => {
        const missing = publishBlockers(editForm, editImages);
        return (
-        <div className="mt-5 flex items-center justify-end gap-3">
+        <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
          {missing.length > 0 && (
-          <p className="mr-auto text-[11px] text-stone-400">
+          <p className="mr-auto basis-full text-[11px] text-stone-400 sm:basis-auto">
            {editForm.status === "active" ? "To publish, add" : "Missing for publishing"}: <span className="text-rose-500">{missing.join(", ")}</span>
           </p>
          )}
@@ -907,6 +915,13 @@ export default function BulkUploadPage() {
      </div>
     </div>
    ); })()}
+  {cropping && (
+   <PhotoCropper
+    url={cropping}
+    onCancel={() => setCropping(null)}
+    onCropped={(next) => { setEditImages((ps) => ps.map((p) => (p === cropping ? next : p))); setCropping(null); }}
+   />
+  )}
   </AdminPage>
  );
 }

@@ -238,7 +238,7 @@ function Registrations() {
      {regs.length > 0 && (
       <div className="divide-y divide-stone-100">
        {regs.map((r) => (
-        <div key={r.id} className="flex items-center gap-3 px-5 py-3">
+        <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3">
          <span className="font-mono text-[13px] text-stone-800">{r.country}{r.state ? ` · ${r.state}` : ""}</span>
          <span className="text-[11.5px] text-stone-400">{r.status}{r.activeFrom ? ` since ${r.activeFrom}` : ""}</span>
          {r.status !== "expired" && (

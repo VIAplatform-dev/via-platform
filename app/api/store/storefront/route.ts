@@ -126,7 +126,10 @@ export async function DELETE(request: NextRequest) {
  // Platform-admin full reset: remove the imported site (captured pages) AND its imported inventory,
  // so nothing from the import lingers. Otherwise the wrapper still sees a capture and reopens the
  // captured editor after reload — and the imported products stay in inventory.
- await deleteCaptures(slug).catch(() => {});
+ // `keepAdded: false`: a platform-admin wipe means the whole hosted site, including pages she built
+ // here. A re-import, the other caller, spares those by default — see deleteCaptures.
+ await deleteCaptures(slug, { keepAdded: false }).catch(() => {});
+ await (await import("@/app/lib/site-builder/pages-db")).clearStoreBuilderRows(slug).catch(() => {});
  const seller = await getSellerBySlug(slug).catch(() => null);
  const itemsDeleted = seller ? await deleteAllItems(seller.id).catch(() => 0) : 0;
  return NextResponse.json({ ok: true, deleted: slug, itemsDeleted });

@@ -16,7 +16,7 @@ import { MAX_ITEM_IMAGES } from "./item-limits";
 // Pure helpers (money, identity, hashing) live in capture-commerce-core.ts so they can be unit
 // tested without the database layer — same split as inventory-core.ts.
 export { productContentHash, centsOf, currencyOf, identityKey, slugifyHandle } from "./capture-commerce-core.ts";
-import { membershipSubjects, mergeCapturedMembership, unfileVanished, taggedSlugs, membershipToWrite, worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, unreadCollectionSlugs } from "./capture-commerce-core.ts";
+import { membershipSubjects, mergeCapturedMembership, unfileVanished, taggedSlugs, membershipToWrite, worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, unreadCollectionSlugs, rentOnlyAction, rentOnlyWarning } from "./capture-commerce-core.ts";
 
 /** Create/refresh db/items (checkout-able inventory) for a captured store's products.
  *
@@ -76,6 +76,12 @@ export async function importProductsAsItems(
  // Per-product failures are collected rather than thrown: one unwritable listing must not cost the
  // seller the other 300. They're summarised into a warning at the end so they're still visible.
  const failures: string[] = [];
+ // Pieces her shop only rents, and how many of those were pulled back off sale. Reported, not silent.
+ let rentOnlyDrafted = 0;
+ let rentOnlyMovedBack = 0;
+ // Only touched when this import actually has a rent-only piece — ensureRentalTables runs a real
+ // CREATE EXTENSION on first use, which a store with no rentals in its feed has no reason to pay for.
+ let saveItemTerms: typeof import("./rentals/rentals-db.ts").saveItemTerms | null = null;
  let coveredByOrders = new Set<string>();
  try {
   coveredByOrders = await getImportedOrderTitleSet(slug);
@@ -86,6 +92,60 @@ export async function importProductsAsItems(
 
  for (const p of products) {
  const title = (p.name || "").trim();
+ // A piece her shop only RENTS has no buy price and must never be for sale — but it is real
+ // inventory with a real rental price, so it is saved as a DRAFT (visible to her in Store OS, never
+ // to a shopper: STOREFRONT_STATUSES excludes drafts from every grid, the hosted cart, and
+ // cross-listing) with its rental ladder saved to rental_terms. See rentOnlyAction for what this
+ // does to a piece already held here, and what is left alone. It still counts as seen — otherwise a
+ // complete read would sweep it to "sold" the moment it's on her site at all.
+ if (p.rentOnly) {
+  if (p.sourceId) seen.add(identityKey(p.sourcePlatform, p.sourceId));
+  const held = priorForProduct({ ...p, name: title }, byIdentity, byTitle);
+  const action = rentOnlyAction(held);
+  if (action !== "skip") {
+   try {
+    const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, MAX_ITEM_IMAGES);
+    const inf = inferItemFields(title, p.description);
+    const hash = productContentHash(p);
+    let itemId: string;
+    if (action === "create-draft") {
+     const created = await createItem({
+      sellerId: seller.id, title, priceCents: 0, currency: currencyOf(p), images,
+      description: p.description ?? null, brand: inf.brand, era: inf.era, material: inf.material,
+      condition: inf.condition, category: inf.category, size: p.size ?? null,
+      measurements: extractMeasurements(p.description), status: "draft", unavailableReason: null,
+      compareAtCents: null, imagesRehosted: !needsCopyAfterImport(images), source: "captured",
+      sourcePlatform: p.sourcePlatform ?? null, sourceId: p.sourceId ?? null, sourceUrl: p.sourceUrl ?? null,
+      contentHash: hash, variants: p.variants ?? [], origin: "source",
+     });
+     itemId = created.id;
+    } else {
+     // held is non-null whenever action is "update-draft" — rentOnlyAction only returns it for a
+     // prior row. Photos we've already copied are left alone, same reasoning as the normal path.
+     const keepCopies = sameImagesAlreadyCopied((held!.images as string[]) || [], images);
+     await updateItemFromSource(held!.id, {
+      title, priceCents: 0, currency: currencyOf(p), ...(keepCopies ? {} : { images }),
+      description: p.description ?? null, size: p.size ?? null, status: "draft", unavailableReason: null,
+      compareAtCents: null, imagesRehosted: keepCopies ? true : !needsCopyAfterImport(images),
+      variants: p.variants ?? [], contentHash: hash,
+      sourcePlatform: p.sourcePlatform ?? null, sourceId: p.sourceId ?? null, sourceUrl: p.sourceUrl ?? null,
+     });
+     itemId = held!.id;
+     if (held!.status === "active") rentOnlyMovedBack++;
+    }
+    if (!saveItemTerms) ({ saveItemTerms } = await import("./rentals/rentals-db.ts"));
+    await saveItemTerms({
+     itemId, sellerId: seller.id, tiers: p.rentalTiers ?? [], replacementCents: null,
+     fitsSizes: null, overrides: {}, alsoForSale: false,
+    });
+    rentOnlyDrafted++;
+   } catch (e) {
+    failures.push(`“${title}” (${msgOf(e)})`);
+   }
+  }
+  stats.skipped++; // not for sale, so never "added"/"updated" in the ordinary sense
+  continue;
+ }
  const cents = centsOf(p);
  // A price of zero used to disqualify a piece outright. A vintage seller zeroes the price when
  // something SELLS and keeps it published as her archive — bag-crush has 24 such pieces with 19 to
@@ -193,6 +253,8 @@ export async function importProductsAsItems(
  }
  }
 
+ const rentNote = rentOnlyWarning(rentOnlyDrafted, rentOnlyMovedBack);
+ if (rentNote) stats.warnings.push(rentNote);
  if (failures.length) {
   const shown = failures.slice(0, 3).join(", ");
   stats.warnings.push(`${failures.length} product${failures.length === 1 ? "" : "s"} couldn’t be saved: ${shown}${failures.length > 3 ? ` and ${failures.length - 3} more` : ""}.`);

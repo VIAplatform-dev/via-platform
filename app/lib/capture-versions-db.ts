@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import { versionsToDrop, worthVersioning, type VersionReason, type VersionRow } from "./capture-versions-core.ts";
+import { versionsToDrop, worthVersioning, keepFor, type VersionReason, type VersionRow } from "./capture-versions-core.ts";
 
 /**
  * Previous versions of captured pages — the undo that `site_captures` does not have.
@@ -73,7 +73,7 @@ export async function keepVersion(
 
   const rows = (await q`SELECT id, reason, created_at FROM site_capture_versions
    WHERE store_slug = ${slug} AND path = ${path}`) as Array<{ id: string | number; reason: string; created_at: string }>;
-  const drop = versionsToDrop(rows.map((r): VersionRow => ({ id: String(r.id), reason: r.reason as VersionReason, createdAt: r.created_at })));
+  const drop = versionsToDrop(rows.map((r): VersionRow => ({ id: String(r.id), reason: r.reason as VersionReason, createdAt: r.created_at })), keepFor(path));
   if (drop.length) {
    await q`DELETE FROM site_capture_versions WHERE id = ANY(${drop.map((d) => Number(d))})`;
   }

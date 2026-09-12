@@ -14,7 +14,14 @@
 // small (a vintage store's catalogue is hundreds, not millions), and doing it here keeps every
 // filtering rule in one pure, testable place instead of spread across SQL builders.
 //
+// A Horizon-generation theme can ALSO file a facet through Shopify's Standard Product Taxonomy
+// (filter.v.t.shopify.size) or a linked Metaobject (filter.p.m.custom.brand) instead of a plain
+// value — both submit an opaque id ("gid://shopify/TaxonomyValue/2885"), never the label a shopper
+// ticked. See facet-labels.ts: the page being served carries the id → label translation on the very
+// checkbox that submitted it, and `opts.labels` (built from that page) is how it reaches here.
+//
 // Everything here is pure and unit tested.
+import { resolveFacetValue } from "./facet-labels.ts";
 
 /** The subset of an inventory item these rules read. Keeps this module free of the DB types. */
 export type FacetItem = {
@@ -25,6 +32,9 @@ export type FacetItem = {
  era?: string | null;
  condition?: string | null;
  size?: string | null;
+ /** Fabric, as Shopify's own Standard Product Taxonomy calls it — matched against the item's own
+  *  "material" field, which is the same thing under VYA's name for it. */
+ material?: string | null;
  status?: string;
  createdAt?: Date | string | null;
 };
@@ -64,14 +74,24 @@ function norm(s: unknown): string {
 }
 
 /**
- * Every value the theme sent for one filter key.
+ * Every value the theme sent for one filter key, resolved to a real label.
  *
  * Shopify repeats the parameter for a multi-select — `?filter.p.vendor=Chanel&filter.p.vendor=Dior`
  * means "Chanel OR Dior". Reading only the first value turned every multi-select into a single
  * select, so a shopper ticking a second brand watched results *shrink*.
+ *
+ * A value that IS a label ("Chanel") passes through resolveFacetValue unchanged when there's no
+ * matching entry in `labels` — the classic case, and every store without taxonomy/metaobject facets.
  */
-function values(params: URLSearchParams, key: string): string[] {
- return params.getAll(key).map(norm).filter(Boolean);
+function values(params: URLSearchParams, key: string, labels: Map<string, string>): string[] {
+ return params.getAll(key).map((v) => norm(resolveFacetValue(v, labels))).filter(Boolean);
+}
+
+/** The SAME facet, filed under whichever of Shopify's parameter conventions the theme actually
+ *  uses — a classic field (`filter.p.vendor`) and a taxonomy/metaobject one can both be present, and
+ *  a shopper who ticks one of each means both (OR), same as two values under one key. */
+function anyOf(params: URLSearchParams, keys: string[], labels: Map<string, string>): string[] {
+ return keys.flatMap((k) => values(params, k, labels));
 }
 
 /** One field of an item, matched against a repeated filter parameter (OR within a key). */
@@ -93,15 +113,20 @@ export type FacetResult<T> = { items: T[]; total: number };
 export function applyFacets<T extends FacetItem>(
  all: T[],
  params: URLSearchParams,
- opts: { perPage: number; paginate?: boolean },
+ opts: { perPage: number; paginate?: boolean; labels?: Map<string, string> },
 ): FacetResult<T> {
- const vendors = values(params, "filter.p.vendor");
- const types = values(params, "filter.p.product_type");
- const eras = values(params, "filter.p.m.custom.era");
- const conditions = values(params, "filter.p.m.custom.condition");
- // Size is the filter that matters most on one-of-one vintage, and Shopify exposes it as an OPTION
- // filter rather than a product field.
- const sizes = [...values(params, "filter.v.option.size"), ...values(params, "filter.p.m.custom.size")];
+ // Empty by default: a caller with no page to read a filter form from (or no filters at all) simply
+ // gets every value back unresolved, which is correct whenever there was nothing to resolve.
+ const labels = opts.labels ?? new Map<string, string>();
+ const vendors = anyOf(params, ["filter.p.vendor", "filter.p.m.custom.brand"], labels);
+ const types = values(params, "filter.p.product_type", labels);
+ const eras = values(params, "filter.p.m.custom.era", labels);
+ const conditions = values(params, "filter.p.m.custom.condition", labels);
+ const materials = anyOf(params, ["filter.p.m.custom.fabric", "filter.v.t.shopify.fabric"], labels);
+ // Size is the filter that matters most on one-of-one vintage. Shopify has filed it three different
+ // ways across theme generations: an OPTION filter, a custom metafield, and (Horizon) a Standard
+ // Product Taxonomy value — a shopper on any of them means the same thing.
+ const sizes = anyOf(params, ["filter.v.option.size", "filter.p.m.custom.size", "filter.v.t.shopify.size"], labels);
  const gte = priceBound(params, "filter.v.price.gte");
  const lte = priceBound(params, "filter.v.price.lte");
  // `filter.v.availability=1` means "in stock only". A sold one-of-one is gone, not restockable.
@@ -112,6 +137,7 @@ export function applyFacets<T extends FacetItem>(
   if (!matchesAny(it.category, types)) return false;
   if (!matchesAny(it.era, eras)) return false;
   if (!matchesAny(it.condition, conditions)) return false;
+  if (materials.length && !matchesAny(it.material, materials)) return false;
   if (sizes.length && !matchesAny(it.size, sizes)) return false;
   if (inStockOnly && it.status !== "active") return false; // sold is gone; held is not for sale today
   // An item with no price can't satisfy a price bound, but must survive when none was asked for.

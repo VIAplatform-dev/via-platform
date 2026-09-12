@@ -3,8 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Send, Check, AlertCircle } from "lucide-react";
-import { AdminPage, AdminHeader, TechCard, TechButton, cn } from "../../../ui";
+import { AdminPage, AdminHeader, TechCard, TechButton, SegmentedControl, cn } from "../../../ui";
 import { parseAudience, audienceIsEmpty, describeAudience, type AudienceFilter } from "@/app/lib/customer-audience-core";
+import { EmailFrame } from "../../EmailFrame";
 
 // Editing an email, the way the storefront builder edits a page: controls on one side, the real
 // thing on the other, updating as you type.
@@ -58,6 +59,12 @@ function Compose() {
 
  const [html, setHtml] = useState("");
  const [senderName, setSenderName] = useState("");
+ const [fromAddress, setFromAddress] = useState("");
+ // Which moment of the shopper's experience the panel is showing. Two moments, never stacked: the
+ // email competing in a list, and the email once it has been opened.
+ const [shopperView, setShopperView] = useState("In the list");
+ // Fixed at mount so a plausible clock doesn't tick inside a preview and pull the eye.
+ const [sentAtLabel] = useState(() => new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
  const [count, setCount] = useState(0);
  // Who it goes to: everyone, or a tag / spent-over / bought-in slice. Resolved by the SAME filter the
  // Customers page runs, and the count comes from the server so the button says what will send.
@@ -131,7 +138,7 @@ function Compose() {
   fetch("/api/store/campaign/render", {
    method: "POST", headers: { "Content-Type": "application/json" },
    body: JSON.stringify(layout),
-  }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.html) setHtml(d.html); if (d?.storeName) setSenderName(d.storeName); }).catch(() => {});
+  }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.html) setHtml(d.html); if (d?.storeName) setSenderName(d.storeName); if (d?.fromAddress) setFromAddress(d.fromAddress); }).catch(() => {});
  }, [layout]);
 
  useEffect(() => { const t = setTimeout(render, 250); return () => clearTimeout(t); }, [render]);
@@ -168,7 +175,7 @@ function Compose() {
     }
    />
 
-   <div className="grid gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
+   <div className="grid gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
     <div className="flex flex-col gap-4">
      <TechCard className="flex flex-col gap-4 p-5">
       <Field label="Subject" hint="The line people see in their inbox before they open it.">
@@ -275,10 +282,10 @@ function Compose() {
       <p className="mb-2 text-[12px] font-medium text-stone-700">Links at the bottom</p>
       <div className="flex flex-col gap-2">
        {links.map((l, i) => (
-        <div key={i} className="flex gap-1.5">
-         <input className={cn(input, "flex-1")} value={l.label} placeholder="New arrivals"
+        <div key={i} className="flex flex-wrap gap-1.5 sm:flex-nowrap">
+         <input className={cn(input, "basis-full sm:basis-0 sm:flex-1")} value={l.label} placeholder="New arrivals"
           onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
-         <input className={cn(input, "flex-[1.4]")} value={l.url} placeholder="https://…"
+         <input className={cn(input, "min-w-0 flex-[1.4]")} value={l.url} placeholder="https://…"
           onChange={(e) => setLinks(links.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))} />
          <button type="button" onClick={() => setLinks(links.filter((_, j) => j !== i))}
           className="px-1.5 text-[12px] text-stone-400 hover:text-rose-600">Remove</button>
@@ -321,27 +328,97 @@ function Compose() {
     </div>
 
     {/* The email itself. Sticky, because the controls are taller than it is. */}
-    <div className="lg:sticky lg:top-6 lg:self-start">
+    <div className="xl:sticky xl:top-6 xl:self-start">
      <TechCard className="overflow-hidden">
       <div className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-2.5">
-       <p className="text-[12px] text-stone-500">Preview</p>
+       <p className="text-[12px] text-stone-500">What the shopper gets</p>
+       <SegmentedControl className="ml-auto" options={["In the list", "Opened"]} value={shopperView} onChange={setShopperView} />
       </div>
-      {/* The inbox line, before the email itself. Subject and preview text are written in two boxes
-          far apart in the form and read as ONE line in a real inbox — the only place you can see
-          whether they repeat each other, or whether the preview text is cut off, is here. Left
-          blank, an inbox falls back to the first words of the email, which is a line wasted saying
-          the shop's name twice. */}
-      <div className="border-b border-stone-100 bg-stone-50/60 px-4 py-3">
-       <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.12em] text-stone-400">In their inbox</p>
-       <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5">
-        <p className="truncate text-[12.5px] font-semibold text-stone-900">{senderName || "Your shop"}</p>
-        <p className="truncate text-[12.5px] text-stone-800">{subject || "No subject yet"}</p>
-        <p className="truncate text-[12px] text-stone-400">
-         {preheader.trim() || `${senderName || "Your shop"} — add a preview line so this isn’t wasted`}
-        </p>
+
+      {/* A mail client, not an admin card describing one.
+          A preview of an inbox should LOOK like an inbox — the previous version listed the parts in
+          labelled grey boxes stacked above the email, which reads as documentation and costs the
+          email half its height. One frame, two moments, toggled above.
+          The frame runs cool (slate) where the workspace runs warm (stone). That temperature shift
+          is what says "this is somewhere else" without a banner saying so, and the inert toolbar
+          glyphs settle it in about a second. */}
+      <div className="bg-slate-100/70 p-3">
+       <div className="overflow-hidden rounded-xl border border-slate-300/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+        {/* Inert chrome. Nothing here is clickable — it exists so the eye reads "mail app" at once. */}
+        <div className="flex items-center gap-3 border-b border-slate-200/80 px-3 py-2 text-slate-300" aria-hidden="true">
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="5" rx="1" /><path d="M5 9v10h14V9M10 13h4" /></svg>
+         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg>
+         <span className="ml-auto text-[10.5px] tabular-nums text-slate-300">{sentAtLabel}</span>
+        </div>
+
+        {shopperView === "In the list" ? (
+         /* Her email in a list, with other mail above and below it. The competition is the point:
+            it is where you can see whether the sender name carries, and where the subject stops
+            and the preview line takes over — the two are written in boxes far apart on the form and
+            arrive as one line. The neighbours are deliberately unreadable; they are context, not
+            content, so they can't be mistaken for real mail. */
+         <div className="divide-y divide-slate-100" data-testid="inbox-preview">
+          {[0, 1].map((i) => (
+           <div key={`a${i}`} className="flex items-center gap-3 px-3.5 py-3 opacity-40">
+            <span className="h-6 w-6 shrink-0 rounded-full bg-slate-200" />
+            <span className="h-2 w-24 shrink-0 rounded-full bg-slate-200" />
+            <span className="h-2 flex-1 rounded-full bg-slate-100" />
+           </div>
+          ))}
+          <div className="flex items-start gap-3 bg-white px-3.5 py-3">
+           <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#5D0F17] text-[10px] font-semibold text-white">
+            {(senderName || "Y").trim().charAt(0).toUpperCase()}
+           </span>
+           <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+             <p className="truncate text-[12.5px] font-semibold text-slate-900">{senderName || "Your shop"}</p>
+             <span className="ml-auto shrink-0 text-[11px] tabular-nums text-slate-400">{sentAtLabel}</span>
+            </div>
+            {/* Subject and preview line run together on one line, the way a client renders them. */}
+            <p className="truncate text-[12.5px] text-slate-700">
+             <span className="font-medium text-slate-900">{subject || "No subject yet"}</span>
+             <span className="text-slate-400"> — {preheader.trim() || `${senderName || "Your shop"}`}</span>
+            </p>
+           </div>
+          </div>
+          {[2, 3].map((i) => (
+           <div key={`b${i}`} className="flex items-center gap-3 px-3.5 py-3 opacity-40">
+            <span className="h-6 w-6 shrink-0 rounded-full bg-slate-200" />
+            <span className="h-2 w-20 shrink-0 rounded-full bg-slate-200" />
+            <span className="h-2 flex-1 rounded-full bg-slate-100" />
+           </div>
+          ))}
+         </div>
+        ) : (
+         /* Opened. The from ADDRESS is the detail worth surfacing: the name is the shop's, but the
+            address stays VYA's shared domain until she verifies her own, and this is the only place
+            she'd find that out before a shopper does. */
+         <div className="px-3.5 pb-3 pt-3" data-testid="opened-preview">
+          <p className="text-[15px] leading-snug text-slate-900">{subject || "No subject yet"}</p>
+          <div className="mt-2.5 flex items-start gap-2.5">
+           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#5D0F17] text-[12px] font-semibold text-white">
+            {(senderName || "Y").trim().charAt(0).toUpperCase()}
+           </span>
+           <div className="min-w-0 flex-1">
+            <p className="truncate text-[12.5px] text-slate-800">
+             <span className="font-semibold">{senderName || "Your shop"}</span>
+             <span className="text-slate-400"> &lt;{fromAddress || "campaigns@vyaplatform.com"}&gt;</span>
+            </p>
+            <p className="text-[11.5px] text-slate-400">to me</p>
+           </div>
+          </div>
+         </div>
+        )}
        </div>
+       {shopperView === "In the list" && !preheader.trim() && (
+        <p className="mt-2 px-0.5 text-[11.5px] leading-relaxed text-slate-500">
+         With no inbox preview line, the grey text falls back to whatever the email opens with — usually
+         your shop’s name, right under a subject that already says it.
+        </p>
+       )}
       </div>
-      <iframe srcDoc={html} title="Email preview" sandbox="" className="h-[620px] w-full border-0 bg-white" />
+      <EmailFrame html={html} title="Email preview" height={620} hidden={shopperView !== "Opened"} />
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 bg-stone-50/60 px-4 py-3">
        <span className="text-[12px]">
         {note ? (
@@ -352,18 +429,18 @@ function Compose() {
          <span className="text-stone-400">{allowance?.label || "Send one to yourself first."}</span>
         )}
        </span>
-       <span className="flex items-center gap-2">
-        <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
+       <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <label className="flex w-full items-center gap-1.5 text-[12px] text-stone-500 sm:w-auto">
          <span className="whitespace-nowrap">Send later</span>
          <input
           type="datetime-local"
           value={sendAt}
           onChange={(e) => setSendAt(e.target.value)}
-          className="rounded-lg border border-stone-200 px-2 py-1.5 text-[12.5px] outline-none focus:border-stone-400"
+          className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 px-2 py-1.5 text-[12.5px] outline-none focus:border-stone-400 sm:h-auto sm:flex-none"
          />
         </label>
-        <TechButton variant="secondary" onClick={() => send(true)} disabled={sending || !ready}>Send test to myself</TechButton>
-        <TechButton onClick={() => send(false)} disabled={sending || !ready || !count || allowance?.canSend === false} title={allowance?.reason ?? undefined}>
+        <TechButton variant="secondary" className="h-11 flex-1 sm:h-auto sm:flex-none" onClick={() => send(true)} disabled={sending || !ready}>Send test to myself</TechButton>
+        <TechButton className="h-11 flex-1 sm:h-auto sm:flex-none" onClick={() => send(false)} disabled={sending || !ready || !count || allowance?.canSend === false} title={allowance?.reason ?? undefined}>
          <Send size={14} />{sending ? "Sending…" : sendAt ? "Schedule it" : `Send to ${count.toLocaleString()}`}
         </TechButton>
        </span>
@@ -373,8 +450,8 @@ function Compose() {
    </div>
    {picking && (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4" onClick={() => setPicking(false)}>
-     <div className="flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-3.5">
+     <div className="flex max-h-[86dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-3 border-b border-stone-100 px-4 py-3.5 sm:px-5">
        <p className="flex-1 text-[13.5px] font-medium text-stone-900">Choose pieces</p>
        <span className="text-[12px] text-stone-400">{itemIds.length} chosen</span>
        <button type="button" onClick={() => setItemIds([])} className="text-[12px] text-stone-400 hover:text-stone-700">Clear</button>

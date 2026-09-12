@@ -304,7 +304,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  <span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" /><span className="h-2.5 w-2.5 rounded-full bg-stone-300" />
  <span className="ml-2 truncate text-[10px] text-stone-400">{(name.trim() ? name.toLowerCase().replace(/[^a-z0-9]+/g, "-") : "your-store")}.vyaplatform.com{pg.slug === "home" ? "" : `/${pg.slug}`}</span>
  </div>
- <div className="h-[68vh] overflow-y-auto overscroll-contain">
+ <div className="h-[68dvh] overflow-y-auto overscroll-contain">
  <div style={{ width: 1180, zoom: 0.457 } as React.CSSProperties}>
  <div style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
  <StoreHeader storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} />
@@ -326,8 +326,10 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  </div>
  {/* Interactive: `zoom` (not transform) scales AND resizes the box, so it scrolls and clicks map
  correctly — you can scroll the page and click the nav to move between pages, like a real site. */}
- <div className="h-[70vh] overflow-y-auto overscroll-contain">
- <div style={{ width: 1180, zoom: 0.64 } as React.CSSProperties}>
+ <div className="h-[70dvh] overflow-y-auto overscroll-contain">
+ {/* 0.64 needs a 755px frame, which only exists from 1280 up; between 1024 and 1280 the frame is
+     ~520px, so the page scrolled sideways inside it. 0.44 fits the whole page width there. */}
+ <div className="lg:[zoom:0.44] xl:[zoom:0.64]" style={{ width: 1180 } as React.CSSProperties}>
  {/* Keyed by a counter so EVERY change replays — template, palette, type, or moving to
      another page. The class decides how much movement that change deserves. */}
  <div key={pulse} className={animKind === "template" ? "vya-preview-in" : "vya-preview-tone"} style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>

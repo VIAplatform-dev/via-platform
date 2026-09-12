@@ -151,6 +151,42 @@ test("injectCollectionItems falls back to after the heading when no grid is foun
  assert.ok($("h2").next().is("[data-vya-collection]"));
 });
 
+test("injectCollectionItems skips a visually-hidden or dialog heading when choosing where to anchor", () => {
+ // Venus Vintage's "girls night out" collection: the real page title isn't marked up as a heading at
+ // all, but the page DOES have h2s — a visually-hidden accessibility label inside a country picker,
+ // and a "Filter" dialog's own title — both sitting near the very top of <main>, well before the real
+ // content. Picking the FIRST h1/h2 in document order landed the live grid inside/right after one of
+ // those — rendering before literally everything else on the page, which read as the site "crashed."
+ const html = `<html><body><main>
+  <h2 class="visually-hidden">Country/Region</h2>
+  <div class="hero"><span class="hero-title">girls night out</span></div>
+  <dialog><h2 class="facets-drawer__title">Filter</h2></dialog>
+  <p>some real page copy</p>
+ </main></body></html>`;
+ const out = injectCollectionItems(html, COLL_ITEMS);
+ const $ = cheerio.load(out);
+ assert.equal($("[data-vya-collection]").length, 1);
+ assert.equal($("dialog [data-vya-collection]").length, 0, "must not land inside the filter dialog");
+ assert.equal($("h2.visually-hidden + [data-vya-collection]").length, 0, "must not land immediately after the hidden label either");
+});
+
+test("injectCollectionItems appends after the page's own content, never prepends before everything, when no usable heading exists", () => {
+ // Even with the hidden/dialog headings excluded, this page has no REAL heading to anchor on at
+ // all — the safe default changed from "before everything" to "after everything", because a shopper
+ // sees a broken-looking page either way, but only one of them hides the header, nav and hero too.
+ const html = `<html><body><main>
+  <h2 class="visually-hidden">Country/Region</h2>
+  <div class="hero">girls night out</div>
+  <p>real content that must stay above the grid</p>
+ </main></body></html>`;
+ const out = injectCollectionItems(html, COLL_ITEMS);
+ const $ = cheerio.load(out);
+ const children = $("main").children().toArray().map((el) => $(el));
+ const gridIndex = children.findIndex((c) => c.is("[data-vya-collection]"));
+ const heroIndex = children.findIndex((c) => c.hasClass("hero"));
+ assert.ok(gridIndex > heroIndex, "the grid must not be inserted before the page's own hero content");
+});
+
 test("injectCollectionItems is a no-op when the collection has no items", () => {
  const html = `<html><body><ul id="product-grid"><li>keep me</li></ul></body></html>`;
  assert.equal(injectCollectionItems(html, []), html);
@@ -1671,6 +1707,30 @@ test("the fallback grid badges sold pieces too — not just the theme-card path"
  const avail = cards.find((c) => c.includes("Available Piece"))!;
  assert.match(sold, /data-vya-sold/, "the badge sits on the sold card");
  assert.doesNotMatch(avail, /data-vya-sold/, "and not on the available one");
+});
+
+test("the theme-card path never shows '$0' either — same convention, same fix", () => {
+ const html = `<html><body><main><h1>Archive</h1><ul id="product-grid" class="grid">
+  <li class="grid__item"><a href="/products/old"><img src="old.jpg"></a>
+   <h3 class="card__heading">STALE product</h3>
+   <span class="price-item">$999.00 USD</span></li>
+ </ul></main></body></html>`;
+ const zeroed = [{ id: "z1", title: "Zeroed Sold Piece", priceCents: 0, currency: "USD", images: ["https://x/1.jpg"], available: false }];
+ const out = injectCollectionItems(html, zeroed);
+ assert.doesNotMatch(out, /\$0\b/);
+});
+
+test("the fallback grid never shows '$0' — priceCents 0 means no price on record, not a free piece", () => {
+ // A vintage seller zeroes the price when a piece SELLS and keeps it published as her archive (see
+ // worthImporting in capture-commerce-core.ts) — 0 is this codebase's own convention for "no real
+ // price", the same as null, everywhere else. The fallback grid formatted it as real money anyway:
+ // Venus Vintage's sold-out Jimmy Choo heels showed "Sold out" right next to "$0", implying $0 was
+ // once a genuine sale price. It never is.
+ const html = liveGridHtml(
+  [{ id: "s1", title: "Zeroed Sold Piece", priceCents: 0, currency: "USD", images: ["https://x/1.jpg"], available: false }],
+  (it) => `/p/${it.id}`,
+ );
+ assert.doesNotMatch(html, /\$0\b/);
 });
 
 test("a cloned card never keeps a reference to an id it just dropped", () => {

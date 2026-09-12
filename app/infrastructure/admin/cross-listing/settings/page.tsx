@@ -165,8 +165,8 @@ export default function CrossListingSettingsPage() {
  // Coming soon — greyed, not connectable.
  if (p.mode === "soon") {
  return (
- <div key={p.key} className="flex items-center gap-3 px-5 py-3.5 opacity-55">
- <div className="w-40 shrink-0 text-[13px] font-medium text-stone-500">{p.name}</div>
+ <div key={p.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3.5 opacity-55 sm:flex-nowrap">
+ <div className="w-full shrink-0 text-[13px] font-medium text-stone-500 sm:w-40">{p.name}</div>
  <span className="flex-1 text-[12px] text-stone-400">Not available yet</span>
  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-400">Coming soon</span>
  </div>
@@ -176,8 +176,8 @@ export default function CrossListingSettingsPage() {
  // eBay — the one real API integration (OAuth, auto-posts + auto-removes).
  if (p.key === "ebay") {
  return (
- <div key={p.key} className="flex items-center gap-3 px-5 py-3.5">
- <div className="w-40 shrink-0"><span className="text-[13px] font-medium text-stone-800">eBay</span><span className="ml-1.5 rounded bg-[var(--accent-soft,#eafaf3)] px-1 text-[10px] text-[var(--accent-ink,#0b7a5c)]">API</span></div>
+ <div key={p.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5 sm:flex-nowrap">
+ <div className="w-full shrink-0 sm:w-40"><span className="text-[13px] font-medium text-stone-800">eBay</span><span className="ml-1.5 rounded bg-[var(--accent-soft,#eafaf3)] px-1 text-[10px] text-[var(--accent-ink,#0b7a5c)]">API</span></div>
  {!ebay?.configured ? (
  <span className="flex-1 text-[12px] text-stone-400">Not set up on the server yet (needs eBay app keys).</span>
  ) : ebay?.connected ? (
@@ -212,8 +212,10 @@ export default function CrossListingSettingsPage() {
  // Extension channels (Depop, Vestiaire) — connect a handle; the VYA browser extension posts on
  // your own logged-in session and reports engagement back. No credentials leave your browser.
  return (
- <div key={p.key} className="flex items-center gap-3 px-5 py-3.5">
- <div className="w-40 shrink-0">
+ <div key={p.key} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5 sm:flex-nowrap">
+ {/* On a phone the name takes its own line — beside a fixed 160px name column the handle box
+     was left a sliver to type in. */}
+ <div className="w-full shrink-0 sm:w-40">
  <span className="text-[13px] font-medium text-stone-800">{p.name}</span>
  <span className="ml-1.5 rounded bg-sky-50 px-1 text-[10px] text-sky-600">Extension</span>
  </div>
@@ -227,7 +229,7 @@ export default function CrossListingSettingsPage() {
  </>
  ) : (
  <>
- <Input value={handles[p.key] || ""} onChange={(e) => setHandles((h) => ({ ...h, [p.key]: e.target.value }))} placeholder={`your ${p.name} handle`} className="flex-1" />
+ <Input value={handles[p.key] || ""} onChange={(e) => setHandles((h) => ({ ...h, [p.key]: e.target.value }))} placeholder={`your ${p.name} handle`} className="min-w-0 flex-1" />
  <TechButton onClick={() => connect(p.key)}>Connect</TechButton>
  </>
  )}

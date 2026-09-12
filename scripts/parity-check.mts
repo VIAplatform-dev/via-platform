@@ -22,7 +22,7 @@ import { compareCollections, type SourceCollectionRead } from "../app/lib/collec
 import { pageShowsPrice } from "../app/lib/live-price.ts";
 import { pagesGenuinelyMissing } from "../app/lib/locale-paths.ts";
 import { DISMISS_OVERLAYS } from "../app/lib/plan-b/dismiss-overlays.ts";
-import { classifyMissing, type FeedProduct } from "../app/lib/catalog-parity.ts";
+import { classifyMissing, buyable, type FeedProduct } from "../app/lib/catalog-parity.ts";
 import { VOLATILE_SELECTOR } from "../app/lib/parity-regions.ts";
 import { productsFromLinks, sectionHeadings, COLLECT_PRODUCT_LINKS, type ProductLinkCandidate, type PageProduct } from "../app/lib/product-links.ts";
 import fs from "node:fs";
@@ -59,9 +59,6 @@ if (isShopify) {
  const ours = seller ? await sql`SELECT source_id, status FROM items WHERE seller_id=${seller.id} AND status IN ('active','sold')` as { source_id: string; status: string }[] : [];
  const ourHandles = new Set(ours.map((o) => o.source_id));
  const srcHandles = new Set(feed.map((p) => p.handle));
- // A piece with no price and nothing available (an archive display listing) is not sellable, so the
- // importer leaves it out on purpose; it is not "missing".
- const sellable = (p: (typeof feed)[number]) => p.variants.some((v) => Number(v.price) > 0 || v.available);
  // "Missing" now means what a shopper would mean: buyable today, photographed, and not on our copy.
  // Sold pieces and un-photographed pre-orders are reported separately — see catalog-parity.ts.
  const classified = classifyMissing(feed, ourHandles);
@@ -119,9 +116,10 @@ if (isShopify) {
   servedSource.set(handle, src ? src[1] : null);
  }
  // Pieces the seller shows but does not sell — same rule the catalogue comparison already applies
- // via `sellable`. Without it, blummier's two £0 archive display pieces read as missing from every
- // collection they appear in.
- const unsellable = new Set(feed.filter((p) => !sellable(p)).map((p) => p.handle));
+ // via `buyable` (never a rental price; see catalog-parity.ts). Without it, blummier's two £0
+ // archive display pieces — and, on a rental shop, every piece priced only to hire — read as
+ // missing from every collection they appear in.
+ const unsellable = new Set(feed.filter((p) => !buyable(p)).map((p) => p.handle));
  const col = compareCollections({ source: colReads, ours: ourCol, liveSourceIds: srcHandles, served: servedCounts, servedSource, ourActive, unsellable });
 
  // PRICE ON THE PAGE. The cart charges the item record; a captured product page carries the price

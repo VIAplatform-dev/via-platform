@@ -34,7 +34,7 @@ export default function Footer() {
  href="https://www.instagram.com/vyaplatform"
  target="_blank"
  rel="noopener noreferrer"
- className="group flex items-center justify-center w-10 h-10 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
+ className="group flex items-center justify-center w-11 h-11 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
  aria-label="Follow us on Instagram"
  >
  <svg
@@ -54,7 +54,7 @@ export default function Footer() {
  href="https://www.tiktok.com/@vyaplatform"
  target="_blank"
  rel="noopener noreferrer"
- className="group flex items-center justify-center w-10 h-10 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
+ className="group flex items-center justify-center w-11 h-11 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
  aria-label="Follow us on TikTok"
  >
  <svg
@@ -70,7 +70,7 @@ export default function Footer() {
  href="https://vyaplatform.substack.com/"
  target="_blank"
  rel="noopener noreferrer"
- className="group flex items-center justify-center w-10 h-10 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
+ className="group flex items-center justify-center w-11 h-11 border border-[#FFFDF8]/35 hover:border-[#FFFDF8] hover:bg-[#FFFDF8] transition-all duration-300"
  aria-label="Read our Substack"
  >
  <svg
@@ -90,7 +90,7 @@ export default function Footer() {
  <h4 className="text-xs uppercase tracking-[0.2em] text-[#FFFDF8]/55 mb-6">
  Shop
  </h4>
- <ul className="space-y-4">
+ <ul className="space-y-0.5">
  {[
  { href: "/browse", label: "Browse All" },
  { href: "/stores", label: "Our Stores" },
@@ -101,7 +101,7 @@ export default function Footer() {
  <li key={href}>
  <Link
  href={href}
- className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
+ className="inline-block py-3 text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
  >
  {label}
  </Link>
@@ -115,7 +115,7 @@ export default function Footer() {
  <h4 className="text-xs uppercase tracking-[0.2em] text-[#FFFDF8]/55 mb-6">
  Company
  </h4>
- <ul className="space-y-4">
+ <ul className="space-y-0.5">
  {[
  { href: "/partner-with-vya", label: "Partner With Us" },
  { href: "/for-stores", label: "Already a Partner?" },
@@ -126,7 +126,7 @@ export default function Footer() {
  <li key={href}>
  <Link
  href={href}
- className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
+ className="inline-block py-3 text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
  >
  {label}
  </Link>
@@ -137,7 +137,7 @@ export default function Footer() {
  href="https://form.typeform.com/to/ssrEgHZ1"
  target="_blank"
  rel="noopener noreferrer"
- className="text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
+ className="inline-block py-3 text-[#FFFDF8]/75 hover:text-[#FFFDF8] transition-colors duration-200 text-sm link-underline"
  >
  Give Feedback
  </a>

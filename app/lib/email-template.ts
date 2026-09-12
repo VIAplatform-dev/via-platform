@@ -355,8 +355,14 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
  for (let i = 0; i < products.length; i += 2) {
   gridRows.push(`<tr>${gridCell(products[i])}${products[i + 1] ? gridCell(products[i + 1]) : '<td width="50%"></td>'}</tr>`);
  }
+ // The grid builds its own table instead of reusing productsBlock, so it has to render the heading
+ // itself — otherwise "Heading above the pieces" silently vanishes on this one layout.
+ const gridHeading = o.productsHeading && products.length
+  ? `<tr><td align="center" style="font-family:${heading};font-size:20px;line-height:1.3;color:${text};text-align:center;padding:0 0 22px;">${esc(o.productsHeading)}</td></tr>`
+  : "";
  const gridBlock = `
   <tr><td align="center" style="padding:0 0 26px;text-align:center;">${eyebrow}${headline}${subhead}${button}</td></tr>
+  ${gridHeading}
   <tr><td style="padding:0 8px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${gridRows.join("")}</table></td></tr>`;
 
  const classicBlock = `

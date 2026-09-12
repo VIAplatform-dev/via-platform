@@ -126,9 +126,10 @@ export const GROUPS: NavGroup[] = [
   { href: `${B}/trends`, label: "Trends", icon: "TrendingUp" },
   { href: `${B}/ai`, label: "AI accuracy", icon: "Target" },
   { href: `${B}/golden-review`, label: "Golden set", icon: "Gem" },
-  // Owner-only, like the three above it: where stores stall on the way to their first sale.
-  // Lost in a merge — the comment at the top of this file promised it and the route exists.
-  { href: `${B}/setup-funnel`, label: "Where stores get stuck", icon: "Filter" },
+  // "Where stores get stuck" (/setup-funnel) is deliberately NOT listed here. It was taken out in
+  // Gianna's round (0fd2924), read as a merge casualty and restored (4c4933f), and taken out again.
+  // The page still exists and is still reachable by URL for anyone who wants the numbers — it is the
+  // SIDEBAR ROW that is unwanted. Please don't "restore" it a fourth time.
  ] },
 ];
 

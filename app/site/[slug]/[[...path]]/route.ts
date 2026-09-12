@@ -5,10 +5,11 @@ import { suppressThemeCart } from "@/app/lib/plan-b/suppress-theme-cart";
 import { detectMyshopifyDomain } from "@/app/lib/plan-b/scripts";
 import { buildFallbackCartPage } from "@/app/lib/fallback-cart-page";
 import { isReservedCapturePath } from "@/app/lib/plan-b/cart-template-store";
-import { applyCartState, injectCart, injectCss, injectCollectionItems, injectLiveGrids, detectGridHandles, capturedGridProductHandles, capturedGridProductHandlesPerGrid, injectSeo, injectPoweredBy, injectShim, prepareEditMode, cleanShopifyChrome, stripScripts, type CartPageLine } from "@/app/lib/site-capture";
+import { applyCartState, injectCart, injectCss, injectCollectionItems, injectLiveGrids, detectGridHandles, capturedGridProductHandles, capturedGridProductHandlesPerGrid, injectSeo, injectPoweredBy, injectShim, prepareEditMode, stampEditIds, cleanShopifyChrome, stripScripts, type CartPageLine } from "@/app/lib/site-capture";
 import { isStoreHost } from "@/app/lib/plan-b/store-host";
 import { requestedSectionId, extractSection, emptySection, predictiveSearchEmptySection, isPredictiveSearchEmptyId } from "@/app/lib/plan-b/section-render";
 import { applyFacets, hasFacetParams } from "@/app/lib/plan-b/facets";
+import { extractFacetLabels } from "@/app/lib/plan-b/facet-labels";
 import { searchItems, applySearchChrome, pickSearchTemplatePath } from "@/app/lib/plan-b/search-page";
 import { getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { applyCartBadge } from "@/app/lib/plan-b/cart-badge";
@@ -34,6 +35,8 @@ import { resolveStoreSlugAny, isAdminRequest } from "@/app/lib/storeAuth";
 import { canEditCapture } from "@/app/lib/capture-edit-access";
 import { reviewGate, reviewGateNoticeHtml } from "@/app/lib/capture-review-gate";
 import { getReviewState } from "@/app/lib/store-health-db";
+import { applySiteBuilderForRequest, hostedPageState } from "@/app/lib/site-builder/serve";
+import { collectionHandleForPath, looksSquarespace } from "@/app/lib/site-builder/collection-path";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +97,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // she is editing. Her own editing session is not a visit — without this, opening a product page in
  // the editor recorded a product view against her own store.
  const isEditRequest = sp.get("edit") === "1";
+ // NUMBER HER PAGE BEFORE ANYTHING BELOW CHANGES IT. The save counts the stored page; the live grids,
+ // collection tiles and cleanup below add and remove elements, and the editor used to be numbered after
+ // them — so "#N" meant different elements in the editor and in the save. Only for someone who may edit,
+ // so a shopper's copy of the page never carries the numbers. See stampEditIds.
+ // `editorView` is also what lets an empty product grid say so, instead of vanishing (see the builder pass below).
+ const editorView = !!html && isEditRequest && canEditCapture(slug, { slug: await resolveStoreSlugAny(req).catch(() => null), isAdmin: isAdminRequest(req) }).allowed;
+ if (editorView && html) {
+  html = stampEditIds(html);
+ }
+
+ // ── A PAGE SHE HAS HIDDEN ───────────────────────────────────────────────────────────────────────
+ // Shoppers get the plain "Page not found" an address that never existed would get — her decision
+ // (builder spec, open question 1). Nothing about the page is changed, so Show brings it straight
+ // back, and her own editor still opens it with a bar saying it is hidden.
+ //
+ // BEFORE ANY RENDERING, deliberately: a hidden page costs nothing to refuse, and a theme's
+ // section-rendering fetch (?section_id=) against one is refused on the same line rather than
+ // quietly handing back a fragment of a page shoppers are not supposed to have.
+ //
+ // This read also carries her menu order and her hidden pages down to the builder pass below, so the
+ // whole of Step 3 costs one lookup per request (cached per store — see pages-db.ts).
+ const builderState = await hostedPageState(slug, pathname);
+ if (builderState.hidden && !editorView) {
+  return new Response("Page not found.", { status: 404, headers: { "Content-Type": "text/plain" } });
+ }
  const query = (sp.get("q") || sp.get("query") || sp.get("s") || "").trim();
  if (query && !isEditRequest && (pathname.includes("search") || sp.has("q") || sp.has("query"))) {
  recordSearch(slug, query, req.cookies.get("via_sess")?.value || null).catch(() => {});
@@ -104,7 +132,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // sells an item in the portal, their site reflects it immediately — no re-crawl. Collection
  // pages show that collection; the homepage (and any other page with a grid) shows the newest
  // inventory, which is what a "featured/archive" strip on a vintage store means in practice.
- const coll = pathname.match(/^\/collections\/([^/]+)\/?$/);
+ // Which collection this page shows: Shopify's /collections/{handle} — and, on a Squarespace capture,
+ // /shop (everything) and /shop/{category}, which used to be served exactly as crawled, with pieces
+ // that had since sold still for sale. See app/lib/site-builder/collection-path.ts.
+ const collHandle = collectionHandleForPath(pathname, { squarespace: looksSquarespace(html) });
  const isHome = pathname === "/" || pathname === "";
  // Plan B (this request arrived on the store's OWN registrable domain): the seller's JavaScript is
  // isolated from VYA by the same-origin policy, so it runs — that's what makes their carousels,
@@ -163,7 +194,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   html = applySearchChrome(grid, { query, count: hits.length, action: `${onStoreOrigin ? "" : `/site/${slug}`}/search` });
  }
  if (!html) return new Response("Page not found.", { status: 404, headers: { "Content-Type": "text/plain" } });
- if (coll || isHome) {
+ if (collHandle || isHome) {
  const seller = await getSellerBySlug(slug).catch(() => null);
  if (seller) {
   // "all" (the shop-all page) shows the whole live inventory; any other handle shows
@@ -173,16 +204,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   // "read, and empty" decides whether an empty collection shows nothing or refills itself from the
   // crawl-day snapshot — see app/lib/plan-b/collection-contents.ts.
   let collectionSync = false;
-  if (isHome || coll![1] === "all") items = await listStorefrontItems(seller.id).catch(() => []);
+  if (isHome || collHandle === "all") items = await listStorefrontItems(seller.id).catch(() => []);
   else {
    // Assigned items PLUS anything matching the handle by category/brand, so listings the seller
    // adds in the portal show up on the collection page they belong to without manual filing.
    // ONE query for both the collection and whether we have read it from her site — the two used to
    // be separate calls, putting a second round trip on the busiest page type across 21 stores.
-   const collection = await getCollectionWithSyncState(seller.id, coll![1]).catch(() => null);
+   const collection = await getCollectionWithSyncState(seller.id, collHandle!).catch(() => null);
    collectionSync = collection?.membershipKnown ?? false;
    // Her own answer about sold pieces, not ours — see collection-sold-policy.ts.
-   items = await listCollectionItemsForStorefront(seller.id, collection?.id ?? null, coll![1], collection?.keepsSold ?? null).catch(() => []);
+   items = await listCollectionItemsForStorefront(seller.id, collection?.id ?? null, collHandle!, collection?.keepsSold ?? null).catch(() => []);
   }
   // A collection with no VYA assignment and no category/brand match is very likely a manually
   // curated Shopify collection with no pattern behind the choice at all ("collection-1", specific
@@ -196,7 +227,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   // Which of the three answers this page is giving, stamped onto it so a check can tell a page that
   // disagrees with our filing (a fault) from one that never claimed to follow it (a fallback).
   let collectionSource: "filed" | "captured" | "empty" | "unknown" = "unknown";
-  if (coll && coll[1] !== "all") {
+  if (collHandle && collHandle !== "all") {
    const handles = items.length ? [] : capturedGridProductHandles(html);
    const fromCapturedGrid = handles.length ? await listStorefrontItemsBySourceIds(seller.id, handles).catch(() => []) : [];
    // Have we actually read this collection from her site? If we have, and nothing is filed in it,
@@ -244,7 +275,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    // (see plan-b/facets.ts). Ignoring them meant the facet UI moved, refetched, and got back the
    // same unfiltered grid — which reads as broken filters, not missing ones. Paging is applied by
    // injectCollectionItems from the theme's own page size, so only filter+sort are applied here.
-   const faceted = applyFacets(items, req.nextUrl.searchParams, { perPage: 0, paginate: false });
+   //
+   // A Horizon-generation theme's own filter checkboxes can submit an opaque Shopify id rather than
+   // a label (Standard Product Taxonomy, a linked Metaobject) — see facet-labels.ts. `html` here is
+   // still the full captured page, filter form and all, from BEFORE the grid it names is replaced —
+   // section extraction (if this is one of those requests) happens later, on the finished page — so
+   // the very checkboxes the shopper ticked are what resolve their own ids back to real labels.
+   const facetLabels = extractFacetLabels(html);
+   const faceted = applyFacets(items, req.nextUrl.searchParams, { perPage: 0, paginate: false, labels: facetLabels });
    // A filter that matches nothing must render an EMPTY collection, not silently fall back to the
    // full one — "no pieces match" is a true answer; showing all of them is a lie the shopper acts on.
    // Only when the shopper actually filtered, though: an ordinary page load with no live data still
@@ -305,6 +343,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   }
  }
 
+ // ── PRODUCT GRIDS SHE ADDED (imported-site builder) ─────────────────────────────────────────────
+ // Her grid markers, filled from live inventory. AFTER the live grids and collection tiles above —
+ // those find product grids by their shape, and must never mistake hers for the theme's — and BEFORE
+ // edit mode, so the editor shows exactly the cards a shopper gets. The cart page fills its own once it
+ // has borrowed the home page's chrome (below). See app/lib/site-builder/apply.ts.
+ if (html && !isCartPath) html = await applySiteBuilderForRequest(html, { slug, onStoreOrigin, editor: editorView, state: builderState, path: pathname });
+
  // ── EDIT MODE (?edit=1) ─────────────────────────────────────────────────────────────────────────
  // Placed HERE, after the live grids and the collection tiles — not up before all of them, where it
  // used to sit and return the CAPTURED page. That gave the editor crawl-day products at crawl-day
@@ -361,7 +406,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
       editHtml = stampProductCards(editHtml, (h) => bySource.get(h) ?? null);
      }
     } catch { /* allow-swallow: the editor opens on the captured page regardless */ }
-    return new Response(prepareEditMode(editHtml, slug, pathname), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+    return new Response(prepareEditMode(editHtml, slug, pathname, { hidden: builderState.hidden }), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
    }
    // She IS the owner and simply hasn't reviewed yet. Falling silently through to the public page
    // is right for a shopper and wrong for her — she clicked Edit (or the storefront studio loaded
@@ -426,6 +471,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   // colours, and renders the bag in VYA's own markup inside them. It is the one cart surface that
   // has never needed a per-store fix, and it now serves them all.
   html = buildFallbackCartPage(html, lines, `/checkout?cart=1${onStoreOrigin ? "" : `&store=${encodeURIComponent(slug)}`}`, { interactive: onStoreOrigin });
+  // A grid she added outside the borrowed page's main content (which the cart replaced) still shows
+  // live pieces — and the borrowed header carries her menu order, like every other page.
+  html = await applySiteBuilderForRequest(html, { slug, onStoreOrigin, state: builderState, path: pathname });
 
   // The cart page just resolved the visitor's real lines — reuse that count for the header badge
   // rather than resolving the same items a second time.

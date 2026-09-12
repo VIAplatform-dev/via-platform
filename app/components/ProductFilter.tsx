@@ -324,10 +324,15 @@ export default function ProductFilter({
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#5D0F17]/40" />
           <input
             type="text"
+            // The placeholder is the only thing naming this field, and a placeholder disappears the
+            // moment you type — a screen reader reaches it as an unnamed "edit text".
+            aria-label="Search products"
             value={filters.search}
             onChange={(e) => updateFilters({ search: e.target.value })}
             placeholder="Search products..."
-            className="w-full pl-11 pr-9 py-2.5 rounded-full border border-[#5D0F17]/15 bg-[#5D0F17]/[0.03] text-sm text-[#5D0F17] placeholder:text-[#5D0F17]/40 focus:border-[#5D0F17]/40 focus:bg-[#FFFDF8] focus:outline-none transition"
+            // `text-base` (16px) below sm: anything smaller makes iOS zoom the page in on focus and
+            // leaves the shopper pinching their way back out of a search box.
+            className="w-full pl-11 pr-9 py-2.5 rounded-full border border-[#5D0F17]/15 bg-[#5D0F17]/[0.03] text-base sm:text-sm text-[#5D0F17] placeholder:text-[#5D0F17]/40 focus:border-[#5D0F17]/40 focus:bg-[#FFFDF8] focus:outline-none transition"
           />
           {filters.search && (
             <button onClick={() => updateFilters({ search: "" })} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#5D0F17]/40 hover:text-[#5D0F17]">
@@ -336,10 +341,23 @@ export default function ProductFilter({
           )}
         </div>
 
-        {/* Filters + Sort row */}
-        <div className="flex items-center gap-2 sm:ml-auto">
+        {/* Phone-only count. It reads as a caption on the results rather than a control, so it sits
+            under the search field instead of competing with Filter and Sort for a 320px row. */}
         {productCount !== undefined && (
-          <span className="text-sm text-[#5D0F17]/45 mr-1 whitespace-nowrap tabular-nums">
+          <span className="sm:hidden -mt-1 text-sm text-[#5D0F17]/45 tabular-nums">
+            {productCount} product{productCount !== 1 ? "s" : ""}
+          </span>
+        )}
+
+        {/* Filters + Sort row.
+            The count is `whitespace-nowrap` and both controls are inline-flex with fixed padding,
+            so at 320px this row's min-content width came to ~360 and pushed the whole document —
+            and with it the fixed header, which sizes off the initial containing block — 40px wider
+            than the screen. The count is contextual text rather than a control, so on phones it
+            moves to its own line below (see above) and only Filter + Sort share this row. */}
+        <div className="flex items-center gap-2 sm:ml-auto min-w-0">
+        {productCount !== undefined && (
+          <span className="hidden sm:inline text-sm text-[#5D0F17]/45 mr-1 whitespace-nowrap tabular-nums">
             {productCount} product{productCount !== 1 ? "s" : ""}
           </span>
         )}
