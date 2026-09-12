@@ -98,8 +98,8 @@ export async function loadStoreBuilderRows(slug: string): Promise<StoreBuilderRo
  try {
   const q = db();
   const [pageRows, menuRows] = await Promise.all([
-   q`SELECT path, title, nav_label, hidden, kind FROM site_pages WHERE store_slug = ${slug}` as Promise<RawPage[]>,
-   q`SELECT menu, items, signature FROM site_menus WHERE store_slug = ${slug}` as Promise<RawMenu[]>,
+   q`SELECT path, title, nav_label, hidden, kind FROM site_pages WHERE store_slug = ${slug}` as unknown as Promise<RawPage[]>,
+   q`SELECT menu, items, signature FROM site_menus WHERE store_slug = ${slug}` as unknown as Promise<RawMenu[]>,
   ]);
   const rows: StoreBuilderRows = { pages: new Map(), menus: new Map(), ready: true };
   for (const r of pageRows) {
