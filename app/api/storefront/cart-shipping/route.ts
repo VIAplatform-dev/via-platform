@@ -7,8 +7,7 @@ import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { emptyBagMessage } from "@/app/lib/storefront-cart-core";
 import { assignTier } from "@/app/lib/shipping-tiers";
 import { combineParcels } from "@/app/lib/parcel-core";
-import { isoCountry } from "@/app/lib/ship-from-core";
-import { quoteShipping } from "@/app/lib/shipping-zones";
+import { resolveBuyerShipping } from "@/app/lib/shipping-price";
 import { resolveDelivery } from "@/app/lib/checkout-delivery.ts";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +56,13 @@ export async function POST(request: NextRequest) {
  // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
  // (shipping-zones.ts + shipping-prices-core.ts). A collection needs no zone, so a country she
  // doesn't post to is only refused once we know this is a delivery.
- const quote = hasAddress ? quoteShipping({ fromCountry: isoCountry(shipping.shipFrom?.country), toCountry: isoCountry(to.country), parcel, zones: shipping.zones }) : null;
+ // ONE resolver, shared with /shipping-rates and with cart-intent's authoritative charge
+ // (shipping-price.ts). Three separate calculations is how a buyer gets shown one price and
+ // billed another; the store's own policy — live rate + markup, or its flat zone prices — is
+ // applied in exactly one place.
+ const quote = hasAddress
+  ? await resolveBuyerShipping({ settings: shipping, sellerName: seller.name, sellerEmail: seller.email, to, parcel })
+  : null;
  const charge = quote?.ok ? quote.amountCents : 0;
 
  // The one place the choice is priced: what she claimed, checked against what this store offers.

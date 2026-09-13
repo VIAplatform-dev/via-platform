@@ -11,7 +11,7 @@ import { consignorCutToHold } from "@/app/lib/consignment-db";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { mayReclaimReservation } from "@/app/lib/bag-reclaim-core";
 import { settleCrossListedBeforeCharge } from "@/app/lib/market-sync";
-import { quoteShipping } from "@/app/lib/shipping-zones";
+import { resolveBuyerShipping } from "@/app/lib/shipping-price";
 import { resolveDelivery, deliveryMetadata } from "@/app/lib/checkout-delivery.ts";
 import { getCheckoutMethods } from "@/app/lib/store-checkout-db";
 import { validateDiscount, distributeDiscount, lastOrderAtForBuyer } from "@/app/lib/store-discounts-db";
@@ -100,16 +100,26 @@ export async function POST(request: NextRequest) {
  // label at fulfillment and keeps the spread; margin is baked into the tier + kept safe by round-up dims.
  // Priced by ZONE with the store's own tier prices (shipping-zones.ts + shipping-prices-core.ts) —
  // the same call /cart-shipping made, so the charge matches the quote to the penny.
- const shipQuote = quoteShipping({
- fromCountry: shipSettings.shipFrom?.country || "US",
- toCountry: hasShipAddress ? ship.country || "US" : shipSettings.shipFrom?.country || "US",
+ // THE SAME RESOLVER /cart-shipping quoted with (shipping-price.ts), so the charge and the
+ // quote cannot drift — including which policy the store chose, live-rate or its own flat zone
+ // prices. This stays server-authoritative: the amount is re-derived here, never taken from the
+ // client, because a buyer could otherwise post zero and dodge the label.
+ const shipQuote = await resolveBuyerShipping({
+ settings: shipSettings,
+ sellerName: seller.name,
+ sellerEmail: seller.email,
+ to: {
+  name: String(buyer.name || ""), street1: String(ship.line1 || ""), street2: String(ship.line2 || ""),
+  city: String(ship.city || ""), state: String(ship.state || ""), zip: String(ship.zip || ""),
+  country: hasShipAddress ? String(ship.country || "US") : shipSettings.shipFrom?.country || "US",
+  email: buyerEmail,
+ },
  parcel: {
  weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
  lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),
  widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
  heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
  },
- zones: shipSettings.zones,
  });
  if (hasShipAddress && !shipQuote.ok) {
  for (const it of reserved) await releaseReservation(it.id).catch(() => {});

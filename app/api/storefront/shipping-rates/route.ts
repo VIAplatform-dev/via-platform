@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getItem } from "@/app/lib/db/inventory";
 import { getSellerById } from "@/app/lib/db/sellers";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
-import { assignTier } from "@/app/lib/shipping-tiers";
-import { quoteShipping } from "@/app/lib/shipping-zones";
 import { parcelForLabel } from "@/app/lib/parcel-core";
-import { isoCountry } from "@/app/lib/ship-from-core";
+import { resolveBuyerShipping, resolveExpedited } from "@/app/lib/shipping-price";
 
 export const dynamic = "force-dynamic";
 
@@ -34,11 +32,25 @@ export async function POST(request: NextRequest) {
  // No shipping paid yet — this IS the quote — so the floor is the middle of the ladder rather than
  // a mailer. Guessing small here undercharges the shopper and the store eats it at label time.
  const parcel = parcelForLabel({ item, shippingPaidCents: null });
- const tier = assignTier(parcel);
  // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
  // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
  // (shipping-zones.ts + shipping-prices-core.ts); a country she doesn't serve is refused, not sold.
- const quote = quoteShipping({ fromCountry: isoCountry(shipping.shipFrom?.country), toCountry: isoCountry(to.country), parcel, zones: shipping.zones });
- if (!quote.ok) return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
- return NextResponse.json({ free: false, currency: item.currency, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: quote.amountCents, estDays: null }] });
+ // ONE resolver for the quote AND the charge (shipping-price.ts). They were computed separately
+ // and my own change made them disagree: this route started returning a live rate while
+ // /cart-intent still charged the zone price, so a buyer could be shown $17 and billed $24.
+ const priced = await resolveBuyerShipping({ settings: shipping, sellerName: seller.name, sellerEmail: seller.email, to, parcel });
+ if (!priced.ok) return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+
+ const express = await resolveExpedited({
+  settings: shipping, sellerName: seller.name, sellerEmail: seller.email, to, parcel,
+  standardEstDays: priced.estDays,
+ });
+
+ return NextResponse.json({
+  free: false, currency: item.currency,
+  rates: [
+   { provider: "VYA", service: priced.service, costCents: priced.amountCents, estDays: priced.estDays },
+   ...(express ? [{ provider: "VYA", service: express.service, costCents: express.amountCents, estDays: express.estDays }] : []),
+  ],
+ });
 }
