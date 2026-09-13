@@ -35,7 +35,7 @@ test("a seller with a store is returned to where she was headed", async () => {
 test("a brand-new signup goes to onboarding, not to `next`", async () => {
  // Setting the shop up comes first — `next` would drop her into an empty workspace.
  const s = stubWhoAmI([{ status: 200, body: { admin: false, needsOnboarding: true } }]);
- assert.equal(await destinationAfterAuth("/admin/orders"), "/admin/onboarding");
+ assert.equal(await destinationAfterAuth("/admin/orders"), "/onboarding");
  s.restore();
 });
 
@@ -108,6 +108,11 @@ test("a `next` pointing at onboarding is refused — it is a router, not a desti
  // This was an infinite loop in production: /admin/onboarding bounced the owner to /store/login,
  // which honoured ?next=/admin/onboarding and sent her straight back. Anyone who genuinely needs
  // onboarding is routed there by destinationAfterAuth itself, so the parameter is never needed.
+ // Both spellings: /onboarding on vyaplatform.com, /admin/onboarding on getvya.ai. A link built
+ // on one host and followed on the other is how the loop started.
+ assert.equal(safeNext("/onboarding"), null);
+ assert.equal(safeNext("/onboarding/build"), null);
+ assert.equal(safeNext("/infrastructure/admin/onboarding"), null);
  assert.equal(safeNext("/admin/onboarding"), null);
  assert.equal(safeNext("/admin/onboarding/build"), null);
  assert.equal(safeNext("/admin/onboarding?from=x"), null);
@@ -119,6 +124,6 @@ test("a `next` pointing at onboarding is refused — it is a router, not a desti
 
 test("a seller who needs onboarding still gets there, without the parameter", async () => {
  const s = stubWhoAmI([{ status: 200, body: { admin: false, needsOnboarding: true } }]);
- assert.equal(await destinationAfterAuth("/admin/orders"), "/admin/onboarding");
+ assert.equal(await destinationAfterAuth("/admin/orders"), "/onboarding");
  s.restore();
 });

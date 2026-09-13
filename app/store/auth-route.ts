@@ -7,7 +7,21 @@
 // back through onboarding, and why "sign in" still reaches the wizard for someone who created an
 // account but never finished setting up.
 
-export const STORE_ONBOARDING = "/admin/onboarding";
+// "/onboarding", NOT "/admin/onboarding".
+//
+// The onboarding page lives at app/infrastructure/admin/onboarding and is served as
+// getvya.ai/admin/onboarding by the host rewrite. There is no app/admin/onboarding, so on
+// VYAPLATFORM.COM — where /store/signup actually is — that path is nothing at all. A new seller
+// signed up, the magic link worked, /store/continue sent her to /admin/onboarding, and she got
+// Next's 404. Logged out the proxy bounces to /admin/login first, which is why this never showed
+// up in testing: it only breaks for someone who just successfully signed in.
+//
+// next.config.ts redirects /onboarding to the real page, and that redirect exists precisely
+// because this path is easy to get wrong.
+export const STORE_ONBOARDING = "/onboarding";
+
+/** Every path that IS onboarding, on either host. Refused as a `next` — see safeNext. */
+const ONBOARDING_PATHS = ["/onboarding", "/admin/onboarding", "/infrastructure/admin/onboarding"];
 
 export type StoreWhoAmI = { admin?: boolean; slug?: string; needsOnboarding?: boolean; dev?: boolean };
 
@@ -29,7 +43,11 @@ export function safeNext(next: string | null | undefined): string | null {
  // Honouring it as a `next` can only fight that decision — and did, as an infinite loop in
  // production. Onboarding bounced the owner here, this returned her there, and round it went.
  // Anyone who genuinely needs onboarding is sent there by destinationAfterAuth anyway.
- if (v === STORE_ONBOARDING || v.startsWith(`${STORE_ONBOARDING}/`) || v.startsWith(`${STORE_ONBOARDING}?`)) return null;
+ //
+ // BOTH SPELLINGS. The page is /onboarding on vyaplatform.com and /admin/onboarding on
+ // getvya.ai (the host rewrite), so a `next` arriving from either host has to be refused — a
+ // link built on one and followed on the other is exactly how the loop started.
+ if (ONBOARDING_PATHS.some((base) => v === base || v.startsWith(`${base}/`) || v.startsWith(`${base}?`))) return null;
  return v;
 }
 
