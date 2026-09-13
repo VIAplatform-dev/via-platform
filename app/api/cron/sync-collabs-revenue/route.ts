@@ -4,8 +4,12 @@ import { saveSetting, getSetting } from "@/app/lib/settings-db";
 import { stores, convertCurrencyToUSD } from "@/app/lib/stores";
 import { markCartItemsPurchased } from "@/app/lib/cart-db";
 import { findCachedOrder } from "@/app/lib/order-cache-db";
+import { sendOpsAlert } from "@/app/lib/ops-alert";
 
 export const maxDuration = 60;
+
+/** Longer than any believable quiet spell. Past this, silence means broken, not slow. */
+const STALE_CONVERSION_DAYS = 10;
 
 // Build a lowercase name → slug map from our store config
 const storeNameToSlug = new Map<string, string>(
@@ -223,6 +227,9 @@ async function fetchIndividualCommissions(
 
 // Returns false when the commission is still in holding period and no order total is available.
 // The caller should then hold back the snapshot for this partnership so the next run retries.
+/** What a save actually did: how many conversions it wrote, and how many it tried to. */
+type SaveResult = { inserted: number; attempted: number };
+
 async function saveCollabsConversions(
  partnershipId: string,
  brandName: string,
@@ -235,10 +242,17 @@ async function saveCollabsConversions(
  commissionRules: CommissionRule[],
  cookie: string,
  csrfToken: string
-): Promise<boolean> {
+): Promise<SaveResult> {
  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
- if (!dbUrl) return false;
+ if (!dbUrl) return { inserted: 0, attempted: 0 };
  const sql = neon(dbUrl);
+ // Counts rows this call ACTUALLY wrote. `ON CONFLICT DO NOTHING` writes nothing when the order
+ // is already recorded, and the old code returned an unconditional `true` regardless — so the
+ // sync reported "1 new conversion recorded" having saved none, and, because it had reported
+ // success, advanced the snapshot past that order. The next run then saw deltaOrders = 0 and the
+ // sale was gone for good. A save must report what it wrote, not that it ran.
+ let insertedRows = 0;
+ let attemptedRows = 0;
 
  const storeSlug = resolveStoreSlug(brandName);
 
@@ -364,7 +378,7 @@ async function saveCollabsConversions(
  orderTotal = calculateOrderTotal(convertCurrencyToUSD(deltaCommission, currency) / Math.max(1, deltaOrders), commissionRules);
  lineItems = [{ productName: firstItem.productName ?? (click?.product_name as string | null) ?? "Item via Shopify Collabs", quantity: 1, price: orderTotal }];
  }
- if (orderTotal <= 0) return false;
+ if (orderTotal <= 0) return { inserted: insertedRows, attempted: attemptedRows };
  }
 
  // Enrich with the REAL line items from the Shopify order-webhook cache. Collabs
@@ -392,7 +406,7 @@ async function saveCollabsConversions(
  // recover it from the order cache (matched by name, else store+total+time).
  const customerEmail = cached?.email ?? null;
 
- await sql`
+ const written = await sql`
  INSERT INTO conversions (
  conversion_id, timestamp, order_id, order_total, currency,
  items, via_click_id, store_slug, store_name, matched, matched_click_data, user_id, customer_email
@@ -415,7 +429,10 @@ async function saveCollabsConversions(
  ${customerEmail}
  )
  ON CONFLICT (order_id, store_slug) DO NOTHING
+ RETURNING id
  `;
+ attemptedRows += 1;
+ if (Array.isArray(written) && written.length > 0) insertedRows += 1;
 
  // Mark cart items purchased so the user won't get an abandoned-cart email
  const clickUserId = click ? (click.user_id as string | null) : null;
@@ -423,11 +440,11 @@ async function saveCollabsConversions(
  markCartItemsPurchased(clickUserId, storeSlug).catch(() => {});
  }
  }
- return true;
+ return { inserted: insertedRows, attempted: attemptedRows };
  }
 
  // Commission is in holding period and individual records weren't findable — retry next run.
- if (deltaCommission <= 0) return false;
+ if (deltaCommission <= 0) return { inserted: 0, attempted: 0 };
 
  // Fallback: delta-based approach using actual commission rates
  const commissionUSD = convertCurrencyToUSD(deltaCommission, currency);
@@ -485,7 +502,7 @@ async function saveCollabsConversions(
  // Buyer email from the webhook order cache (Collabs doesn't provide it).
  const customerEmail = cached?.email ?? null;
 
- await sql`
+ const written2 = await sql`
  INSERT INTO conversions (
  conversion_id, timestamp, order_id, order_total, currency,
  items, via_click_id, store_slug, store_name, matched, matched_click_data, user_id, customer_email
@@ -500,9 +517,12 @@ async function saveCollabsConversions(
  ${customerEmail}
  )
  ON CONFLICT (order_id, store_slug) DO NOTHING
+ RETURNING id
  `;
+ attemptedRows += 1;
+ if (Array.isArray(written2) && written2.length > 0) insertedRows += 1;
  }
- return true;
+ return { inserted: insertedRows, attempted: attemptedRows };
 }
 
 /**
@@ -837,10 +857,18 @@ export async function GET(request: Request) {
  if (deltaOrders > 0) {
  try {
  const recorded = await saveCollabsConversions(p.id, p.name, deltaOrders, deltaCommission, p.currency ?? "USD", now, lastSyncedAt, prevOrders, p.commissionRules ?? [], cookie, csrfToken);
- if (recorded) {
- newOrdersRecorded += deltaOrders;
- console.log(`[Sync Collabs Revenue] ${p.name}: +${deltaOrders} orders, +${deltaCommission.toFixed(2)} ${p.currency ?? "USD"} commission, rates: [${(p.commissionRules ?? []).map((r: CommissionRule) => r.value + "%").join(", ")}]`);
+ // COUNT WHAT WAS WRITTEN, not what was asked for. The reported number is what the admin
+ // screen prints, and it used to say "1 new conversion recorded" on runs that wrote nothing.
+ if (recorded.inserted > 0) {
+ newOrdersRecorded += recorded.inserted;
+ console.log(`[Sync Collabs Revenue] ${p.name}: +${recorded.inserted} conversions written (delta was ${deltaOrders}), +${deltaCommission.toFixed(2)} ${p.currency ?? "USD"} commission, rates: [${(p.commissionRules ?? []).map((r: CommissionRule) => r.value + "%").join(", ")}]`);
+ } else if (recorded.attempted > 0) {
+ // Tried and every row already existed. Nothing new, but nothing lost either — so the
+ // snapshot may advance. Do NOT count these: they are not new conversions.
+ console.log(`[Sync Collabs Revenue] ${p.name}: ${recorded.attempted} order(s) already recorded — nothing new`);
  } else {
+ // Never got as far as an insert (holding period, no amount yet). HOLD THE SNAPSHOT so the
+ // next run sees the delta again — otherwise the order is lost for good.
  holdbackIds.add(p.id);
  console.log(`[Sync Collabs Revenue] ${p.name}: +${deltaOrders} orders in holding period — no amount yet, will retry next run`);
  }
@@ -870,6 +898,27 @@ export async function GET(request: Request) {
  await saveSetting("collabs_data", JSON.stringify(snapshotToSave));
  } else {
  console.warn("[Sync Collabs Revenue] Snapshot NOT advanced due to DB write failures — will retry on next run");
+ }
+
+ // A SYNC THAT STOPS FINDING ANYTHING LOOKS EXACTLY LIKE A QUIET MARKETPLACE.
+ //
+ // Collabs is reached with a session cookie, not an API key, and that cookie expires. When it
+ // does, every run still returns 200 and records nothing — so conversions simply stop, and the
+ // first anyone knows is a store asking where its sale went. Alert once the gap is longer than
+ // any believable quiet spell, so the cookie gets refreshed before a month of sales is lost.
+ try {
+ const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+ const lastWrite = dbUrl ? await neon(dbUrl)`SELECT MAX(timestamp) AS latest FROM conversions`.catch(() => []) : [];
+ const latest = (lastWrite as { latest: string | null }[])[0]?.latest;
+ const daysQuiet = latest ? (Date.now() - new Date(latest).getTime()) / 86_400_000 : Infinity;
+ if (daysQuiet > STALE_CONVERSION_DAYS) {
+  await sendOpsAlert(
+  "Collabs conversions have gone quiet",
+  `No conversion has been recorded for ${Number.isFinite(daysQuiet) ? Math.floor(daysQuiet) : "any"} days (last: ${latest ?? "never"}). The sync is still running, so this is usually the Collabs SESSION COOKIE having expired — refresh collabs_cookie / collabs_csrf_token from the admin. Partnerships seen this run: ${partnerships.length}.`,
+  ).catch(() => {});
+ }
+ } catch {
+ /* allow-swallow: a health check must never be the thing that breaks the sync */
  }
 
  // Retroactively match any older collabs conversions that still have no user_id

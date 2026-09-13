@@ -29,6 +29,21 @@ type SortOption = "relevance" | "price-asc" | "price-desc";
 // means ~780KB for a query like "bag", almost all of it per-product image JSON.
 const PAGE_SIZE = 96;
 
+// The same vocabulary the category pages use, so narrowing by size in one place uses the same
+// words as the other.
+const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "6", "7", "8", "9", "10", "36", "37", "38", "39", "40"];
+const COLOR_OPTIONS = ["black", "white", "brown", "beige", "red", "pink", "blue", "green", "grey", "gold", "silver"];
+const PRICE_BANDS: { label: string; min: string; max: string }[] = [
+  { label: "Under $100", min: "", max: "100" },
+  { label: "$100-250", min: "100", max: "250" },
+  { label: "$250-500", min: "250", max: "500" },
+  { label: "$500+", min: "500", max: "" },
+];
+
+/** One chip style for every filter, so the four lists can't drift apart. */
+const chip = (on: boolean) =>
+  `px-3 py-1.5 text-xs border transition-colors ${on ? "bg-[#5D0F17] text-[#FFFDF8] border-[#5D0F17]" : "border-[#5D0F17]/20 hover:border-[#5D0F17]"}`;
+
 const SORT_LABELS: Record<SortOption, string> = {
  relevance: "Relevance",
  "price-asc": "Price: Low to High",
@@ -60,6 +75,12 @@ function SearchResultsContent({ q }: { q: string }) {
  const router = useRouter();
  const [refine, setRefine] = useState(q);
  const [storesOpen, setStoresOpen] = useState(false);
+ // Price, size and colour — the same three the category pages offer. Applied SERVER-side (they
+ // are part of the query key below), because the results are paged and filtering the downloaded
+ // page would silently hide matches further down.
+ const [sizes, setSizes] = useState<string[]>([]);
+ const [colors, setColors] = useState<string[]>([]);
+ const [price, setPrice] = useState<{ min: string; max: string }>({ min: "", max: "" });
  const [sortOpen, setSortOpen] = useState(false);
  const [hasMore, setHasMore] = useState(false);
  const [loading, setLoading] = useState(true);
@@ -86,13 +107,17 @@ function SearchResultsContent({ q }: { q: string }) {
  try {
  sessionStorage.setItem(searchFilterKey(q), JSON.stringify({ selectedStore, sort }));
  } catch {}
- }, [q, selectedStore, sort]);
+ }, [q, selectedStore, sort, sizes, colors, price]);
 
  // Filtering and sorting go to the server, so they apply to EVERY match rather than to
  // whichever page is currently loaded. Changing either restarts at page one.
  const buildUrl = (offset: number) => {
  const params = new URLSearchParams({ q: q.trim(), limit: String(PAGE_SIZE), offset: String(offset) });
  if (selectedStore) params.set("store", selectedStore);
+ if (sizes.length) params.set("sizes", sizes.join(","));
+ if (colors.length) params.set("colors", colors.join(","));
+ if (price.min.trim()) params.set("priceMin", price.min.replace(/[^0-9.]/g, ""));
+ if (price.max.trim()) params.set("priceMax", price.max.replace(/[^0-9.]/g, ""));
  if (sort !== "relevance") params.set("sort", sort);
  if (offset === 0) params.set("log", "1");
  return `/api/search?${params}`;
@@ -172,6 +197,10 @@ function SearchResultsContent({ q }: { q: string }) {
  const productStores = storeFacets;
  // Filtering and sorting already happened in SQL.
  const displayProducts = products;
+ // Everything narrowing the results right now — the button has to say so, or a filter left on
+ // from a previous search silently explains a thin page.
+ const activeFilterCount =
+  (selectedStore ? 1 : 0) + sizes.length + colors.length + (price.min || price.max ? 1 : 0);
 
  const hasQuickLinks = designers.length > 0 || categories.length > 0 || matchedStores.length > 0;
 
@@ -348,18 +377,55 @@ function SearchResultsContent({ q }: { q: string }) {
  <button
  onClick={() => { setStoresOpen(!storesOpen); setSortOpen(false); }}
  className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm transition-all duration-200 ${
- selectedStore
+ activeFilterCount > 0
  ? "border-[#5D0F17] text-[#5D0F17] font-medium"
  : "border-[#5D0F17]/15 text-[#5D0F17]/70 hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"
  }`}
  >
  <SlidersHorizontal size={14} />
- Filter{selectedStore ? " (1)" : ""}
+ Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
  </button>
  {storesOpen && (
  <>
  <div className="fixed inset-0 z-40" onClick={() => setStoresOpen(false)} />
  <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-2 z-50 w-72 bg-[#FFFDF8] border border-[#5D0F17]/15 rounded-2xl shadow-lg max-h-[60vh] overflow-y-auto py-1">
+ {/* PRICE · SIZE · COLOUR · STORE. The filter had only Store, so narrowing 1,189 bags
+     to the ones in your size meant leaving search and browsing a category instead. */}
+ <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-[0.15em] text-[#5D0F17]/40">Price</p>
+ <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+ {PRICE_BANDS.map((b) => {
+ const on = price.min === b.min && price.max === b.max;
+ return (
+ <button key={b.label} onClick={() => setPrice(on ? { min: "", max: "" } : { min: b.min, max: b.max })} className={chip(on)}>
+ {b.label}
+ </button>
+ );
+ })}
+ </div>
+
+ <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-[0.15em] text-[#5D0F17]/40">Size</p>
+ <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+ {SIZE_OPTIONS.map((sz) => {
+ const on = sizes.includes(sz);
+ return (
+ <button key={sz} onClick={() => setSizes(on ? sizes.filter((x) => x !== sz) : [...sizes, sz])} className={chip(on)}>
+ {sz}
+ </button>
+ );
+ })}
+ </div>
+
+ <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-[0.15em] text-[#5D0F17]/40">Colour</p>
+ <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+ {COLOR_OPTIONS.map((c) => {
+ const on = colors.includes(c);
+ return (
+ <button key={c} onClick={() => setColors(on ? colors.filter((x) => x !== c) : [...colors, c])} className={chip(on) + " capitalize"}>
+ {c}
+ </button>
+ );
+ })}
+ </div>
  <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-[0.15em] text-[#5D0F17]/40">Store</p>
  <button
  onClick={() => { setSelectedStore(null); setStoresOpen(false); }}

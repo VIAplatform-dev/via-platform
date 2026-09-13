@@ -472,6 +472,20 @@ export async function GET(request: Request) {
   const storeFilter = searchParams.get("store") ?? "";
   const sortParam = searchParams.get("sort") ?? "relevance";
 
+  // THE SAME FILTERS THE CATEGORY PAGES OFFER. Search had only Store, so narrowing 1,147 bags to
+  // the ones in your size meant leaving search and browsing a category instead.
+  //
+  // Applied in SQL, not in JavaScript over the loaded page. The results are paginated, so
+  // filtering the 96 rows that happen to be downloaded would silently hide matches on page two —
+  // the same trap the store filter and the sort already had to be moved into SQL to avoid.
+  const csv = (k: string) => (searchParams.get(k) ?? "").split(",").map((v) => v.trim()).filter(Boolean);
+  const sizes = csv("sizes").map((v) => v.toUpperCase());
+  const colors = csv("colors").map((v) => v.toLowerCase());
+  const priceMin = Number(searchParams.get("priceMin"));
+  const priceMax = Number(searchParams.get("priceMax"));
+  const hasMin = Number.isFinite(priceMin) && priceMin > 0;
+  const hasMax = Number.isFinite(priceMax) && priceMax > 0;
+
   if (!q || q.length < 2) {
     return NextResponse.json({ products: [], designers: [], categories: [], stores: [], storeFacets: [], total: 0, hasMore: false });
   }
@@ -624,6 +638,7 @@ export async function GET(request: Request) {
       WITH scored AS (
         SELECT
           id, store_slug, store_name, title, price, currency, image, images, created_at,
+          size_keys, image_color,
           (
             CASE WHEN unaccent(LOWER(title)) = ${q} THEN 10000 ELSE 0 END
             + CASE WHEN unaccent(LOWER(title)) LIKE ${startPattern} THEN 5000 ELSE 0 END
@@ -691,6 +706,10 @@ export async function GET(request: Request) {
         FROM scored
         WHERE relevance > 0
           AND (${storeFilter} = '' OR store_slug = ${storeFilter})
+          AND (${sizes.length} = 0 OR size_keys && ${sizes}::text[])
+          AND (${colors.length} = 0 OR LOWER(image_color) = ANY(${colors}))
+          AND (${!hasMin} OR price >= ${hasMin ? priceMin : 0})
+          AND (${!hasMax} OR price <= ${hasMax ? priceMax : 0})
       )
       SELECT * FROM matched
       ORDER BY

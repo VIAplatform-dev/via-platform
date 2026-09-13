@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
   if (!dbUrl) return NextResponse.json({ error: "No database" }, { status: 500 });
 
   const sql = neon(dbUrl);
-  const filter = request.nextUrl.searchParams.get("filter") ?? "unmatched";
+  // "all", matching what the client defaults to. The two disagreed, and a hidden default that
+  // shows fewer rows than the screen implies is how a conversion looks missing when it is only
+  // filtered — every Collabs row is written matched:true, so "unmatched" hides the normal case.
+  const filter = request.nextUrl.searchParams.get("filter") ?? "all";
   const storeSlug = request.nextUrl.searchParams.get("store");
 
   const utmJoin = sql`
