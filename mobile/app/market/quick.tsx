@@ -88,7 +88,7 @@ export default function QuickList() {
         keyboardType={opts?.numeric ? "decimal-pad" : "default"}
         placeholder={opts?.numeric ? "0" : "optional"}
         placeholderTextColor={colors.textDim}
-        style={{ flex: 1, fontSize: 17, color: colors.text, fontWeight: "600" }}
+        style={{ flex: 1, fontSize: 16, color: colors.text, fontWeight: "600" }}
       />
     </View>
   );
@@ -105,7 +105,7 @@ export default function QuickList() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => void snap()} style={{ height: 180, borderRadius: 14, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        <Pressable onPress={() => void snap()} style={{ height: 120, borderRadius: 12, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
           {photo ? <Image source={{ uri: photo }} style={{ width: "100%", height: "100%" }} /> : <Text style={{ fontSize: 14, color: colors.textMuted }}>Add a photo (optional)</Text>}
         </Pressable>
 

@@ -93,10 +93,10 @@ export default function FindItem() {
         <Pressable
           onPress={() => void snap()}
           disabled={busy !== null}
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, backgroundColor: colors.accent, borderRadius: 16, paddingVertical: spacing.xl, marginTop: spacing.lg, opacity: busy ? 0.6 : 1 }}
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: spacing.lg, marginTop: spacing.lg, opacity: busy ? 0.6 : 1 }}
         >
           {busy === "matching" ? <ActivityIndicator color={colors.accentText} /> : null}
-          <Text style={{ fontSize: 17, fontWeight: "600", color: colors.accentText }}>{busy === "matching" ? "Looking…" : shot ? "Take another" : "Take a photo"}</Text>
+          <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accentText }}>{busy === "matching" ? "Looking…" : shot ? "Take another" : "Take a photo"}</Text>
         </Pressable>
 
         {error ? <Text style={{ fontSize: 13.5, color: colors.text, marginTop: spacing.md }}>{error}</Text> : null}

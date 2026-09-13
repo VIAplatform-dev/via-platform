@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 import { Redirect } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
@@ -40,12 +40,30 @@ export default function HomeScreen() {
   });
   // The endpoint ranks on clicks, favourites and views server-side, but also takes these as query
   // signals so the feed is personal on the FIRST session — before any view history exists.
-  const favIds = favorites.map((f) => f.id).slice(0, 60).join(",");
+  //
+  // SEEDED ONCE, DELIBERATELY FROZEN. This string used to be live, and it is part of the query
+  // key: saving a piece changed the key, which threw the whole 40-item feed away and refetched it,
+  // remounting forty image galleries. Then onSettled refetched favourites, the key moved again,
+  // and it all happened twice. Tapping a heart should darken a heart — not rebuild the page under
+  // your thumb.
+  //
+  // Freezing it costs nothing real: the server already ranks on the favourites it has stored, so
+  // the newly saved piece is reflected the next time Home mounts. These ids only exist to give the
+  // very first session something to go on.
+  // Carried in a ref and read at FETCH time, deliberately not in the query key. The seed is a
+  // detail of the request, not an identity of the result — the server ranks on the favourites it
+  // has stored either way — so it has no business invalidating the cache.
+  const favSeed = useRef("");
+  useEffect(() => {
+    if (!favSeed.current && favorites.length > 0) {
+      favSeed.current = favorites.map((f) => f.id).slice(0, 60).join(",");
+    }
+  }, [favorites]);
   const forYou = useQuery({
-    queryKey: ["for-you", favIds, sizes.join(",")],
+    queryKey: ["for-you", sizes.join(",")],
     queryFn: () => {
       const p = new URLSearchParams({ limit: "40" });
-      if (favIds) p.set("favs", favIds);
+      if (favSeed.current) p.set("favs", favSeed.current);
       if (sizes.length) p.set("sizes", sizes.join(","));
       return apiGet<{ products: Product[]; personalized: boolean }>(`/api/public/for-you?${p.toString()}`);
     },

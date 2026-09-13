@@ -243,10 +243,10 @@ export default function CashCheckout() {
                 <Pressable
                   onPress={() => { setError(null); pay.mutate(); }}
                   disabled={pay.isPending || cancel.isPending}
-                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, backgroundColor: colors.accent, borderRadius: 16, paddingVertical: spacing.xl, marginTop: spacing.xl, opacity: pay.isPending ? 0.6 : 1 }}
+                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: spacing.lg, marginTop: spacing.xl, opacity: pay.isPending ? 0.6 : 1 }}
                 >
                   {pay.isPending ? <ActivityIndicator color={colors.accentText} /> : null}
-                  <Text style={{ fontSize: 17, fontWeight: "600", color: colors.accentText }}>Cash received</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "600", color: colors.accentText }}>Cash received</Text>
                 </Pressable>
                 <Pressable onPress={() => cancel.mutate()} disabled={pay.isPending || cancel.isPending} style={{ alignItems: "center", paddingVertical: spacing.lg, marginTop: spacing.sm }}>
                   <Text style={{ fontSize: 15, fontWeight: "600", color: colors.textMuted }}>{cancel.isPending ? "Cancelling…" : "Cancel — put it back"}</Text>

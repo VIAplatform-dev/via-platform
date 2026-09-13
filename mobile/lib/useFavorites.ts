@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "./api";
 import { useAuth } from "./auth";
@@ -40,8 +40,23 @@ export function useFavorites() {
     enabled: Boolean(user),
   });
 
-  const all = q.data?.products ?? [];
-  const ids = new Set(all.map((p) => p.id));
+  const all = useMemo(() => q.data?.products ?? [], [q.data]);
+
+  // IDENTITY MATTERS HERE, not just contents.
+  //
+  // `ids` was a fresh Set on every render, so the two callbacks below were fresh too, so
+  // ProductCard's memo — which compares onToggleFavorite by reference — never held. One heart tap
+  // re-rendered every card on screen and every image gallery inside them. Keyed on the ids
+  // themselves, the Set survives renders that did not change what is saved.
+  // `all` is itself memoized on q.data, and React Query's structural sharing keeps that object
+  // identical across a refetch that changed nothing — so this Set survives those too.
+  const ids = useMemo(() => new Set(all.map((p) => p.id)), [all]);
+
+  // The toggle reads the CURRENT set through a ref rather than closing over it, so its own
+  // identity never changes. Without this the memo above is defeated again by the very callback
+  // it is trying to keep stable.
+  const idsRef = useRef(ids);
+  useEffect(() => { idsRef.current = ids; }, [ids]);
 
   const toggle = useMutation({
     mutationFn: (v: { product: Product; favorited: boolean }) =>
@@ -62,14 +77,19 @@ export function useFavorites() {
   });
 
   const isFavorited = useCallback((p: Product) => ids.has(p.id), [ids]);
+  const mutateRef = useRef(toggle.mutate);
+  useEffect(() => { mutateRef.current = toggle.mutate; }, [toggle.mutate]);
   const toggleFavorite = useCallback(
-    (p: Product) => { if (user) toggle.mutate({ product: p, favorited: !ids.has(p.id) }); },
-    [toggle, user, ids],
+    (p: Product) => { if (user) mutateRef.current({ product: p, favorited: !idsRef.current.has(p.id) }); },
+    [user],
   );
 
+  const favorites = useMemo(() => all.filter((p) => !p.soldOut), [all]);
+  const soldOut = useMemo(() => all.filter((p) => p.soldOut), [all]);
+
   return {
-    favorites: all.filter((p) => !p.soldOut),
-    soldOut: all.filter((p) => p.soldOut),
+    favorites,
+    soldOut,
     isFavorited,
     toggleFavorite,
     query: q,
