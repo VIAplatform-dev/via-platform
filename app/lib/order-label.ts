@@ -1,6 +1,7 @@
 import { getOrderDetail, setOrderLabel, setReturnLabel, getReturnLabelInfo, setShipBackLabel, listParcelItemSizes } from "./db/orders";
 import { getSellerById } from "./db/sellers";
 import { getShippingSettings, hasShipFrom } from "./store-shipping-db";
+import { DEFAULT_LABEL_PRINTER } from "./label-format-core";
 import { getRates, buyLabel, voidLabel, isShipConfigured, getOrCreateShipAccount } from "./ship-provider";
 import { recordLabelTransaction, getLabelTransaction, markLabelVoided } from "./shippo-labels-db";
 import { MIN_MARGIN_CENTS } from "./shipping-tiers";
@@ -28,6 +29,8 @@ export async function generateOrderLabel(orderId: string): Promise<{ ok: boolean
  const seller = await getSellerById(order.sellerId);
  if (!seller) return { ok: false, reason: "no-seller" };
  const shipping = await getShippingSettings(seller.slug);
+ // What she prints on (label-format-core.ts): 4×6 for a thermal printer, the sheet otherwise.
+ const printer = shipping.labelPrinter ?? DEFAULT_LABEL_PRINTER;
  if (!hasShipFrom(shipping)) return { ok: false, reason: "no-ship-from" };
 
  const f = shipping.shipFrom!;
@@ -59,9 +62,9 @@ export async function generateOrderLabel(orderId: string): Promise<{ ok: boolean
   fromCountry: from.country, toCountry: to.country,
   parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
  }).catch(() => ({ declaration: null }));
- const rates = await getRates(from, to, parcel, shipAcct, customs);
+ const rates = await getRates(from, to, parcel, shipAcct, customs, printer);
  if (!rates.length) return { ok: false, reason: "no-rates" };
- const label = await buyLabel(rates[0].rateId, shipAcct);
+ const label = await buyLabel(rates[0].rateId, shipAcct, printer);
  if (!label) return { ok: false, reason: "label-failed" };
  await setOrderLabel(orderId, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
  await recordLabelTransaction(orderId, label.transactionId); // so we can void it if the order is refunded
@@ -111,6 +114,8 @@ export async function generateReturnLabel(orderId: string): Promise<{ ok: boolea
  const seller = await getSellerById(order.sellerId);
  if (!seller) return { ok: false, reason: "no-seller" };
  const shipping = await getShippingSettings(seller.slug);
+ // What she prints on (label-format-core.ts): 4×6 for a thermal printer, the sheet otherwise.
+ const printer = shipping.labelPrinter ?? DEFAULT_LABEL_PRINTER;
  if (!hasShipFrom(shipping)) return { ok: false, reason: "no-store-address" };
  const s = shipping.shipFrom!;
 
@@ -134,9 +139,9 @@ export async function generateReturnLabel(orderId: string): Promise<{ ok: boolea
   fromCountry: from.country, toCountry: to.country,
   parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
  }).catch(() => ({ declaration: null }));
- const rates = await getRates(from, to, parcel, shipAcct, customs);
+ const rates = await getRates(from, to, parcel, shipAcct, customs, printer);
  if (!rates.length) return { ok: false, reason: "no-rates" };
- const label = await buyLabel(rates[0].rateId, shipAcct);
+ const label = await buyLabel(rates[0].rateId, shipAcct, printer);
  if (!label) return { ok: false, reason: "label-failed" };
  await setReturnLabel(orderId, { url: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents });
  return { ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents };
@@ -154,6 +159,8 @@ export async function generateShipBackLabel(orderId: string): Promise<{ ok: bool
  const seller = await getSellerById(order.sellerId);
  if (!seller) return { ok: false, reason: "no-seller" };
  const shipping = await getShippingSettings(seller.slug);
+ // What she prints on (label-format-core.ts): 4×6 for a thermal printer, the sheet otherwise.
+ const printer = shipping.labelPrinter ?? DEFAULT_LABEL_PRINTER;
  if (!hasShipFrom(shipping)) return { ok: false, reason: "no-store-address" };
  const f = shipping.shipFrom!;
 
@@ -176,9 +183,9 @@ export async function generateShipBackLabel(orderId: string): Promise<{ ok: bool
   fromCountry: from.country, toCountry: to.country,
   parcelWeightOz: parcel.weightOz, fallbackValueCents: order.amountCents, fallbackTitle: order.itemTitle ?? undefined,
  }).catch(() => ({ declaration: null }));
- const rates = await getRates(from, to, parcel, shipAcct, customs);
+ const rates = await getRates(from, to, parcel, shipAcct, customs, printer);
  if (!rates.length) return { ok: false, reason: "no-rates" };
- const label = await buyLabel(rates[0].rateId, shipAcct);
+ const label = await buyLabel(rates[0].rateId, shipAcct, printer);
  if (!label) return { ok: false, reason: "label-failed" };
  await setShipBackLabel(orderId, label.labelUrl);
  return { ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents };

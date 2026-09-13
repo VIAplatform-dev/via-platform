@@ -3,6 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getShippingSettings, setShippingSettings, type ShipMode, type ShipFrom } from "@/app/lib/store-shipping-db";
 import { pickupOffered } from "@/app/lib/pickup-core.ts";
 import { isDutyMode, resolveDutyMode, DEFAULT_DUTY_MODE } from "@/app/lib/customs";
+import { isLabelPrinter, DEFAULT_LABEL_PRINTER } from "@/app/lib/label-format-core";
 import { normalizeZones, DEFAULT_ZONES } from "@/app/lib/shipping-zones";
 import { SHIPPING_TIERS } from "@/app/lib/shipping-tiers";
 import { validateZoneRates } from "@/app/lib/shipping-prices-core";
@@ -40,6 +41,9 @@ export async function GET(request: NextRequest) {
   effectiveDutyMode: effective.mode,
   dutyDowngraded: effective.downgraded,
   carrierConnected: Boolean(s.carrierAccountId),
+  labelPrinter: s.labelPrinter ?? DEFAULT_LABEL_PRINTER,
+  expeditedOffered: s.expeditedOffered === true,
+  pricing: s.pricing ?? "live",
   zones: s.zones ?? DEFAULT_ZONES,
   tiers: SHIPPING_TIERS.map((t) => ({ id: t.id, label: t.label, priceCents: t.priceCents, examples: t.examples })),
  });
@@ -64,6 +68,9 @@ export async function POST(request: NextRequest) {
   : null;
 
  const dutyMode = isDutyMode(body?.dutyMode) ? body.dutyMode : existing?.dutyMode ?? DEFAULT_DUTY_MODE;
+ const labelPrinter = isLabelPrinter(body?.labelPrinter) ? body.labelPrinter : existing?.labelPrinter ?? DEFAULT_LABEL_PRINTER;
+ const expeditedOffered = has("expeditedOffered") ? body.expeditedOffered === true : existing?.expeditedOffered === true;
+ const pricing = body?.pricing === "flat" || body?.pricing === "live" ? body.pricing : existing?.pricing ?? "live";
  // Zones say both WHERE she ships and what she charges; normalizeZones refuses junk and can never
  // produce a store that ships nowhere.
  // A negative price is refused with the box named, rather than quietly dropped to the default.
@@ -104,7 +111,7 @@ export async function POST(request: NextRequest) {
  }
 
  // The connected carrier account is set by /api/store/shipping/carrier; a settings save carries it.
- await setShippingSettings(slug, { mode, freeThresholdCents, shipFrom, pickup, dutyMode, carrierAccountId: existing?.carrierAccountId ?? null, zones });
+ await setShippingSettings(slug, { mode, freeThresholdCents, shipFrom, pickup, dutyMode, carrierAccountId: existing?.carrierAccountId ?? null, zones, labelPrinter, expeditedOffered, pricing });
  // Tell Stripe Tax where the store is established as soon as we know. These are Express accounts —
  // their dashboard has no Tax Settings page — so if the platform doesn't set this, nobody can, and
  // the seller meets a Stripe error pointing at a screen she can't open. Best-effort: a shipping save

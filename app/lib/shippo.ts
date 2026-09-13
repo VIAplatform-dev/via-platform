@@ -2,6 +2,8 @@
 // USPS/UPS/FedEx rates — sellers never need their own carrier accounts. Gated by
 // SHIPPO_API_KEY so it's dormant until you add the key.
 
+const FALLBACK_EMAIL = "shipping@vyaplatform.com";
+
 const SHIPPO_API = "https://api.goshippo.com";
 
 export function isShippoConfigured(): boolean {
@@ -9,6 +11,7 @@ export function isShippoConfigured(): boolean {
 }
 
 import type { CustomsDeclaration } from "./customs";
+import { shippoLabelFileType, DEFAULT_LABEL_PRINTER, type LabelPrinter } from "./label-format-core";
 
 export type ShipAddress = {
  name?: string | null;
@@ -43,7 +46,10 @@ async function shippo(path: string, method: "GET" | "POST", body?: any): Promise
 }
 
 function toShippo(a: ShipAddress) {
- return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || "" };
+ // EMAIL IS NOT OPTIONAL TO USPS. It rejects an empty address_from.email and the whole purchase
+ // fails — so a store whose sellers row has no email could never buy a label. A placeholder on
+ // OUR domain is better than a failed label: the carrier only ever uses it for delivery notices.
+ return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || FALLBACK_EMAIL };
 }
 /** Our declaration in Shippo's field names — its enums are upper-cased and its EEL code is slugged. */
 function toShippoCustoms(d: CustomsDeclaration) {
@@ -72,7 +78,9 @@ function parcelToShippo(p: Parcel) {
 }
 
 /** Live rates from->to for a parcel, cheapest first. [] if not configured / on error. */
-export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, customs?: CustomsDeclaration | null): Promise<Rate[]> {
+// `printer` is accepted for interface symmetry with EasyPost and deliberately unused: Shippo puts
+// the label format on the TRANSACTION, not the shipment, so the choice is applied in buyLabel.
+export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, customs?: CustomsDeclaration | null, _printer?: LabelPrinter): Promise<Rate[]> {
  const shipment = await shippo("/shipments/", "POST", {
   address_from: toShippo(from), address_to: toShippo(to), parcels: [parcelToShippo(parcel)], async: false,
   // Same rule as EasyPost: no declaration, no international rates.
@@ -92,14 +100,26 @@ export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parce
  .sort((a, b) => a.amountCents - b.amountCents);
 }
 
-export type PurchasedLabel = { labelUrl: string; trackingNumber: string; trackingUrl: string | null; costCents: number; transactionId: string };
+export type PurchasedLabel = {
+ labelUrl: string; trackingNumber: string; trackingUrl: string | null; costCents: number; transactionId: string;
+ /**
+  * USPS Label Broker: a QR the Post Office scans and prints the label from, so a seller with no
+  * printer can still post. Shippo returns it on the transaction as `qr_code_url`; it is null
+  * unless the service and account support it, which is why nothing anywhere may assume it exists.
+  */
+ qrCodeUrl?: string | null;
+};
 
 /** Buy a label for a previously-returned rate id. Returns null if it didn't succeed. */
-export async function buyLabel(rateId: string): Promise<PurchasedLabel | null> {
- const tx = await shippo("/transactions/", "POST", { rate: rateId, label_file_type: "PDF", async: false });
+export async function buyLabel(rateId: string, printer: LabelPrinter = DEFAULT_LABEL_PRINTER): Promise<PurchasedLabel | null> {
+ // PDF_4x6 for a label printer. This was hardcoded "PDF", which for USPS is an 8.5×11 sheet with
+ // the label in the top quarter — unusable on the thermal printer a resale shop actually owns, and
+ // uncroppable on a phone.
+ const tx = await shippo("/transactions/", "POST", { rate: rateId, label_file_type: shippoLabelFileType(printer), async: false });
  if (!tx || tx.status !== "SUCCESS" || !tx.label_url) return null;
  return {
  labelUrl: tx.label_url as string,
+ qrCodeUrl: (tx.qr_code_url as string) || null,
  trackingNumber: String(tx.tracking_number || ""),
  trackingUrl: tx.tracking_url_provider || null,
  costCents: Math.round(parseFloat((tx.rate?.amount as string) || "0") * 100),

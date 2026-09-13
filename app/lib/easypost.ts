@@ -6,6 +6,9 @@
 
 import type { ShipAddress, Parcel, Rate, PurchasedLabel } from "./shippo";
 import type { CustomsDeclaration } from "./customs";
+import { labelOptionsFor, DEFAULT_LABEL_PRINTER, type LabelPrinter } from "./label-format-core";
+
+const FALLBACK_EMAIL = "shipping@vyaplatform.com";
 
 const EASYPOST_API = "https://api.easypost.com/v2";
 
@@ -38,7 +41,7 @@ async function ep(path: string, method: "GET" | "POST", body?: any, apiKey?: str
 }
 
 function toEpAddress(a: ShipAddress) {
- return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || "" };
+ return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || FALLBACK_EMAIL };
 }
 /**
  * Our declaration in EasyPost's field names.
@@ -73,7 +76,7 @@ function toEpParcel(p: Parcel) {
 }
 
 /** Live rates from->to for a parcel, cheapest first. [] if not configured / on error. */
-export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, apiKey?: string, customs?: CustomsDeclaration | null): Promise<Rate[]> {
+export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parcel, apiKey?: string, customs?: CustomsDeclaration | null, printer: LabelPrinter = DEFAULT_LABEL_PRINTER): Promise<Rate[]> {
  const shipment = await ep("/shipments", "POST", { shipment: {
   to_address: toEpAddress(to), from_address: toEpAddress(from), parcel: toEpParcel(parcel),
   // A shipment crossing a border needs a declaration or EasyPost returns no international rates at
@@ -82,13 +85,17 @@ export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parce
   // whose account to bill. DHL Express reads the incoterm alone, but FedEx and UPS bill the
   // RECEIVER unless duty_payment says otherwise — which would hand the buyer a bill at the door on
   // an order whose store promised duties were covered.
-  ...(customs ? {
-   customs_info: toEpCustoms(customs),
-   options: {
+  ...(customs ? { customs_info: toEpCustoms(customs) } : {}),
+  // ONE options object, not two. label_format/label_size decide what comes out of her printer
+  // (see label-format-core.ts) and must survive a customs declaration being present — an earlier
+  // shape put options inside the customs branch, so a domestic parcel got no format at all.
+  options: {
+   ...labelOptionsFor(printer),
+   ...(customs ? {
     incoterm: customs.incoterm,
     ...(customs.incoterm === "DDP" ? { duty_payment: { type: "SENDER" } } : {}),
-   },
-  } : {}),
+   } : {}),
+  },
  } }, apiKey);
  const shipmentId = shipment?.id as string | undefined;
  const rates: any[] = shipment?.rates || [];

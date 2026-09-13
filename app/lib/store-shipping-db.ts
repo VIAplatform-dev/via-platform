@@ -1,16 +1,41 @@
 import { neon } from "@neondatabase/serverless";
 import { isShipFromComplete, isoCountry } from "./ship-from-core";
 import type { PickupSettings } from "./pickup-core";
+import { type LabelPrinter, isLabelPrinter, DEFAULT_LABEL_PRINTER } from "./label-format-core";
 
 // Per-store shipping policy: where they ship from, and who pays.
 //   buyer_pays — live rate shown at checkout, added to the buyer's total
 //   store_pays — free at checkout; the store absorbs the label cost
 //   free_over  — buyer pays below freeThresholdCents, free at/above it
 export type ShipMode = "buyer_pays" | "store_pays" | "free_over";
+/** How a buyer-paid price is arrived at. Orthogonal to WHO pays, which is ShipMode. */
+export type ShipPricing = "live" | "flat";
+const isShipPricing = (v: unknown): v is ShipPricing => v === "live" || v === "flat";
 import { type DutyMode, DEFAULT_DUTY_MODE, isDutyMode } from "./customs";
 import { type ZoneConfig, normalizeZones, DEFAULT_ZONES } from "./shipping-zones";
 export type ShipFrom = { name?: string | null; street1?: string | null; street2?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string | null; phone?: string | null };
 export type ShippingSettings = {
+ /**
+  * What she prints labels on. A resale shop usually owns a 4×6 thermal printer; asking the carrier
+  * for nothing gets its default, which for USPS is an 8.5×11 sheet nobody can feed into a Rollo.
+  * See label-format-core.ts.
+  */
+ labelPrinter?: LabelPrinter;
+ /**
+  * Whether this store offers a faster service at checkout alongside the standard one.
+  *
+  * Off by default and per store on purpose: expedited is a promise about the SELLER's behaviour,
+  * not the carrier's. A shop that gets to the Post Office twice a week cannot keep a two-day
+  * promise however fast the label is, and a missed one costs more than the sale.
+  */
+ expeditedOffered?: boolean;
+ /**
+  * How buyer-paid postage is priced on this store's own site — the store's call, as it would be
+  * on Shopify. "live" quotes the real carrier rate for the route and adds VYA's markup; "flat"
+  * uses the store's own per-zone prices (shipping-zones.ts) and the store carries the variance.
+  * Default live: at a 1% platform fee VYA cannot absorb distance, and it buys every label.
+  */
+ pricing?: ShipPricing;
  /**
   * Who settles customs duty on an international order. It is not just a billing preference — it
   * decides the INCOTERM on the declaration, so a store that absorbs duty in its prices and ships
@@ -59,19 +84,22 @@ async function ensureTable() {
  await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS duty_mode TEXT`;
  await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS carrier_account_id TEXT`;
  await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS zones JSONB`;
+ await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS label_printer TEXT`;
+ await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS expedited_offered BOOLEAN`;
+ await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS pricing TEXT`;
  ensured = true;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export async function getShippingSettings(storeSlug: string): Promise<ShippingSettings> {
  await ensureTable();
- const rows = await db()`SELECT mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones FROM store_shipping WHERE store_slug = ${storeSlug}`;
+ const rows = await db()`SELECT mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, label_printer, expedited_offered, pricing FROM store_shipping WHERE store_slug = ${storeSlug}`;
  if (!rows.length) return DEFAULT;
  const r: any = rows[0];
  const mode = MODES.includes(r.mode) ? (r.mode as ShipMode) : "buyer_pays";
  const shipFrom = r.ship_from ? (typeof r.ship_from === "string" ? JSON.parse(r.ship_from) : r.ship_from) : null;
  const pickup = r.pickup ? (typeof r.pickup === "string" ? JSON.parse(r.pickup) : r.pickup) : null;
- return { mode, freeThresholdCents: r.free_threshold_cents ?? null, shipFrom, pickup, dutyMode: isDutyMode(r.duty_mode) ? r.duty_mode : DEFAULT_DUTY_MODE, carrierAccountId: r.carrier_account_id ?? null, zones: r.zones ? (typeof r.zones === "string" ? JSON.parse(r.zones) : r.zones) : DEFAULT_ZONES };
+ return { mode, freeThresholdCents: r.free_threshold_cents ?? null, shipFrom, pickup, dutyMode: isDutyMode(r.duty_mode) ? r.duty_mode : DEFAULT_DUTY_MODE, carrierAccountId: r.carrier_account_id ?? null, zones: r.zones ? (typeof r.zones === "string" ? JSON.parse(r.zones) : r.zones) : DEFAULT_ZONES, labelPrinter: isLabelPrinter(r.label_printer) ? r.label_printer : DEFAULT_LABEL_PRINTER, expeditedOffered: r.expedited_offered === true, pricing: isShipPricing(r.pricing) ? r.pricing : "live" };
 }
 
 /** Has the store saved shipping settings at all? getShippingSettings answers with a default for a
@@ -95,9 +123,12 @@ export async function setShippingSettings(storeSlug: string, s: ShippingSettings
  const dutyMode = isDutyMode(s.dutyMode) ? s.dutyMode : DEFAULT_DUTY_MODE;
  const carrierAccountId = s.carrierAccountId ? String(s.carrierAccountId).trim().slice(0, 60) : null;
  const zonesJson = JSON.stringify(normalizeZones(s.zones));
- await db()`INSERT INTO store_shipping (store_slug, mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, updated_at)
- VALUES (${storeSlug}, ${mode}, ${threshold}, ${shipFromJson}::jsonb, ${pickupJson}::jsonb, ${dutyMode}, ${carrierAccountId}, ${zonesJson}::jsonb, now())
- ON CONFLICT (store_slug) DO UPDATE SET mode = ${mode}, free_threshold_cents = ${threshold}, ship_from = ${shipFromJson}::jsonb, pickup = ${pickupJson}::jsonb, duty_mode = ${dutyMode}, carrier_account_id = ${carrierAccountId}, zones = ${zonesJson}::jsonb, updated_at = now()`;
+ const labelPrinter = isLabelPrinter(s.labelPrinter) ? s.labelPrinter : DEFAULT_LABEL_PRINTER;
+ const expeditedOffered = s.expeditedOffered === true;
+ const pricing = isShipPricing(s.pricing) ? s.pricing : "live";
+ await db()`INSERT INTO store_shipping (store_slug, mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, label_printer, expedited_offered, pricing, updated_at)
+ VALUES (${storeSlug}, ${mode}, ${threshold}, ${shipFromJson}::jsonb, ${pickupJson}::jsonb, ${dutyMode}, ${carrierAccountId}, ${zonesJson}::jsonb, ${labelPrinter}, ${expeditedOffered}, ${pricing}, now())
+ ON CONFLICT (store_slug) DO UPDATE SET mode = ${mode}, free_threshold_cents = ${threshold}, ship_from = ${shipFromJson}::jsonb, pickup = ${pickupJson}::jsonb, duty_mode = ${dutyMode}, carrier_account_id = ${carrierAccountId}, zones = ${zonesJson}::jsonb, label_printer = ${labelPrinter}, expedited_offered = ${expeditedOffered}, pricing = ${pricing}, updated_at = now()`;
 }
 
 /** Does this store have a usable ship-from address (required for rates + labels)? */

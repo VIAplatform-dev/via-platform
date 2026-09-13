@@ -15,6 +15,7 @@ import { getBooking, setRentalReturnLabel, getStoreSettings } from "./rentals-db
 import { resolveSettings } from "./settings-core";
 import { getSellerById } from "../db/sellers";
 import { getShippingSettings, hasShipFrom } from "../store-shipping-db";
+import { DEFAULT_LABEL_PRINTER } from "../label-format-core";
 import { getRates, buyLabel, isShipConfigured, getOrCreateShipAccount } from "../ship-provider";
 import { getItem } from "../db/inventory";
 
@@ -48,6 +49,8 @@ export async function generateRentalReturnLabel(bookingId: string): Promise<Labe
  if (!settings.prepaidLabel) return { ok: false, reason: "store-does-not-prepay" };
 
  const shipping = await getShippingSettings(seller.slug);
+ // What she prints on (label-format-core.ts): 4×6 for a thermal printer, the sheet otherwise.
+ const printer = shipping.labelPrinter ?? DEFAULT_LABEL_PRINTER;
  if (!hasShipFrom(shipping)) return { ok: false, reason: "no-store-address" };
  const s = shipping.shipFrom!;
 
@@ -75,10 +78,10 @@ export async function generateRentalReturnLabel(bookingId: string): Promise<Labe
  });
 
  const acct = await getOrCreateShipAccount(seller.slug, seller.name);
- const rates = await getRates(from, to, parcel, acct);
+ const rates = await getRates(from, to, parcel, acct, null, printer);
  if (!rates.length) return { ok: false, reason: "no-rates" };
 
- const label = await buyLabel(rates[0].rateId, acct);
+ const label = await buyLabel(rates[0].rateId, acct, printer);
  if (!label) return { ok: false, reason: "label-failed" };
 
  await setRentalReturnLabel(bookingId, { url: label.labelUrl, trackingNumber: label.trackingNumber, costCents: label.costCents });

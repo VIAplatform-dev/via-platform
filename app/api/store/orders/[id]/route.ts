@@ -9,14 +9,16 @@ import { reverseConsignedSale } from "@/app/lib/consignment-db";
 import { voidOrderLabel, generateReturnLabel, generateShipBackLabel } from "@/app/lib/order-label";
 import { getReturnLabelInfo, setReturnRejected } from "@/app/lib/db/orders";
 import { getRefundPolicy } from "@/app/lib/store-policy-db";
-import { sendReturnLabelEmail, sendReturnRejectedEmail } from "@/app/lib/email";
+import { sendOpsAlert } from "@/app/lib/ops-alert";
+import { sendReturnLabelEmail, sendReturnRejectedEmail, sendStoreOwnerAlert, ownerAlertButton } from "@/app/lib/email";
 import { recordLabelTransaction } from "@/app/lib/shippo-labels-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
+import { DEFAULT_LABEL_PRINTER } from "@/app/lib/label-format-core";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
 import { refundOrderPayment } from "@/app/lib/order-refund";
 import { getRates, buyLabel, isShipConfigured, getOrCreateShipAccount } from "@/app/lib/ship-provider";
-import { shippingMarginCents } from "@/app/lib/shipping-tiers";
+import { shippingMarginCents, MIN_MARGIN_CENTS } from "@/app/lib/shipping-tiers";
 import { logError } from "@/app/lib/error-log";
 import { sendBuyerTrackingEmail } from "@/app/lib/email";
 import { customsForOrder } from "@/app/lib/order-customs";
@@ -192,6 +194,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  if (del.method === "pickup") return NextResponse.json({ error: "This order is being collected in store — there’s nothing to post." }, { status: 400 });
  if (!isShipConfigured()) return NextResponse.json({ error: "Shipping labels aren’t enabled yet." }, { status: 503 });
  const shipping = await getShippingSettings(slug);
+ // What she prints on (label-format-core.ts): 4×6 for a thermal printer, the sheet otherwise.
+ const printer = shipping.labelPrinter ?? DEFAULT_LABEL_PRINTER;
  if (!hasShipFrom(shipping)) return NextResponse.json({ error: "Add your ship-from address in Settings → Shipping first." }, { status: 400 });
  if (!order.shipLine1 || !order.shipCity) return NextResponse.json({ error: "This order has no shipping address." }, { status: 400 });
 
@@ -219,7 +223,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  if (needsAesFiling) {
   return NextResponse.json({ error: "This order is over $2,500 and shipping abroad, so US customs needs an AES filing with an ITN before it can go. File it at aesdirect.census.gov, then ship with that number." }, { status: 400 });
  }
- const rates = await getRates(from, to, parcel, shipAcct, customs);
+ const rates = await getRates(from, to, parcel, shipAcct, customs, printer);
  if (!rates.length) return NextResponse.json({ error: customs ? "No international rates for this address — check the ship-from country and the parcel weight." : "No shipping rates available for this address." }, { status: 502 });
  const cheapest = rates[0];
 
@@ -242,7 +246,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // Free-shipping labels are billed to the seller — require a card up front.
  if (sellerPays && !seller.stripeCustomerId) return NextResponse.json({ error: "Add a payment method to cover free-shipping labels first." }, { status: 400 });
  // Buy the label FIRST: if Shippo fails, the seller is never left charged for a label they didn't get.
- const label = await buyLabel(rateId, shipAcct);
+ const label = await buyLabel(rateId, shipAcct, printer);
  if (!label) return NextResponse.json({ error: "Label purchase failed — try again." }, { status: 502 });
  // Then recover the cost from the seller. Idempotency key stops a double-click double-charge; and if
  // billing fails the order still ships — we don't strand the buyer over a seller-card problem, just log it.
@@ -253,6 +257,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  // actually drop it off (which is what emails the buyer their tracking).
  await setOrderLabel(id, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
  await recordLabelTransaction(id, label.transactionId); // so it can be voided if the order is refunded
+
+ // MARGIN WATCH, on this path too. It already existed in order-label.ts (the automatic path) and
+ // was missing here — which is the path the app and the dashboard use. A label bought from the
+ // phone that cost more than the buyer paid told nobody at all.
+ const paidCents = order.shippingPaidCents || 0;
+ if (paidCents > 0 && label.costCents > paidCents - MIN_MARGIN_CENTS) {
+ await sendOpsAlert(
+  `Thin shipping margin on order ${id}`,
+  `Buyer paid ${paidCents}¢, real label ${label.costCents}¢ → margin ${paidCents - label.costCents}¢ (target ≥ ${MIN_MARGIN_CENTS}¢). Bought manually from ${slug}. If this size/route recurs, re-tune SHIPPING_TIERS.`,
+ ).catch(() => {});
+ }
+
+ // SEND HER THE LABEL. Until now it was only STORED: the app said "Label sent to you" and nothing
+ // had been. On a laptop the stored URL is enough — click, print. On a phone there is no printer,
+ // so the practical path from "bought" to "on the box" is an email she opens at a desk. Buying a
+ // label from the app and then having no way to print it is the same as not having bought one.
+ /* allow-swallow: the label IS bought and stored; a mail outage must not make this look like a failure */
+ if (label.labelUrl) {
+ const tracking = label.trackingNumber ? `<p style="font-size:13px;color:#6b6b6b;margin:16px 0 0;">Tracking: <b>${label.trackingNumber}</b></p>` : "";
+ // USPS Label Broker, when the carrier gives us one: no printer needed at all — the counter
+ // scans this and prints the label for her. Only ever shown when it actually came back.
+ const qr = label.qrCodeUrl
+  ? `<p style="font-size:14px;line-height:1.7;margin:18px 0 0;">No printer? Show this at the Post Office and they'll print it for you.</p>${ownerAlertButton(label.qrCodeUrl, "Open the QR code")}`
+  : "";
+ await sendStoreOwnerAlert(slug, {
+  subject: `Shipping label — ${order.itemTitle || `order ${id}`}`,
+  html: `<p style="font-size:16px;line-height:1.7;margin:0 0 18px;">Your label for <b>${order.itemTitle || `order ${id}`}</b> is ready. Print it, tape it on, and mark the order posted when it's dropped off.</p>${ownerAlertButton(label.labelUrl, "Print the label")}${qr}${tracking}`,
+ }).catch(() => {});
+ }
+
  return NextResponse.json({ ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl });
  }
 
