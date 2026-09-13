@@ -23,7 +23,14 @@ export default function AuthCallback() {
       return;
     }
     verifyMagicLink(token)
-      .then(() => router.replace("/(tabs)"))
+      .then(() => {
+        // DISMISS THE SHEET FIRST. The emailed link can open the app while auth/login is
+        // presented as a modal, and replacing from inside a modal keeps the presentation — so
+        // the whole signed-in app rendered in a card with a grey gutter above it that could be
+        // swiped away. Dismiss back to the root, then replace.
+        try { router.dismissAll(); } catch { /* nothing presented — a cold open from the link */ }
+        router.replace("/(tabs)");
+      })
       .catch(() => setError("That link has expired or was already used. Request a new one."));
   }, [params.token, verifyMagicLink]);
 

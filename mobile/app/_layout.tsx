@@ -67,9 +67,12 @@ export default function RootLayout() {
                 contentStyle: { backgroundColor: colors.bg },
               }}
             >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              {/* Explicitly a card, never a sheet. Replacing into it from the sign-in modal
+                  otherwise inherited that presentation and left the app in a dismissible
+                  card — see the dismissAll in auth/callback. */}
+              <Stack.Screen name="(tabs)" options={{ headerShown: false, presentation: "card" }} />
               {/* The seller app. Same bundle, same sign-in; `storeSlug` routes between them. */}
-              <Stack.Screen name="(seller)" options={{ headerShown: false }} />
+              <Stack.Screen name="(seller)" options={{ headerShown: false, presentation: "card" }} />
               {/* Market Mode takes over the screen — no tab bar, no header. */}
               <Stack.Screen name="market/index" options={{ headerShown: false }} />
               <Stack.Screen name="market/find" options={{ headerShown: false }} />
