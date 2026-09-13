@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing } from "../../lib/portal-theme";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { formatMoney } from "../../lib/seller/home";
 

@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { formatMoney, percentDelta } from "../../lib/seller/home";
 import { profitRows, netProfitLine, noProfitPrompt, type MarginSection } from "../../lib/seller/profit";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
@@ -32,7 +32,7 @@ const RANGES: { key: Range; label: string }[] = [
 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.chip, borderRadius: 12, padding: spacing.lg }}>
+    <View style={{ flex: 1, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
       <Text style={{ fontSize: 10, letterSpacing: 1.3, color: colors.textMuted }}>{label}</Text>
       <Text style={{ fontSize: 20, color: colors.text, fontWeight: "700", marginTop: spacing.sm }}>{value}</Text>
     </View>
@@ -94,7 +94,7 @@ export default function AnalyticsScreen() {
           ) : profit.isPending ? (
             <Empty> </Empty>
           ) : net === null ? (
-            <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.lg }}>
+            <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
               <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>No cost on record</Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2, lineHeight: 18 }}>{noProfitPrompt(profit.data?.margin)}</Text>
             </View>

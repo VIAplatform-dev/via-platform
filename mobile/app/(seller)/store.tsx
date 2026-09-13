@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius } from "../../lib/portal-theme";
 
 // The Store tab — option A: her own storefront, running inside the app.
 //
@@ -78,7 +78,7 @@ export default function StoreScreen() {
           ) : null}
           <Pressable
             onPress={() => { setFailed(null); setLoading(true); webRef.current?.reload(); }}
-            style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}
+            style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: radius, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}
           >
             <Text style={{ color: colors.accentText, fontWeight: "600" }}>Try again</Text>
           </Pressable>

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPost, apiPatch, apiDelete } from "../../lib/api";
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
-import { PAYOUT_METHOD_LABELS, payoutMethodOptions, splitPctFromText, describeConsignor } from "../../lib/seller/consignors";
+import { PAYOUT_METHOD_LABELS, payoutMethodOptions, splitPctFromText, describeConsignor, ALL_PAYOUT_METHODS, toggleMethod } from "../../lib/seller/consignors";
 
 // The people who bring pieces in — added, edited and removed on the phone.
 //
@@ -60,6 +60,23 @@ export default function ConsignorsScreen() {
   const [form, setForm] = useState(BLANK);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savingMethods, setSavingMethods] = useState(false);
+
+  /** Write the store's offered methods. The route refuses some switches while money is owed and
+   *  says why, so its message is shown rather than a generic failure. */
+  async function setMethods(next: string[]) {
+    if (savingMethods) return;
+    setSavingMethods(true);
+    setError(null);
+    try {
+      await apiPut("/api/store/consignment/config", { settings: { payoutMethods: next } });
+      await cfg.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save that.");
+    } finally {
+      setSavingMethods(false);
+    }
+  }
 
   const methods = payoutMethodOptions(cfg.data?.payoutMethods);
   const list = q.data?.consignors ?? [];
@@ -161,12 +178,41 @@ export default function ConsignorsScreen() {
 
           {open === "new" ? (
             <View style={{ marginTop: spacing.md }}>
-              <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted }}>NEW CONSIGNOR</Text>
+              <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted }}>NEW CONSIGNOR</Text>
               <FormBody />
             </View>
           ) : (
             <Button label="Add someone" kind="secondary" onPress={openNew} />
           )}
+
+          {/* HOW YOU PAY THEM. Until this was here, the phone offered whatever the store had
+              already switched on — and a store that has never opened the web settings page is on
+              the table default, which is store credit and nothing else. So "I can only pay by
+              store credit" was true, and the switch that fixes it lived on a screen she was not
+              on. Same four the web offers; the last one on cannot be turned off, because a
+              consignor owed money needs some way to be settled with. */}
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>
+            HOW YOU PAY THEM
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+            {ALL_PAYOUT_METHODS.map((m) => {
+              const on = (cfg.data?.payoutMethods ?? ["store_credit"]).includes(m.key);
+              return (
+                <Pressable
+                  key={m.key}
+                  disabled={savingMethods}
+                  onPress={() => void setMethods(toggleMethod(cfg.data?.payoutMethods, m.key))}
+                  style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border, backgroundColor: on ? colors.chipActive : colors.chip, opacity: savingMethods ? 0.6 : 1 }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{m.label}</Text>
+                  <Text style={{ fontSize: 11, marginTop: 1, color: on ? colors.chipActiveText : colors.textDim, opacity: on ? 0.8 : 1 }}>{m.hint}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+            These are the ways a consignor can be paid. Each person can then be set to their own.
+          </Text>
 
           {error ? <Notice>{error}</Notice> : null}
         </>

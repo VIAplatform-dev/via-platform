@@ -44,12 +44,11 @@ export const FIELDS: ListingField[] = [
   // The paragraph a shopper reads. Last of the words, and multiline so it isn't a one-line box
   // holding two thousand characters.
   { key: "description", label: "Description", multiline: true, placeholder: "How it feels, what it goes with, why you bought it…" },
-  // Packed weight and box size decide the parcel tier, and therefore what the label costs. The
-  // shipping quote on Orders is built from exactly these.
-  { key: "weightOz", label: "Packed weight", numeric: true, placeholder: "oz" },
-  { key: "lengthIn", label: "Box length", numeric: true, placeholder: "in" },
-  { key: "widthIn", label: "Box width", numeric: true, placeholder: "in" },
-  { key: "heightIn", label: "Box height", numeric: true, placeholder: "in" },
+  // The box is not typed — it is chosen, from the same "Ships in" list the web offers, which
+  // writes lengthIn/widthIn/heightIn from the preset (see lib/seller/packaging.ts). Nobody
+  // measures a mailer. The WEIGHT stays a field, because the buyer's postage is chosen by the
+  // larger of weight and girth and it is the one number the box cannot supply.
+  { key: "weightOz", label: "Weight", numeric: true, placeholder: "oz" },
 ];
 
 /** The four the shipping quote reads. Whole units; blank clears one. */

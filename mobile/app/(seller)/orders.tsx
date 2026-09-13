@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Share, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { groupIntoParcels, parcelsToCollect, type Parcel } from "../../lib/seller/parcels";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
@@ -137,7 +137,7 @@ export default function OrdersScreen() {
           const pickup = p.deliveryMethod === "pickup";
           const busy = act.isPending && act.variables?.parcel.key === p.key;
           return (
-            <View key={p.key} style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.lg, marginBottom: spacing.md }}>
+            <View key={p.key} style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg, marginBottom: spacing.md }}>
               <View style={{ flexDirection: "row", gap: spacing.md }}>
                 <View style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: colors.bgAlt }} />
                 <View style={{ flex: 1 }}>
@@ -160,7 +160,7 @@ export default function OrdersScreen() {
                     {p.buyerEmail ? ` · ${p.buyerEmail}` : ""}
                   </Text>
                   <Text style={{ fontSize: 13, color: pickup ? colors.textMuted : colors.positive, marginTop: 3 }}>
-                    {pickup ? "Collection — no label needed" : p.labelUrl ? "Label sent to you" : "No label yet"}
+                    {pickup ? "Collection — no label needed" : p.labelUrl ? "Label bought — emailed to you" : "No label yet"}
                   </Text>
                 </View>
               </View>
@@ -170,21 +170,30 @@ export default function OrdersScreen() {
                   <Pressable
                     disabled={busy}
                     onPress={() => act.mutate({ parcel: p, action: pickup ? "collected" : "posted" })}
-                    style={{ flex: 1, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.md, alignItems: "center" }}
+                    style={{ flex: 1, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.md, alignItems: "center" }}
                   >
                     <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: "600" }}>
                       {busy ? "…" : pickup ? "Mark collected" : "Mark as posted"}
                     </Text>
                   </Pressable>
                   {!pickup && p.labelUrl ? (
-                    <Pressable onPress={() => void Linking.openURL(p.labelUrl!)} style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: 10, backgroundColor: colors.bgAlt }}>
-                      <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Label</Text>
+                    // THE SHARE SHEET, NOT A BROWSER. openURL drops a PDF into Safari, where the
+                    // only way to a printer is a two-tap detour most people never find. The share
+                    // sheet puts AirPrint, Files and Mail on the first screen — which is the whole
+                    // difference between "the label is on my phone" and "the label is on the box".
+                    // Long-press still opens it, for anyone who wants to look at it first.
+                    <Pressable
+                      onPress={() => void Share.share({ url: p.labelUrl!, message: `Shipping label — ${first.itemTitle ?? "order"}` })}
+                      onLongPress={() => void Linking.openURL(p.labelUrl!)}
+                      style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: radius, backgroundColor: colors.bgAlt }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>Print label</Text>
                     </Pressable>
                   ) : !pickup && quote?.key !== p.key ? (
                     <Pressable
                       disabled={labelBusy !== null}
                       onPress={() => void getQuote(p)}
-                      style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: 10, backgroundColor: colors.bgAlt, opacity: labelBusy ? 0.6 : 1 }}
+                      style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: radius, backgroundColor: colors.bgAlt, opacity: labelBusy ? 0.6 : 1 }}
                     >
                       <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
                         {labelBusy === p.key ? "…" : "Buy label"}
@@ -196,7 +205,7 @@ export default function OrdersScreen() {
                 <Pressable
                   disabled={busy}
                   onPress={() => act.mutate({ parcel: p, action: "delivered" })}
-                  style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: 10, paddingVertical: spacing.md, alignItems: "center" }}
+                  style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: radius, paddingVertical: spacing.md, alignItems: "center" }}
                 >
                   <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>{busy ? "…" : "Mark delivered"}</Text>
                 </Pressable>
@@ -205,7 +214,7 @@ export default function OrdersScreen() {
               {/* The quote. Shown only for the parcel she asked about, and it says who pays before
                   it offers to spend anything. */}
               {quote?.key === p.key ? (
-                <View style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: 10, padding: spacing.md }}>
+                <View style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: radius, padding: spacing.md }}>
                   <Text style={{ fontSize: 13, color: colors.text, lineHeight: 18 }}>
                     {labelQuoteLine(quote.quote, p.currency ?? first.currency)}
                   </Text>
@@ -213,7 +222,7 @@ export default function OrdersScreen() {
                     <Pressable
                       disabled={labelBusy !== null}
                       onPress={() => void buyLabel(p, quote.quote.rate.rateId)}
-                      style={{ flex: 1, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.md, alignItems: "center", opacity: labelBusy ? 0.6 : 1 }}
+                      style={{ flex: 1, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.md, alignItems: "center", opacity: labelBusy ? 0.6 : 1 }}
                     >
                       <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: "600" }}>
                         {labelBusy === p.key ? "Buying…" : "Buy this label"}

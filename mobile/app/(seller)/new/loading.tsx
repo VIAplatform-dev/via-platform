@@ -3,7 +3,7 @@ import { ActivityIndicator, Image, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing, fonts } from "../../../lib/theme";
+import { colors, spacing, fonts } from "../../../lib/portal-theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { draftListing, priceListing, publishListing } from "../../../lib/seller/intake";
 

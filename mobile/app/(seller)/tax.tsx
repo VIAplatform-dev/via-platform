@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { ToggleRow, Button, Notice, Loading } from "../../components/seller/Form";
 

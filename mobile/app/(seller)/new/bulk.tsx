@@ -5,7 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiPost } from "../../../lib/api";
-import { colors, spacing, fonts } from "../../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
 import { uploadPhoto, publishListing, draftListing, priceListing } from "../../../lib/seller/intake";
 import { rowReadiness, batchSummary, canPriceBatch, type BulkRow } from "../../../lib/seller/listing";
 import { splitCostAcross, batchCostLine } from "../../../lib/seller/cost-split";
@@ -165,7 +165,7 @@ export default function BulkScreen() {
         <Pressable
           disabled={busy}
           onPress={() => void pick()}
-          style={{ backgroundColor: colors.accent, borderRadius: 12, paddingVertical: spacing.xl, alignItems: "center", marginTop: spacing.xl }}
+          style={{ backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.xl, alignItems: "center", marginTop: spacing.xl }}
         >
           <Text style={{ color: colors.accentText, fontSize: 16, fontWeight: "600" }}>
             {status === "grouping" ? "Reading photos…" : "Choose photos"}
@@ -178,7 +178,7 @@ export default function BulkScreen() {
           </Text>
 
           {/* The batch: one price for all of them. */}
-          <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginBottom: spacing.sm }}>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.sm }}>
             <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: spacing.sm }}>
               <Text style={{ width: 128, fontSize: 13, color: colors.textMuted }}>These {rows.length} cost</Text>
               <TextInput value={lotTotal} onChangeText={setLotTotal} placeholder="total, e.g. 340" placeholderTextColor={colors.textDim} keyboardType="decimal-pad" style={{ flex: 1, fontSize: 14, color: colors.text, fontWeight: "600" }} />
@@ -204,7 +204,7 @@ export default function BulkScreen() {
                   onChangeText={(v) => set(r.id, "brand", v)}
                   placeholder="Brand"
                   placeholderTextColor={colors.textDim}
-                  style={{ width: 96, backgroundColor: colors.chip, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: 13, color: colors.text }}
+                  style={{ width: 96, backgroundColor: colors.chip, borderRadius: radius, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: 13, color: colors.text }}
                 />
                 <TextInput
                   value={r.cost}
@@ -212,7 +212,7 @@ export default function BulkScreen() {
                   placeholder="Cost"
                   placeholderTextColor={colors.textDim}
                   keyboardType="numeric"
-                  style={{ width: 64, backgroundColor: colors.chip, borderRadius: 8, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: 13, color: colors.text }}
+                  style={{ width: 64, backgroundColor: colors.chip, borderRadius: radius, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, fontSize: 13, color: colors.text }}
                 />
                 <Text
                   style={{
@@ -232,7 +232,7 @@ export default function BulkScreen() {
             <Pressable
               disabled={busy || !canPriceBatch(rows)}
               onPress={() => void priceAll()}
-              style={{ flex: 2, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center", opacity: canPriceBatch(rows) ? 1 : 0.5 }}
+              style={{ flex: 2, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center", opacity: canPriceBatch(rows) ? 1 : 0.5 }}
             >
               <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "600" }}>
                 {status === "pricing" ? "Pricing…" : `Price all ${rows.length}`}
@@ -241,7 +241,7 @@ export default function BulkScreen() {
             <Pressable
               disabled={busy}
               onPress={() => void saveDrafts()}
-              style={{ flex: 1, backgroundColor: colors.chip, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center" }}
+              style={{ flex: 1, backgroundColor: colors.chip, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
             >
               <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>
                 {status === "saving" ? "Saving…" : "Save drafts"}

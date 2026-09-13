@@ -9,7 +9,7 @@ import { apiGet, ApiError, API_BASE_URL } from "../../lib/api";
 import { rentalDay, rentalsTileLine, todayDay, type Booking } from "../../lib/seller/rentals";
 import { daySchedule, appointmentsTileLine, type Appointment } from "../../lib/seller/appointments";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { agingTile, type AgingBuckets } from "../../lib/seller/aging";
 import { holdLapseRow, type HoldRow } from "../../lib/seller/holds";
 import { setupSummary, phoneRouteFor, type SetupStep } from "../../lib/seller/setup";
@@ -75,7 +75,7 @@ function Tile({ children, onPress, style }: { children: React.ReactNode; onPress
   return (
     <Pressable
       onPress={onPress}
-      style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.lg, ...style }}
+      style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg, ...style }}
     >
       {children}
     </Pressable>
@@ -187,7 +187,7 @@ export default function SellerHome() {
       }
     >
       {blocked ? (
-        <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginBottom: spacing.md }}>
+        <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.md }}>
           <Text style={{ fontSize: 13, color: colors.text }}>
             Signed in, but this account isn&apos;t linked to a store yet.
           </Text>
@@ -247,7 +247,7 @@ export default function SellerHome() {
           else void WebBrowser.openBrowserAsync(`${API_BASE_URL}${s.href}`);
         };
         return (
-          <View style={{ marginTop: spacing.lg, backgroundColor: colors.chip, borderRadius: 14, padding: spacing.lg }}>
+          <View style={{ marginTop: spacing.lg, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}>Set up your store</Text>
               <Text style={{ fontSize: 12, color: colors.textMuted }}>{sum.done} of {sum.total} done</Text>
@@ -315,7 +315,7 @@ export default function SellerHome() {
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Feather name="archive" size={18} color={colors.text} />
             {payable.length > 0 ? (
-              <View style={{ marginLeft: "auto", minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 }}>
+              <View style={{ marginLeft: "auto", minWidth: 20, height: 20, borderRadius: radius, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 }}>
                 <Text style={{ color: colors.accentText, fontSize: 11, fontWeight: "700" }}>{payable.length}</Text>
               </View>
             ) : null}

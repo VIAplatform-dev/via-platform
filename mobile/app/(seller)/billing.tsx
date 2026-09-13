@@ -3,7 +3,7 @@ import { Linking, Pressable, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Button, Notice, ChoiceRow, Loading } from "../../components/seller/Form";
 import { stripeNative, stripeAvailable, STRIPE_UNAVAILABLE } from "../../lib/seller/stripe-native";
@@ -237,8 +237,8 @@ function BillingBody({
 
   return (
     <SellerScreen title="Plan & billing" back onRefresh={refetch} refreshing={refreshing}>
-      <View style={{ borderWidth: 1.5, borderColor: colors.accent, borderRadius: 14, padding: spacing.xl }}>
-        <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.accent }}>YOUR PLAN</Text>
+      <View style={{ borderWidth: 1.5, borderColor: colors.accent, borderRadius: radius, padding: spacing.xl }}>
+        <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.accent }}>YOUR PLAN</Text>
         <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.accent, marginTop: spacing.sm }}>
           {planLabel(c)}
         </Text>
@@ -274,7 +274,7 @@ function BillingBody({
       {/* ── Choosing a plan: only when there isn't one ─────────────────────────────────── */}
       {!subscribed && data.configured && !payDisabled && tiers.length ? (
         <>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>CHOOSE A PLAN</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>CHOOSE A PLAN</Text>
           <ChoiceRow
             label="Billed"
             options={[{ key: "month" as const, label: "Monthly" }, { key: "year" as const, label: "Yearly" }]}
@@ -286,7 +286,7 @@ function BillingBody({
               key={t.id}
               disabled={busy !== null}
               onPress={() => void subscribe(t.id)}
-              style={{ marginTop: spacing.lg, backgroundColor: colors.chip, borderRadius: 12, padding: spacing.lg, opacity: busy && busy !== t.id ? 0.5 : 1 }}
+              style={{ marginTop: spacing.lg, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg, opacity: busy && busy !== t.id ? 0.5 : 1 }}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ flex: 1, fontFamily: fonts.serif, fontSize: 20, color: colors.text }}>{t.name}</Text>
@@ -310,7 +310,7 @@ function BillingBody({
       {/* ── Managing the one she has ───────────────────────────────────────────────────── */}
       {subscribed ? (
         <>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>MANAGE</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>MANAGE</Text>
 
           {!payDisabled ? (
             <Button label="Change the card on file" busyLabel="Opening…" busy={busy === "card"} kind="secondary" onPress={() => void changeCard()} />

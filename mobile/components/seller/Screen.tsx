@@ -2,7 +2,7 @@ import { ScrollView, Text, View, RefreshControl, Pressable } from "react-native"
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts } from "../../lib/portal-theme";
 
 // The frame every seller screen sits in.
 //

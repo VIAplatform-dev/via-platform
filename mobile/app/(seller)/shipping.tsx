@@ -3,7 +3,7 @@ import { Text } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, fonts } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ToggleRow, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
 import { ZONE_LABELS, ZONE_IDS, type ZoneId, type Zones, zonesWith, shipsAbroad, DUTY_OPTIONS } from "../../lib/seller/shipping";
@@ -34,7 +34,20 @@ type Settings = {
   dutyDowngraded: boolean;
   carrierConnected: boolean;
   zones: Zones;
+  labelPrinter: "sheet" | "thermal";
+  expeditedOffered: boolean;
+  pricing: "live" | "flat";
 };
+
+const PRICING = [
+  { key: "live" as const, label: "Real cost + markup" },
+  { key: "flat" as const, label: "My own flat rate" },
+];
+
+const PRINTERS = [
+  { key: "thermal" as const, label: "Label printer" },
+  { key: "sheet" as const, label: "Regular printer" },
+];
 
 const MODES = [
   { key: "buyer_pays" as const, label: "Buyer pays" },
@@ -93,6 +106,9 @@ export default function ShippingScreen() {
         shipFrom: s.shipFrom ?? {},
         dutyMode: s.dutyMode,
         zones: s.zones,
+        labelPrinter: s.labelPrinter,
+        expeditedOffered: s.expeditedOffered,
+        pricing: s.pricing,
         // Flattened on purpose: the route reads pickup.street1, not pickup.address.street1, and
         // reshapes it itself. Sending the shape GET returns would save a collection point with no
         // address, which the route then refuses — correctly, and confusingly.
@@ -119,7 +135,7 @@ export default function ShippingScreen() {
         <Loading />
       ) : (
         <>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.lg }}>YOU SHIP FROM</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.lg }}>YOU SHIP FROM</Text>
           <Field label="Name" value={s.shipFrom?.name ?? ""} onChangeText={(v) => editFrom({ name: v })} placeholder="Who's on the parcel" autoCapitalize="words" />
           <Field label="Street" value={s.shipFrom?.street1 ?? ""} onChangeText={(v) => editFrom({ street1: v })} autoCapitalize="words" />
           <Field label="Street 2" value={s.shipFrom?.street2 ?? ""} onChangeText={(v) => editFrom({ street2: v })} placeholder="Optional" autoCapitalize="words" />
@@ -136,7 +152,49 @@ export default function ShippingScreen() {
           />
           <Field label="Phone" value={s.shipFrom?.phone ?? ""} onChangeText={(v) => editFrom({ phone: v })} placeholder="Optional — some carriers ask" keyboardType="phone-pad" />
 
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>POSTAGE</Text>
+          {/* WHAT SHE PRINTS ON. The carrier returns its own default unless told otherwise, and for
+              USPS that is an 8.5×11 sheet with the label in the top quarter — useless on the 4×6
+              thermal printer a resale shop actually owns, and impossible to crop on a phone. */}
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>LABELS</Text>
+          <ChoiceRow
+            label="You print on"
+            options={PRINTERS}
+            value={s.labelPrinter ?? "sheet"}
+            onChange={(v) => edit({ labelPrinter: v })}
+            hint={
+              (s.labelPrinter ?? "sheet") === "thermal"
+                ? "Labels come out 4×6, ready to peel and stick."
+                : "Labels come out full page — you'll cut them out."
+            }
+          />
+
+          {/* HER SITE, HER POLICY — the way it would be on Shopify. Live quotes what the parcel
+              actually costs on the route and adds VYA's markup, so a nearer buyer pays less and
+              nothing is ever sold below cost. Flat is one predictable number she sets per region,
+              and she carries the difference when a parcel goes further than she priced for. */}
+          <ChoiceRow
+            label="Shipping price"
+            options={PRICING}
+            value={s.pricing ?? "live"}
+            onChange={(v) => edit({ pricing: v })}
+            hint={
+              (s.pricing ?? "live") === "live"
+                ? "Buyers see the real cost for their address, so nearby orders are cheaper."
+                : "One price per region, set by you below. You cover anything a far parcel costs over it."
+            }
+          />
+
+          {/* A promise about HER, not the carrier. A shop that reaches the Post Office twice a week
+              cannot keep a two-day promise however fast the label is — and a missed one costs more
+              than the sale did. Off unless she says otherwise. */}
+          <ToggleRow
+            label="Offer faster shipping"
+            value={s.expeditedOffered ?? false}
+            onValueChange={(v) => edit({ expeditedOffered: v })}
+            hint="Buyers see a quicker option and pay more for it. Only turn this on if you can post the same or next day."
+          />
+
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>POSTAGE</Text>
           <ChoiceRow
             label="Who pays"
             options={MODES}
@@ -154,7 +212,7 @@ export default function ShippingScreen() {
             />
           ) : null}
 
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>WHERE YOU SHIP</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>WHERE YOU SHIP</Text>
           {ZONE_IDS.map((z: ZoneId) => (
             <ToggleRow
               key={z}
@@ -182,7 +240,7 @@ export default function ShippingScreen() {
             </>
           ) : null}
 
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>COLLECTION</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>COLLECTION</Text>
           <ToggleRow
             label="Let buyers collect in person"
             value={pickup.enabled}

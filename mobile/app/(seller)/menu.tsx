@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts } from "../../lib/portal-theme";
 import { SellerScreen } from "../../components/seller/Screen";
 
 // The settings drawer, grouped by what she came for: selling, shop, money, account.
@@ -30,7 +30,7 @@ type Payments = { connected: boolean; payoutsEnabled: boolean };
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={{ marginTop: spacing.xl }}>
-      <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginBottom: spacing.sm }}>{label}</Text>
+      <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginBottom: spacing.sm }}>{label}</Text>
       {children}
     </View>
   );

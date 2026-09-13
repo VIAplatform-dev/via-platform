@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing, fonts } from "../../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { publishListing, uploadPhoto } from "../../../lib/seller/intake";
 import { InlineField } from "../../../components/seller/Form";
@@ -100,7 +100,7 @@ export default function DetailsScreen() {
         <Pressable
           disabled={saving !== null}
           onPress={() => void fillWithAI()}
-          style={{ backgroundColor: colors.chip, borderRadius: 10, paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}
+          style={{ backgroundColor: colors.chip, borderRadius: radius, paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}
         >
           <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>
             {saving === "ai" ? "Uploading…" : "Fill with AI"}
@@ -135,14 +135,14 @@ export default function DetailsScreen() {
         <Pressable
           disabled={saving !== null}
           onPress={() => void fillWithAI()}
-          style={{ flex: 2, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center" }}
+          style={{ flex: 2, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
         >
           <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "600" }}>List it</Text>
         </Pressable>
         <Pressable
           disabled={saving !== null}
           onPress={() => void saveManually()}
-          style={{ flex: 1, backgroundColor: colors.chip, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center" }}
+          style={{ flex: 1, backgroundColor: colors.chip, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
         >
           <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>
             {saving === "manual" ? "Saving…" : "Draft"}

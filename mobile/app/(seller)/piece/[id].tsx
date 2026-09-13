@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { pickPhotos, remainingSlots } from "../../../lib/seller/pick-photos";
+import { liveCrossListPlatforms, crossListNote, crossListFootnote, type CrossListPlatform } from "../../../lib/seller/cross-listing";
 import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiPatch, apiPost, ApiError } from "../../../lib/api";
+import { apiGet, apiPatch, apiPost, apiPut, apiDelete, ApiError } from "../../../lib/api";
 import { uploadPhoto } from "../../../lib/seller/intake";
 import { useAuth } from "../../../lib/auth";
-import { colors, spacing, fonts } from "../../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
 import { formatMoney } from "../../../lib/seller/home";
 import { daysListed } from "../../../lib/seller/aging";
 import { describeHold, HOLD_LENGTHS } from "../../../lib/seller/holds";
@@ -14,6 +15,8 @@ import { flawsFromLine, flawsToLine } from "../../../lib/seller/intake-shape";
 import { templateFor, unitFor, measurementsFromForm, measurementsToForm, formatMeasurements, MEASUREMENT_LABELS, type MeasurementKey, type Measurement } from "../../../lib/seller/measurements";
 import { SellerScreen } from "../../../components/seller/Screen";
 import { FIELDS, PARCEL_KEYS, MAX_PHOTOS, type FieldKey } from "../../../lib/seller/listing-fields";
+import { PACKAGING, packagingById, packagingFromDims, packagingSummary } from "../../../lib/seller/packaging";
+import { TIER_DAYS, tierLabel, starterTiers, formFromTiers, termsProblem, termsPayload, termsSummary, type TermsForm } from "../../../lib/seller/rental-terms";
 import { schedulePresets, parseScheduleInput, describeSchedule } from "../../../lib/seller/schedule";
 import { InlineField } from "../../../components/seller/Form";
 
@@ -66,7 +69,7 @@ function Button({ label, onPress, disabled, primary }: { label: string; onPress?
     <Pressable
       disabled={disabled}
       onPress={onPress}
-      style={{ flex: 1, backgroundColor: primary ? colors.accent : colors.chip, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center", opacity: disabled ? 0.5 : 1 }}
+      style={{ flex: 1, backgroundColor: primary ? colors.accent : colors.chip, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center", opacity: disabled ? 0.5 : 1 }}
     >
       <Text style={{ color: primary ? colors.accentText : colors.text, fontSize: 15, fontWeight: "600" }}>{label}</Text>
     </Pressable>
@@ -99,6 +102,9 @@ export default function PieceScreen() {
   const [whenTyped, setWhenTyped] = useState("");
   const [channels, setChannels] = useState<string[] | null>(null);
   const [consignor, setConsignor] = useState<number | null | undefined>(undefined);
+  const [packing, setPacking] = useState<string | null>(null);
+  const [renting, setRenting] = useState<boolean | null>(null);
+  const [terms, setTerms] = useState<TermsForm | null>(null);
 
   const q = useQuery({
     queryKey: ["store", "items"],
@@ -121,9 +127,18 @@ export default function PieceScreen() {
     queryFn: () => apiGet<{ consignors: { id: number; name: string }[] }>("/api/store/consignment/consignors"),
     enabled: !!storeSlug,
   });
+  // A piece is rentable exactly when terms exist for it. 404 is the ordinary answer for "not
+  // rentable", not an error — so it resolves to null rather than throwing a red screen.
+  const rental = useQuery({
+    queryKey: ["store", "rental-terms", id],
+    queryFn: () => apiGet<{ terms?: { tiers: { days: number; cents: number }[]; replacementCents: number | null; alsoForSale?: boolean } | null }>(`/api/store/rentals/terms/${id}`)
+      .then((r) => r.terms ?? null)
+      .catch(() => null),
+    enabled: !!storeSlug && !!id,
+  });
   const crossList = useQuery({
     queryKey: ["store", "cross-listing"],
-    queryFn: () => apiGet<{ platforms: { key: string; name: string }[] }>("/api/store/cross-listing"),
+    queryFn: () => apiGet<{ platforms: CrossListPlatform[] }>("/api/store/cross-listing"),
     enabled: !!storeSlug,
   });
   const shipping = useQuery({
@@ -171,9 +186,17 @@ export default function PieceScreen() {
       if (when !== undefined) body.publishAt = when === null ? null : when.toISOString();
       if (channels) body.channels = channels;
       if (consignor !== undefined) body.consignorId = consignor;
-      return apiPatch(`/api/store/items/${id}`, body);
+      return apiPatch(`/api/store/items/${id}`, body).then(async () => {
+        // RENTING IS ITS OWN RESOURCE, not a field on the item: terms exist or they don't, and
+        // that is what makes a piece rentable. Saved after the item so a failed patch never
+        // leaves a piece rentable with the wrong price on it.
+        if (renting === null && terms === null) return;
+        if (isRentable) await apiPut(`/api/store/rentals/terms/${id}`, termsPayload(rentForm, true));
+        else await apiDelete(`/api/store/rentals/terms/${id}`);
+        await rental.refetch();
+      });
     },
-    onSuccess: () => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); refresh(); },
+    onSuccess: () => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); setPacking(null); setRenting(null); setTerms(null); refresh(); },
     onError: (e) => fail(e, "Couldn't save that. Try again."),
   });
   const placeHold = useMutation({
@@ -220,31 +243,46 @@ export default function PieceScreen() {
   const measurementsLine = formatMeasurements(measurementsFromForm(measureValues, unit));
   const storedMeasurementsLine = formatMeasurements(item.measurementsJson);
   const dirty = Object.keys(form).length > 0 || measureForm !== null || photos !== null || cols !== null
-    || when !== undefined || channels !== null || consignor !== undefined;
+    || when !== undefined || channels !== null || consignor !== undefined || packing !== null || renting !== null || terms !== null;
   // The three that can be set here but only ACT at publish.
   const scheduledAt = when !== undefined ? when : (item.publishAt ? new Date(item.publishAt) : null);
   const chosenChannels = channels ?? (Array.isArray(item.crossListChannels) ? item.crossListChannels : []);
+  // Which box it ships in. There is no `packaging` column — only L/W/H are stored — so the
+  // current choice is read back FROM those numbers; otherwise every edit would quietly reset a
+  // chosen large box to the suggestion. See lib/seller/packaging.ts.
+  // Renting: what the piece has today, unless she has touched it this session.
+  const isRentable = renting ?? Boolean(rental.data);
+  const rentForm = terms ?? (rental.data
+    ? formFromTiers(rental.data.tiers ?? [], rental.data.replacementCents ?? null)
+    : formFromTiers(starterTiers(item.priceCents), null));
+  const rentProblem = isRentable ? termsProblem(rentForm) : null;
+
+  const rec = item as unknown as Record<string, unknown>;
+  const currentPacking = packing ?? packagingFromDims({
+    lengthIn: rec.lengthIn as number | null, widthIn: rec.widthIn as number | null,
+    heightIn: rec.heightIn as number | null, weightOz: rec.weightOz as number | null,
+  });
+  // ONLY THE THREE THAT ARE ACTUALLY WIRED UP. The route returns every marketplace VYA knows
+  // about, including seven still marked "soon", and this screen was drawing all ten as if they
+  // were choices — so a seller could switch on Poshmark or Grailed and nothing would ever happen.
+  const platforms = liveCrossListPlatforms(crossList.data?.platforms ?? []);
   const chosenConsignor = consignor !== undefined ? consignor : (item.consignorId ?? null);
   const isDraft = item.status === "draft";
   const chosen = cols ?? (Array.isArray(item.collections) ? item.collections : []);
   const toggleCol = (t: string) => setCols(chosen.includes(t) ? chosen.filter((c) => c !== t) : [...chosen, t]);
   const shots = photos ?? (Array.isArray(item.images) ? item.images : []);
 
-  /** Add from the library. Uploaded immediately — the route stores URLs, never bytes. */
+  /** Camera or library — a piece with no photo is usually one sitting right in front of her.
+   *  Uploaded immediately: the route stores URLs, never bytes. */
   async function addPhotos() {
-    const r = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsMultipleSelection: true,
-      selectionLimit: MAX_PHOTOS,
-      quality: 0.85,
-    });
-    if (r.canceled) return;
+    // One definition of the cap (listing-fields.ts), matching what the routes actually store.
+    const uris = await pickPhotos(remainingSlots(shots.length, MAX_PHOTOS));
+    if (uris.length === 0) return;
     setError(null);
     setUploading(true);
     try {
       const urls: string[] = [];
-      for (const a of r.assets) urls.push(await uploadPhoto(a.uri));
-      // One definition of the cap (listing-fields.ts), matching what the routes actually store.
+      for (const uri of uris) urls.push(await uploadPhoto(uri));
       setPhotos([...shots, ...urls].slice(0, MAX_PHOTOS));
     } catch (e) {
       fail(e, "Couldn't upload those photos.");
@@ -261,13 +299,13 @@ export default function PieceScreen() {
       {shots.length > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing.lg }} contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
           {shots.map((src, i) => (
-            <Image key={`${src}-${i}`} source={{ uri: src }} style={{ width: 300, height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
+            <Image key={`${src}-${i}`} source={{ uri: src }} style={{ width: 300, height: 340, borderRadius: radius, backgroundColor: colors.chip }} />
           ))}
         </ScrollView>
       ) : shots[0] ? (
-        <Image source={{ uri: shots[0] }} style={{ width: "100%", height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
+        <Image source={{ uri: shots[0] }} style={{ width: "100%", height: 340, borderRadius: radius, backgroundColor: colors.chip }} />
       ) : (
-        <View style={{ width: "100%", height: 340, borderRadius: 12, backgroundColor: colors.chip }} />
+        <View style={{ width: "100%", height: 340, borderRadius: radius, backgroundColor: colors.chip }} />
       )}
 
       <Text style={{ fontSize: 17, color: colors.text, fontWeight: "600", marginTop: spacing.lg }}>{item.title}</Text>
@@ -344,6 +382,38 @@ export default function PieceScreen() {
               placeholder={f.placeholder}
             />
           ))}
+
+          {/* SHIPS IN — the web's one question instead of the phone's three boxes. Choosing a
+              preset writes its L/W/H onto the piece, which is exactly what the web does; the
+              line underneath shows the size and the packed weight so nothing is decided out of
+              sight. */}
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+            <Text style={{ fontSize: 14, color: colors.textMuted }}>Ships in</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+              {PACKAGING.map((b) => {
+                const on = b.id === currentPacking;
+                return (
+                  <Pressable
+                    key={b.id}
+                    onPress={() => {
+                      setPacking(b.id);
+                      setForm({ ...form, lengthIn: String(b.lengthIn), widthIn: String(b.widthIn), heightIn: String(b.heightIn) });
+                    }}
+                    style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border, backgroundColor: on ? colors.chipActive : colors.chip }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{b.label}</Text>
+                    <Text style={{ fontSize: 11, marginTop: 1, color: on ? colors.chipActiveText : colors.textDim, opacity: on ? 0.8 : 1 }}>{b.hint}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            {packagingSummary(currentPacking, current("weightOz")) ? (
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+                {packagingSummary(currentPacking, current("weightOz"))}
+              </Text>
+            ) : null}
+          </View>
+
           {/* Measurements: the category's template, kept compact — one row, opening the fields (as Review). */}
           {measureKeys.length > 0 ? (
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
@@ -485,33 +555,87 @@ export default function PieceScreen() {
           ) : null}
 
           {/* CROSS-LISTING. Stored here, pushed when the piece publishes — never from the phone. */}
-          {(crossList.data?.platforms ?? []).length > 0 ? (
+          {platforms.length > 0 ? (
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
               <Text style={{ fontSize: 14, color: colors.textMuted }}>Also list on</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
-                {(crossList.data?.platforms ?? []).map((pl) => {
+                {platforms.map((pl) => {
                   const on = chosenChannels.includes(pl.key);
                   return (
                     <Pressable
                       key={pl.key}
                       onPress={() => setChannels(on ? chosenChannels.filter((k) => k !== pl.key) : [...chosenChannels, pl.key])}
-                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
+                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border, backgroundColor: on ? colors.chipActive : colors.chip }}
                     >
                       <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{pl.name}</Text>
+                      {/* SAY WHAT EACH ONE WILL DO. eBay has a real API and posts itself; Depop and
+                          Vestiaire have none, so the extension fills her own logged-in form and
+                          that only happens at a browser. Same chip, two different promises. */}
+                      <Text style={{ fontSize: 11, marginTop: 1, color: on ? colors.chipActiveText : colors.textDim, opacity: on ? 0.8 : 1 }}>
+                        {crossListNote(pl)}
+                      </Text>
                     </Pressable>
                   );
                 })}
               </View>
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
-                Saved against the piece. The actual posting runs from the computer — connecting a
-                marketplace needs a sign-in the phone can&apos;t complete.
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+                {crossListFootnote(platforms)}
               </Text>
             </View>
           ) : null}
 
+          {/* RENT IT OUT. A piece is rentable exactly when terms exist for it, so this is a switch
+              and a short price list rather than a form. The lengths are VYA's three — a long
+              weekend, a week, a month — and an unpriced one is simply not offered. Opening prices
+              are suggested from what the piece sells for, using the same proportions as the web,
+              because three empty boxes and a Save that fails is how the toggle used to feel. */}
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+            <Pressable
+              onPress={() => { setRenting(!isRentable); if (!isRentable && terms === null) setTerms(rentForm); }}
+              style={{ flexDirection: "row", alignItems: "center" }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, color: colors.text }}>Rent it out</Text>
+                <Text style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>
+                  {isRentable ? (termsSummary(rentForm, item.currency) ?? "Give at least one length a price") : "Sale only"}
+                </Text>
+              </View>
+              <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius, borderWidth: 1, borderColor: isRentable ? colors.chipActive : colors.border, backgroundColor: isRentable ? colors.chipActive : colors.chip }}>
+                <Text style={{ fontSize: 13, fontWeight: "600", color: isRentable ? colors.chipActiveText : colors.text }}>{isRentable ? "On" : "Off"}</Text>
+              </View>
+            </Pressable>
+
+            {isRentable ? (
+              <View style={{ marginTop: spacing.md }}>
+                {TIER_DAYS.map((days) => (
+                  <InlineField
+                    key={days}
+                    label={tierLabel(days)}
+                    labelWidth={92}
+                    value={rentForm.prices[days] ?? ""}
+                    onChangeText={(v) => setTerms({ ...rentForm, prices: { ...rentForm.prices, [days]: v } })}
+                    keyboardType="decimal-pad"
+                    placeholder="not offered"
+                  />
+                ))}
+                <InlineField
+                  label="If it's lost"
+                  labelWidth={92}
+                  value={rentForm.replacement}
+                  onChangeText={(v) => setTerms({ ...rentForm, replacement: v })}
+                  keyboardType="decimal-pad"
+                  placeholder="replacement value"
+                />
+                {rentProblem ? (
+                  <Text style={{ fontSize: 12, color: colors.accent, marginTop: spacing.sm }}>{rentProblem}</Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
-            <Button label={save.isPending ? "Saving…" : "Save"} primary disabled={busy || !dirty} onPress={() => save.mutate()} />
-            <Button label="Cancel" disabled={busy} onPress={() => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); setError(null); }} />
+            <Button label={save.isPending ? "Saving…" : "Save"} primary disabled={busy || !dirty || rentProblem !== null} onPress={() => save.mutate()} />
+            <Button label="Cancel" disabled={busy} onPress={() => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); setPacking(null); setRenting(null); setTerms(null); setError(null); }} />
           </View>
         </View>
       ) : mode === "hold" ? (
@@ -571,7 +695,7 @@ export default function PieceScreen() {
       {/* Flaws — the list shoppers see under Condition; Edit changes it as one comma-separated line. */}
       {flaws.length > 0 && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700" }}>FLAWS</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>FLAWS</Text>
           {flaws.map((f, i) => (
             <Text key={`${f}-${i}`} style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{"\u2022"} {f}</Text>
           ))}
@@ -580,13 +704,13 @@ export default function PieceScreen() {
       {/* Beyond the grade and the tape measure — both print on the product page; Edit changes them. */}
       {item.conditionNote && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700" }}>CONDITION NOTE</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>CONDITION NOTE</Text>
           <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{item.conditionNote}</Text>
         </View>
       ) : null}
       {storedMeasurementsLine && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700" }}>MEASUREMENTS</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>MEASUREMENTS</Text>
           <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{storedMeasurementsLine}</Text>
         </View>
       ) : null}

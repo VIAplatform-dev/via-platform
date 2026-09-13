@@ -2,7 +2,7 @@ import { Tabs } from "expo-router";
 import { Pressable, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
-import { colors } from "../../lib/theme";
+import { colors, radius } from "../../lib/portal-theme";
 import { SellerConnectProvider } from "../../lib/seller/connect";
 
 // The seller's five tabs: Home · Inventory · List (+) · Inbox · Store.
@@ -37,7 +37,7 @@ function ListButton({ onPress }: BottomTabBarButtonProps) {
         style={{
           width: 52,
           height: 34,
-          borderRadius: 10,
+          borderRadius: radius,
           backgroundColor: colors.accent,
           alignItems: "center",
           justifyContent: "center",

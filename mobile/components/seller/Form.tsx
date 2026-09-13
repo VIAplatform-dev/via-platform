@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ActivityIndicator, Pressable, Switch, Text, TextInput, View } from "react-native";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, button, radius } from "../../lib/portal-theme";
 
 // The pieces every settings screen is built from.
 //
@@ -9,7 +9,7 @@ import { colors, spacing } from "../../lib/theme";
 // into nine slightly different ideas of what a label, a save button and an error look like. The
 // seller notices that even when she couldn't name it.
 //
-// The palette rule from lib/theme.ts holds throughout: one burgundy ink, green ONLY for something
+// The palette rule from lib/portal-theme.ts holds throughout: one burgundy ink, green ONLY for something
 // that has genuinely gone right. There is no red. A failed save says so in words on the same chip
 // ground every other notice uses — a settings screen that flashes red at a seller who mistyped a
 // postcode is a worse screen, and burgundy on cream is already legible.
@@ -162,7 +162,7 @@ export function ChoiceRow<T extends string>({
             <Pressable
               key={o.key}
               onPress={() => onChange(o.key)}
-              style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
+              style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius, backgroundColor: on ? colors.chipActive : colors.chip, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border }}
             >
               <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{o.label}</Text>
             </Pressable>
@@ -193,14 +193,24 @@ export function Button({
       disabled={off}
       style={{
         marginTop: spacing.lg,
-        backgroundColor: primary ? colors.accent : colors.chip,
-        borderRadius: 10,
+        backgroundColor: primary ? colors.accent : "transparent",
+        borderRadius: button.borderRadius,
+        borderWidth: 1,
+        borderColor: primary ? colors.accent : colors.taupeDeep,
         paddingVertical: spacing.lg,
         alignItems: "center",
         opacity: off ? 0.6 : 1,
       }}
     >
-      <Text style={{ fontSize: 15, fontWeight: "600", color: primary ? colors.accentText : colors.text }}>
+      <Text
+        style={{
+          fontFamily: button.fontFamily,
+          fontSize: button.fontSize,
+          letterSpacing: button.letterSpacing,
+          textTransform: button.textTransform,
+          color: primary ? colors.accentText : colors.text,
+        }}
+      >
         {busy ? (busyLabel ?? label) : label}
       </Text>
     </Pressable>
@@ -210,7 +220,7 @@ export function Button({
 /** Anything the screen needs to say back: a save that failed, a rule that applies, a step still to do. */
 export function Notice({ children, tone = "plain" }: { children: React.ReactNode; tone?: "plain" | "good" }) {
   return (
-    <View style={{ backgroundColor: colors.chip, borderRadius: 10, padding: spacing.md, marginTop: spacing.lg }}>
+    <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border }}>
       <Text style={{ fontSize: 13, color: tone === "good" ? colors.positive : colors.text, lineHeight: 18 }}>{children}</Text>
     </View>
   );

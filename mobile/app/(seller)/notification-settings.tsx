@@ -3,7 +3,7 @@ import { Linking, Pressable, Switch, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet, apiPut } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius, fonts } from "../../lib/portal-theme";
 import { SellerScreen } from "../../components/seller/Screen";
 import { PREF_ROWS, DEFAULT_PREFS, normalizePrefs, toggled, applyPatch, type Prefs } from "../../lib/seller/notifications";
 import { registerForPush, lastPushStatus, type PushStatus } from "../../lib/push";
@@ -57,19 +57,19 @@ export default function NotificationsScreen() {
   return (
     <SellerScreen title="Notifications" back>
       {saveErr ? (
-        <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginTop: spacing.lg }}>
+        <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginTop: spacing.lg }}>
           <Text style={{ fontSize: 13, color: colors.text }}>{saveErr}</Text>
         </View>
       ) : null}
 
       {(["push", "email"] as const).map((group) => (
         <View key={group} style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginBottom: spacing.sm }}>{group.toUpperCase()}</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginBottom: spacing.sm }}>{group.toUpperCase()}</Text>
 
           {group === "push" && push === "denied" ? (
             <Pressable
               onPress={() => void Linking.openSettings()}
-              style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md, marginBottom: spacing.sm }}
+              style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.sm }}
             >
               <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>Push is off for this phone</Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
@@ -80,7 +80,7 @@ export default function NotificationsScreen() {
 
           {group === "push" && pushUnavailable ? (
             // No dead toggles: a switch that can never buzz this phone is a promise the app can't keep.
-            <View style={{ backgroundColor: colors.chip, borderRadius: 12, padding: spacing.md }}>
+            <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md }}>
               <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>Push isn&apos;t available in this build</Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
                 Your choices are saved for the store; they take effect on a phone running the App Store build.

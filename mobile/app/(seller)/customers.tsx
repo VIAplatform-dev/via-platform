@@ -3,7 +3,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { allTags, filterByTag, withTag, withoutTag } from "../../lib/seller/customers";
 import { SellerScreen, Empty } from "../../components/seller/Screen";

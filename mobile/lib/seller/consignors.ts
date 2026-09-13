@@ -5,8 +5,41 @@ export const PAYOUT_METHOD_LABELS: Record<string, string> = {
   store_credit: "Store credit",
   cash: "Cash",
   check: "Check",
-  stripe: "Bank transfer",
+  stripe: "Direct deposit",
 };
+
+/**
+ * Every method a store CAN offer, in the web's order.
+ *
+ * The phone only ever showed what the store had already switched on, and a store that has never
+ * opened the web settings page is on the table default: store_credit, and nothing else. So the
+ * phone looked broken ("I can only pay by store credit") when in truth nothing had been enabled —
+ * and the page that enables them was web-only. These are the switches, on the phone.
+ *
+ * Mirrors app/infrastructure/admin/consignment/settings/page.tsx.
+ */
+export const ALL_PAYOUT_METHODS: { key: string; label: string; hint: string }[] = [
+  { key: "stripe", label: "Direct deposit", hint: "Straight to their bank, via Stripe" },
+  { key: "store_credit", label: "Store credit", hint: "Spend it with you" },
+  { key: "cash", label: "Cash", hint: "Out of the till" },
+  { key: "check", label: "Check", hint: "Posted to them" },
+];
+
+/**
+ * Turning one on or off, with the one rule that must hold: a store always offers at least one way
+ * to pay. Switching off the last method would leave a consignor owed money and no way to settle
+ * it, so the last one on cannot be turned off.
+ */
+export function toggleMethod(current: string[] | null | undefined, key: string): string[] {
+  const list = Array.isArray(current) && current.length ? [...current] : ["store_credit"];
+  if (list.includes(key)) {
+    if (list.length === 1) return list; // never leave a store with no way to pay
+    return list.filter((k) => k !== key);
+  }
+  // Keep the canonical order rather than append order, so the chips don't shuffle as she taps.
+  const order = ALL_PAYOUT_METHODS.map((m) => m.key);
+  return [...list, key].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+}
 
 /**
  * The methods this store actually offers, as chips.

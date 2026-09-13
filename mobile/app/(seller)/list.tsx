@@ -7,7 +7,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { MAX_PHOTOS } from "../../lib/seller/listing-fields";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius } from "../../lib/portal-theme";
 import { useDraft } from "../../lib/seller/draft";
 
 // Capture — the first screen of the one flow that makes her money.
@@ -57,7 +57,7 @@ export default function CaptureScreen() {
       <View style={{ flex: 1, backgroundColor: "#141210", alignItems: "center", justifyContent: "center", padding: spacing.xl }}>
         <StatusBar style="light" />
         <Text style={{ color: "#fff", fontSize: 16, textAlign: "center" }}>VYA needs the camera to photograph a piece.</Text>
-        <Pressable onPress={() => void requestPermission()} style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}>
+        <Pressable onPress={() => void requestPermission()} style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: radius, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}>
           <Text style={{ color: colors.accentText, fontWeight: "600" }}>Allow camera</Text>
         </Pressable>
         {/* The library still works without the camera — never a dead end. */}
@@ -89,7 +89,7 @@ export default function CaptureScreen() {
       </View>
 
       {/* The frame */}
-      <View style={{ flex: 1, marginHorizontal: spacing.lg, borderRadius: 14, overflow: "hidden" }}>
+      <View style={{ flex: 1, marginHorizontal: spacing.lg, borderRadius: radius, overflow: "hidden" }}>
         <CameraView ref={camera} style={{ flex: 1 }} facing="back" />
         {/* Corner brackets — something to fill, rather than a bare rectangle. */}
         {([["top", "left"], ["top", "right"], ["bottom", "left"], ["bottom", "right"]] as const).map(([v, h]) => (

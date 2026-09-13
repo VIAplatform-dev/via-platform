@@ -2,7 +2,7 @@ import { Image, Linking, Pressable, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Loading } from "../../components/seller/Form";
 import { rentalDay, bookingLine, trackingLine, todayDay, type Booking } from "../../lib/seller/rentals";
@@ -23,7 +23,7 @@ function Section({ title, tone, items, today }: { title: string; tone?: "urgent"
   if (!items.length) return null;
   return (
     <View style={{ marginTop: spacing.xl }}>
-      <Text style={{ fontSize: 11, letterSpacing: 1.4, color: tone === "urgent" ? colors.accent : colors.textMuted, fontWeight: "700" }}>
+      <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: tone === "urgent" ? colors.accent : colors.textMuted, fontWeight: "700" }}>
         {title.toUpperCase()}
       </Text>
       {items.map((b) => {
@@ -80,8 +80,8 @@ export default function RentalsScreen() {
         <Empty>Nothing out and nothing booked.</Empty>
       ) : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.xl, marginTop: spacing.sm }}>
-            <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textMuted }}>OUT NOW</Text>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
+            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>OUT NOW</Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginTop: spacing.sm }}>
               {day.out.length}
             </Text>

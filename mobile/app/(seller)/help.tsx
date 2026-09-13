@@ -1,6 +1,6 @@
 import { Linking, Pressable, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius } from "../../lib/portal-theme";
 import { SellerScreen } from "../../components/seller/Screen";
 
 // Four questions sellers actually ask, then a way to reach a person, with the hours stated.
@@ -25,12 +25,12 @@ export default function HelpScreen() {
         </Pressable>
       ))}
 
-      <View style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.xl, marginTop: spacing.xl }}>
+      <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl, marginTop: spacing.xl }}>
         <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }}>Still stuck?</Text>
         <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 4 }}>We answer within a few hours, 9–6 UK.</Text>
         <Pressable
           onPress={() => void Linking.openURL("mailto:hana@vyaplatform.com?subject=Help%20with%20my%20store")}
-          style={{ backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center", marginTop: spacing.lg }}
+          style={{ backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center", marginTop: spacing.lg }}
         >
           <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "600" }}>Message us</Text>
         </Pressable>

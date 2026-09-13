@@ -3,7 +3,7 @@ import { Linking, Pressable, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { Loading } from "../../components/seller/Form";
 import { daySchedule, stillToCome, appointmentLine, clock, type Appointment } from "../../lib/seller/appointments";
@@ -57,8 +57,8 @@ export default function AppointmentsScreen() {
         <Loading />
       ) : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.xl, marginTop: spacing.sm }}>
-            <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textMuted }}>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
+            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>
               {which === "today" ? "STILL TO COME" : "BOOKED"}
             </Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginTop: spacing.sm }}>

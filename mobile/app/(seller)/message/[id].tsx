@@ -5,7 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
-import { colors, spacing } from "../../../lib/theme";
+import { colors, spacing, radius } from "../../../lib/portal-theme";
 import { SellerScreen } from "../../../components/seller/Screen";
 
 // One thread.
@@ -44,7 +44,7 @@ export default function MessageScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <SellerScreen title={conv?.buyerName ?? conv?.buyerEmail ?? "Message"} back>
         {conv?.itemTitle ? (
-          <View style={{ backgroundColor: colors.chip, borderRadius: 10, padding: spacing.md, marginBottom: spacing.lg, flexDirection: "row", gap: spacing.md, alignItems: "center" }}>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.lg, flexDirection: "row", gap: spacing.md, alignItems: "center" }}>
             <View style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: colors.bgAlt }} />
             <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600", flex: 1 }} numberOfLines={2}>
               {conv.itemTitle}
@@ -66,7 +66,7 @@ export default function MessageScreen() {
                   alignSelf: mine ? "flex-end" : "flex-start",
                   maxWidth: "82%",
                   backgroundColor: mine ? colors.accent : colors.chip,
-                  borderRadius: 14,
+                  borderRadius: radius,
                   paddingHorizontal: spacing.lg,
                   paddingVertical: spacing.md,
                   marginBottom: spacing.sm,

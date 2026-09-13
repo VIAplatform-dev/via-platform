@@ -4,8 +4,9 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius } from "../../lib/portal-theme";
 import { flattenHits, hitTarget, isPiece, searchPlaceholder, type SearchGroup } from "../../lib/seller/search";
+import { matchDestinations } from "../../lib/seller/destinations";
 import { imageUrl } from "../../lib/imageUrl";
 
 // The search box — the same "look up anything" the desktop has, on Home and Inventory.
@@ -32,10 +33,13 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
     staleTime: 10_000,
   });
   const rows = q ? flattenHits(results.data?.groups ?? []) : [];
+  // Places, matched on the phone. They appear FIRST and without waiting for the network: if she
+  // typed the name of a screen she wants the screen, and she wants it now.
+  const places = q ? matchDestinations(q) : [];
 
   return (
     <View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.chip, borderRadius: 12, paddingHorizontal: spacing.md, height: 42 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.chip, borderRadius: radius, paddingHorizontal: spacing.md, height: 42 }}>
         <Feather name="search" size={16} color={colors.textDim} />
         <TextInput
           autoFocus={autoFocus}
@@ -54,9 +58,28 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
 
       {q ? (
         <View style={{ marginTop: spacing.sm }}>
+          {places.map((d) => (
+            <Pressable
+              key={`place-${d.href}-${d.label}`}
+              onPress={() => router.push(d.href as never)}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm + 2, borderBottomWidth: 1, borderBottomColor: colors.border }}
+            >
+              <View style={{ width: 44, alignItems: "center" }}>
+                <Feather name="corner-down-right" size={16} color={colors.textDim} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{d.label}</Text>
+                <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{d.sub}</Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.textDim} />
+            </Pressable>
+          ))}
+
           {results.isError ? (
-            <Text style={{ fontSize: 13, color: colors.textMuted, paddingVertical: spacing.md }}>Couldn&apos;t search just now.</Text>
-          ) : rows.length === 0 && !results.isPending ? (
+            places.length === 0 ? (
+              <Text style={{ fontSize: 13, color: colors.textMuted, paddingVertical: spacing.md }}>Couldn&apos;t search just now.</Text>
+            ) : null
+          ) : rows.length === 0 && places.length === 0 && !results.isPending ? (
             <Text style={{ fontSize: 13, color: colors.textMuted, paddingVertical: spacing.md }}>Nothing matches &ldquo;{q}&rdquo;.</Text>
           ) : (
             rows.slice(0, 12).map((r) => (

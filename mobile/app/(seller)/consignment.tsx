@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { Button, Notice } from "../../components/seller/Form";
@@ -121,7 +121,7 @@ export default function ConsignmentScreen() {
                       <Pressable
                         disabled={busy !== null}
                         onPress={() => void payOut(c)}
-                        style={{ backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, opacity: busy ? 0.6 : 1 }}
+                        style={{ backgroundColor: colors.accent, borderRadius: radius, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, opacity: busy ? 0.6 : 1 }}
                       >
                         <Text style={{ color: colors.accentText, fontSize: 13, fontWeight: "600" }}>
                           {busy === c.id ? "…" : `${action.verb} ${formatMoney(action.amountCents, currency)}`}
@@ -151,8 +151,8 @@ export default function ConsignmentScreen() {
         <Empty>Couldn&apos;t load consignment.</Empty>
       ) : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.xl, marginTop: spacing.sm }}>
-            <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textMuted }}>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
+            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>
               {tab === "owed" ? "DUE NOW" : "STILL ON HOLD"}
             </Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginTop: spacing.sm }}>

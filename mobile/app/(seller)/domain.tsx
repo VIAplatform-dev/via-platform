@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiDelete } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, Button, Notice, Loading } from "../../components/seller/Form";
 import {
@@ -158,8 +158,8 @@ export default function DomainScreen() {
         <Notice>Custom domains aren&apos;t switched on for this store yet — that one is ours to fix. Get in touch from Help.</Notice>
       ) : !d.domain ? (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.xl }}>
-            <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textMuted }}>YOUR ADDRESS TODAY</Text>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl }}>
+            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>YOUR ADDRESS TODAY</Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 22, color: colors.text, marginTop: spacing.sm }}>
               {storeSlug}.vyasites.com
             </Text>
@@ -170,7 +170,7 @@ export default function DomainScreen() {
 
           {picked && contact ? (
             <>
-              <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>
+              <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>
                 REGISTERING {picked.domain.toUpperCase()}
               </Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 19 }}>
@@ -235,7 +235,7 @@ export default function DomainScreen() {
                 </View>
               ) : null}
 
-              <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xxl }}>ALREADY HAVE ONE?</Text>
+              <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>ALREADY HAVE ONE?</Text>
               <Field
                 label="Connect a domain you own"
                 value={typed}
@@ -257,8 +257,8 @@ export default function DomainScreen() {
         </>
       ) : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: 14, padding: spacing.xl }}>
-            <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textMuted }}>
+          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl }}>
+            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>
               {live ? "LIVE" : "WAITING ON DNS"}
             </Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 22, color: live ? colors.positive : colors.text, marginTop: spacing.sm }}>
@@ -273,7 +273,7 @@ export default function DomainScreen() {
 
           {!live && d.status?.records?.length ? (
             <View style={{ marginTop: spacing.xl }}>
-              <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginBottom: spacing.sm }}>
+              <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginBottom: spacing.sm }}>
                 RECORDS TO ADD
               </Text>
               {d.status.records.map((r, i) => (

@@ -3,7 +3,7 @@ import { Image, Pressable, ScrollView, Text, TextInput, View } from "react-nativ
 import { router } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors, spacing, fonts } from "../../../lib/theme";
+import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { flawsFromLine, flawsToLine, costFromText, CONDITION_GRADES, type ConditionGrade } from "../../../lib/seller/intake-shape";
 import { publishListing } from "../../../lib/seller/intake";
@@ -265,7 +265,7 @@ export default function ReviewScreen() {
             {/* Price: below what she decided she must make on it. Warned, never silently rewritten —
                 a price she has seen is a decision, and this only undoes one made before the cost was. */}
             {r.key === "price" && showFloorMiss && floorMiss && minMarkupBps !== null ? (
-              <View style={{ marginLeft: 92, marginTop: spacing.sm, backgroundColor: colors.chip, borderRadius: 8, padding: spacing.md }}>
+              <View style={{ marginLeft: 92, marginTop: spacing.sm, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md }}>
                 <Text style={{ fontSize: 12, color: colors.text, lineHeight: 17 }}>
                   {describeFloorMiss(floorMiss, minMarkupBps, currency)}
                 </Text>
@@ -325,7 +325,7 @@ export default function ReviewScreen() {
 
       {/* When it goes out, whose it is, and where else it lands — the three things the web asks at
           publish time and the phone never did. */}
-      <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xl }}>GOES LIVE</Text>
+      <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xl }}>GOES LIVE</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
         <Pressable
           onPress={() => setWhen(null)}
@@ -354,7 +354,7 @@ export default function ReviewScreen() {
 
       {(consignors.data?.consignors ?? []).length > 0 ? (
         <>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xl }}>CONSIGNOR</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xl }}>CONSIGNOR</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
             <Pressable
               onPress={() => setConsignor(null)}
@@ -380,7 +380,7 @@ export default function ReviewScreen() {
 
       {(crossList.data?.platforms ?? []).length > 0 ? (
         <>
-          <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textMuted, marginTop: spacing.xl }}>ALSO LIST ON</Text>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xl }}>ALSO LIST ON</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
             {(crossList.data?.platforms ?? []).map((pl) => {
               const on = channels.includes(pl.key);
@@ -407,7 +407,7 @@ export default function ReviewScreen() {
         <Pressable
           disabled={saving !== null}
           onPress={() => void save("active")}
-          style={{ flex: 2, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center" }}
+          style={{ flex: 2, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
         >
           <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "600" }}>
             {saving === "active" ? "Listing…" : when ? "Schedule it" : "List it"}
@@ -416,7 +416,7 @@ export default function ReviewScreen() {
         <Pressable
           disabled={saving !== null}
           onPress={() => void save("draft")}
-          style={{ flex: 1, backgroundColor: colors.chip, borderRadius: 10, paddingVertical: spacing.lg, alignItems: "center" }}
+          style={{ flex: 1, backgroundColor: colors.chip, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
         >
           <Text style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>
             {saving === "draft" ? "Saving…" : "Draft"}

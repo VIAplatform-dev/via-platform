@@ -5,7 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing } from "../../lib/theme";
+import { colors, spacing, radius } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { filterItems, itemDot, inventoryCount, reservedWord, lacks, parseMissing, missingLabel, type InventoryFilter } from "../../lib/seller/inventory";
 import { daysListed, ageLabel, AGING_THRESHOLDS } from "../../lib/seller/aging";
@@ -138,9 +138,9 @@ export default function InventoryScreen() {
             <Link key={it.id} href={{ pathname: "/(seller)/piece/[id]", params: { id: it.id } }} asChild>
               <Pressable style={{ width: `${(100 - 4) / 3}%`, aspectRatio: 1 }}>
                 {it.images?.[0] ? (
-                  <Image source={{ uri: it.images[0] }} style={{ width: "100%", height: "100%", borderRadius: 8, backgroundColor: colors.chip }} />
+                  <Image source={{ uri: it.images[0] }} style={{ width: "100%", height: "100%", borderRadius: radius, backgroundColor: colors.chip }} />
                 ) : (
-                  <View style={{ width: "100%", height: "100%", borderRadius: 8, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
+                  <View style={{ width: "100%", height: "100%", borderRadius: radius, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
                     <Text style={{ fontSize: 11, color: colors.textDim, textAlign: "center", paddingHorizontal: 6 }} numberOfLines={2}>{it.title}</Text>
                   </View>
                 )}
