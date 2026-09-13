@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getBaseUrl } from "@/app/lib/base-url";
 import { getLastChanceCandidates, recordLastChanceSent } from "@/app/lib/notification-db";
 import { sendLastChanceEmail } from "@/app/lib/email";
+import { getPushTokensForUser } from "@/app/lib/saved-searches-db";
+import { sendExpoPush } from "@/app/lib/push";
+import { lastChancePush } from "@/app/lib/shopper-push-core";
 
 const BASE_URL = getBaseUrl();
 
@@ -31,6 +34,7 @@ export async function GET(request: Request) {
  daysSaved: item.days_saved,
  })),
  );
+ await pushAlso(userId, items.map((i) => ({ id: i.product_id, name: i.product_title })));
  await recordLastChanceSent(userId, items.map((i) => i.product_id));
  sent++;
  } catch (err) {
@@ -44,4 +48,19 @@ export async function GET(request: Request) {
  console.error("Last chance cron error:", err);
  return NextResponse.json({ error: "Internal error" }, { status: 500 });
  }
+}
+
+/** Buzz this person's phones with the same news the email carried. Never throws.
+ *  Push is an ADDITION: the email still sends, because a push is gone the moment it is swiped
+ *  away and an inbox is not. These reminders were email-only, which meant the app existed but was
+ *  never the thing that told her. */
+async function pushAlso(userId: string, items: { id: number; name: string | null }[]): Promise<void> {
+  try {
+    const payload = lastChancePush(items);
+    if (!payload) return;
+    const tokens = await getPushTokensForUser(userId);
+    if (tokens.length) await sendExpoPush(tokens, payload);
+  } catch {
+    /* allow-swallow: a push failure must not undo a sent email */
+  }
 }

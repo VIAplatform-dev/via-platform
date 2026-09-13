@@ -21,7 +21,7 @@ import { sendExpoPush, type PushPayload } from "./push.ts";
 export type SellerPushDeps = {
  getPrefs: (storeSlug: string) => Promise<NotificationPrefs>;
  getTokens: (storeSlug: string) => Promise<string[]>;
- send: (tokens: string[], payload: PushPayload) => Promise<void>;
+ send: (tokens: string[], payload: PushPayload) => Promise<unknown>;
 };
 
 const live: SellerPushDeps = { getPrefs: getNotificationPrefs, getTokens: getStorePushTokens, send: sendExpoPush };

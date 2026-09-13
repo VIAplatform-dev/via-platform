@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import { getApprovedPilotEmails } from "@/app/lib/pilot-db";
 import { sendNewArrivalsEmail, NEW_ARRIVALS_SUBJECT_KEY } from "@/app/lib/email";
+import { tokensByEmail } from "@/app/lib/shopper-push";
+import { sendExpoPush } from "@/app/lib/push";
+import { newArrivalsPush } from "@/app/lib/shopper-push-core";
 import { getEmailPickProducts } from "@/app/lib/editors-picks-db";
 import { getSetting } from "@/app/lib/settings-db";
 import { shouldSendAtFivePmEastern, easternHour } from "@/app/lib/eastern-cron";
@@ -192,12 +195,30 @@ export async function GET(request: Request) {
 
  const { sent, failed } = await sendNewArrivalsEmail(emails, products, usingPicks, await getSetting(NEW_ARRIVALS_SUBJECT_KEY).catch(() => null));
 
+ // "NEW PIECES JUST DROPPED", on the phone. The weekly drop is the single most app-shaped
+ // notification VYA sends and it was email-only, so the people who installed the app to hear
+ // about exactly this were the ones it never reached.
+ //
+ // Same audience as the email, one query to find which of them carry a phone. Best-effort and
+ // last, so nothing here can cost an email that already went out.
+ let pushed = 0;
+ try {
+ const payload = newArrivalsPush(products.length, products.map((p) => ({ id: p.id, name: p.title })));
+ if (payload) {
+  const byEmail = await tokensByEmail(emails);
+  const tokens = [...byEmail.values()].flat();
+  if (tokens.length) { const r = await sendExpoPush(tokens, payload); pushed = r.sent; }
+ }
+ } catch {
+ /* allow-swallow: push is a courtesy on top of the email */
+ }
+
  // If nothing actually went out, release the slot so it retries next run.
  if (!testEmail && sent === 0) {
  await rollback();
  }
 
- return NextResponse.json({ ok: true, since: sinceIso, products: products.length, sent, failed, test: !!testEmail });
+ return NextResponse.json({ ok: true, since: sinceIso, products: products.length, sent, failed, pushed, test: !!testEmail });
  } catch (err) {
  console.error("New arrivals cron error:", err);
  await rollback();

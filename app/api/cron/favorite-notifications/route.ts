@@ -5,6 +5,9 @@ import {
  recordNotificationSent,
 } from "@/app/lib/notification-db";
 import { sendFavoriteActivityNotification, type FavoriteActivityProduct } from "@/app/lib/email";
+import { getPushTokensForUser } from "@/app/lib/saved-searches-db";
+import { sendExpoPush } from "@/app/lib/push";
+import { favoritePush } from "@/app/lib/shopper-push-core";
 
 const MAX_ITEMS_PER_EMAIL = 3;
 const BASE_URL = getBaseUrl();
@@ -51,6 +54,7 @@ export async function GET(request: Request) {
 
  try {
  await sendFavoriteActivityNotification(email, products);
+ await pushAlso(userId, toShow.map((c) => ({ id: c.product_id, name: c.product_title })));
  // Record every qualifying item as sent (including ones beyond the display cap)
  await Promise.all(
  items.map((c) => recordNotificationSent(userId, c.product_id, c.recent_click_count))
@@ -72,4 +76,16 @@ export async function GET(request: Request) {
  console.error("Favorite notifications cron error:", err);
  return NextResponse.json({ error: "Internal error" }, { status: 500 });
  }
+}
+
+/** Buzz this person's phones. Never throws: a push failure must not undo a sent email. */
+async function pushAlso(userId: string, items: { id: number; name: string | null }[]): Promise<void> {
+  try {
+    const payload = favoritePush(items);
+    if (!payload) return;
+    const tokens = await getPushTokensForUser(userId);
+    if (tokens.length) await sendExpoPush(tokens, payload);
+  } catch {
+    /* allow-swallow */
+  }
 }

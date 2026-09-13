@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getBaseUrl } from "@/app/lib/base-url";
 import { getTrendingCandidates, claimTrendingNotificationSlots } from "@/app/lib/notification-db";
 import { sendTrendingItemEmail, type TrendingEmailProduct } from "@/app/lib/email";
+import { getPushTokensForUser } from "@/app/lib/saved-searches-db";
+import { sendExpoPush } from "@/app/lib/push";
+import { trendingPush } from "@/app/lib/shopper-push-core";
 
 const BASE_URL = getBaseUrl();
 const MAX_ITEMS_PER_EMAIL = 5;
@@ -60,6 +63,7 @@ export async function GET(request: Request) {
 
  try {
  await sendTrendingItemEmail(email, products);
+ await pushAlso(userId, toShow.map((c) => ({ id: c.product_id, name: c.product_title })));
  sent++;
  } catch (err) {
  console.error(`Trending email failed for ${email}:`, err);
@@ -72,4 +76,19 @@ export async function GET(request: Request) {
  console.error("Trending items cron error:", err);
  return NextResponse.json({ error: "Internal error" }, { status: 500 });
  }
+}
+
+/** Buzz this person's phones with the same news the email carried. Never throws.
+ *  Push is an ADDITION: the email still sends, because a push is gone the moment it is swiped
+ *  away and an inbox is not. These reminders were email-only, which meant the app existed but was
+ *  never the thing that told her. */
+async function pushAlso(userId: string, items: { id: number; name: string | null }[]): Promise<void> {
+  try {
+    const payload = trendingPush(items);
+    if (!payload) return;
+    const tokens = await getPushTokensForUser(userId);
+    if (tokens.length) await sendExpoPush(tokens, payload);
+  } catch {
+    /* allow-swallow: a push failure must not undo a sent email */
+  }
 }

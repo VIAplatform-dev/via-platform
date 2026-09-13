@@ -109,6 +109,10 @@
       "schedule": "0 14 * * *"
     },
     {
+      "path": "/api/cron/favorite-notifications",
+      "schedule": "0 15 * * *"
+    },
+    {
       "path": "/api/cron/send-new-arrivals",
       "schedule": "0 21 * * 2"
     },
