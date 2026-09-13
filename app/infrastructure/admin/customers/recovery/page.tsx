@@ -93,9 +93,38 @@ export default function RecoveryPage() {
  {err && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{err}</div>}
 
  <TechCard className="overflow-hidden p-0">
- <div className="overflow-x-auto">
+ {/* Phones: a card per checkout, reminder button full width under it. */}
+ <ul className="divide-y divide-stone-100 sm:hidden">
+ {attempts.map((a) => {
+ const st = STATUS[a.status];
+ return (
+ <li key={a.id} className="px-4 py-3.5">
+ <div className="flex items-start gap-3">
+ <span className="h-12 w-12 shrink-0 rounded bg-stone-100 bg-cover bg-center ring-1 ring-black/5" style={a.itemImage ? { backgroundImage: `url("${a.itemImage.replace(/"/g, "%22")}")` } : undefined} />
+ <div className="min-w-0 flex-1">
+ <p className="truncate text-[13px] font-medium text-stone-800">{a.itemTitle || "Item"}</p>
+ <p className="truncate text-[12.5px] text-stone-700">{a.name || "—"}</p>
+ <a href={`mailto:${a.email}`} className="block truncate text-[12px] text-stone-400 hover:text-stone-600 hover:underline">{a.email}</a>
+ </div>
+ </div>
+ <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+ <StatusPill tone={st.tone} dot>{st.label}</StatusPill>
+ <span className="text-[12px] text-stone-500">{ago(a.createdAt)}</span>
+ </div>
+ {a.status === "recovered" ? (
+ <p className="mt-2 text-[12px] text-emerald-600">Purchased ✓</p>
+ ) : (
+ <TechButton variant="secondary" className="mt-3 w-full py-2.5" onClick={() => remind(a.id)} disabled={sending === a.id}>
+ {sending === a.id ? "Sending…" : a.status === "emailed" ? "Remind again" : "Send reminder"}
+ </TechButton>
+ )}
+ </li>
+ );
+ })}
+ </ul>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full">
- <thead><tr><TH className="pl-4">Item</TH><TH>Shopper</TH><TH>Started</TH><TH>Status</TH><TH right className="pr-4">Action</TH></tr></thead>
+ <thead><tr><TH className="pl-4">Item</TH><TH>Shopper</TH><TH className="hidden lg:table-cell">Started</TH><TH>Status</TH><TH right className="pr-4">Action</TH></tr></thead>
  <tbody>
  {attempts.map((a) => {
  const st = STATUS[a.status];
@@ -104,14 +133,14 @@ export default function RecoveryPage() {
  <TD className="pl-4">
  <div className="flex items-center gap-2.5">
  <span className="h-9 w-9 shrink-0 rounded bg-stone-100 bg-cover bg-center ring-1 ring-black/5" style={a.itemImage ? { backgroundImage: `url("${a.itemImage.replace(/"/g, "%22")}")` } : undefined} />
- <span className="block max-w-[220px] truncate font-medium text-stone-800">{a.itemTitle || "Item"}</span>
+ <span className="block max-w-[140px] truncate font-medium text-stone-800 lg:max-w-[220px]">{a.itemTitle || "Item"}</span>
  </div>
  </TD>
  <TD>
  <span className="block font-medium text-stone-800">{a.name || "—"}</span>
  <a href={`mailto:${a.email}`} className="block text-[12px] text-stone-400 hover:text-stone-600 hover:underline">{a.email}</a>
  </TD>
- <TD><span className="text-stone-500">{ago(a.createdAt)}</span></TD>
+ <TD className="hidden lg:table-cell"><span className="text-stone-500">{ago(a.createdAt)}</span></TD>
  <TD><StatusPill tone={st.tone} dot>{st.label}</StatusPill></TD>
  <TD right className="pr-4">
  {a.status === "recovered" ? (

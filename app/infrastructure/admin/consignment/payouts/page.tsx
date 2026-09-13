@@ -63,6 +63,52 @@ export default function PayoutsPage() {
 
  const totalPayable = rows.reduce((s, r) => s + r.payableCents, 0);
 
+ // Method picker + Pay button. One definition, rendered in the phone card and in the table row.
+ const payControls = (c: Row) => (
+ <>
+ <select value={payMethod[c.id] ?? c.method} onChange={(e) => setPayMethod({ ...payMethod, [c.id]: e.target.value })} className="rounded-lg border border-stone-200 px-2 py-1.5 text-[12px] text-stone-600 outline-none focus:border-stone-400 max-sm:h-11 max-sm:min-w-0 max-sm:flex-1 max-sm:text-[13px]" aria-label="Payout method">
+ <option value="stripe">Direct deposit</option>
+ {/* Only offered where it can actually work: it settles marketplace sales by debiting the
+     store, so it is meaningless without a mandate or without money owed off-platform. */}
+ {bank.ready && (c.offPlatform?.totalCents ?? 0) > 0 ? <option value="ach">From your bank</option> : null}
+ <option value="cash">Cash</option>
+ <option value="check">Check</option>
+ <option value="store_credit">Store credit</option>
+ </select>
+ {(() => {
+  // Direct deposit can only send money VYA actually holds. The manual methods are the store
+  // paying from its own pocket, so they can settle the marketplace sales too.
+  const m = payMethod[c.id] ?? c.method;
+  // Each method can settle a different pot. Direct deposit sends only what VYA holds; ACH sends
+  // only the off-platform debt (that is the money it goes and fetches); cash and cheque are the
+  // store paying from its own pocket, so they cover both.
+  const offPlatform = c.offPlatform?.totalCents ?? 0;
+  const canSend = m === "stripe" ? c.payableCents
+   : m === "ach" ? Math.max(0, offPlatform - (c.inFlightCents ?? 0))
+   : c.payableCents + offPlatform;
+  return (
+   <TechButton className="px-3 py-1.5 text-[12px] max-sm:h-11 max-sm:px-4 max-sm:text-[13px]" disabled={canSend <= 0 || paying === c.id} onClick={() => pay(c.id, m)}>
+    {paying === c.id ? "…" : `Pay ${money(canSend)}`}
+   </TechButton>
+  );
+ })()}
+ </>
+ );
+
+ // Owed on a marketplace (+ anything clearing) — shown in both layouts.
+ const offPlatformCell = (c: Row) => (
+ <>
+  {c.offPlatform && c.offPlatform.totalCents > 0 ? (
+   <span className="text-amber-700" title={`${Object.entries(c.offPlatform.byChannel).map(([ch, v]) => `${ch}: ${money(v)}`).join(" · ")} — these marketplaces paid you directly, so pay her yourself and record it below.`}>
+    {money(c.offPlatform.totalCents)}
+   </span>
+  ) : <span className="text-stone-300">—</span>}
+  {(c.inFlightCents ?? 0) > 0 && (
+   <div className="text-[11px] text-stone-400">{money(c.inFlightCents!)} clearing</div>
+  )}
+ </>
+ );
+
  return (
  <AdminPage>
  <div className="mb-1">
@@ -75,7 +121,7 @@ export default function PayoutsPage() {
  />
 
  <div className="flex items-center gap-3">
- <TechButton variant="secondary" className="px-3 py-1.5 text-[12.5px]" onClick={copyPortal}>{copied ? "Copied!" : "Copy consignor portal link"}</TechButton>
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12.5px] max-sm:py-2.5" onClick={copyPortal}>{copied ? "Copied!" : "Copy consignor portal link"}</TechButton>
  </div>
  <p className="mt-1.5 text-[11px] text-stone-400">Consignors sign in there with their email to see their own statement.</p>
 
@@ -101,7 +147,7 @@ export default function PayoutsPage() {
  <>Items sold on eBay or Depop were paid to you directly. Connect your bank and VYA can debit you and pay your consignors for those too — otherwise pay them yourself and record it as cash.</>
  )}
  </div>
- <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={linking} onClick={connectBank}>
+ <TechButton variant="secondary" className="px-3 py-1.5 text-[12px] max-sm:py-2.5" disabled={linking} onClick={connectBank}>
  {linking ? "…" : bank.ready ? "Change bank" : "Connect bank"}
  </TechButton>
  </div>
@@ -111,12 +157,35 @@ export default function PayoutsPage() {
  <TechEmpty className="mt-6" title="No active consignors yet." />
  ) : (
  <TechCard className="mt-6 overflow-hidden">
- <div className="overflow-x-auto">
+ {/* Phones: one card per consignor, what's payable up top and the Pay controls full width. */}
+ <ul className="divide-y divide-stone-100 sm:hidden">
+ {loading ? (
+ <li className="py-10 text-center text-[13px] text-stone-400">Loading…</li>
+ ) : rows.map((c) => (
+ <li key={c.id} className="px-4 py-3.5">
+ <div className="flex items-start justify-between gap-3">
+ <div className="min-w-0">
+ <p className="font-medium text-stone-900">{c.name}</p>
+ <p className="mt-0.5 text-[12px] text-stone-500">{METHOD_LABEL[c.method] ?? c.method} · Balance <span className="tabular-nums">{money(c.balanceCents)}</span></p>
+ </div>
+ <div className="shrink-0 text-right">
+ <p className="text-[15px] font-semibold tabular-nums text-stone-900">{money(c.payableCents)}</p>
+ <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-400">Payable now</p>
+ </div>
+ </div>
+ {((c.offPlatform?.totalCents ?? 0) > 0 || (c.inFlightCents ?? 0) > 0) && (
+ <div className="mt-1.5 flex items-baseline gap-1.5 text-[12px]"><span className="text-stone-500">Owed off VYA</span> <span className="tabular-nums">{offPlatformCell(c)}</span></div>
+ )}
+ <div className="mt-3 flex items-center gap-2">{payControls(c)}</div>
+ </li>
+ ))}
+ </ul>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[13px]">
  <thead>
  <tr>
  <TH className="px-4">Consignor</TH>
- <TH className="px-4">Method</TH>
+ <TH className="hidden px-4 lg:table-cell">Method</TH>
  <TH right className="px-4">Balance</TH>
  <TH right className="px-4">Payable now</TH>
  <TH right className="px-4">Owed off VYA</TH>
@@ -129,50 +198,19 @@ export default function PayoutsPage() {
  ) : rows.map((c) => (
  <tr key={c.id} className="transition hover:bg-stone-50/70">
  <TD className="px-4 font-medium text-stone-900">{c.name}</TD>
- <TD className="px-4 text-stone-500">{METHOD_LABEL[c.method] ?? c.method}</TD>
+ <TD className="hidden px-4 text-stone-500 lg:table-cell">{METHOD_LABEL[c.method] ?? c.method}</TD>
  <TD right className="px-4 text-stone-700">{money(c.balanceCents)}</TD>
  <TD right className="px-4 font-medium text-stone-900">{money(c.payableCents)}</TD>
  {/* Sold on eBay or Depop: they paid YOU, so VYA has nothing to send. Still owed, and settled by
      paying her yourself and recording it as cash or a bank transfer. Shown separately or the
      balance looks unpayable for no visible reason. */}
  <TD right className="px-4">
-  {c.offPlatform && c.offPlatform.totalCents > 0 ? (
-   <span className="text-amber-700" title={`${Object.entries(c.offPlatform.byChannel).map(([ch, v]) => `${ch}: ${money(v)}`).join(" · ")} — these marketplaces paid you directly, so pay her yourself and record it below.`}>
-    {money(c.offPlatform.totalCents)}
-   </span>
-  ) : <span className="text-stone-300">—</span>}
-  {(c.inFlightCents ?? 0) > 0 && (
-   <div className="text-[11px] text-stone-400">{money(c.inFlightCents!)} clearing</div>
-  )}
+  {offPlatformCell(c)}
  </TD>
  <TD className="px-4">
- <div className="flex items-center justify-end gap-2">
- <select value={payMethod[c.id] ?? c.method} onChange={(e) => setPayMethod({ ...payMethod, [c.id]: e.target.value })} className="rounded-lg border border-stone-200 px-2 py-1.5 text-[12px] text-stone-600 outline-none focus:border-stone-400" aria-label="Payout method">
- <option value="stripe">Direct deposit</option>
- {/* Only offered where it can actually work: it settles marketplace sales by debiting the
-     store, so it is meaningless without a mandate or without money owed off-platform. */}
- {bank.ready && (c.offPlatform?.totalCents ?? 0) > 0 ? <option value="ach">From your bank</option> : null}
- <option value="cash">Cash</option>
- <option value="check">Check</option>
- <option value="store_credit">Store credit</option>
- </select>
- {(() => {
-  // Direct deposit can only send money VYA actually holds. The manual methods are the store
-  // paying from its own pocket, so they can settle the marketplace sales too.
-  const m = payMethod[c.id] ?? c.method;
-  // Each method can settle a different pot. Direct deposit sends only what VYA holds; ACH sends
-  // only the off-platform debt (that is the money it goes and fetches); cash and cheque are the
-  // store paying from its own pocket, so they cover both.
-  const offPlatform = c.offPlatform?.totalCents ?? 0;
-  const canSend = m === "stripe" ? c.payableCents
-   : m === "ach" ? Math.max(0, offPlatform - (c.inFlightCents ?? 0))
-   : c.payableCents + offPlatform;
-  return (
-   <TechButton className="px-3 py-1.5 text-[12px]" disabled={canSend <= 0 || paying === c.id} onClick={() => pay(c.id, m)}>
-    {paying === c.id ? "…" : `Pay ${money(canSend)}`}
-   </TechButton>
-  );
- })()}
+ {/* Below lg the method picker sits above the button, so the row fits an iPad without scrolling. */}
+ <div className="flex flex-col items-end gap-2 lg:flex-row lg:items-center lg:justify-end">
+ {payControls(c)}
  </div>
  </TD>
  </tr>

@@ -8,6 +8,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { ImportedProduct } from "./store-import.ts";
 import { formatPrice } from "./formatPrice.ts";
+import { pickBuyVariant, withoutRentalOptions, sizeFromOptionLabel, rentalTiersFromOptions } from "./variant-pricing.ts";
 
 const API_VERSION = "2024-10";
 
@@ -70,18 +71,23 @@ const PRODUCTS_QUERY = `query($cursor: String) {
 export function adminProductToImported(n: any, currency: string): ImportedProduct {
  const imgs: string[] = (n.images?.edges || []).map((i: any) => i.node?.url).filter(Boolean);
  const img = n.featuredImage?.url || imgs[0] || "";
- const amount = parseFloat(n.variants?.edges?.[0]?.node?.price || "0");
+ const nodes: any[] = (n.variants?.edges || []).map((ve: any) => ve?.node || {});
+ const readNode = (v: any) => ({ label: v.title, price: parseFloat(v.price || "0") });
+ // The BUY price, not simply the first option's: a rental shop lists "3 Day Rental" first, and a
+ // piece it only rents has no buy price at all. See variant-pricing.ts.
+ const pick = pickBuyVariant(nodes, readNode);
+ const amount = pick.price ?? 0;
  const sizeOpt = (n.options || []).find((o: any) => /size/i.test(o.name));
  const desc = n.descriptionHtml ? String(n.descriptionHtml).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000) : null;
  // The full size run, not just the first variant — reproduction-vintage sellers list one style
- // across a dozen sizes, and a single price+size can't represent that.
+ // across a dozen sizes, and a single price+size can't represent that. Rental options are not part
+ // of it: they are not sizes, and nobody can buy one.
  const optionValue = (v: any, re: RegExp) => (v?.selectedOptions || []).find((o: any) => re.test(String(o?.name || "")))?.value ?? null;
- const variants = (n.variants?.edges || []).map((ve: any) => {
-  const v = ve?.node || {};
+ const variants = withoutRentalOptions(nodes, readNode).map((v: any) => {
   const vp = parseFloat(v.price || "0");
   return {
    sourceVariantId: v.id ? String(v.id) : null,
-   size: optionValue(v, /size/i) ?? (v.title && v.title !== "Default Title" ? v.title : null),
+   size: optionValue(v, /size/i) ?? sizeFromOptionLabel(v.title),
    color: optionValue(v, /colou?r/i),
    priceCents: Number.isFinite(vp) && vp > 0 ? Math.round(vp * 100) : null,
    available: v.availableForSale !== false,
@@ -101,6 +107,8 @@ export function adminProductToImported(n: any, currency: string): ImportedProduc
   priceCents: amount > 0 ? Math.round(amount * 100) : null,
   currency,
   variants,
+  rentOnly: pick.rentOnly,
+  rentalTiers: rentalTiersFromOptions(nodes, readNode),
   // The store's own identity for this product, so a re-sync matches instead of duplicating.
   sourcePlatform: "shopify",
   sourceId: n.handle ? String(n.handle) : n.id ? String(n.id) : null,

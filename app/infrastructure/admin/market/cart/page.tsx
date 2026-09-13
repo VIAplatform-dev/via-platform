@@ -248,7 +248,7 @@ function CartInner() {
  {/* Custom sale price — an in-page sheet (browser prompt() doesn't exist on phones). */}
  {saleFor && (() => { const l = cart.find((x) => x.itemId === saleFor); if (!l) return null; const cents = Math.round(Number(saleDraft) * 100); const valid = Number.isFinite(cents) && cents >= 0 && cents <= l.listCents; return (
  <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setSaleFor(null)}>
- <div className="w-full max-w-lg rounded-t-3xl bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom))] md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+ <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom))] md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Sale price · this customer only</p>
  <p className="mt-1 truncate text-[15px] font-medium text-stone-900">{l.title}</p>
  <p className="text-[12.5px] text-stone-500">Listed at {money(l.listCents)} — the listing keeps its price.</p>

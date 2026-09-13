@@ -8,7 +8,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, Se
 type Consignor = { id: number; name: string; email: string | null; phone: string | null; defaultSplitPct: number | null; payoutMethod: string | null; status: string; balanceCents: number; stripeAccountId: string | null; portalToken: string | null };
 
 const label = "block text-[11px] font-medium uppercase tracking-wide text-stone-500 mb-1";
-const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400";
+const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400 max-sm:py-2.5";
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 export default function ConsignorsPage() {
@@ -91,6 +91,18 @@ export default function ConsignorsPage() {
  reload();
  }
 
+ // Direct-deposit state: "Ready", or a button that copies the portal link. Shared by card and table.
+ const depositCell = (c: Consignor) => (
+ c.stripeAccountId ? (
+ <StatusPill tone="live" dot>Ready</StatusPill>
+ ) : (
+ <button type="button" onClick={() => copySetupLink(c.id)} className="inline-flex flex-col items-start gap-1 max-sm:flex-row max-sm:items-center max-sm:py-2 lg:flex-row lg:items-center lg:gap-1.5" title="Copy the consignor portal link so they can connect their bank">
+ <StatusPill tone="neutral">Not set up</StatusPill>
+ <span className="text-[11px] text-stone-400 underline">{copiedId === c.id ? "Copied!" : "Copy setup link"}</span>
+ </button>
+ )
+ );
+
  return (
  <AdminPage>
  <Link href="/admin/consignment" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Consignment</Link>
@@ -106,7 +118,7 @@ export default function ConsignorsPage() {
  <div><label className={label}>Default split %</label><input className={input} value={form.defaultSplitPct} onChange={(e) => setForm({ ...form, defaultSplitPct: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" placeholder="e.g. 60" /></div>
  </div>
  {err && <p className="mt-2 text-[12px] text-rose-600">{err}</p>}
- <div className="mt-3"><TechButton type="submit" disabled={saving}>{saving ? "Adding…" : "Add consignor"}</TechButton></div>
+ <div className="mt-3"><TechButton type="submit" className="max-sm:py-2.5" disabled={saving}>{saving ? "Adding…" : "Add consignor"}</TechButton></div>
  <p className="mt-2 text-[11px] text-stone-400">Leave the split blank to use your store rules. Set it here to override for this person.</p>
  </form>
  </TechCard>
@@ -120,7 +132,7 @@ export default function ConsignorsPage() {
  <input type="file" accept=".csv,.tsv,text/csv,text/plain" onChange={onImportFile} className="w-full text-[12px] text-stone-600 file:mr-3 file:rounded-lg file:border file:border-stone-200 file:bg-stone-50 file:px-3 file:py-1.5 file:text-[12px] file:text-stone-700 hover:file:bg-stone-100" />
  </div>
  <div><label className={label}>From (platform)</label><input className={input} value={imp.source} onChange={(e) => setImp({ ...imp, source: e.target.value })} placeholder="e.g. ConsignCloud" /></div>
- <div className="flex items-end"><TechButton type="button" onClick={runImport} disabled={importing || !imp.csv.trim()}>{importing ? "Importing…" : "Import consignors"}</TechButton></div>
+ <div className="flex items-end"><TechButton type="button" className="max-sm:py-2.5" onClick={runImport} disabled={importing || !imp.csv.trim()}>{importing ? "Importing…" : "Import consignors"}</TechButton></div>
  </div>
  <div className="mt-3">
  <label className={label}>…or paste the CSV</label>
@@ -147,7 +159,43 @@ export default function ConsignorsPage() {
  />
  ) : (
  <TechCard className="mt-6 overflow-hidden">
- <div className="overflow-x-auto">
+ {/* Phones: a card per consignor with every control the table row has. */}
+ <ul className="divide-y divide-stone-100 sm:hidden">
+ {rows.map((c) => (
+ <li key={c.id} className="px-4 py-3.5">
+ <div className="flex items-start justify-between gap-3">
+ <div className="min-w-0">
+ <p className="font-medium text-stone-900">{c.name}</p>
+ <p className="text-[12px] text-stone-400 [overflow-wrap:anywhere]">{[c.email, c.phone].filter(Boolean).join(" · ") || "—"}</p>
+ </div>
+ <div className="shrink-0 text-right">
+ <p className="font-medium tabular-nums text-stone-900">{money(c.balanceCents)}</p>
+ <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-400">Balance owed</p>
+ </div>
+ </div>
+ <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+ <span className="flex items-center gap-1.5 text-[12px] text-stone-500">
+ Split
+ <input
+ defaultValue={c.defaultSplitPct ?? ""}
+ onBlur={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); patchConsignor(c.id, { defaultSplitPct: v ? Number(v) : null }); }}
+ className="h-10 w-20 rounded-lg border border-stone-200 px-2 text-[13px] tabular-nums outline-none focus:border-stone-400"
+ inputMode="numeric" placeholder="store rule" aria-label={`Default split for ${c.name}`}
+ />
+ {c.defaultSplitPct != null && <span className="text-stone-400">%</span>}
+ </span>
+ {depositCell(c)}
+ </div>
+ <div className="mt-2 flex items-center gap-3">
+ <button type="button" onClick={() => patchConsignor(c.id, { status: c.status === "active" ? "inactive" : "active" })} className="inline-flex py-2" title={`Toggle ${c.name}'s status`}>
+ <StatusPill tone={c.status === "active" ? "live" : "neutral"} dot={c.status === "active"}>{c.status}</StatusPill>
+ </button>
+ <button onClick={() => removeConsignor(c.id, c.name)} className="ml-auto grid h-10 w-10 place-items-center text-[20px] leading-none text-stone-300 transition hover:text-rose-500" title="Remove consignor" aria-label={`Remove ${c.name}`}>&times;</button>
+ </div>
+ </li>
+ ))}
+ </ul>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[13px]">
  <thead>
  <tr>
@@ -176,14 +224,8 @@ export default function ConsignorsPage() {
  </TD>
  <TD right className="px-4 font-medium text-stone-900">{money(c.balanceCents)}</TD>
  <TD className="px-4">
- {c.stripeAccountId ? (
- <StatusPill tone="live" dot>Ready</StatusPill>
- ) : (
- <button type="button" onClick={() => copySetupLink(c.id)} className="inline-flex items-center gap-1.5" title="Copy the consignor portal link so they can connect their bank">
- <StatusPill tone="neutral">Not set up</StatusPill>
- <span className="text-[11px] text-stone-400 underline">{copiedId === c.id ? "Copied!" : "Copy setup link"}</span>
- </button>
- )}
+ {/* Below lg the pill and "Copy setup link" stack, so the row fits iPad portrait. */}
+ {depositCell(c)}
  </TD>
  <TD className="px-4">
  <div className="flex items-center gap-3">

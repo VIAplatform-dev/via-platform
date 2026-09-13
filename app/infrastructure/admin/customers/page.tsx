@@ -172,10 +172,10 @@ export default function CustomersPage() {
  title="Customers"
  subtitle={`${count.toLocaleString()} ${count === 1 ? "customer" : "customers"} · 100% of your customer base`}
  actions={
- <div className="flex items-center gap-2">
+ <div className="flex flex-wrap items-center gap-2">
  {customers.length > 0 && <TechButton variant="ghost" onClick={exportCsv}>Export</TechButton>}
  <TechButton variant="ghost" onClick={() => setShowImport((v) => !v)}>{showImport ? "Close import" : "Import"}</TechButton>
- <TechButton onClick={() => { setAddErr(null); setAdding(true); }}>Add customer</TechButton>
+ <TechButton className="max-sm:py-2.5" onClick={() => { setAddErr(null); setAdding(true); }}>Add customer</TechButton>
  </div>
  }
  />
@@ -204,8 +204,8 @@ export default function CustomersPage() {
  onChange={(e) => { setCsv(e.target.value); setFileName(null); }}
  placeholder={"email,first name,last name\njane@example.com,Jane,Doe\nbob@shop.co,Bob,Smith"}
  />
- <div className="mt-4 flex items-center gap-3">
- <TechButton onClick={importNow} disabled={busy || !csv.trim()}>{busy ? "Importing…" : "Import customers"}</TechButton>
+ <div className="mt-4 flex flex-wrap items-center gap-3">
+ <TechButton className="max-sm:py-2.5" onClick={importNow} disabled={busy || !csv.trim()}>{busy ? "Importing…" : "Import customers"}</TechButton>
  {err && <span className="text-xs text-red-600">{err}</span>}
  </div>
  </>
@@ -226,16 +226,17 @@ export default function CustomersPage() {
  <div className="flex gap-1.5" role="tablist" aria-label="Customer filter">
  {([["all", "All"], ["buyers", "Buyers"], ["imported", "Imported"]] as const).map(([k, lab]) => (
  <button key={k} type="button" role="tab" aria-selected={filter === k} onClick={() => setFilter(k)}
- className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", filter === k ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
+ className={cn("rounded-full border px-2.5 py-1 text-[12px] transition max-sm:px-3.5 max-sm:py-2", filter === k ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>
  {lab}
  </button>
  ))}
  </div>
+ {/* On a phone the search takes its own full row rather than squeezing beside the chips. */}
  <input
  value={q}
  onChange={(e) => setQ(e.target.value)}
  placeholder="Search customers…"
- className={cn(inputCls, "h-9 min-w-[200px] flex-1 text-[13px]")}
+ className={cn(inputCls, "h-9 min-w-[200px] flex-1 text-[13px] max-sm:h-11 max-sm:basis-full")}
  />
  </div>
  {(allTags.length > 0 || categories.length > 0 || customers.some((c) => c.spentCents > 0)) && (
@@ -247,19 +248,19 @@ export default function CustomersPage() {
  const on = (audience.tags || []).includes(t);
  return (
  <button key={t} type="button" aria-pressed={on} onClick={() => toggleTag(t)}
- className={cn("rounded-full border px-2.5 py-1 text-[12px] transition", on ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>{t}</button>
+ className={cn("rounded-full border px-2.5 py-1 text-[12px] transition max-sm:px-3 max-sm:py-1.5", on ? "border-transparent bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-400")}>{t}</button>
  );
  })}
  </div>
  )}
  <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
  <span className="whitespace-nowrap">Spent over $</span>
- <input type="number" inputMode="decimal" min={0} value={spentOverText} onChange={(e) => setSpentOver(e.target.value)} placeholder="0" aria-label="Spent over" className={cn(inputCls, "h-8 w-24 text-[12.5px]")} />
+ <input type="number" inputMode="decimal" min={0} value={spentOverText} onChange={(e) => setSpentOver(e.target.value)} placeholder="0" aria-label="Spent over" className={cn(inputCls, "h-8 w-24 text-[12.5px] max-sm:h-10")} />
  </label>
  {categories.length > 0 && (
  <label className="flex items-center gap-1.5 text-[12px] text-stone-500">
  <span className="whitespace-nowrap">Bought in</span>
- <select value={audience.category || ""} onChange={(e) => setAudience((a) => ({ ...a, category: e.target.value || null }))} aria-label="Bought in category" className={cn(inputCls, "h-8 w-auto text-[12.5px]")}>
+ <select value={audience.category || ""} onChange={(e) => setAudience((a) => ({ ...a, category: e.target.value || null }))} aria-label="Bought in category" className={cn(inputCls, "h-8 w-auto text-[12.5px] max-sm:h-10")}>
  <option value="">any category</option>
  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
  </select>
@@ -274,13 +275,42 @@ export default function CustomersPage() {
  )}
  </div>
  )}
- <div className="overflow-x-auto">
+ {/* Phones: one card per customer. Five columns can't share a 390px screen. */}
+ <ul className="divide-y divide-stone-100 sm:hidden">
+ {filtered.map((c) => (
+ <li key={c.email} className="px-4 py-3.5">
+ <div className="flex items-start justify-between gap-3">
+ <Link href={`/admin/customers/${encodeURIComponent(c.email)}`} className="group/name block min-w-0">
+ <div className="truncate text-[14px] font-medium text-stone-900 group-hover/name:underline">{c.name || c.email}</div>
+ {c.name && <div className="truncate text-[12px] text-stone-400">{c.email}</div>}
+ </Link>
+ <span className="shrink-0 text-[13px] tabular-nums text-stone-900">{money(c.spentCents)}</span>
+ </div>
+ <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-stone-500">
+ {c.subscribed
+ ? <StatusPill tone="live" dot>Subscribed</StatusPill>
+ : <StatusPill tone="neutral">Not subscribed</StatusPill>}
+ <span className="tabular-nums">{c.orders} {c.orders === 1 ? "order" : "orders"}</span>
+ {c.location && <span>· {c.location}</span>}
+ </div>
+ {(c.tags || []).length > 0 && (
+ <div className="mt-2 flex flex-wrap gap-1.5">
+ {c.tags.map((t) => <button key={t} type="button" onClick={() => toggleTag(t)} className="rounded-full bg-stone-100 px-2.5 py-1 text-[11.5px] text-stone-600 hover:bg-stone-200">{t}</button>)}
+ </div>
+ )}
+ </li>
+ ))}
+ {filtered.length === 0 && (
+ <li className="px-4 py-10 text-center text-[13px] text-stone-400">{q ? `No customers match “${q}”.` : "No customers match those filters."}</li>
+ )}
+ </ul>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[13px]">
  <thead>
  <tr>
   <TH className="px-3">Customer name</TH>
  <TH className="px-5">Email subscription</TH>
- <TH className="px-5">Location</TH>
+ <TH className="hidden px-5 md:table-cell">Location</TH>
  <TH right className="px-5">Orders</TH>
  <TH right className="px-5">Amount spent</TH>
  </tr>
@@ -304,7 +334,7 @@ export default function CustomersPage() {
  ? <StatusPill tone="live" dot>Subscribed</StatusPill>
  : <StatusPill tone="neutral">Not subscribed</StatusPill>}
  </TD>
- <TD className="px-5 text-stone-500">{c.location || "—"}</TD>
+ <TD className="hidden px-5 text-stone-500 md:table-cell">{c.location || "—"}</TD>
  <TD right className="px-5 text-stone-600">{c.orders}</TD>
  <TD right className="px-5 text-stone-900">{money(c.spentCents)}</TD>
  </tr>
@@ -323,16 +353,16 @@ export default function CustomersPage() {
  {/* Add-customer modal */}
  {adding && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setAdding(false)}>
- <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+ <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
  <h2 className="mb-4 text-base font-semibold text-stone-900">Add customer</h2>
  <div className="space-y-3">
- <Field label="Name"><Input value={newC.name} onChange={(e) => setNewC((c) => ({ ...c, name: e.target.value }))} placeholder="Jane Doe" /></Field>
- <Field label="Email"><Input type="email" value={newC.email} onChange={(e) => setNewC((c) => ({ ...c, email: e.target.value }))} placeholder="jane@example.com" /></Field>
+ <Field label="Name"><Input className="max-sm:h-11" value={newC.name} onChange={(e) => setNewC((c) => ({ ...c, name: e.target.value }))} placeholder="Jane Doe" /></Field>
+ <Field label="Email"><Input className="max-sm:h-11" type="email" value={newC.email} onChange={(e) => setNewC((c) => ({ ...c, email: e.target.value }))} placeholder="jane@example.com" /></Field>
  </div>
  {addErr && <p className="mt-3 text-xs text-red-600">{addErr}</p>}
  <div className="mt-5 flex items-center justify-end gap-2">
- <TechButton variant="ghost" onClick={() => setAdding(false)}>Cancel</TechButton>
- <TechButton disabled={savingNew || !newC.email.trim()} onClick={addCustomer}>{savingNew ? "Adding…" : "Add customer"}</TechButton>
+ <TechButton variant="ghost" className="max-sm:py-2.5" onClick={() => setAdding(false)}>Cancel</TechButton>
+ <TechButton className="max-sm:py-2.5" disabled={savingNew || !newC.email.trim()} onClick={addCustomer}>{savingNew ? "Adding…" : "Add customer"}</TechButton>
  </div>
  </div>
  </div>

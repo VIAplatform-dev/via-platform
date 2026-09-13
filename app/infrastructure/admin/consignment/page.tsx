@@ -75,14 +75,27 @@ export default function ConsignmentPage() {
          even before the first sale (which is when the metrics/chart below light up). */}
      {consignors.length > 0 && (
       <TechCard className="mb-5 overflow-hidden">
-       <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
-        <div>
+       <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
+        <div className="min-w-0">
          <h3 className="text-[13px] font-semibold text-stone-900">Consignors</h3>
          <p className="mt-0.5 text-[12px] text-stone-500">Everyone consigning with you, their split, and what they’re owed.</p>
         </div>
         <TechButtonLink variant="secondary" href="/admin/consignment/consignors" className="text-[12px]">Manage →</TechButtonLink>
        </div>
-       <div className="overflow-x-auto">
+       {/* Phones: a row per consignor — the four columns ran off a 390px card. */}
+       <ul className="divide-y divide-stone-100 sm:hidden">
+        {consignors.map((c) => (
+         <li key={c.id} className="flex items-center gap-3 px-5 py-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] text-[10px] font-semibold text-[var(--accent-ink,#0b7a5c)]">{initials(c.name)}</span>
+          <div className="min-w-0 flex-1">
+           <p className="truncate text-[13px] font-medium text-stone-800">{c.name}</p>
+           <p className="truncate text-[12px] text-stone-500">{c.defaultSplitPct != null ? `${c.defaultSplitPct}%` : "Store rule"} · <span className="font-medium tabular-nums text-stone-800">{money(c.balanceCents)}</span> owed</p>
+          </div>
+          <StatusPill tone={c.status === "active" ? "live" : "neutral"} dot={c.status === "active"} className="shrink-0">{c.status}</StatusPill>
+         </li>
+        ))}
+       </ul>
+       <div className="hidden overflow-x-auto sm:block">
         <table className="w-full text-[13px]">
          <thead>
           <tr>
@@ -126,7 +139,7 @@ export default function ConsignmentPage() {
 
        {/* Sales volume — net-to-consignor by week (more meaningful early than payout volume). */}
        <TechCard className="mb-5 p-5">
-        <div className="mb-3 flex items-baseline justify-between">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
          <div>
           <h3 className="text-[13px] font-semibold text-stone-900">Consignment sales</h3>
           <p className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-stone-400">Net to consignors · last 8 weeks</p>
@@ -149,40 +162,60 @@ export default function ConsignmentPage() {
         {sum!.activity.length === 0 ? (
          <div className="px-5 py-10 text-center text-[13px] text-stone-400">No sold consignment pieces yet.</div>
         ) : (
-         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
-           <thead>
-            <tr>
-             <TH className="px-5">Payee</TH>
-             <TH className="px-4">Type</TH>
-             <TH className="px-4">Item</TH>
-             <TH right className="px-4">Gross</TH>
-             <TH right className="px-4">Net</TH>
-             <TH className="px-5">Status</TH>
-            </tr>
-           </thead>
-           <tbody>
-            {sum!.activity.map((a, i) => (
-             <tr key={i} className="transition hover:bg-stone-50/70">
-              <TD className="px-5">
-               <span className="flex items-center gap-2.5">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] text-[10px] font-semibold text-[var(--accent-ink,#0b7a5c)]">{initials(a.payee)}</span>
-                <span className="font-medium text-stone-800">{a.payee}</span>
-               </span>
-              </TD>
-              <TD className="px-4 text-stone-500">{a.type}</TD>
-              <TD className="px-4 text-stone-600">{a.item}</TD>
-              <TD right className="px-4 text-stone-500">{money(a.grossCents)}</TD>
-              <TD right className="px-4"><span className="font-semibold text-[var(--accent-ink,#0b7a5c)]">+{money(a.netCents)}</span></TD>
-              <TD className="px-5"><StatusPill tone={a.status === "payable" ? "live" : "pending"} dot={a.status === "payable"}>{a.status === "payable" ? "Payable" : "On hold"}</StatusPill></TD>
+         <>
+          {/* Phones: a card per sold piece. */}
+          <ul className="divide-y divide-stone-100 sm:hidden">
+           {sum!.activity.map((a, i) => (
+            <li key={i} className="px-5 py-3.5">
+             <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+               <p className="text-[13px] font-medium text-stone-800">{a.payee}</p>
+               <p className="mt-0.5 text-[12px] text-stone-500">{a.item}</p>
+              </div>
+              <span className="shrink-0 font-semibold tabular-nums text-[var(--accent-ink,#0b7a5c)]">+{money(a.netCents)}</span>
+             </div>
+             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-stone-400">
+              <StatusPill tone={a.status === "payable" ? "live" : "pending"} dot={a.status === "payable"}>{a.status === "payable" ? "Payable" : "On hold"}</StatusPill>
+              <span>{a.type} · <span className="tabular-nums">{money(a.grossCents)}</span> gross</span>
+             </div>
+            </li>
+           ))}
+          </ul>
+          <div className="hidden overflow-x-auto sm:block">
+           <table className="w-full text-[13px]">
+            <thead>
+             <tr>
+              <TH className="px-5">Payee</TH>
+              <TH className="hidden px-4 lg:table-cell">Type</TH>
+              <TH className="px-4">Item</TH>
+              <TH right className="hidden px-4 lg:table-cell">Gross</TH>
+              <TH right className="px-4">Net</TH>
+              <TH className="px-5">Status</TH>
              </tr>
-            ))}
-           </tbody>
-          </table>
-         </div>
+            </thead>
+            <tbody>
+             {sum!.activity.map((a, i) => (
+              <tr key={i} className="transition hover:bg-stone-50/70">
+               <TD className="px-5">
+                <span className="flex items-center gap-2.5">
+                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] text-[10px] font-semibold text-[var(--accent-ink,#0b7a5c)]">{initials(a.payee)}</span>
+                 <span className="font-medium text-stone-800">{a.payee}</span>
+                </span>
+               </TD>
+               <TD className="hidden px-4 text-stone-500 lg:table-cell">{a.type}</TD>
+               <TD className="px-4 text-stone-600">{a.item}</TD>
+               <TD right className="hidden px-4 text-stone-500 lg:table-cell">{money(a.grossCents)}</TD>
+               <TD right className="px-4"><span className="font-semibold text-[var(--accent-ink,#0b7a5c)]">+{money(a.netCents)}</span></TD>
+               <TD className="px-5"><StatusPill tone={a.status === "payable" ? "live" : "pending"} dot={a.status === "payable"}>{a.status === "payable" ? "Payable" : "On hold"}</StatusPill></TD>
+              </tr>
+             ))}
+            </tbody>
+           </table>
+          </div>
+         </>
         )}
         <div className="flex items-center justify-end border-t border-stone-100 px-5 py-3">
-         <TechButtonLink variant="secondary" href="/admin/consignment/payouts" className={cn("text-[12px]")}>Pay out consignors →</TechButtonLink>
+         <TechButtonLink variant="secondary" href="/admin/consignment/payouts" className={cn("text-[12px] max-sm:py-2.5")}>Pay out consignors →</TechButtonLink>
         </div>
        </TechCard>
       </>

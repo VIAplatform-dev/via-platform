@@ -48,7 +48,7 @@ export default function CampaignsPage() {
  <p className="text-[13px] font-semibold text-stone-900">New email</p>
  <p className="mt-0.5 text-[12px] text-stone-500">From <span className="font-medium text-stone-700">{camp?.storeName || "your store"}</span> · replies go to {camp?.storeEmail || "your contact email"}</p>
  </div>
- <div className="flex items-center gap-2">
+ <div className="flex flex-wrap items-center gap-2">
  <Link href="/admin/marketing/design" className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium text-stone-500 ring-1 ring-stone-200 transition hover:text-stone-800 hover:ring-stone-300">
  <Palette size={13} className="text-stone-400" /> Design
  </Link>
@@ -92,9 +92,9 @@ export default function CampaignsPage() {
 </span>
  )}
  </div>
- <div className="flex items-center gap-2">
- <TechButton variant="secondary" onClick={() => send(true)} disabled={sending || !ready}>Send test to myself</TechButton>
- <TechButton onClick={() => send(false)} disabled={sending || !ready || !count || camp?.allowance?.canSend === false} title={camp?.allowance?.reason ?? undefined}>
+ <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+ <TechButton variant="secondary" className="h-11 flex-1 sm:h-auto sm:flex-none" onClick={() => send(true)} disabled={sending || !ready}>Send test to myself</TechButton>
+ <TechButton className="h-11 flex-1 sm:h-auto sm:flex-none" onClick={() => send(false)} disabled={sending || !ready || !count || camp?.allowance?.canSend === false} title={camp?.allowance?.reason ?? undefined}>
  <Send size={14} />{sending ? "Sending…" : `Send to ${count.toLocaleString()}`}
  </TechButton>
  </div>

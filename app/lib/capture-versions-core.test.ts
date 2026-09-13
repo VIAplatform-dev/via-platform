@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { versionsToDrop, worthVersioning, describeReason, KEEP_VERSIONS } from "./capture-versions-core.ts";
+import { versionsToDrop, worthVersioning, describeReason, KEEP_VERSIONS, KEEP_EDIT_VERSIONS, keepFor } from "./capture-versions-core.ts";
 
 const at = (n: number) => new Date(2026, 0, n).toISOString();
 
@@ -103,6 +103,44 @@ test("versions saved in the same second are still ordered by which came last", (
   { id: "13", reason: "rewrite" as const, createdAt: same },
  ];
  assert.deepEqual(versionsToDrop(rows), ["10"]);
+});
+
+// ── undo that survives save (imported-site builder, Step 2) ──────────────────────────────────────
+// The editor's own undo stack dies on every structural save (the page reloads), so after a save the
+// top-bar Undo steps back through these versions. Three slots is one save and a half of history.
+const edits = (n: number, from = 10) => Array.from({ length: n }, (_, i) => ({ id: String(from + i), reason: "edit" as const, createdAt: at(from + i) }));
+
+test("her newest ten edits are kept beyond the three newest versions", () => {
+ const rows = edits(12);
+ // ids 10..21, newest last: the two oldest go.
+ assert.deepEqual(versionsToDrop(rows).sort(), ["10", "11"]);
+ assert.equal(KEEP_EDIT_VERSIONS, 10);
+});
+
+test("the newest crawl is still kept when edits fill the window", () => {
+ const rows = [{ id: "1", reason: "crawl" as const, createdAt: at(1) }, ...edits(12)];
+ const drop = versionsToDrop(rows);
+ assert.ok(!drop.includes("1"));
+ assert.deepEqual(drop.sort(), ["10", "11"]);
+});
+
+test("rewrites do not ride on the edit allowance", () => {
+ const rows = [
+  ...edits(2, 1),
+  { id: "r1", reason: "rewrite" as const, createdAt: at(5) },
+  { id: "r2", reason: "rewrite" as const, createdAt: at(6) },
+  { id: "r3", reason: "rewrite" as const, createdAt: at(7) },
+  { id: "r4", reason: "rewrite" as const, createdAt: at(8) },
+ ];
+ // Newest three are r2..r4; both edits survive on the edit allowance; r1 goes.
+ assert.deepEqual(versionsToDrop(rows), ["r1"]);
+});
+
+test("reserved builder rows keep twenty; pages keep the ordinary window", () => {
+ assert.equal(keepFor("/__vya/grid-kit"), 20);
+ assert.equal(keepFor("/__vya/chrome/header"), 20);
+ assert.equal(keepFor("/__vya/cart-template"), KEEP_VERSIONS);
+ assert.equal(keepFor("/collections/all"), KEEP_VERSIONS);
 });
 
 test("a tie between a crawl and a rewrite still protects the crawl", () => {

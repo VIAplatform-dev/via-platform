@@ -53,7 +53,9 @@ export default function EmbeddedPayments({
  // emerald for "success", your type + radius. These flow into Stripe's rendered fields/table.
  variables: {
  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
- fontSizeBase: "14px",
+ // 16px so iOS doesn't zoom the page when a seller taps a field in Stripe's embedded
+ // onboarding/payout forms — the Store OS is used from a phone.
+ fontSizeBase: "16px",
  borderRadius: "10px",
  spacingUnit: "9px",
  colorPrimary: "#5D0F17",

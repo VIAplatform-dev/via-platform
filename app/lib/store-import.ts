@@ -44,6 +44,12 @@ export type ImportedProduct = {
  sourceId?: string | null; // platform's own stable id/handle — survives a rename
  sourceUrl?: string | null;
  variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
+ /** Her shop only RENTS this piece: nothing to buy, but a priced rental option. It arrives with no
+  *  price, and the importer keeps it off sale. See variant-pricing.ts. */
+ rentOnly?: boolean;
+ /** The piece's rental price ladder (days → cents), when it has one — regardless of whether it also
+  *  has a buy price. Empty when nothing rents. */
+ rentalTiers?: { days: number; cents: number }[];
  /** Collections this product belongs to, when the source tells us directly (a connected store's
   *  API does; a scraped one needs a separate per-collection crawl to work it out). */
  collectionHandles?: string[];
@@ -714,6 +720,8 @@ export async function importStoreFromUrl(raw: string, max = 5000): Promise<Impor
  sourceId: p.handle || p.shopifyProductId || null,
  sourceUrl: p.externalUrl || null,
  variants: p.variants || [],
+ rentOnly: p.rentOnly === true,
+ rentalTiers: p.rentalTiers || [],
  }));
  if (mapped.length) {
  platform = "shopify";

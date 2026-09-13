@@ -16,7 +16,7 @@ const PAYOUT_METHODS = [
 const CYCLES = ["weekly", "biweekly", "monthly", "on_demand"];
 
 const label = "block text-[11px] font-medium uppercase tracking-wide text-stone-500 mb-1";
-const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400";
+const input = "w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400 max-sm:py-2.5";
 const dollars = (c: number | null) => (c == null ? "" : String(Math.round(c / 100)));
 const toCents = (s: string) => { const n = Number(s.replace(/[^0-9.]/g, "")); return Number.isFinite(n) ? Math.round(n * 100) : 0; };
 
@@ -50,6 +50,9 @@ export default function ConsignmentSettingsPage() {
 
  if (!settings) return <div className="flex items-center justify-center py-32 text-sm text-stone-400">Loading…</div>;
 
+ // One band's four inputs. Cells in the table; labelled fields in a card on a phone.
+ const setRule = (i: number, patch: Partial<Rule>) => setRules(rules.map((x, j) => j === i ? { ...x, ...patch } : x));
+
  return (
  <AdminPage>
  <div className="mb-1">
@@ -70,10 +73,11 @@ export default function ConsignmentSettingsPage() {
  <div className="flex flex-wrap gap-2">
  {PAYOUT_METHODS.map((m) => {
  const on = settings.payoutMethods.includes(m.key);
- return <button key={m.key} onClick={() => toggleMethod(m.key)} className={`rounded-lg border px-3 py-1.5 text-[12.5px] transition ${on ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>{m.label}</button>;
+ return <button key={m.key} onClick={() => toggleMethod(m.key)} className={`rounded-lg border px-3 py-1.5 text-[12.5px] transition max-sm:py-2.5 ${on ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>{m.label}</button>;
  })}
  </div>
- <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+ {/* One field per row on a phone — two across cut "Direct deposit" off inside its select. */}
+ <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
  <div>
  <label className={label}>Default method</label>
  <select className={input} value={settings.defaultPayoutMethod} onChange={(e) => set("defaultPayoutMethod", e.target.value)}>
@@ -100,12 +104,29 @@ export default function ConsignmentSettingsPage() {
  <TechCard className="p-5">
  <SectionLabel>Splits</SectionLabel>
  <p className="mb-4 mt-2 text-[12px] text-stone-500">The consignor&rsquo;s cut. A consignor&rsquo;s own rate wins; otherwise the first matching band here; otherwise the default.</p>
- <div className="mb-4 flex items-center gap-2">
+ <div className="mb-4 flex flex-wrap items-center gap-2">
  <label className="text-[12.5px] text-stone-600">Store default</label>
- <input className="w-16 rounded border border-stone-200 px-2 py-1 text-[13px] tabular-nums outline-none focus:border-stone-400" value={settings.storeDefaultSplitPct} onChange={(e) => set("storeDefaultSplitPct", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" />
+ <input className="w-16 rounded border border-stone-200 px-2 py-1 text-[13px] tabular-nums outline-none focus:border-stone-400 max-sm:h-10" value={settings.storeDefaultSplitPct} onChange={(e) => set("storeDefaultSplitPct", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" />
  <span className="text-[12.5px] text-stone-400">% to the consignor</span>
  </div>
- <div className="overflow-x-auto">
+ {/* Phones: each band is a small card of labelled fields — the five-column row of inputs was
+     ~480px wide and scrolled sideways inside a 310px card. */}
+ {rules.length > 0 && (
+ <div className="space-y-2 sm:hidden">
+ {rules.map((r, i) => (
+ <div key={i} className="flex items-start gap-2 rounded-xl border border-stone-200 p-3">
+ <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+ <div><label className={label}>Min $</label><input className={`${input} tabular-nums`} value={dollars(r.minPriceCents)} onChange={(e) => setRule(i, { minPriceCents: toCents(e.target.value) })} inputMode="numeric" /></div>
+ <div><label className={label}>Max $</label><input className={`${input} tabular-nums`} value={dollars(r.maxPriceCents)} onChange={(e) => setRule(i, { maxPriceCents: e.target.value.trim() ? toCents(e.target.value) : null })} inputMode="numeric" placeholder="& up" /></div>
+ <div><label className={label}>Category</label><input className={input} value={r.category ?? ""} onChange={(e) => setRule(i, { category: e.target.value.trim() || null })} placeholder="any" /></div>
+ <div><label className={label}>Consignor %</label><input className={`${input} tabular-nums`} value={r.splitPct} onChange={(e) => setRule(i, { splitPct: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} inputMode="numeric" /></div>
+ </div>
+ <button onClick={() => setRules(rules.filter((_, j) => j !== i))} className="-mr-1 -mt-1 grid h-10 w-10 shrink-0 place-items-center text-[18px] text-stone-300 hover:text-rose-500" aria-label="Remove rule">×</button>
+ </div>
+ ))}
+ </div>
+ )}
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[12.5px]">
  <thead>
  <tr>
@@ -119,27 +140,27 @@ export default function ConsignmentSettingsPage() {
  <tbody>
  {rules.map((r, i) => (
  <tr key={i}>
- <TD className="px-3"><input className="w-20 rounded border border-stone-200 px-2 py-1 tabular-nums outline-none focus:border-stone-400" value={dollars(r.minPriceCents)} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, minPriceCents: toCents(e.target.value) } : x))} inputMode="numeric" /></TD>
- <TD className="px-3"><input className="w-20 rounded border border-stone-200 px-2 py-1 tabular-nums outline-none focus:border-stone-400" value={dollars(r.maxPriceCents)} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, maxPriceCents: e.target.value.trim() ? toCents(e.target.value) : null } : x))} inputMode="numeric" placeholder="& up" /></TD>
- <TD className="px-3"><input className="w-28 rounded border border-stone-200 px-2 py-1 outline-none focus:border-stone-400" value={r.category ?? ""} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, category: e.target.value.trim() || null } : x))} placeholder="any" /></TD>
- <TD className="px-3"><input className="w-16 rounded border border-stone-200 px-2 py-1 tabular-nums outline-none focus:border-stone-400" value={r.splitPct} onChange={(e) => setRules(rules.map((x, j) => j === i ? { ...x, splitPct: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 } : x))} inputMode="numeric" /></TD>
+ <TD className="px-3"><input className="w-20 rounded border border-stone-200 px-2 py-1 tabular-nums outline-none focus:border-stone-400" value={dollars(r.minPriceCents)} onChange={(e) => setRule(i, { minPriceCents: toCents(e.target.value) })} inputMode="numeric" /></TD>
+ <TD className="px-3"><input className="w-20 rounded border border-stone-200 px-2 py-1 tabular-nums outline-none focus:border-stone-400" value={dollars(r.maxPriceCents)} onChange={(e) => setRule(i, { maxPriceCents: e.target.value.trim() ? toCents(e.target.value) : null })} inputMode="numeric" placeholder="& up" /></TD>
+ <TD className="px-3"><input className="w-28 rounded border border-stone-200 px-2 py-1 outline-none focus:border-stone-400" value={r.category ?? ""} onChange={(e) => setRule(i, { category: e.target.value.trim() || null })} placeholder="any" /></TD>
+ <TD className="px-3"><input className="w-16 rounded border border-stone-200 px-2 py-1 tabular-nums outline-none focus:border-stone-400" value={r.splitPct} onChange={(e) => setRule(i, { splitPct: Number(e.target.value.replace(/[^0-9]/g, "")) || 0 })} inputMode="numeric" /></TD>
  <TD className="px-3"><button onClick={() => setRules(rules.filter((_, j) => j !== i))} className="text-stone-300 hover:text-rose-500" aria-label="Remove rule">×</button></TD>
  </tr>
  ))}
  </tbody>
  </table>
  </div>
- <TechButton variant="secondary" className="mt-3 px-3 py-1.5 text-[12.5px]" onClick={() => setRules([...rules, { minPriceCents: 0, maxPriceCents: null, category: null, splitPct: settings.storeDefaultSplitPct }])}>+ Add band</TechButton>
+ <TechButton variant="secondary" className="mt-3 px-3 py-1.5 text-[12.5px] max-sm:py-2.5" onClick={() => setRules([...rules, { minPriceCents: 0, maxPriceCents: null, category: null, splitPct: settings.storeDefaultSplitPct }])}>+ Add band</TechButton>
  </TechCard>
 
  {/* Agreement */}
  <TechCard className="p-5">
- <div className="flex items-center justify-between">
+ <div className="flex items-center justify-between gap-4">
  <div><SectionLabel>Consignor agreement</SectionLabel><p className="mt-2 text-[12px] text-stone-500">The terms a consignor accepts before you take their items.</p></div>
  <Toggle on={settings.requireAgreement} onClick={() => set("requireAgreement", !settings.requireAgreement)} />
  </div>
  <textarea className={`${input} mt-4 min-h-[120px]`} value={settings.agreementTerms ?? ""} onChange={(e) => set("agreementTerms", e.target.value || null)} placeholder="Your consignment terms — ownership stays with the consignor until sold, the split, who bears loss, what happens to unsold goods, payment timing…" />
- <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-4">
+ <div className="mt-4 flex items-center justify-between gap-4 border-t border-stone-100 pt-4">
  <div><p className="text-[13px] font-medium text-stone-800">Collect a W-9 at signup</p><p className="mt-0.5 text-[12px] text-stone-500">Stay 1099-ready — Stripe gathers this automatically.</p></div>
  <Toggle on={settings.collectW9} onClick={() => set("collectW9", !settings.collectW9)} />
  </div>
@@ -148,7 +169,7 @@ export default function ConsignmentSettingsPage() {
  </div>
 
  <div className="sticky bottom-4 mt-6 flex items-center gap-3">
- <TechButton disabled={saving} onClick={save}>{saving ? "Saving…" : "Save settings"}</TechButton>
+ <TechButton className="max-sm:px-5 max-sm:py-3" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save settings"}</TechButton>
  {savedAt && <StatusPill tone="live" dot>Saved</StatusPill>}
  </div>
  </AdminPage>

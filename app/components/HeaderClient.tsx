@@ -86,6 +86,21 @@ export default function HeaderClient({
  return () => { document.body.style.overflow = ""; };
  }, [mobileMenuOpen, activeDrawer]);
 
+ // Escape closes whatever is open. There WAS an Escape handler, but it lived inside the search
+ // effect behind `if (activeDrawer !== "search") return`, so it only ever fired for the search
+ // drawer — the mobile menu, the cart and the account panels trapped a keyboard user with no way
+ // out but the mouse. Registered once, for all of them.
+ useEffect(() => {
+ if (!mobileMenuOpen && activeDrawer === null) return;
+ const onKey = (e: KeyboardEvent) => {
+  if (e.key !== "Escape") return;
+  setMobileMenuOpen(false);
+  setActiveDrawer(null);
+ };
+ window.addEventListener("keydown", onKey);
+ return () => window.removeEventListener("keydown", onKey);
+ }, [mobileMenuOpen, activeDrawer]);
+
  // ── Search ───────────────────────────────────────────────────
  const [results, setResults] = useState<SearchResult[]>([]);
  const [suggestion, setSuggestion] = useState<{ term: string; count: number } | null>(null);
@@ -216,10 +231,11 @@ export default function HeaderClient({
  className={`fixed top-0 z-[60] w-full transition-colors duration-300 ${transparent ? "bg-gradient-to-b from-black/25 to-transparent border-b border-transparent" : "bg-[#FFFDF8] border-b border-[#5D0F17]/10"}`}
  style={{ height: HEADER_H }}
  >
- {/* px-4, not px-6: the bar sits a touch wider than the content under it, which pushes the logo
-     out to the left and the nav and actions out to the right. A fixed header reading slightly
-     wider than the grid it floats over is deliberate, it stops the top of the page looking inset. */}
- <div className="max-w-7xl mx-auto px-4 h-full flex items-center gap-6 relative">
+ {/* px-4/gap-3 below `sm`: at 320px the logo (78) + gap (24) + the four 44px icon buttons (200)
+  came to 302 inside a 272px content box, so the row ran 30px past the viewport and the hamburger
+  was sliced in half — invisible in testing only because <body> clips overflow-x. The chrome gives
+  up the space, never the tap targets. */}
+ <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center gap-3 sm:gap-6 relative">
 
  {/* Logo — always left on all screen sizes */}
  <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex-shrink-0 flex items-start gap-1.5">
@@ -261,7 +277,7 @@ export default function HeaderClient({
 
 
  {/* Right actions */}
- <div className="flex items-center gap-2">
+ <div className="flex items-center gap-0.5 sm:gap-2 ml-auto">
 
  {/* Inline search — desktop */}
  <button
@@ -314,6 +330,9 @@ export default function HeaderClient({
  {/* Account icon — mobile */}
  <Link
  href={session ? "/account" : "/login"}
+ // Icon-only, so it needs its own name: the desktop twin has one, this one didn't, and it is on
+ // every page — a screen reader announced the header's last control as just "link".
+ aria-label={session ? "Account" : "Sign in"}
  className={`md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors duration-300 ${icon}`}
  >
  {session?.user?.image

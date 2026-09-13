@@ -30,6 +30,25 @@ export type VersionRow = {
  */
 export const KEEP_VERSIONS = 3;
 
+/**
+ * Her own saves kept on top of that window, so Undo survives a save.
+ *
+ * The editor's in-page undo stack is lost whenever a structural save reloads the page, and after that
+ * the top-bar Undo steps back through these versions instead (see /api/store/capture/undo). Three slots
+ * shared with re-imports and rehosting was one save and a half of history. At ~80 KB per gzipped page
+ * this is a few MB per store, only for pages she actually edits.
+ */
+export const KEEP_EDIT_VERSIONS = 10;
+
+/** Reserved builder rows (the grid kit, later the shared header/footer) are small and are her design,
+ *  so they keep a longer history. */
+export const KEEP_BUILDER_ROW_VERSIONS = 20;
+
+/** How many versions of any kind a path keeps. */
+export function keepFor(path: string): number {
+ return /^\/__vya\/(grid-kit$|chrome\/)/i.test(path || "") ? KEEP_BUILDER_ROW_VERSIONS : KEEP_VERSIONS;
+}
+
 function time(v: string | Date): number {
  return v instanceof Date ? v.getTime() : Date.parse(v);
 }
@@ -44,13 +63,15 @@ function time(v: string | Date): number {
  *
  * Order-insensitive: callers hand over whatever the database returned.
  */
-export function versionsToDrop(rows: VersionRow[], keep: number = KEEP_VERSIONS): string[] {
+export function versionsToDrop(rows: VersionRow[], keep: number = KEEP_VERSIONS, keepEdits: number = KEEP_EDIT_VERSIONS): string[] {
  if (keep < 1) return []; // a caller asking to keep nothing is a bug, not an instruction
  // `id` breaks the tie, and it has to: Postgres handed back whole-second timestamps in practice, so
  // three rewrites of one page in the same second are indistinguishable by time alone. The id is a
  // BIGSERIAL — the order the rows were actually written.
  const sorted = [...rows].sort((a, b) => (time(b.createdAt) - time(a.createdAt)) || (Number(b.id) - Number(a.id)));
  const survivors = new Set(sorted.slice(0, keep).map((r) => r.id));
+ // Her newest saves, beyond the shared window — the history the top-bar Undo walks back through.
+ for (const r of sorted.filter((x) => x.reason === "edit").slice(0, Math.max(0, keepEdits))) survivors.add(r.id);
  const newestCrawl = sorted.find((r) => r.reason === "crawl");
  if (newestCrawl) survivors.add(newestCrawl.id);
  return sorted.filter((r) => !survivors.has(r.id)).map((r) => r.id);

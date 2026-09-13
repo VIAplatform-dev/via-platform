@@ -57,7 +57,8 @@ export function PeriodPicker({ value, onChange, className }: { value: PeriodValu
  const grouped = ["Quarter", "Month", "Year"] as const;
 
  return (
-  <div className={cn("flex flex-wrap items-center justify-end gap-2", className)}>
+  // Right-aligned only beside the title (sm+); stacked under it on a phone it reads from the left.
+  <div className={cn("flex flex-wrap items-center justify-start gap-2 sm:justify-end", className)}>
    <SegmentedControl
     options={PRESETS.map((p) => p.label)}
     value={presetLabel ?? ""}
@@ -91,10 +92,12 @@ export function PeriodPicker({ value, onChange, className }: { value: PeriodValu
    </button>
 
    {customOpen && (
-    <div className="flex items-center gap-1.5">
-     <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-[30px] rounded-lg border border-stone-200 px-2 text-[12px] text-stone-600 outline-none focus:border-stone-400" />
+    // Two date inputs, an arrow and Apply are ~330px — wider than a 360px phone's content. Below sm
+    // the row takes the full width and the two dates share it.
+    <div className="flex w-full items-center gap-1.5 sm:w-auto">
+     <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-[30px] min-w-0 flex-1 rounded-lg border border-stone-200 px-2 text-[12px] text-stone-600 outline-none focus:border-stone-400 sm:flex-none" />
      <span className="text-[12px] text-stone-400">→</span>
-     <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-[30px] rounded-lg border border-stone-200 px-2 text-[12px] text-stone-600 outline-none focus:border-stone-400" />
+     <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-[30px] min-w-0 flex-1 rounded-lg border border-stone-200 px-2 text-[12px] text-stone-600 outline-none focus:border-stone-400 sm:flex-none" />
      <TechButton
       className="h-[30px] px-2.5 py-0 text-[12px]"
       disabled={!from || !to || from > to}

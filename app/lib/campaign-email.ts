@@ -14,7 +14,7 @@
 import { resolveStoreSender } from "./email-settings-db";
 import { getStoreEmailBrand } from "./email";
 import { storeEmailHtml } from "./email-template";
-import type { CampaignDesign } from "./campaign-design-core";
+import { bandsPieces, type CampaignDesign } from "./campaign-design-core";
 import { getSellerBySlug } from "./db/sellers";
 import { listStorefrontItems } from "./db/inventory";
 
@@ -26,8 +26,8 @@ export async function campaignRenderer(
  storeSlug: string,
  d: CampaignDesign,
  opts: { fallbackLink?: string } = {},
-): Promise<{ render: (unsubscribeUrl: string) => string; storeName: string }> {
- const [{ fromName, website }, brand, seller] = await Promise.all([
+): Promise<{ render: (unsubscribeUrl: string) => string; storeName: string; fromAddress: string }> {
+ const [{ fromName, website, fromAddress }, brand, seller] = await Promise.all([
   resolveStoreSender(storeSlug),
   getStoreEmailBrand(storeSlug).catch(() => null),
   getSellerBySlug(storeSlug).catch(() => null),
@@ -51,6 +51,8 @@ export async function campaignRenderer(
   }));
  }
 
+ const band = bandsPieces(d.design, d.productsHeading, products.length);
+
  const render = (unsubscribeUrl: string) => storeEmailHtml({
   storeName: fromName,
   logo: brand?.logo ?? null,
@@ -59,18 +61,17 @@ export async function campaignRenderer(
   showPrices: d.showPrices,
   eyebrow: d.eyebrow,
   preheader: d.preheader,
-  productsHeading: d.productsHeading,
   code: d.code,
   linksHeading: null,
   links: d.links,
   headline: d.headline,
   subhead: d.subhead,
   button: d.ctaLabel ? { label: d.ctaLabel, url: link } : null,
-  // Pieces go in a band when the seller gave the band a heading, and inline otherwise — the bands
-  // are what let one email carry eight pieces without reading as a dump.
-  products: d.productsHeading ? [] : products,
-  sections: d.productsHeading && products.length
-   ? [{ heading: d.productsHeading, products, columns: products.length > 4 ? 3 : 2 }]
+  // Band or inline — see bandsPieces in campaign-design-core.ts.
+  products: band ? [] : products,
+  productsHeading: d.productsHeading,
+  sections: band
+   ? [{ heading: d.productsHeading!, products, columns: products.length > 4 ? 3 : 2 }]
    : undefined,
   footerNote: brand?.footerText?.trim()
    ? brand.footerText.trim().replace(/\{store\}/g, fromName)
@@ -83,7 +84,9 @@ export async function campaignRenderer(
   } : null,
  });
 
- return { render, storeName: fromName };
+ // The address a shopper will see it come from. Falls back to the shared domain, which is what
+ // sendStoreCampaign does when a store has no verified sender of its own.
+ return { render, storeName: fromName, fromAddress: fromAddress || "campaigns@vyaplatform.com" };
 }
 
 export { parseCampaignDesign, type CampaignDesign } from "./campaign-design-core";

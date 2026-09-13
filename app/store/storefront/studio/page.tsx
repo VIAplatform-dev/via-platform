@@ -2426,22 +2426,24 @@ export default function StorefrontStudio() {
  )}
  {/* Top bar */}
  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
- <div className="flex items-center gap-2.5">
- <a href={`${base}/home`} title="Back to admin" className="grid h-7 w-7 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronLeft size={16} /></a>
- <span className="text-[15px] font-semibold tracking-tight">{storeName}</span>
- <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
- <span className="mx-0.5 h-5 w-px bg-black/10" />
+ <div className="flex min-w-0 items-center gap-2.5">
+ <a href={`${base}/home`} title="Back to admin" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronLeft size={16} /></a>
+ <span className="truncate text-[15px] font-semibold tracking-tight">{storeName}</span>
+ {/* Hidden on a phone: the Publish / Published button says the same thing, and the bar needs the room. */}
+ <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] max-sm:hidden ${enabled ? "bg-emerald-500/[0.12] text-emerald-700" : "bg-black/[0.06] text-stone-500"}`}>{enabled ? "Live" : "Draft"}</span>
+ <span className="mx-0.5 h-5 w-px shrink-0 bg-black/10 max-sm:hidden" />
  <div className="flex overflow-hidden rounded-lg border border-black/10 bg-[#f4f1ec]">
  <button type="button" onClick={undo} disabled={!hist.u} title="Undo (⌘Z)" aria-label="Undo" className="grid h-7 w-8 place-items-center text-stone-500 transition enabled:hover:bg-white enabled:hover:text-stone-800 disabled:opacity-35"><Undo2 size={15} strokeWidth={1.9} /></button>
  <span className="w-px bg-black/10" />
  <button type="button" onClick={redo} disabled={!hist.r} title="Redo (⌘⇧Z)" aria-label="Redo" className="grid h-7 w-8 place-items-center text-stone-500 transition enabled:hover:bg-white enabled:hover:text-stone-800 disabled:opacity-35"><Redo2 size={15} strokeWidth={1.9} /></button>
  </div>
- <span className="text-[11px] text-stone-400">{save === "saving" ? "Saving…" : save === "saved" ? "All changes saved" : ""}</span>
+ <span className="hidden shrink-0 text-[11px] text-stone-400 sm:inline">{save === "saving" ? "Saving…" : save === "saved" ? "All changes saved" : ""}</span>
  </div>
 
- <div className="flex rounded-lg border border-black/10 bg-[#f4f1ec] p-0.5">{dbtn("desktop", "Desktop", Monitor)}{dbtn("tablet", "Tablet", Tablet)}{dbtn("phone", "Phone", Smartphone)}</div>
+ {/* Hidden on a phone, as in the imported-site editor: the bar can't hold it, and the canvas is already phone-sized. */}
+ <div className="hidden rounded-lg border border-black/10 bg-[#f4f1ec] p-0.5 md:flex">{dbtn("desktop", "Desktop", Monitor)}{dbtn("tablet", "Tablet", Tablet)}{dbtn("phone", "Phone", Smartphone)}</div>
 
- <div className="flex items-center gap-2">
+ <div className="flex shrink-0 items-center gap-2">
  <button type="button" onClick={() => setShowTemplates(true)} className="flex items-center gap-1.5 rounded-lg border border-black/15 px-3 py-1.5 text-[13px] font-medium text-stone-700 transition hover:bg-stone-100"><LayoutTemplate size={13} /> <span className="hidden sm:inline">Templates</span></button>
  {handle && <a href={viewHref} target="_blank" rel="noopener noreferrer" className="hidden items-center gap-1.5 rounded-lg border border-black/15 px-3 py-1.5 text-[13px] font-medium text-stone-700 transition hover:bg-stone-100 sm:flex"><ExternalLink size={13} /> View</a>}
  <button type="button" onClick={togglePublish} disabled={publishing || !settings} className="rounded-lg bg-[#5D0F17] px-4 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12] disabled:opacity-50">{publishing ? "Saving…" : enabled ? "Published ✓" : "Publish"}</button>
@@ -2456,8 +2458,10 @@ export default function StorefrontStudio() {
  )}
 
  {/* Body: editing rail (Design / Add / Assist) + editable live preview */}
- <div className="flex min-h-0 flex-1">
- <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-[#fbf9f5] transition-[width] duration-200 ${panelOpen ? "w-[404px] max-w-[46vw]" : "w-[70px]"}`}>
+ <div className="relative flex min-h-0 flex-1">
+ {/* Below 768 the open panel floats OVER the canvas: capped at 46vw it was ~95px of usable panel on a
+     phone. Collapse it to see the page. */}
+ <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-[#fbf9f5] transition-[width] duration-200 ${panelOpen ? "w-[404px] max-w-[46vw] max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[calc(100vw-2.5rem)] max-md:max-w-none max-md:shadow-[8px_0_24px_-12px_rgba(0,0,0,0.25)]" : "w-[70px]"}`}>
  {/* Collapse / expand the side panel (Canva-style) — the icon rail always stays visible */}
  <button type="button" onClick={() => setPanelOpen((o) => !o)} title={panelOpen ? "Collapse panel" : "Expand panel"} className="absolute -right-3 top-1/2 z-30 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-black/10 bg-white text-stone-500 shadow-sm transition hover:text-[#5D0F17]">{panelOpen ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}</button>
  {/* Canva-style vertical icon rail */}

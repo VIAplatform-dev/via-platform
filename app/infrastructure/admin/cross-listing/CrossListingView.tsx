@@ -258,6 +258,51 @@ function shortBlock(reason: string): string {
  const allSelected = board.length > 0 && board.every((it) => selected.has(it.itemId));
  const toggleSelectAll = () => setSelected(allSelected ? new Set() : new Set(board.map((it) => it.itemId)));
 
+ // One marketplace's cell for one piece — drawn in the table on a tablet/desktop and in the card
+ // list on a phone, so both always say the same thing.
+ const channelCell = (it: BoardRow, p: Platform) => {
+ const st = it.listings[p.key];
+ const isExt = p.mode === "extension" && QUEUEABLE.has(p.key);
+ // Vestiaire is curated — it only takes designer brands. Saying so in the cell beats letting her
+ // queue it and meet a refusal at the end of their form.
+ // Everything Vestiaire's five-step form would refuse — brand, three photos, material, condition,
+     // category, price — checked here so it's said before she opens their site, not four screens in.
+     const vest = p.key === "vestiaire" && !st ? vestReady(it) : null;
+ // A draft is on this board so she can find it, not so she can list it — nothing can go to a
+ // marketplace before it is live on her own shop.
+ const isDraft = it.status === "draft";
+     // Per cell, not per row: this is the marketplace whose button we're drawing. Computed once
+     // per row before, which is how Depop's "Queued ✓" appeared in the Vestiaire column.
+     const qs = queueState[`${p.key}:${it.itemId}`];
+ return (
+ <>
+ {isDraft && !st ? (
+ <span className="text-[11px] text-stone-400">Publish first</span>
+ ) : vest && !vest.ready ? (
+              // The first thing standing in the way, with the rest on hover — a cell can hold one
+              // sentence, and "only 1 photo" is the one that matters most often.
+              <span className="inline-flex items-center gap-1 text-[11px] text-amber-700" title={vest.blocking.join("\n")}>
+               <Ban size={12} />{shortBlock(vest.blocking[0])}
+              </span>
+ ) : st === "listed" ? (
+ <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><Check size={13} strokeWidth={2.6} />Listed</span>
+ ) : st === "pending" ? (
+ <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Queued</span>
+ ) : st === "sold" ? (
+ <span className="text-[11px] text-stone-500">Sold</span>
+ ) : st === "error" ? (
+ <button onClick={() => retry(it.itemId)} disabled={retrying === it.itemId} className="text-[11px] font-medium text-rose-600 hover:underline disabled:opacity-50">{retrying === it.itemId ? "…" : "Failed"}</button>
+ ) : isExt ? (
+ <button onClick={() => queueForPlatform(it.itemId, it.title, p.key)} disabled={qs === "queuing" || qs === "ok"} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{qs === "queuing" ? "…" : qs === "ok" ? "Queued ✓" : "List"}</button>
+ ) : p.hasApi ? (
+ <button onClick={() => retry(it.itemId, [p.key])} disabled={retrying === it.itemId} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{retrying === it.itemId ? "Listing…" : "List"}</button>
+ ) : (
+ <span className="text-[13px] text-stone-300">—</span>
+ )}
+ </>
+ );
+ };
+
  const settingsBtn = <TechButtonLink variant="secondary" href="/admin/cross-listing/settings"><Settings2 size={14} /> Marketplace settings</TechButtonLink>;
  const installBtn = <TechButtonLink variant="secondary" href={EXTENSION_URL} target="_blank" rel="noopener"><Download size={14} /> Install the extension</TechButtonLink>;
 
@@ -311,7 +356,7 @@ function shortBlock(reason: string): string {
  {tab === "overview" ? (
  <>
  {/* KPI strip */}
- <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+ <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
  <MetricCard label="Cross-listed" value={crossListedCount} sub={`${board.length} live on VYA`} />
  <MetricCard label="Open offers" value={totalOffers} sub="Across all channels" />
  <MetricCard label="Sold off-VYA" value={totalSold} sub="On marketplaces" />
@@ -320,7 +365,7 @@ function shortBlock(reason: string): string {
 
  {/* Per-marketplace rollup */}
  <TechCard className="overflow-hidden">
- <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
+ <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
  <div>
  <h3 className="text-[13px] font-semibold text-stone-900">By marketplace</h3>
  <p className="mt-0.5 text-[12px] text-stone-500">Listings, offers and revenue on each channel you sell on.</p>
@@ -330,7 +375,35 @@ function shortBlock(reason: string): string {
  {marketRows.length === 0 ? (
  <div className="px-5 py-8 text-center text-[13px] text-stone-400">No marketplaces connected — <a href="/admin/cross-listing/settings" className="text-[var(--accent-ink,#0b7a5c)] hover:underline">connect one</a> to start.</div>
  ) : (
- <div className="overflow-x-auto">
+ <div>
+ {/* A phone gets a card per marketplace — six columns in a 340px card only scrolled sideways. */}
+ <ul className="divide-y divide-stone-100 sm:hidden">
+ {marketRows.map((m) => (
+ <li key={m.key} className="px-5 py-3.5">
+ <span className="flex flex-wrap items-center gap-2">
+ <span className="text-[13px] font-medium text-stone-800">{m.name}</span>
+ {acct(m.key) || (m.key === "ebay" && ebay?.connected) || (m.key === "etsy" && etsy?.connected)
+ ? <StatusPill tone="live" dot className="px-1.5 py-0.5 text-[10px]">Connected</StatusPill>
+ : <StatusPill tone="neutral" className="px-1.5 py-0.5 text-[10px]">Not connected</StatusPill>}
+ </span>
+ <dl className="mt-2.5 grid grid-cols-3 gap-x-3 gap-y-2 text-[13px]">
+ {([
+ ["Listed", m.listed || null],
+ ["Queued", platforms.find((p) => p.key === m.key)?.mode === "extension" && m.queued ? m.queued : null],
+ ["Offers", m.offers || null],
+ ["Sold", m.sold || null],
+ ["Revenue", m.revenueCents ? money(m.revenueCents) : null],
+ ] as const).map(([lab, v]) => (
+ <div key={lab}>
+ <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400">{lab}</dt>
+ <dd className={v == null ? "text-stone-300" : "font-medium text-stone-800"}>{v ?? "—"}</dd>
+ </div>
+ ))}
+ </dl>
+ </li>
+ ))}
+ </ul>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[13px]">
  <thead>
  <tr>
@@ -362,6 +435,7 @@ function shortBlock(reason: string): string {
  ))}
  </tbody>
  </table>
+ </div>
  </div>
  )}
  <p className="border-t border-stone-100 px-5 py-2.5 text-[11px] text-stone-400">Offers &amp; engagement are reported by the browser extension and the eBay/Etsy APIs. Buyer messages per marketplace aren’t synced yet.</p>
@@ -430,7 +504,7 @@ function shortBlock(reason: string): string {
  <TechCard className="overflow-hidden">
  <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-3">
  {board.length > 0 && (
- <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-[var(--accent-ink,#0b7a5c)]" title="Select all" />
+ <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} className="h-5 w-5 shrink-0 sm:h-3.5 sm:w-3.5 cursor-pointer accent-[var(--accent-ink,#0b7a5c)]" title="Select all" />
  )}
  <div className="flex-1">
  <h3 className="text-[13px] font-semibold text-stone-900">Listings</h3>
@@ -442,7 +516,47 @@ function shortBlock(reason: string): string {
  <TechEmpty icon={<Tag size={28} strokeWidth={1.5} />} title="No active listings" body="Publish a piece on VYA and it appears here, ready to list on other sites." />
  </div>
  ) : (
- <div className="overflow-x-auto">
+ <div>
+ {/* A phone gets a card per piece with one line per marketplace, rather than a matrix that only
+     scrolled sideways. Same cells (channelCell), same selection. */}
+ <ul className="divide-y divide-stone-100 sm:hidden">
+ {board.map((it) => (
+ <li key={it.itemId} className={`px-4 py-3 ${selected.has(it.itemId) ? "bg-[var(--accent-ink,#0b7a5c)]/[0.04]" : ""}`}>
+ <div className="flex items-center gap-3">
+ <input type="checkbox" checked={selected.has(it.itemId)} onChange={() => toggleSelect(it.itemId)} aria-label={`Select ${it.title}`} className="h-5 w-5 shrink-0 cursor-pointer accent-[var(--accent-ink,#0b7a5c)]" />
+ <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-stone-100">{it.image && <img src={it.image} alt="" className="h-full w-full object-cover" />}</div>
+ <div className="min-w-0 flex-1">
+ <a href={`/admin/inventory?item=${it.itemId}`} className="block truncate text-[14px] font-medium text-stone-800 hover:text-[var(--accent-ink,#0b7a5c)] hover:underline" title={`Open ${it.title}`}>{it.title}</a>
+ <div className="flex flex-wrap items-center gap-2 text-[12px] text-stone-400">
+ <span>{money(it.priceCents)}</span>
+ {it.status === "draft" && <span className="rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">Draft</span>}
+ {it.stats && it.stats.totals.offers > 0 && <span className="inline-flex items-center gap-1 font-medium text-[var(--accent-ink,#0b7a5c)]" title={statTip(it.stats.byPlatform)}><Tag size={11} />{it.stats.totals.offers}</span>}
+ {it.stats && it.stats.totals.likes > 0 && <span className="inline-flex items-center gap-1 text-stone-400"><Heart size={11} className="text-rose-400" fill="currentColor" />{it.stats.totals.likes}</span>}
+ </div>
+ </div>
+ </div>
+ {connected.length > 0 && (
+ <dl className="mt-2.5 space-y-2 pl-8">
+ {connected.map((p) => (
+ <div key={p.key} className="flex min-h-7 items-center justify-between gap-3">
+ <dt className="text-[11px] font-medium uppercase tracking-wide text-stone-400">{p.name}</dt>
+ <dd className="text-right">{channelCell(it, p)}</dd>
+ </div>
+ ))}
+ </dl>
+ )}
+ {(Object.keys(it.errors || {}).length > 0 || errors[it.itemId]) && (
+ <div className="mt-2.5 rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2">
+ {errors[it.itemId] && <p className="text-[11px] leading-snug text-rose-700">{errors[it.itemId]}</p>}
+ {Object.entries(it.errors || {}).map(([k, msg]) => (
+ <p key={k} className="text-[11px] leading-snug text-rose-700"><span className="font-semibold">{nameFor(k)} couldn’t list:</span> {msg}</p>
+ ))}
+ </div>
+ )}
+ </li>
+ ))}
+ </ul>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full min-w-[560px] text-[13px]">
  <thead>
  <tr className="border-b border-stone-100">
@@ -476,48 +590,7 @@ function shortBlock(reason: string): string {
  </div>
  </div>
  </td>
- {connected.map((p) => {
- const st = it.listings[p.key];
- const isExt = p.mode === "extension" && QUEUEABLE.has(p.key);
- // Vestiaire is curated — it only takes designer brands. Saying so in the cell beats letting her
- // queue it and meet a refusal at the end of their form.
- // Everything Vestiaire's five-step form would refuse — brand, three photos, material, condition,
-     // category, price — checked here so it's said before she opens their site, not four screens in.
-     const vest = p.key === "vestiaire" && !st ? vestReady(it) : null;
- // A draft is on this board so she can find it, not so she can list it — nothing can go to a
- // marketplace before it is live on her own shop.
- const isDraft = it.status === "draft";
-     // Per cell, not per row: this is the marketplace whose button we're drawing. Computed once
-     // per row before, which is how Depop's "Queued ✓" appeared in the Vestiaire column.
-     const qs = queueState[`${p.key}:${it.itemId}`];
- return (
- <td key={p.key} className="whitespace-nowrap px-3 py-3 text-center">
- {isDraft && !st ? (
- <span className="text-[11px] text-stone-400">Publish first</span>
- ) : vest && !vest.ready ? (
-              // The first thing standing in the way, with the rest on hover — a cell can hold one
-              // sentence, and "only 1 photo" is the one that matters most often.
-              <span className="inline-flex items-center gap-1 text-[11px] text-amber-700" title={vest.blocking.join("\n")}>
-               <Ban size={12} />{shortBlock(vest.blocking[0])}
-              </span>
- ) : st === "listed" ? (
- <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600"><Check size={13} strokeWidth={2.6} />Listed</span>
- ) : st === "pending" ? (
- <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" />Queued</span>
- ) : st === "sold" ? (
- <span className="text-[11px] text-stone-500">Sold</span>
- ) : st === "error" ? (
- <button onClick={() => retry(it.itemId)} disabled={retrying === it.itemId} className="text-[11px] font-medium text-rose-600 hover:underline disabled:opacity-50">{retrying === it.itemId ? "…" : "Failed"}</button>
- ) : isExt ? (
- <button onClick={() => queueForPlatform(it.itemId, it.title, p.key)} disabled={qs === "queuing" || qs === "ok"} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{qs === "queuing" ? "…" : qs === "ok" ? "Queued ✓" : "List"}</button>
- ) : p.hasApi ? (
- <button onClick={() => retry(it.itemId, [p.key])} disabled={retrying === it.itemId} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{retrying === it.itemId ? "Listing…" : "List"}</button>
- ) : (
- <span className="text-[13px] text-stone-300">—</span>
- )}
- </td>
- );
- })}
+ {connected.map((p) => <td key={p.key} className="whitespace-nowrap px-3 py-3 text-center">{channelCell(it, p)}</td>)}
   </tr>
  {(Object.keys(it.errors || {}).length > 0 || errors[it.itemId]) && (
  <tr><td colSpan={connected.length + 2} className="px-5 pb-3">
@@ -536,6 +609,7 @@ function shortBlock(reason: string): string {
  })}
  </tbody>
  </table>
+ </div>
  </div>
  )}
  </TechCard>

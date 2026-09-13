@@ -245,8 +245,10 @@ export default function InboxPage() {
  <EmptyState icon={<MessageCircle size={26} strokeWidth={1.5} />} title="No messages yet" body="When a shopper asks about one of your pieces, the conversation lands here to read and reply." />
  </div>
  ) : (
+ /* Below md it is one pane at a time, like every phone messaging app: the list, or the open thread
+    with a back arrow. Stacked, the thread sat under the entire list and a tap looked like nothing happened. */
  <div className="grid gap-5 md:grid-cols-[340px_1fr]">
- <div className={cn(CARD, "overflow-hidden")}>
+ <div className={cn(CARD, "overflow-hidden", active && "hidden md:block")}>
  <div className="divide-y divide-stone-100">
  {convs.map((c) => {
  const on = active?.id === c.id;
@@ -272,21 +274,22 @@ export default function InboxPage() {
  </div>
  </div>
 
- <div className={cn(CARD, "flex min-h-[440px] flex-col")}>
+ <div className={cn(CARD, "min-h-[440px] flex-col", active ? "flex" : "hidden md:flex")}>
  {!active ? (
  <div className="flex flex-1 items-center justify-center p-8">
  <EmptyState icon={<MessageCircle size={26} strokeWidth={1.5} />} title="Select a conversation" body="Pick a shopper on the left to read and reply." />
  </div>
  ) : (
  <>
- <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-3.5">
+ <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-3.5 max-md:pl-2">
+ <button type="button" onClick={() => setActive(null)} aria-label="Back to conversations" className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-[18px] text-stone-500 hover:bg-stone-100 md:hidden">←</button>
  <Avatar name={active.buyerName} email={active.buyerEmail} className="h-8 w-8" />
  <div className="min-w-0">
  <p className="truncate text-[13px] font-semibold text-stone-900">{active.buyerName || active.buyerEmail || "Buyer"}</p>
  {active.itemTitle && <p className="truncate text-[11px] text-stone-400">Re: {active.itemTitle}</p>}
  </div>
  </div>
- <div className="flex max-h-[52vh] flex-1 flex-col gap-3 overflow-y-auto px-5 py-5">
+ <div className="flex max-h-[52dvh] flex-1 flex-col gap-3 overflow-y-auto px-5 py-5">
  {messages.map((m) => (
  <div key={m.id} className={cn("flex flex-col", m.sender === "store" ? "items-end" : "items-start")}>
  <div className={cn("max-w-[78%] px-3.5 py-2 text-[13px] leading-relaxed", m.sender === "store" ? "rounded-2xl rounded-tr-sm text-white" : "rounded-2xl rounded-tl-sm bg-stone-100 text-stone-800")}

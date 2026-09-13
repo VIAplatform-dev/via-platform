@@ -224,14 +224,16 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  return (
  <>
  {/* Launcher */}
+ {/* On a phone the wordmark pill sat on top of whatever was bottom-right — a form's last button, a
+     table row — so there it is just the round icon: a 48px target that covers a third as much. */}
  {!docked && !open && !suppressed && !dismissed && (
- <div className="fixed bottom-5 right-5 z-50">
- <button onClick={() => setOpen(true)} className="group flex items-center gap-2 rounded-full bg-[#5D0F17] py-2.5 pl-2.5 pr-4 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12]">
+ <div className="fixed bottom-4 right-4 z-50 sm:bottom-5 sm:right-5">
+ <button onClick={() => setOpen(true)} aria-label="Ask VYA" className="group flex items-center gap-2 rounded-full bg-[#5D0F17] p-2.5 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12] sm:pr-4">
  <span className="relative grid h-7 w-7 place-items-center rounded-full bg-white/10">
  <Sparkles size={15} />
  <span className="vya-status-dot absolute -right-0 -top-0 h-2 w-2 rounded-full border border-[#5D0F17] bg-emerald-400" />
  </span>
- <span className="font-mono text-[11px] uppercase tracking-[0.18em]">Ask VYA</span>
+ <span className="hidden font-mono text-[11px] uppercase tracking-[0.18em] sm:inline">Ask VYA</span>
  </button>
  <button onClick={dismiss} title="Hide" aria-label="Hide Ask VYA" className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full border border-black/10 bg-white text-[#5D0F17] shadow transition hover:bg-[#5D0F17] hover:text-white">
  <X size={11} strokeWidth={2.5} />
@@ -241,7 +243,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
 
  {/* Panel */}
  {(open || docked) && (
- <div className={docked ? "flex h-full w-full flex-col overflow-hidden bg-[#FBF9F5]" : "fixed bottom-5 right-5 z-50 flex h-[600px] max-h-[82vh] w-[400px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-[#FBF9F5] shadow-[0_28px_80px_-24px_rgba(0,0,0,0.5)]"}>
+ <div className={docked ? "flex h-full w-full flex-col overflow-hidden bg-[#FBF9F5]" : "fixed bottom-5 right-5 z-50 flex h-[600px] max-h-[82dvh] w-[400px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-[#FBF9F5] shadow-[0_28px_80px_-24px_rgba(0,0,0,0.5)]"}>
  {/* Header */}
  <div className="flex items-center justify-between border-b border-black/[0.06] bg-gradient-to-br from-[#5D0F17] to-[#3a0a0f] px-4 py-3 text-[#FFFDF8]">
  <div className="flex items-center gap-2.5">

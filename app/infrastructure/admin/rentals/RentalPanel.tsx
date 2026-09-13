@@ -221,7 +221,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
       </div>
 
       {perDay ? (
-       <div className="flex items-center gap-2">
+       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] text-stone-400">$</span>
         <input
          inputMode="decimal"
@@ -297,7 +297,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
      {err && <p className="text-[12.5px] text-rose-600" role="alert">{err}</p>}
 
      {deferred ? null : (
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-3">
        {saved && <span className="text-[12px] text-emerald-700">Rental terms saved</span>}
        <TechButton variant="ghost" onClick={() => { void turnOff(); }} disabled={busy}>Don&rsquo;t rent this</TechButton>
        <TechButton onClick={save} disabled={busy} className={cn(busy && "opacity-70")}>

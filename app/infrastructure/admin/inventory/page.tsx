@@ -14,6 +14,7 @@ import { ConditionChips, MeasurementFields, ShipsAsRow, measurementsFromForm, me
 import { formatMeasurements, type MeasurementKey, type Measurement } from "@/app/lib/measurements-core";
 import type { ParcelEstimate } from "@/app/lib/parcel-core";
 import RentalPanel from "../rentals/RentalPanel";
+import PhotoCropper from "../PhotoCropper";
 import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySlug, categoryValueLabel, categoryFamily, isCanonicalCategory, statusLabel, publishBlockers, type ItemStatus } from "@/app/lib/item-tags";
 
 /**
@@ -106,7 +107,9 @@ export default function ItemsPage() {
  const statusParam = searchParams.get("status");
  // List vs thumbnail grid (?layout=grid deep-links; the choice is remembered per device).
  const [layout, setLayout] = useState<"list" | "grid">(searchParams.get("layout") === "grid" ? "grid" : "list");
- useEffect(() => { try { if (!searchParams.get("layout") && localStorage.getItem("inventory:layout") === "grid") void Promise.resolve().then(() => setLayout("grid")); } catch { /* storage off */ } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+ // A phone opens on thumbnails: the list is a 10-column table that can only scroll sideways there. A choice
+ // she has made (stored, or ?layout=) always wins.
+ useEffect(() => { try { const stored = localStorage.getItem("inventory:layout"); if (!searchParams.get("layout") && (stored === "grid" || (!stored && window.matchMedia("(max-width: 639px)").matches))) void Promise.resolve().then(() => setLayout("grid")); } catch { /* storage off */ } }, []); // eslint-disable-line react-hooks/exhaustive-deps
  const changeLayout = (v: "list" | "grid") => { setLayout(v); try { localStorage.setItem("inventory:layout", v); } catch { /* */ } };
  const [colTag, setColTag] = useState<string | null>(null); // collection filter
  const handledDeepLink = useRef<string | null>(null);
@@ -136,6 +139,7 @@ export default function ItemsPage() {
  // In-page confirmations (never browser dialogs): the row × becomes "Remove? Remove · Keep"; the bulk bar
  // and owner reset do the same two-step in place.
  const [confirmRow, setConfirmRow] = useState<string | null>(null);
+ const [confirmSoldRow, setConfirmSoldRow] = useState<string | null>(null); // "Mark sold" — one stray tap shouldn't need a bug report to undo
  const [confirmBulk, setConfirmBulk] = useState(false);
  const [confirmReset, setConfirmReset] = useState(false);
  const [soldNotice, setSoldNotice] = useState<string | null>(null);
@@ -161,7 +165,15 @@ export default function ItemsPage() {
  const [costOpen, setCostOpen] = useState(false);
  const [costForm, setCostForm] = useState<{ mode: "each" | "total"; amount: string }>({ mode: "each", amount: "" });
  const [bulkErr, setBulkErr] = useState<string | null>(null);
+ // Bulk reprice — a flat/% fill to start from, then each piece is still its own editable price:
+ // a flat value used to land on every selected item identically, with no way to give one of them
+ // a different number without leaving the bulk action and opening it alone.
+ const [repriceOpen, setRepriceOpen] = useState(false);
+ const [repriceRows, setRepriceRows] = useState<{ id: string; title: string; sku: number; image?: string; priceCents: number; value: string }[]>([]);
+ const [repriceFill, setRepriceFill] = useState("");
+ const [repriceErr, setRepriceErr] = useState<string | null>(null);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
+ const [cropping, setCropping] = useState<string | null>(null); // cover photo mid-reposition — the card's crop, not a full editor
  const [uploading, setUploading] = useState(false);
  const [savingEdit, setSavingEdit] = useState(false);
  // Collections: the store's collections + the ones selected for the item being edited.
@@ -237,6 +249,7 @@ export default function ItemsPage() {
 
  async function act(id: string, action: "sold" | "remove" | "publish" | "release") {
  setConfirmRow(null);
+ setConfirmSoldRow(null);
  setBusyId(id);
  const r = await fetch(withStore(`/api/store/items/${id}`), {
  method: "POST",
@@ -289,38 +302,49 @@ export default function ItemsPage() {
  const selectedItems = items.filter((i) => selected.has(i.id));
  const draftsSelected = selectedItems.filter((i) => i.status === "draft").length;
 
- // Reprice the selection in one go. The analytics tab points a seller at aging
- // stock to reprice; without this they'd have to open each listing to act on it.
- async function bulkReprice() {
-  const raw = prompt(`Reprice ${selected.size} selected ${selected.size === 1 ? "piece" : "pieces"}.\n\nEnter a new price (e.g. 45), or a percentage change (e.g. -20% to cut a fifth).`);
-  if (raw == null) return;
-  const input = raw.trim();
+ // Reprice the selection — the analytics tab points a seller at aging stock to reprice, and a
+ // flat/% number is the fast start, but each piece still gets its own editable field: a batch of
+ // three doesn't always want the same price, and this used to be the only way to touch any of them.
+ function openReprice() {
+  setRepriceErr(null);
+  setRepriceFill("");
+  setRepriceRows(selectedItems.map((it) => ({
+   id: it.id, title: it.title, sku: it.sku, image: it.images[0], priceCents: it.priceCents,
+   value: (it.priceCents / 100).toFixed(2).replace(/\.00$/, ""),
+  })));
+  setRepriceOpen(true);
+ }
+ // Fills every row from the fill box — flat or %, computed off each item's own current price so
+ // applying it twice doesn't compound. A row already hand-edited is fair game to overwrite too;
+ // that's what "fill" means, and the seller can retype it after.
+ function fillReprice() {
+  const input = repriceFill.trim();
   if (!input) return;
   const pctMatch = input.match(/^([+-]?\d+(?:\.\d+)?)\s*%$/);
   const flat = Number(input.replace(/^\$/, ""));
-  if (!pctMatch && (!Number.isFinite(flat) || flat < 0)) { alert("Enter a price like 45, or a change like -20%."); return; }
-
-  const ids = [...selected];
-  const updates = ids.map((id) => {
-   const item = items.find((x) => x.id === id);
-   if (!item) return null;
-   const cents = pctMatch
-    ? Math.max(0, Math.round(item.priceCents * (1 + Number(pctMatch[1]) / 100)))
-    : Math.round(flat * 100);
-   return { id, priceCents: cents };
-  }).filter(Boolean) as { id: string; priceCents: number }[];
-
-  const preview = pctMatch ? `${Number(pctMatch[1]) > 0 ? "+" : ""}${pctMatch[1]}%` : `$${flat.toFixed(2)} each`;
-  if (!confirm(`Set ${updates.length} ${updates.length === 1 ? "piece" : "pieces"} to ${preview}? This changes live prices.`)) return;
-
+  if (!pctMatch && !(Number.isFinite(flat) && flat >= 0)) { setRepriceErr("Enter a price like 45, or a change like -20%."); return; }
+  setRepriceErr(null);
+  setRepriceRows((rows) => rows.map((r) => {
+   const cents = pctMatch ? Math.max(0, Math.round(r.priceCents * (1 + Number(pctMatch[1]) / 100))) : Math.round(flat * 100);
+   return { ...r, value: (cents / 100).toFixed(2).replace(/\.00$/, "") };
+  }));
+ }
+ async function saveReprice() {
+  // An empty field parses to 0 via Number(""), so it's checked for separately — otherwise a row
+  // left blank would silently save that piece at $0 instead of catching the seller's attention.
+  const bad = repriceRows.find((r) => !r.value.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) < 0);
+  if (bad) { setRepriceErr("Every price needs to be a number, 0 or more."); return; }
+  const parsed = repriceRows.map((r) => ({ id: r.id, cents: Math.round(Number(r.value) * 100) }));
+  setRepriceErr(null);
   setBulkBusy(true);
   // One request per item — the existing PATCH already validates ownership per id.
-  for (const u of updates) {
-   await fetch(`/api/store/items/${u.id}`, {
+  for (const p of parsed) {
+   await fetch(withStore(`/api/store/items/${p.id}`), {
     method: "PATCH", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ price: u.priceCents / 100 }),
+    body: JSON.stringify({ price: p.cents / 100 }),
    }).catch(() => {});
   }
+  setRepriceOpen(false);
   setSelected(new Set());
   await load();
   setBulkBusy(false);
@@ -698,6 +722,26 @@ export default function ItemsPage() {
  );
  };
 
+ // A row's actions. One definition for the table and the phone card list, so the two can't drift;
+ // `touch` only makes the targets thumb-sized.
+ const rowActions = (it: Item, touch = false) => {
+ const b = touch ? "h-10 px-3 text-[13px]" : "px-2 py-1 text-[12px]";
+ return (
+ <div className={touch ? "flex flex-wrap items-center gap-2" : "flex items-center justify-end gap-0.5"}>
+ {it.status === "draft" && <TechButton variant="secondary" className={b} disabled={busyId === it.id} onClick={() => act(it.id, "publish")}>Publish</TechButton>}
+ {(it.status === "active" || it.status === "reserved") && <TechButton variant="secondary" className={b} disabled={busyId === it.id} onClick={() => setConfirmSoldRow(it.id)}>Mark sold</TechButton>}
+ {it.status === "active" && <TechButton variant="secondary" className={b} disabled={busyId === it.id} onClick={() => { setHoldErr(null); setHoldForm({ name: "", days: 3 }); setHoldFor(it); }}>Hold</TechButton>}
+ {it.status === "reserved" && holds[it.id] && <TechButton variant="secondary" className={b} disabled={busyId === it.id} onClick={() => act(it.id, "release")}>Release hold</TechButton>}
+ {it.status !== "removed" && (
+ <button type="button" aria-label={`Remove ${it.title}`} title="Remove from sale" disabled={busyId === it.id} onClick={() => setConfirmRow(it.id)}
+ className={cn("grid place-items-center rounded-full text-[#5D0F17]/70 transition hover:bg-[#5D0F17]/10 hover:text-[#5D0F17] disabled:opacity-40", touch ? "ml-auto h-10 w-10" : "ml-1 h-7 w-7")}>
+ <X size={15} strokeWidth={2.2} />
+ </button>
+ )}
+ </div>
+ );
+ };
+
  // Wider than the standard admin page — this table has 9 columns and shouldn't need to scroll.
  return (
  <AdminPage className="max-w-[92rem]">
@@ -765,13 +809,14 @@ export default function ItemsPage() {
  {selected.size > 0 && (
  <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-[13px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
  <span className="font-medium text-stone-700">{selected.size} selected</span>
- <div className="ml-auto flex items-center gap-2">
- <div className="relative">
- <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={bulkReprice}>Reprice</TechButton>
- <TechButton variant={missingTag === "cost" ? "primary" : "secondary"} className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => { setBulkErr(null); setCostOpen(true); }}>Set cost</TechButton>
- <TechButton variant="secondary" className="px-3 py-1.5 text-[12px]" disabled={bulkBusy} onClick={() => setBulkColOpen((o) => !o)}>Add to collection ▾</TechButton>
+ {/* Wraps on a phone/iPad: seven buttons in one row were wider than the screen. */}
+ <div className="ml-auto flex flex-wrap items-center gap-2">
+ <div className="relative flex flex-wrap items-center gap-2">
+ <TechButton variant="secondary" className="h-10 px-3 py-1.5 text-[12px] sm:h-auto" disabled={bulkBusy} onClick={openReprice}>Reprice</TechButton>
+ <TechButton variant={missingTag === "cost" ? "primary" : "secondary"} className="h-10 px-3 py-1.5 text-[12px] sm:h-auto" disabled={bulkBusy} onClick={() => { setBulkErr(null); setCostOpen(true); }}>Set cost</TechButton>
+ <TechButton variant="secondary" className="h-10 px-3 py-1.5 text-[12px] sm:h-auto" disabled={bulkBusy} onClick={() => setBulkColOpen((o) => !o)}>Add to collection ▾</TechButton>
  {bulkColOpen && (
- <div className="absolute right-0 top-full z-30 mt-1.5 w-64 rounded-xl border border-stone-200 bg-white p-2.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]">
+ <div className="absolute right-0 top-full z-30 mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-stone-200 bg-white p-2.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]">
  <p className="mb-1.5 px-1 text-[11px] font-medium text-stone-500">Add {selected.size} item{selected.size > 1 ? "s" : ""} to a collection</p>
  <input
  autoFocus value={bulkColName} onChange={(e) => setBulkColName(e.target.value)}
@@ -834,7 +879,7 @@ export default function ItemsPage() {
  <div className="p-2.5">
  <p className="truncate text-[13px] font-medium text-stone-900">{it.title}</p>
  <div className="mt-0.5 flex items-center justify-between text-[12px] text-stone-500"><span className="truncate">{it.size || slugOf.get(it.id) || `SKU-${1000 + it.sku}`}</span><span className="font-semibold text-stone-900">${(it.priceCents / 100).toFixed(0)}</span></div>
- <div className="mt-2 flex items-center justify-between gap-2">{collectionsCell(it)}{postedCell(it)}</div>
+ <div className="mt-2 flex flex-wrap items-center justify-between gap-2">{collectionsCell(it)}{postedCell(it)}</div>
  </div>
  </div>
  ))}
@@ -848,7 +893,44 @@ export default function ItemsPage() {
  </div>
  ) : (
  <TechCard className="overflow-hidden">
- <div className="overflow-x-auto">
+ {/* A phone gets a card per piece. The table below it is ten columns, which could only scroll
+     sideways in a 340px card; everything a row can do — select, open, publish, sell, hold,
+     remove — is on the card too. */}
+ <div className="sm:hidden">
+ <label className="flex items-center gap-3 border-b border-stone-100 px-4 py-2.5 text-[12px] text-stone-500">
+ <input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-5 w-5 cursor-pointer accent-[var(--accent,#0e9f76)]" />
+ Select all
+ </label>
+ <ul className="divide-y divide-stone-100">
+ {paged.map((it) => {
+ const cat = slugOf.get(it.id);
+ const days = it.status === "active" ? daysListed(it.createdAt) : null;
+ const margin = it.costCents != null && it.costCents > 0 && it.priceCents > 0 ? Math.round(((it.priceCents - it.costCents) / it.priceCents) * 100) : null;
+ return (
+ <li key={it.id} className={cn("flex gap-3 px-4 py-3", selected.has(it.id) && "bg-stone-50")}>
+ <input type="checkbox" checked={selected.has(it.id)} onChange={() => toggle(it.id)} className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label={`Select ${it.title}`} />
+ <button type="button" onClick={() => openEdit(it)} aria-label={`Edit ${it.title}`} className="h-16 w-12 shrink-0 overflow-hidden rounded-md bg-stone-100 ring-1 ring-stone-200">
+ {it.images[0] && /* eslint-disable-next-line @next/next/no-img-element */ <img src={it.images[0]} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
+ </button>
+ <div className="min-w-0 flex-1">
+ <button type="button" onClick={() => openEdit(it)} className="block w-full truncate text-left text-[14px] font-medium text-stone-900">{it.title}</button>
+ <p className="truncate text-[12px] text-stone-500"><span className="font-mono tabular-nums text-stone-400">SKU-{1000 + it.sku}</span>{cat ? ` · ${isCanonicalCategory(cat) ? categoryValueLabel(cat) : cat}` : ""}</p>
+ <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-stone-500">
+ <span className="text-[13px] font-semibold text-stone-900">${(it.priceCents / 100).toFixed(0)}</span>
+ {it.status === "draft" && it.publishAt ? <StatusPill tone="info">scheduled</StatusPill> : pill(it)}
+ {it.costCents ? <span>cost ${(it.costCents / 100).toFixed(0)}</span> : null}
+ {margin != null && <span className={cn("font-semibold tabular-nums", margin >= 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-rose-500")}>{margin}%</span>}
+ {days != null && <span className={days >= AGING_THRESHOLDS.stale ? "font-medium text-rose-600" : days >= AGING_THRESHOLDS.attention ? "text-amber-600" : ""}>{days}d</span>}
+ </div>
+ {(it.collections || []).length > 0 && <div className="mt-1.5">{collectionsCell(it)}</div>}
+ <div className="mt-2">{rowActions(it, true)}</div>
+ </div>
+ </li>
+ );
+ })}
+ </ul>
+ </div>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[13px]">
  <thead>
  <tr>
@@ -873,7 +955,9 @@ export default function ItemsPage() {
  ) : "Category"}
  </TH>
  <TH right className="px-3"><button type="button" onClick={() => sortBy("revenue")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Revenue{sortKey === "revenue" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
- <TH right className="px-3"><button type="button" onClick={() => sortBy("cost")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Cost{sortKey === "cost" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
+ {/* Cost, Days, Margin, Collection and Posted on come in at xl. Below that the table is an iPad's
+     width and scrolled sideways with them; the editor and the Filter button still reach all five. */}
+ <TH right className="hidden px-3 xl:table-cell"><button type="button" onClick={() => sortBy("cost")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Cost{sortKey === "cost" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH right className="px-3"><button type="button" onClick={() => sortBy("age")} title="Days on the rail" className="inline-flex items-center gap-1 transition hover:text-stone-700">Days{sortKey === "age" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH right className="px-3"><button type="button" onClick={() => sortBy("margin")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Margin{sortKey === "margin" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH className="px-3">
@@ -890,7 +974,7 @@ export default function ItemsPage() {
  </HeaderFilter>
  )}
  </TH>
- <TH className="px-3">
+ <TH className="hidden px-3 xl:table-cell">
  {cols.length > 0 ? (
  <HeaderFilter label="Collection" value={colTag} onClear={() => setColTag(null)}>
  {(close) => (
@@ -904,7 +988,7 @@ export default function ItemsPage() {
  </HeaderFilter>
  ) : "Collection"}
  </TH>
- <TH className="px-3">Posted on</TH>
+ <TH className="hidden px-3 xl:table-cell">Posted on</TH>
  <TH right className="pl-3 pr-4">Actions</TH>
  </tr>
  </thead>
@@ -937,8 +1021,8 @@ export default function ItemsPage() {
  })()}
  </TD>
  <TD right className="px-3 font-medium text-stone-800">${(it.priceCents / 100).toFixed(0)}</TD>
- <TD right className="px-3 text-stone-500">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "—"}</TD>
- <TD right className="px-3 tabular-nums">
+ <TD right className="hidden px-3 text-stone-500 xl:table-cell">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "—"}</TD>
+ <TD right className="hidden px-3 tabular-nums xl:table-cell">
  {(() => {
  const d = it.status === "active" ? daysListed(it.createdAt) : null;
  if (d === null) return <span className="text-stone-300">—</span>;
@@ -947,7 +1031,7 @@ export default function ItemsPage() {
  return <span className={tone}>{d}</span>;
  })()}
  </TD>
- <TD right className="px-3">
+ <TD right className="hidden px-3 xl:table-cell">
  {(() => {
  const hasCost = it.costCents != null && it.costCents > 0;
  if (!hasCost || it.priceCents <= 0) return <span className="text-stone-300">—</span>;
@@ -965,22 +1049,9 @@ export default function ItemsPage() {
  pill(it)
  )}
  </TD>
- <TD className="px-3">{collectionsCell(it)}</TD>
- <TD className="px-3">{postedCell(it)}</TD>
- <TD right className="pl-3 pr-4">
- <div className="flex items-center justify-end gap-0.5">
- {it.status === "draft" && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "publish")}>Publish</TechButton>}
- {(it.status === "active" || it.status === "reserved") && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "sold")}>Mark sold</TechButton>}
- {it.status === "active" && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => { setHoldErr(null); setHoldForm({ name: "", days: 3 }); setHoldFor(it); }}>Hold</TechButton>}
- {it.status === "reserved" && holds[it.id] && <TechButton variant="secondary" className="px-2 py-1 text-[12px]" disabled={busyId === it.id} onClick={() => act(it.id, "release")}>Release hold</TechButton>}
- {it.status !== "removed" && (
- <button type="button" aria-label={`Remove ${it.title}`} title="Remove from sale" disabled={busyId === it.id} onClick={() => setConfirmRow(it.id)}
- className="ml-1 grid h-7 w-7 place-items-center rounded-full text-[#5D0F17]/70 transition hover:bg-[#5D0F17]/10 hover:text-[#5D0F17] disabled:opacity-40">
- <X size={15} strokeWidth={2.2} />
- </button>
- )}
- </div>
- </TD>
+ <TD className="hidden px-3 xl:table-cell">{collectionsCell(it)}</TD>
+ <TD className="hidden px-3 xl:table-cell">{postedCell(it)}</TD>
+ <TD right className="pl-3 pr-4">{rowActions(it)}</TD>
  </tr>
  ))}
  </tbody>
@@ -1022,7 +1093,7 @@ export default function ItemsPage() {
  {/* Edit modal */}
  {editing && (
  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setEditing(null)}>
- <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+ <div className="max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl sm:p-6" onClick={(e) => e.stopPropagation()}>
  <div className="mb-4 flex items-center justify-between">
  <div>
  <h2 className="text-base font-semibold text-stone-900">Edit listing</h2>
@@ -1043,6 +1114,12 @@ export default function ItemsPage() {
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={src} alt="" className="h-full w-full object-cover" />
  {i === 0 && <span className="absolute left-0 top-0 rounded-br bg-[var(--accent,#0e9f76)] px-1 text-[8px] font-bold text-white">COVER</span>}
+ {i === 0 && (
+ <button type="button" aria-label="Reposition cover photo" title="Reposition — this is the crop the product card shows"
+ onClick={() => setCropping(src)}
+ className="absolute right-0 top-0 rounded-bl bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+ >⤢</button>
+ )}
  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/50 px-1 py-0.5 text-[12px] leading-none text-white opacity-0 transition group-hover:opacity-100">
  <button type="button" aria-label="Move left" onClick={() => moveImage(i, -1)} disabled={i === 0} className="disabled:opacity-30">‹</button>
  <button type="button" aria-label="Remove" onClick={() => setEditImages((a) => a.filter((_, k) => k !== i))} className="hover:text-rose-300">✕</button>
@@ -1218,6 +1295,49 @@ export default function ItemsPage() {
  </div>
  }
  />
+ <ConfirmDialog
+ open={repriceOpen}
+ title={`Reprice ${repriceRows.length} ${repriceRows.length === 1 ? "piece" : "pieces"}`}
+ tone="primary"
+ confirmLabel={bulkBusy ? "Saving…" : "Save"}
+ busy={bulkBusy}
+ onCancel={() => setRepriceOpen(false)}
+ onConfirm={saveReprice}
+ body={
+ <div className="space-y-3 text-left" data-testid="reprice-dialog">
+ <div className="flex items-end gap-2">
+ <div className="flex-1">
+ <span className="mb-1.5 block text-[13px] font-medium text-stone-700">Fill all with</span>
+ <Input value={repriceFill} onChange={(e) => setRepriceFill(e.target.value)} placeholder="45 or -20%" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); fillReprice(); } }} />
+ </div>
+ <TechButton type="button" variant="secondary" className="h-[38px] shrink-0 px-3 text-[12px]" onClick={fillReprice}>Fill</TechButton>
+ </div>
+ <p className="text-[11.5px] text-stone-400">A flat price or a percentage change, applied to every row below — then edit any one of them before saving.</p>
+ <div className="max-h-[300px] space-y-1.5 overflow-y-auto pr-1" data-testid="reprice-rows">
+ {repriceRows.map((r) => (
+ <div key={r.id} className="flex items-center gap-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-2">
+ <div className="h-10 w-8 shrink-0 overflow-hidden rounded-md bg-stone-100 ring-1 ring-stone-200">
+ {r.image && /* eslint-disable-next-line @next/next/no-img-element */ <img src={r.image} alt="" className="h-full w-full object-cover" />}
+ </div>
+ <span className="min-w-0 flex-1">
+ <span className="block truncate text-[12.5px] font-medium text-stone-900">{r.title}</span>
+ <span className="block font-mono text-[10.5px] text-stone-400">SKU-{1000 + r.sku} · was ${(r.priceCents / 100).toFixed(0)}</span>
+ </span>
+ <div className="relative shrink-0">
+ <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-stone-400">$</span>
+ <input
+ type="number" inputMode="decimal" value={r.value}
+ onChange={(e) => { const v = e.target.value; setRepriceRows((rows) => rows.map((x) => (x.id === r.id ? { ...x, value: v } : x))); }}
+ className="w-20 rounded-lg border border-stone-200 bg-white py-1 pl-5 pr-2 text-[12.5px] text-stone-900 outline-none focus:border-stone-400"
+ />
+ </div>
+ </div>
+ ))}
+ </div>
+ {repriceErr && <p className="text-[12px] text-rose-600">{repriceErr}</p>}
+ </div>
+ }
+ />
  {(() => {
  const it = items.find((x) => x.id === confirmRow);
  return (
@@ -1244,6 +1364,33 @@ export default function ItemsPage() {
  />
  );
  })()}
+ {(() => {
+ const it = items.find((x) => x.id === confirmSoldRow);
+ return (
+ <ConfirmDialog
+ open={!!it}
+ title="Mark this sold?"
+ tone="primary"
+ body="It comes off your storefront and every connected channel right away. If it didn't really sell, you can switch it back to active from Edit."
+ preview={it && (
+ <div className="flex items-center gap-3">
+ <div className="h-12 w-10 shrink-0 overflow-hidden rounded-md bg-stone-100 ring-1 ring-stone-200">
+ {it.images[0] && /* eslint-disable-next-line @next/next/no-img-element */ <img src={it.images[0]} alt="" className="h-full w-full object-cover" />}
+ </div>
+ <span className="min-w-0">
+ <span className="block truncate text-[13.5px] font-medium text-stone-900">{it.title}</span>
+ <span className="block font-mono text-[11px] text-stone-400">SKU-{1000 + it.sku} · ${(it.priceCents / 100).toFixed(0)}</span>
+ </span>
+ </div>
+ )}
+ confirmLabel="Mark sold"
+ cancelLabel="Not yet"
+ busy={busyId === confirmSoldRow}
+ onConfirm={() => confirmSoldRow && act(confirmSoldRow, "sold")}
+ onCancel={() => setConfirmSoldRow(null)}
+ />
+ );
+ })()}
  <ConfirmDialog
  open={confirmBulk}
  title={`Remove ${selected.size} item${selected.size === 1 ? "" : "s"}?`}
@@ -1263,6 +1410,13 @@ export default function ItemsPage() {
  onConfirm={clearAll}
  onCancel={() => setConfirmReset(false)}
  />
+ {cropping && (
+ <PhotoCropper
+ url={cropping}
+ onCancel={() => setCropping(null)}
+ onCropped={(next) => { setEditImages((ps) => ps.map((p) => (p === cropping ? next : p))); setCropping(null); }}
+ />
+ )}
  </AdminPage>
  );
 }
@@ -1350,8 +1504,10 @@ function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick, filter 
  </button>
  );
  return (
- <div className={cn("flex items-center justify-between gap-3", inCard ? "border-b border-stone-100 px-4 py-2" : "mb-3")}>
- <span className="flex shrink-0 items-center gap-2 text-[12px] text-stone-400"><span><span className="font-medium text-stone-600">{count}</span> item{count === 1 ? "" : "s"}</span>
+ // Wraps on a phone: the count + quick chips, the filter and the view switch share one row and the search
+ // takes a full-width row of its own — squeezed into the leftover gap it was a 32px circle.
+ <div className={cn("flex flex-wrap items-center justify-between gap-x-3 gap-y-2", inCard ? "border-b border-stone-100 px-4 py-2" : "mb-3")}>
+ <span className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] text-stone-400"><span><span className="font-medium text-stone-600">{count}</span> item{count === 1 ? "" : "s"}</span>
  {quick && quick.total > 0 && (
  <>
  <button type="button" onClick={quick.toggle} aria-pressed={quick.on} className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium transition", quick.on ? "border-transparent bg-[#5D0F17] text-white" : "border-stone-200 bg-white text-stone-600 hover:border-stone-400")}>Quick-listed · {quick.total}</button>
@@ -1359,9 +1515,9 @@ function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick, filter 
  </>
  )}
  </span>
- <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 focus-within:border-stone-400 sm:max-w-md">
+ <label className="order-last flex min-w-0 basis-full items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 focus-within:border-stone-400 sm:order-none sm:max-w-md sm:flex-1 sm:basis-auto">
  <Search size={14} className="shrink-0 text-stone-400" />
- <input value={q} onChange={(e) => onQuery(e.target.value)} placeholder="Filter by name, brand, size, SKU, collection…" className="h-8 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-stone-400" />
+ <input value={q} onChange={(e) => onQuery(e.target.value)} placeholder="Filter by name, brand, size, SKU, collection…" aria-label="Filter inventory" className="h-11 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-stone-400 sm:h-8" />
  {q && <button type="button" onClick={() => onQuery("")} className="text-[11px] text-stone-400 hover:text-stone-700">Clear</button>}
  </label>
  {filter}

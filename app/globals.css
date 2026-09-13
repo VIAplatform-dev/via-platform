@@ -81,6 +81,41 @@ body {
 }
 
 /* ================================
+   Store OS: grids never outgrow the screen
+================================ */
+/* A grid item's min-width defaults to `auto`, i.e. its min-content width. So `grid lg:grid-cols-3`
+   on a phone is one implicit column exactly as wide as the widest thing inside it — a bar chart, a
+   nowrap label — and the Store OS shell's `overflow-x: clip` then silently cut the page off at the
+   right edge. `1fr` has the same floor (it means minmax(auto, 1fr)). Zeroing the floor lets every
+   column shrink to the screen and its content wrap, which is what every one of these layouts meant.
+   In @layer base on purpose: a component that genuinely needs a minimum (`min-w-[…]`) still wins. */
+@layer base {
+  .infra .grid > * {
+    min-width: 0;
+  }
+}
+
+/* ================================
+   Touch-device form controls
+================================ */
+/* iOS Safari zooms the whole page in when you focus a control whose font-size is under 16px, and
+   there is no way back out except pinching. It had every search box, the checkout email field and
+   the discount code doing it.
+   A width breakpoint cannot express the rule: `sm:text-base` still leaves a phone in LANDSCAPE
+   (844px wide, very much a touch device) at 14px. The real condition is the input modality, so
+   ask about that directly. Desktop keeps its denser type untouched.
+   Deliberately UNLAYERED: Tailwind v4 puts utilities in `@layer utilities`, and unlayered rules
+   win over layered ones regardless of specificity — which is what lets this beat `.text-sm`
+   without `!important` and without editing every input in the codebase. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ================================
    Links & focus handling
 ================================ */
 *:focus-visible {

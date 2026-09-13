@@ -9,7 +9,7 @@
  * their pages, their products, their collections. The obvious cleanup — the reset on
  * /api/store/capture — calls deleteAllItems, which takes the seller's OWN pieces with it.
  *
- * This removes only what the import created:
+ * It stops a still-running job first, then removes only what the import created:
  *   · captured pages for the slug
  *   · items with source='captured' (the importer's own marker; hand-added and AI pieces are not)
  *   · collections created inside the import job's time window, and their memberships
@@ -65,6 +65,11 @@ console.log(`  items            ${keptItems.n}   (manual / ai — the seller's o
 console.log(`  collections      ${keptCols.length}   ${keptCols.map((c: any) => c.title).join(", ")}`);
 
 if (!confirm) { console.log(`\nDry run. Re-run with --confirm to delete.`); process.exit(0); }
+
+// Stop it before clearing up. A job left `running`/`paused`/`stalled` with crawl state is resumable,
+// and import-sweeper runs every 5 minutes — delete the pages first and it cheerfully starts writing
+// them back. `failed` is terminal, so nothing picks it up again.
+await sql`UPDATE import_jobs SET status = 'failed' WHERE store_slug = ${slug} AND status IN ('running','paused','stalled')`;
 
 const itemIds = items.map((i) => i.id);
 const colIds = cols.map((c) => c.id);

@@ -29,14 +29,19 @@ const COLOR_SWATCH: Record<string, string> = {
  multicolor: "linear-gradient(90deg,#e2711d,#e8c33d,#3f8f4f,#2f6fd3,#6c3aa0)",
 };
 type SourcePick = { segmentType: string; segmentValue: string; score: number; confidence: "high" | "medium"; trend: "rising" | "falling" | "flat"; reason: string };
-type SourceNowData = { picks: SourcePick[]; asOfDate: string | null; empty?: boolean; locked?: boolean };
+// `picks`/`asOfDate` are optional for the same reason as CultureData below: a non-Pro store gets
+// `{ locked: true }` and nothing else, so anything that reads them has to cope with absence.
+type SourceNowData = { picks?: SourcePick[]; asOfDate?: string | null; empty?: boolean; locked?: boolean };
 type DemandResult = { segmentType: string; segmentValue: string; demandIndex: number; hasPriceData: boolean; priceP25: number | null; priceMedian: number | null; priceP75: number | null; verdict: { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string } };
 type BuyVerdict = { rating: "source" | "buy-sharp" | "selective" | "pass"; headline: string; detail: string; basis?: string };
 type BuyEbay = { medianPrice: number | null; p25: number | null; p75: number | null; activeCount: number | null; soldPer30d: number | null; priceMomentumPct: number | null };
 type BuyCluster = { label: string; count: number; medianPrice: number | null; p25: number | null; p75: number | null };
 type BuyGoogle = { momentumPct: number | null; avgInterest: number; breakout: boolean };
 type CultureTrend = { keyword: string; growthWow: number | null };
-type CultureData = { trends: CultureTrend[]; empty?: boolean; locked?: boolean };
+// `trends` is OPTIONAL, because the route genuinely does not always send it: a store that isn't Pro
+// gets `{ locked: true }` back with a 200, and nothing else. Declaring it required was why
+// `culture.trends.length` type-checked and then threw on every non-Pro store.
+type CultureData = { trends?: CultureTrend[]; empty?: boolean; locked?: boolean };
 type WSPick = { segmentType: string; segmentValue: string; demandIndex: number; demandTrend: string; trajectory: string | null; supplyGapScore: number; priceMedian: number | null; priceP25: number | null; priceP75: number | null; priceMomentumPct: number | null; reason: string };
 // "brand_category" → a readable label; the value ("Dior · bags") already reads as the pair.
 const segLabel = (t: string) => (t === "brand_category" ? "brand × category" : t === "brand_model" ? "model" : t);
@@ -91,6 +96,10 @@ export default function TrendsPage() {
  const [data, setData] = useState<Data | null>(null);
  const [sourceNow, setSourceNow] = useState<SourceNowData | null>(null);
  const [culture, setCulture] = useState<CultureData | null>(null);
+ // One place to absorb the locked/empty/absent cases, so the two render sites below can just read
+ // an array instead of each remembering to null-check a field the API sometimes omits.
+ const cultureTrends = culture?.trends ?? [];
+ const sourceNowPicks = sourceNow?.picks ?? [];
  const [whitespace, setWhitespace] = useState<WSPick[] | null>(null);
  const [consensus, setConsensus] = useState<CPick[] | null>(null);
  const [consensusScore, setConsensusScore] = useState<{ hitRate: number | null; evaluated: number; hits: number } | null>(null);
@@ -132,15 +141,15 @@ export default function TrendsPage() {
  />
 
  {/* Source Now — the headline: what to buy right now, from VYA's own data (works before external signals are on). */}
- {sourceNow && sourceNow.picks.length > 0 && (
+ {sourceNowPicks.length > 0 && (
  <TechCard className="mb-6 p-5">
- <div className="mb-1 flex items-center justify-between">
+ <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Source now</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Rising demand · thin supply</span>
  </div>
  <p className="mb-3 text-[12px] text-stone-400">What to buy right now — where VYA buyers&apos; demand is rising and few stores carry it. The window to source before prices climb.</p>
  <div className="space-y-2">
- {sourceNow.picks.map((p) => (
+ {sourceNowPicks.map((p) => (
  <div key={`${p.segmentType}:${p.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[12px] font-semibold tabular-nums text-[var(--accent-ink)]" title="How worth buying this is, 0 to 100">{Math.round(p.score)}</span>
  <div className="min-w-0 flex-1">
@@ -161,7 +170,7 @@ export default function TrendsPage() {
  {/* Source Now is Pro — when locked, show the upsell instead of silently rendering nothing. */}
  {sourceNow?.locked && (
  <TechCard className="mb-6 p-5">
- <div className="flex items-center justify-between gap-4">
+ <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
  <div>
  <p className="text-[13px] font-semibold text-stone-900">Source now</p>
  <p className="mt-0.5 text-[12px] text-stone-500">What to buy right now — where VYA buyers&apos; demand is rising and few stores carry it. Available on Pro.</p>
@@ -174,7 +183,7 @@ export default function TrendsPage() {
  {/* Substack consensus — what fashion writers are collectively calling (a leading, editorial signal). */}
  {consensus && consensus.length > 0 && (
  <TechCard className="mb-6 p-5">
- <div className="mb-1 flex items-center justify-between">
+ <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">What tastemakers are calling</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Fashion Substack · weekly consensus</span>
  </div>
@@ -205,7 +214,7 @@ export default function TrendsPage() {
  {/* Colour of the season — the hottest colours by demand (a cross-market signal: resale tracks retail). */}
  {data && data.topColors && data.topColors.length > 0 && (
  <TechCard className="mb-6 p-5">
- <div className="mb-1 flex items-center justify-between">
+ <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Colour of the season</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Hottest colours · demand</span>
  </div>
@@ -235,7 +244,7 @@ export default function TrendsPage() {
  {/* Whitespace — rising demand you DON'T carry yet (the personalized sourcing gap). */}
  {whitespace && whitespace.length > 0 && (
  <TechCard className="mb-6 p-5">
- <div className="mb-1 flex items-center justify-between">
+ <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Gaps in your inventory</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Rising demand · you don&apos;t carry it</span>
  </div>
@@ -270,8 +279,8 @@ export default function TrendsPage() {
  <p className="mb-1 text-[13px] font-semibold text-stone-900">Should I source this?</p>
  <p className="mb-3 text-[12px] text-stone-400">Type a brand or item type — see if it&apos;s worth buying to resell.</p>
  <form onSubmit={(e) => { e.preventDefault(); runDemandSearch(buyQ); }} className="flex items-center gap-2">
- <input value={buyQ} onChange={(e) => setBuyQ(e.target.value)} placeholder="e.g. Cavalli, slip dress, Y2K, bags…" className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-[var(--accent)]" />
- <TechButton type="submit">Check</TechButton>
+ <input value={buyQ} onChange={(e) => setBuyQ(e.target.value)} placeholder="e.g. Cavalli, slip dress, Y2K, bags…" className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-[var(--accent)] sm:h-auto" />
+ <TechButton type="submit" className="h-11 sm:h-auto">Check</TechButton>
  </form>
  {buyLoading && <p className="mt-3 text-[12px] text-stone-400">Checking…</p>}
  {!buyLoading && buyVerdict && (
@@ -330,16 +339,17 @@ export default function TrendsPage() {
  )}
  </TechCard>
 
- {/* Rising in culture — Pinterest fashion trends. Hidden until Pinterest is configured. */}
- {culture && culture.trends.length > 0 && (
+ {/* Rising in culture — Pinterest fashion trends. Hidden until Pinterest is configured, and for
+  any store that isn't Pro (the route answers those with `{ locked: true }` and no trends). */}
+ {cultureTrends.length > 0 && (
  <TechCard className="mb-6 p-5">
- <div className="mb-1 flex items-center justify-between">
+ <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Rising in culture</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Pinterest · fashion</span>
  </div>
  <p className="mb-3 text-[12px] text-stone-400">Fastest-growing fashion searches on Pinterest — where taste forms before it hits secondhand.</p>
  <div className="flex flex-wrap gap-2">
- {culture.trends.map((t) => (
+ {cultureTrends.map((t) => (
  <span key={t.keyword} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[12px] capitalize text-stone-700">
  {t.keyword}
  {t.growthWow != null && t.growthWow > 0 && <span className="text-[11px] font-semibold not-italic text-[var(--accent-ink)]">+{t.growthWow}%</span>}
@@ -367,8 +377,8 @@ export default function TrendsPage() {
  <div key={p.brand} className="flex gap-3 overflow-hidden rounded-lg border border-stone-100">
  <span className={`w-1 shrink-0 ${s.rail}`} />
  <div className="min-w-0 flex-1 py-2.5 pr-3">
- <div className="flex items-center justify-between gap-2">
- <span className="flex items-center gap-2">
+ <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+ <span className="flex flex-wrap items-center gap-2">
  <StatusPill tone={s.tone}>{s.label}</StatusPill>
  <span className="text-[13px] font-semibold text-stone-900">{p.brand}</span>
  {p.carried && <StatusPill tone="neutral">you carry</StatusPill>}

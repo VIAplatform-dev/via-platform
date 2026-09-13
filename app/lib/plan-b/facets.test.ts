@@ -119,3 +119,42 @@ test("paginate:false still filters and sorts", () => {
  const r = applyFacets(CATALOGUE, P("filter.p.vendor=Chanel&sort_by=price-ascending"), { perPage: 0, paginate: false });
  assert.deepEqual(r.items.map((i) => i.title), ["Sold Chanel Tote", "Chanel Flap"]);
 });
+
+// ── Shopify's newer taxonomy/metaobject facets (Venus Vintage's theme, and every store on a similar
+// theme) submit an opaque id, not a label — see facet-labels.ts. Ticking a brand or size checkbox
+// changed nothing until these were recognised AND resolved. ─────────────────────────────────────────
+
+test("a Metaobject-backed brand filter resolves its id through the page's own labels", () => {
+ const labels = new Map([["gid://shopify/Metaobject/441893388388", "Chanel"]]);
+ const r = applyFacets(CATALOGUE, P("filter.p.m.custom.brand=gid%3A%2F%2Fshopify%2FMetaobject%2F441893388388"), { perPage: 50, labels });
+ assert.equal(r.total, 2, "should match the same 2 Chanel pieces filter.p.vendor=Chanel does");
+});
+
+test("a Standard-Taxonomy size filter resolves its id through the page's own labels", () => {
+ const labels = new Map([["gid://shopify/TaxonomyValue/2885", "OS"]]);
+ const r = applyFacets(CATALOGUE, P("filter.v.t.shopify.size=gid%3A%2F%2Fshopify%2FTaxonomyValue%2F2885"), { perPage: 50, labels });
+ assert.equal(r.total, 2, "Chanel Flap and Dior Saddle are both size OS");
+});
+
+test("without a label map, a taxonomy id matches nothing rather than throwing", () => {
+ // No labels supplied (e.g. the page had no filter form to read one from) — the id is used as-is,
+ // which correctly matches no item's plain-text size rather than crashing the request.
+ const r = applyFacets(CATALOGUE, P("filter.v.t.shopify.size=gid%3A%2F%2Fshopify%2FTaxonomyValue%2F2885"), { perPage: 50 });
+ assert.equal(r.total, 0);
+});
+
+test("the classic and taxonomy brand parameters both apply — OR, not either-or", () => {
+ const labels = new Map([["gid://shopify/Metaobject/1", "Alaia"]]);
+ const r = applyFacets(CATALOGUE, P("filter.p.vendor=Chanel&filter.p.m.custom.brand=gid%3A%2F%2Fshopify%2FMetaobject%2F1"), { perPage: 50, labels });
+ assert.equal(r.total, 3, "2 Chanel + 1 Alaia");
+});
+
+test("a fabric taxonomy filter matches the item's material", () => {
+ const catalogue: FacetItem[] = [
+  it({ title: "Cashmere Sweater", material: "Cashmere" }),
+  it({ title: "Cotton Tee", material: "Cotton" }),
+ ];
+ const labels = new Map([["gid://shopify/TaxonomyValue/66", "Cashmere"]]);
+ const r = applyFacets(catalogue, P("filter.v.t.shopify.fabric=gid%3A%2F%2Fshopify%2FTaxonomyValue%2F66"), { perPage: 50, labels });
+ assert.deepEqual(r.items.map((i) => i.title), ["Cashmere Sweater"]);
+});

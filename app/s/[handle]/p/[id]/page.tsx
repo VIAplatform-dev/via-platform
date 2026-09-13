@@ -28,6 +28,7 @@ import ProductSlideshow from "@/app/s/ProductSlideshow";
 import SiteEffects from "@/app/s/SiteEffects";
 import { resolveEffects, hasEffects } from "@/app/lib/storefront-effects";
 import { rentalContext } from "@/app/lib/rentals/rentals-db";
+import { resolveOffer } from "@/app/lib/rentals/settings-core";
 import { storefrontCss } from "@/app/lib/storefront-chrome-css";
 import { storePublicOrigin, isStoreHost } from "@/app/lib/plan-b/store-host";
 import { storefrontScript } from "@/app/lib/storefront-code";
@@ -121,8 +122,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
  // Resolved on the server because rentals decide whether Buy is offered at all: a piece the store
  // rents but doesn't sell must not show a Buy button.
  const rental = await rentalContext(item.id, sf.storeSlug).catch(() => null);
- const rentable = Boolean(rental?.settings.enabled && rental?.terms?.tiers?.length);
- const buyable = !rentable || rental?.terms?.alsoForSale !== false;
+ const terms = rental?.terms ? { tiersCount: rental.terms.tiers.length, alsoForSale: rental.terms.alsoForSale } : null;
+ const { rentable, buyable } = resolveOffer(Boolean(rental?.settings.enabled), terms);
  // Honor the store's Buyer-messaging toggle (defaults on if settings are unavailable).
  const inbox = await getInboxSettings(sf.storeSlug).catch(() => null);
  // The store's return/refund policy — shown so a buyer knows before they buy.

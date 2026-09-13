@@ -43,9 +43,9 @@ function BringInner() {
  {err && <div className="mb-3"><Notice tone="danger">{err}</Notice></div>}
  <p className="-mt-2 mb-3 text-[13px] text-stone-500">Select what’s physically coming. Nothing selected = everything counts as here.</p>
  <div className="flex items-center gap-2">
- <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, brand, size…" className="min-h-[48px] min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 text-[15px] outline-none focus:border-stone-400" />
+ <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, brand, size…" aria-label="Search items to bring" className="min-h-[48px] min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 text-[15px] outline-none focus:border-stone-400" />
  <div className="flex shrink-0 overflow-hidden rounded-2xl border border-stone-200 divide-x divide-stone-200">
- {(["list", "grid"] as const).map((v) => { const Icon = v === "list" ? List : LayoutGrid; return <button key={v} onClick={() => setLayout(v)} aria-pressed={layout === v} className={`flex min-h-[48px] items-center gap-1 px-3 ${layout === v ? "bg-[#5D0F17]/10 text-[#5D0F17]" : "bg-white text-stone-600"}`}>{layout === v && <Check size={13} strokeWidth={2.5} />}<Icon size={18} /></button>; })}
+ {(["list", "grid"] as const).map((v) => { const Icon = v === "list" ? List : LayoutGrid; return <button key={v} onClick={() => setLayout(v)} aria-pressed={layout === v} aria-label={v === "list" ? "List view" : "Grid view"} className={`flex min-h-[48px] items-center gap-1 px-3 ${layout === v ? "bg-[#5D0F17]/10 text-[#5D0F17]" : "bg-white text-stone-600"}`}>{layout === v && <Check size={13} strokeWidth={2.5} />}<Icon size={18} /></button>; })}
  </div>
  </div>
  <div className="mt-3 flex items-center justify-between">

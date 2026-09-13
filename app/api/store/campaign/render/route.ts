@@ -14,8 +14,8 @@ export async function POST(request: NextRequest) {
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
  const design = parseCampaignDesign(await request.json().catch(() => ({})));
- const { render, storeName } = await campaignRenderer(slug, design);
+ const { render, storeName, fromAddress } = await campaignRenderer(slug, design);
  // A real unsubscribe link is signed per recipient; the preview has no recipient, so it shows the
  // link in place without one behind it.
- return NextResponse.json({ ok: true, html: render("https://example.com/unsubscribe"), storeName });
+ return NextResponse.json({ ok: true, html: render("https://example.com/unsubscribe"), storeName, fromAddress });
 }

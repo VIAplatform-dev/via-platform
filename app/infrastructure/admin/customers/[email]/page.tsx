@@ -75,14 +75,16 @@ export default function CustomerDetailPage() {
  title={
  <span className="flex items-center gap-3">
  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] text-[13px] font-semibold text-[var(--accent-ink,#0b7a5c)]">{initials(name)}</span>
- {name}
+ {/* A long email is one unbreakable word — let it wrap instead of running off a phone. */}
+ <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
  </span>
  }
- subtitle={[decoded, p.phone, p.location].filter(Boolean).join(" · ")}
+ subtitle={<span className="[overflow-wrap:anywhere]">{[decoded, p.phone, p.location].filter(Boolean).join(" · ")}</span>}
  actions={<StatusPill tone={p.subscribed ? "live" : "neutral"} dot={p.subscribed}>{p.subscribed ? "Subscribed" : "Not subscribed"}</StatusPill>}
  />
 
- <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+ {/* Four across only once each card is wide enough for "CONVERSATIONS" — at 640–767 it was cut off. */}
+ <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
  <MetricCard label="Orders" value={orders.length} sub={p.lastOrderAt ? `Last ${date(p.lastOrderAt)}` : "None yet"} />
  <MetricCard label="Total spent" value={money(p.spentCents)} sub="Lifetime" />
  <MetricCard label="Offers" value={offers.length} sub={offers.filter((o) => o.status === "pending").length ? `${offers.filter((o) => o.status === "pending").length} open` : "None open"} />
@@ -93,7 +95,7 @@ export default function CustomerDetailPage() {
  <TechCard className="mb-5 p-5" data-testid="customer-memory">
  <div className="grid gap-4 sm:grid-cols-2">
  <div>
- <div className="mb-1.5 flex items-center justify-between">
+ <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3">
  <label htmlFor="customer-notes" className="text-[12px] font-medium text-stone-700">Notes</label>
  <span className="text-[11px] text-stone-400">{saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Couldn’t save" : "Private — saves when you click away"}</span>
  </div>
@@ -105,19 +107,19 @@ export default function CustomerDetailPage() {
  <div className="flex flex-wrap items-center gap-1.5" data-testid="customer-tags">
  {tags.map((t) => (
  <span key={t} className="inline-flex items-center gap-1 rounded-full bg-stone-900 px-2.5 py-1 text-[12px] text-white">
- {t}<button type="button" aria-label={`Remove tag ${t}`} onClick={() => removeTag(t)} className="ml-0.5 text-white/70 hover:text-white">×</button>
+ {t}<button type="button" aria-label={`Remove tag ${t}`} onClick={() => removeTag(t)} className="ml-0.5 text-white/70 hover:text-white max-sm:px-1 max-sm:text-[15px]">×</button>
  </span>
  ))}
  <input value={newTag} onChange={(e) => setNewTag(e.target.value)} list="all-tags" placeholder={tags.length ? "Add a tag…" : "vip, wholesale, market:brick-lane…"}
  onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(newTag); } if (e.key === "Backspace" && !newTag && tags.length) removeTag(tags[tags.length - 1]); }}
  onBlur={() => { if (newTag.trim()) addTag(newTag); }}
- className="min-w-[140px] flex-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-[12.5px] outline-none focus:border-stone-400" />
+ className="min-w-[140px] flex-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-[12.5px] outline-none focus:border-stone-400 max-sm:py-2.5" />
  <datalist id="all-tags">{(data.allTags || []).filter((t) => !tags.includes(t)).map((t) => <option key={t} value={t} />)}</datalist>
  </div>
  {(data.allTags || []).filter((t) => !tags.includes(t)).length > 0 && (
  <div className="mt-2 flex flex-wrap gap-1">
  {(data.allTags || []).filter((t) => !tags.includes(t)).slice(0, 8).map((t) => (
- <button key={t} type="button" onClick={() => addTag(t)} className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] text-stone-500 transition hover:border-stone-400 hover:text-stone-800">+ {t}</button>
+ <button key={t} type="button" onClick={() => addTag(t)} className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] text-stone-500 transition hover:border-stone-400 hover:text-stone-800 max-sm:px-2.5 max-sm:py-1.5">+ {t}</button>
  ))}
  </div>
  )}
@@ -131,9 +133,26 @@ export default function CustomerDetailPage() {
  {orders.length === 0 ? (
  <div className="px-5 py-8 text-center text-[13px] text-stone-400">No orders from this customer yet.</div>
  ) : (
- <div className="overflow-x-auto">
+ <>
+ {/* Phones: a row per order that still opens it; the five-column table needs a wider screen. */}
+ <div className="divide-y divide-stone-100 sm:hidden">
+ {orders.map((o) => (
+ <a key={o.id} href={`/admin/orders/${o.id}`} className="block px-5 py-3.5 transition hover:bg-stone-50/70">
+ <div className="flex items-start justify-between gap-3">
+ <p className="min-w-0 truncate text-[13px] font-medium text-stone-800">{o.itemTitle || "Item"}</p>
+ <span className="shrink-0 text-[13px] tabular-nums text-stone-700">{money(o.amountCents)}</span>
+ </div>
+ <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-stone-500">
+ <span className="font-mono tabular-nums">{fmtOrderNo(o.orderNo)}</span>
+ <span>· {date(o.paidAt || o.createdAt)}</span>
+ <StatusPill tone={orderTone(o.status)} dot={o.status === "delivered"}>{orderLabel(o.status)}</StatusPill>
+ </div>
+ </a>
+ ))}
+ </div>
+ <div className="hidden overflow-x-auto sm:block">
  <table className="w-full text-[13px]">
- <thead><tr><TH className="px-5">Order</TH><TH className="px-4">Item</TH><TH right className="px-4">Amount</TH><TH className="px-4">Status</TH><TH right className="px-5">Date</TH></tr></thead>
+ <thead><tr><TH className="px-5">Order</TH><TH className="px-4">Item</TH><TH right className="px-4">Amount</TH><TH className="px-4">Status</TH><TH right className="hidden px-5 md:table-cell">Date</TH></tr></thead>
  <tbody>
  {orders.map((o) => (
  <tr key={o.id} className="cursor-pointer transition hover:bg-stone-50/70" onClick={() => { window.location.href = `/admin/orders/${o.id}`; }}>
@@ -141,12 +160,13 @@ export default function CustomerDetailPage() {
  <TD className="px-4 font-medium text-stone-800">{o.itemTitle || "Item"}</TD>
  <TD right className="px-4 text-stone-700">{money(o.amountCents)}</TD>
  <TD className="px-4"><StatusPill tone={orderTone(o.status)} dot={o.status === "delivered"}>{orderLabel(o.status)}</StatusPill></TD>
- <TD right className="px-5 text-stone-500">{date(o.paidAt || o.createdAt)}</TD>
+ <TD right className="hidden px-5 text-stone-500 md:table-cell">{date(o.paidAt || o.createdAt)}</TD>
  </tr>
  ))}
  </tbody>
  </table>
  </div>
+ </>
  )}
  </TechCard>
 
@@ -154,7 +174,7 @@ export default function CustomerDetailPage() {
  <TechCard className="mb-5 overflow-hidden">
  <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
  <h3 className="text-[13px] font-semibold text-stone-900">Offers sent</h3>
- <TechButtonLink variant="secondary" href="/admin/inbox" className="px-3 py-1 text-[12px]"><Tag size={12} /> Inbox</TechButtonLink>
+ <TechButtonLink variant="secondary" href="/admin/inbox" className="px-3 py-1 text-[12px] max-sm:py-2"><Tag size={12} /> Inbox</TechButtonLink>
  </div>
  {offers.length === 0 ? (
  <div className="px-5 py-8 text-center text-[13px] text-stone-400">No offers from this customer.</div>
@@ -168,7 +188,7 @@ export default function CustomerDetailPage() {
  <p className="truncate text-[13px] font-medium text-stone-800">{o.itemTitle || "Item"}</p>
  <p className="text-[12px] text-stone-400"><span className="tabular-nums text-stone-600">{money(o.amountCents)}</span> vs {money(o.listPriceCents)} asking{off > 0 ? ` · ${off}% off` : ""}</p>
  </div>
- <StatusPill tone={offerTone(o.status)} dot={o.status === "accepted"}>{o.status === "pending" && o.lastActor === "buyer" ? "Your move" : o.status}</StatusPill>
+ <StatusPill tone={offerTone(o.status)} dot={o.status === "accepted"} className="shrink-0">{o.status === "pending" && o.lastActor === "buyer" ? "Your move" : o.status}</StatusPill>
  </div>
  );
  })}
@@ -180,7 +200,7 @@ export default function CustomerDetailPage() {
  <TechCard className="overflow-hidden">
  <div className="flex items-center justify-between border-b border-stone-100 px-5 py-4">
  <h3 className="text-[13px] font-semibold text-stone-900">Messages</h3>
- <TechButtonLink variant="secondary" href="/admin/inbox" className="px-3 py-1 text-[12px]"><MessageCircle size={12} /> Open inbox</TechButtonLink>
+ <TechButtonLink variant="secondary" href="/admin/inbox" className="px-3 py-1 text-[12px] max-sm:py-2"><MessageCircle size={12} /> Open inbox</TechButtonLink>
  </div>
  {conversations.length === 0 ? (
  <div className="px-5 py-8 text-center text-[13px] text-stone-400">No messages from this customer.</div>

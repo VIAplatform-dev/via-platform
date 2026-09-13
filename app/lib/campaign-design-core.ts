@@ -58,3 +58,17 @@ export function parseCampaignDesign(v: unknown): CampaignDesign {
   showPrices: b.showPrices !== false,
  };
 }
+
+/**
+ * Do the pieces go in a titled band below the email, or stay inline in the layout's own block?
+ *
+ * A band is what lets one email carry eight pieces without reading as a dump, so a heading normally
+ * moves them there. But Photo leads with `products[0]` and Grid IS a table built from them — empty
+ * their `products` and both blocks render nothing, so the two layouts whose whole identity is how
+ * they show the pieces collapse into Standard the moment a heading is typed. Inline renders the
+ * heading above them anyway, so those two keep their pieces.
+ */
+export function bandsPieces(design: CampaignLayout, productsHeading: string | null, productCount: number): boolean {
+ if (!productsHeading || productCount < 1) return false;
+ return design !== "photo" && design !== "grid";
+}

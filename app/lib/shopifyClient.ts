@@ -8,6 +8,7 @@
  */
 import { safeFetch } from "./safe-url.ts";
 import type { ReadOutcome } from "./feed-completeness";
+import { pickBuyVariant, withoutRentalOptions, sizeFromOptionLabel, rentalTiersFromOptions } from "./variant-pricing.ts";
 
 /** JSON.parse that tolerates the raw control characters real storefronts embed in product
  *  descriptions (every Shopify feed profiled had them; strict parsing rejects the whole payload).
@@ -41,6 +42,10 @@ export type ShopifyProduct = {
  /** Source identity for the import engine: the product's stable handle, and its full size run. */
  handle?: string | null;
  variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
+ /** Her shop only rents this piece — `price` is null because nothing can be bought. See variant-pricing.ts. */
+ rentOnly?: boolean;
+ /** The piece's rental price ladder (days → cents), when it has one. Empty when nothing rents. */
+ rentalTiers?: { days: number; cents: number }[];
  // Captured from the product page (scrapeProductPage stores) — the seller's own words.
  condition?: string | null;
  materials?: string | null;
@@ -58,6 +63,42 @@ export type ShopifyFetchResult = {
   */
  outcome?: ReadOutcome;
 };
+
+type FeedVariant = {
+ id?: unknown; title?: string; option1?: string | null; option2?: string | null; option3?: string | null;
+ price?: string; compare_at_price?: string | null; available?: boolean;
+};
+
+/**
+ * A public-feed listing's BUY option, its price, and the options it is sold in.
+ *
+ * Not simply the first option: a rental shop lists "3 Day Rental" first and leaves options it does not
+ * offer at $0.00, and a piece it only rents has nothing to buy at all. See variant-pricing.ts. The
+ * sold-in options keep their old mapping — including a one-option listing's "Default Title" size —
+ * except that rental options are dropped and a "Purchase" option is not a size.
+ */
+export function feedProductPricing<V extends FeedVariant>(variants: V[]): {
+ variant: V | null; price: number | null; rentOnly: boolean; rentalTiers: { days: number; cents: number }[];
+ variants: NonNullable<ShopifyProduct["variants"]>;
+} {
+ const priceOf = (v: V) => { const p = v.price ? parseFloat(v.price) : null; return p != null && !isNaN(p) ? p : null; };
+ const read = (v: V) => ({ label: v.title, price: priceOf(v) });
+ const pick = pickBuyVariant(variants, read);
+ return {
+  ...pick,
+  rentalTiers: rentalTiersFromOptions(variants, read),
+  variants: withoutRentalOptions(variants, read).map((v) => {
+   const cents = priceOf(v);
+   return {
+    sourceVariantId: v.id != null ? String(v.id) : null,
+    size: v.title && v.title !== "Default Title" ? sizeFromOptionLabel(v.title) : (v.option1 ?? null),
+    color: v.option2 ?? null,
+    priceCents: cents != null ? Math.round(cents * 100) : null,
+    available: v.available !== false,
+   };
+  }),
+ };
+}
 
 type ShopifyImageNode = {
  url: string;
@@ -632,8 +673,11 @@ export async function fetchShopifyProductsPublic(
  continue;
  }
 
- const variant = variants[0];
- const price = variant?.price ? parseFloat(variant.price) : null;
+ // The BUY option, not simply the first: a rental shop lists "3 Day Rental" first, and a piece it only
+ // rents has nothing to buy at all (price null, rentOnly true). See variant-pricing.ts.
+ const pricing = feedProductPricing(variants);
+ const variant = pricing.variant;
+ const price = pricing.price;
  const variantId = variant?.id ? String(variant.id) : null;
  const shopifyProductId = product.id ? String(product.id) : null;
  const compareAtRawPublic = variant?.compare_at_price ? parseFloat(variant.compare_at_price) : null;
@@ -698,16 +742,9 @@ export async function fetchShopifyProductsPublic(
  // Stable identity + the full size run, so the importer can match on re-sync instead of
  // guessing by title, and multi-size listings survive as more than their first variant.
  handle: product.handle || null,
- variants: variants.map((v: { id?: unknown; title?: string; option1?: string | null; option2?: string | null; price?: string; available?: boolean }) => {
- const vPrice = v.price ? parseFloat(v.price) : null;
- return {
- sourceVariantId: v.id != null ? String(v.id) : null,
- size: v.title && v.title !== "Default Title" ? v.title : (v.option1 ?? null),
- color: v.option2 ?? null,
- priceCents: vPrice != null && !isNaN(vPrice) ? Math.round(vPrice * 100) : null,
- available: v.available !== false,
- };
- }),
+ variants: pricing.variants,
+ rentOnly: pricing.rentOnly,
+ rentalTiers: pricing.rentalTiers,
  });
  }
 
@@ -821,8 +858,10 @@ export async function fetchShopifyProductsByCollections(
  }
  if (isSoldOut) { skippedCount++; continue; }
 
- const variant = variants[0];
- const price = variant?.price ? parseFloat(variant.price) : null;
+ // Same rule as the full-feed reader above: the BUY option, never a rental. See variant-pricing.ts.
+ const pricing = feedProductPricing(variants);
+ const variant = pricing.variant;
+ const price = pricing.price;
  const variantId = variant?.id ? String(variant.id) : null;
  const compareAtRaw = variant?.compare_at_price ? parseFloat(variant.compare_at_price) : null;
  const compareAtPrice = compareAtRaw && price && compareAtRaw > price ? compareAtRaw : null;

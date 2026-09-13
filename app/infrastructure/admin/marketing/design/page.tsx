@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, RotateCcw, Undo2, Upload, Type as TypeIcon, Sparkles } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, SectionLabel, Toggle, SegmentedControl, cn } from "../../ui";
 import { Input } from "@/app/store/ui";
+import { EmailFrame } from "../EmailFrame";
 
 type Brand = {
  accent: string; text: string; bg: string;
@@ -144,8 +145,8 @@ export default function EmailDesignPage() {
  title="Email design"
  subtitle="The logo, colours and fonts used in every email you send. Set them once here and all your emails match."
  actions={
- <div className="flex items-center gap-2">
- {canUndo && <TechButton variant="ghost" onClick={undo} disabled={busy}><Undo2 size={13} /> Revert last change</TechButton>}
+ <div className="flex flex-wrap items-center gap-2">
+ {canUndo &&<TechButton variant="ghost" onClick={undo} disabled={busy}><Undo2 size={13} /> Revert last change</TechButton>}
  <TechButton variant="secondary" onClick={matchStorefront} disabled={busy}><RotateCcw size={13} /> Match my storefront</TechButton>
  <TechButton onClick={save} disabled={busy || !dirty}>{busy ? "Saving…" : dirty ? "Save changes" : "Saved"}</TechButton>
  </div>
@@ -177,7 +178,7 @@ export default function EmailDesignPage() {
  : "How an email you write and send yourself will look."}
  </p>
  <div className="overflow-hidden rounded-xl border border-stone-200/70 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
- <iframe srcDoc={previewHtml} title="Email preview" className="h-[620px] w-full border-0 bg-white" sandbox="" />
+ <EmailFrame html={previewHtml} title="Email preview" height={620} />
  </div>
  </div>
 
@@ -249,7 +250,7 @@ export default function EmailDesignPage() {
  <span className="text-[13px] text-stone-700">Alignment</span>
  <SegmentedControl options={["Center", "Left"]} value={brand.headerAlign === "left" ? "Left" : "Center"} onChange={(v) => set({ headerAlign: v === "Left" ? "left" : "center" })} />
  </div>
- <div className="flex items-center justify-between gap-3">
+ <div className="flex flex-wrap items-center justify-between gap-3">
  <span className="text-[13px] text-stone-700">Button shape</span>
  <SegmentedControl options={["Rounded", "Pill", "Square"]} value={(brand.buttonStyle || "rounded").replace(/^\w/, (c) => c.toUpperCase())} onChange={(v) => set({ buttonStyle: v.toLowerCase() as Brand["buttonStyle"] })} />
  </div>
@@ -325,7 +326,7 @@ function FontRow({ label, value, groups, onChange }: { label: string; value: str
  return (
   <div className="flex items-start justify-between gap-3">
    <span className="pt-1.5 text-[13px] text-stone-700">{label}</span>
-   <div className="relative w-[210px]">
+   <div className="relative w-[210px] min-w-0">
     <button
      type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
      className="flex w-full items-center justify-between gap-2 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-left text-[13px] text-stone-800 outline-none hover:border-stone-300"

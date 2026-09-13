@@ -178,7 +178,7 @@ export default function CollectionsPage() {
  </button>
  )}
  {renameId !== c.id && (
- <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+ <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100">
  <button type="button" title="Rename" onClick={() => { setRenameId(c.id); setRenameVal(c.title); }} className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"><Pencil size={12} /></button>
  {c.imageUrl && <button type="button" title="Remove the cover photo" onClick={() => clearCover(c.id)} className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-stone-200/60 hover:text-stone-700"><X size={12} /></button>}
  <button type="button" title="Delete" onClick={() => removeCollection(c.id, c.title)} className="grid h-6 w-6 place-items-center rounded text-stone-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 size={12} /></button>
@@ -230,7 +230,7 @@ export default function CollectionsPage() {
   className={`group relative cursor-grab overflow-hidden rounded-xl border bg-white transition active:cursor-grabbing ${dragIdx === i ? "border-[#5D0F17] opacity-50" : "border-stone-200"}`}
  >
  <span className="absolute left-1.5 top-1.5 z-10 grid h-5 min-w-[20px] place-items-center rounded-full bg-stone-900/75 px-1 text-[10px] font-semibold tabular-nums text-white">{i + 1}</span>
- <button type="button" title="Remove from collection" onClick={() => removeItem(it.id)} className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-stone-500 opacity-0 shadow transition hover:text-rose-600 group-hover:opacity-100"><X size={13} /></button>
+ <button type="button" title="Remove from collection" onClick={() => removeItem(it.id)} className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-stone-500 opacity-0 shadow transition hover:text-rose-600 group-hover:opacity-100 [@media(hover:none)]:opacity-100"><X size={13} /></button>
  {/* The tile opens the piece. A grid of photos that can't be clicked into is a dead end —
      a seller looking at a collection is usually looking for the piece, not the grid.
      Dragging still works: a drag never fires a click. */}
@@ -285,7 +285,7 @@ function AddItemsModal({ collectionId, collectionTitle, inCollection, onClose, o
 
  return (
  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
- <div className="flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+ <div className="flex max-h-[86dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
  <div className="flex items-center justify-between gap-3 border-b border-stone-200 px-5 py-3.5">
  <div>
  <h3 className="text-[15px] font-semibold text-stone-900">Add items to “{collectionTitle}”</h3>

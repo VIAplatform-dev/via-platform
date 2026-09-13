@@ -28,12 +28,13 @@ const cents = (v: string) => {
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
  return (
-  <div className="flex items-start justify-between gap-6 border-t border-stone-100 py-3.5 first:border-t-0 first:pt-0">
+  // Wraps: on a phone a 288px box can't sit beside its label, so the control drops underneath.
+  <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2.5 border-t border-stone-100 py-3.5 first:border-t-0 first:pt-0">
    <div className="min-w-0">
     <p className="text-[13.5px] font-medium text-stone-900">{label}</p>
     {hint && <p className="mt-0.5 max-w-[46ch] text-[12.5px] leading-relaxed text-stone-500">{hint}</p>}
    </div>
-   <div className="flex shrink-0 items-center gap-2">{children}</div>
+   <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{children}</div>
   </div>
  );
 }
@@ -75,7 +76,7 @@ function TypeChips({ values, onChange }: { values: string[]; onChange: (v: strin
   // The input used to take `flex-1`, so with a few chips it wrapped onto a line of its own and left
   // an empty band under them — the box read as broken rather than as somewhere to type. It now sits
   // beside the chips at its own size, and says what it wants.
-  <div className="flex w-72 flex-wrap items-center gap-1.5 rounded-lg border border-stone-200 p-1.5 focus-within:border-stone-400">
+  <div className="flex w-72 max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-stone-200 p-1.5 focus-within:border-stone-400">
    {values.map((t) => (
     <span key={t} className="inline-flex items-center gap-1 rounded-full bg-stone-100 py-1 pl-2.5 pr-1.5 text-[12.5px] text-stone-700">
      {t}
@@ -204,7 +205,7 @@ export default function AppointmentSettingsPage() {
         setS((cur) => (cur ? { ...cur, bookingUrl: url, enabled: url ? true : cur.enabled } : cur));
        }}
        placeholder="https://calendly.com/…"
-       className="w-72 rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
+       className="w-72 max-w-full rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
       />
      </Row>
      {s.bookingUrl && !s.enabled && (
@@ -230,7 +231,7 @@ export default function AppointmentSettingsPage() {
        {DAYS.map((name, dow) => {
         const win = s.openingHours.find((h) => h.day === dow);
         return (
-         <div key={dow} className="flex items-center gap-3 border-t border-stone-100 py-2.5 first:border-t-0 first:pt-0">
+         <div key={dow} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-100 py-2.5 first:border-t-0 first:pt-0">
           <span className="w-24 shrink-0 text-[13.5px] text-stone-800">{name}</span>
           <Toggle
            on={Boolean(win)}
@@ -289,7 +290,7 @@ export default function AppointmentSettingsPage() {
         value={s.intro ?? ""}
         onChange={(e) => set("intro", e.target.value || null)}
         placeholder="Come and see the archive — 45 minutes, one on one."
-        className="w-72 rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
+        className="w-72 max-w-full rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
        />
       </Row>
      </Card>
@@ -303,7 +304,7 @@ export default function AppointmentSettingsPage() {
       </Row>
       {s.depositCents > 0 && (
        <Row label="What happens to the deposit">
-        <span className="flex gap-1.5">
+        <span className="flex flex-wrap gap-1.5">
          <Tag on={s.depositCredits} onClick={() => set("depositCredits", true)}>Comes off their purchase</Tag>
          <Tag on={!s.depositCredits} onClick={() => set("depositCredits", false)}>Booking fee, kept</Tag>
         </span>
@@ -327,7 +328,7 @@ export default function AppointmentSettingsPage() {
          value={s.notifyEmail ?? ""}
          onChange={(e) => set("notifyEmail", e.target.value.trim() || null)}
          placeholder="bookings@yourshop.com"
-         className="w-72 rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
+         className="w-72 max-w-full rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
         />
        </Row>
       )}
@@ -336,7 +337,7 @@ export default function AppointmentSettingsPage() {
       </Row>
       <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">
        Want to say more than that? Write your own in{" "}
-       <a href="/infrastructure/admin/marketing/automations" className="underline underline-offset-2">Marketing &rsaquo; Automations</a>
+       <a href="/infrastructure/admin/marketing/emails" className="underline underline-offset-2">Marketing &rsaquo; Your emails</a>
        {" "}— there are triggers for a booking, a confirmation, a cancellation and this reminder, and you can
        use <code className="rounded bg-white px-1 py-0.5 text-[11.5px]">{"{{name}}"}</code>,{" "}
        <code className="rounded bg-white px-1 py-0.5 text-[11.5px]">{"{{when}}"}</code>,{" "}

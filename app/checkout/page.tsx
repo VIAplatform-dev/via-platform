@@ -10,7 +10,10 @@ type Pickup = { available: boolean; address: string | null; instructions: string
 type Info = { items: LineItem[]; storeName: string; freeShipping: boolean; subtotalCents: number; publishableKey?: string; pickup?: Pickup };
 type Addr = { name: string; line1: string; line2: string; city: string; state: string; zip: string; country: string; phone: string };
 
-const input = "w-full bg-white border border-black/30 px-3 py-2.5 text-sm text-black placeholder-black/40 outline-none focus:border-black transition rounded";
+// 16px, not 14. Safari zooms the whole page in when you focus a field smaller than 16px and gives
+// you no way back except pinching — on the one page where every transaction is completed, from a
+// phone. `sm:text-sm` keeps the denser desktop look where no zoom rule applies.
+const input = "w-full bg-white border border-black/30 px-3 py-2.5 text-base sm:text-sm text-black placeholder-black/40 outline-none focus:border-black transition rounded";
 const label = "block mb-2 text-[11px] uppercase tracking-[0.16em] text-black/55";
 // Black & white. The "stripe" theme (not "flat") renders legible payment-method tabs and visible
 // field borders out of the box; we only push the input borders darker so every box reads clearly,
@@ -26,7 +29,12 @@ const appearance = {
  colorDanger: "#b00020",
  fontFamily: "ui-sans-serif, system-ui, sans-serif",
  borderRadius: "6px",
- fontSizeBase: "14px",
+ // Card number, expiry, CVC and every address field inherit this. At 14px iOS Safari zooms the
+ // page the moment one is focused and never zooms back out, so the buyer finishes paying on a
+ // page they have to pinch around — at the last step, on the surface that earns the commission.
+ // Stripe's own guidance is a 16px minimum for exactly this reason. Not media-queried on purpose:
+ // changing `appearance` remounts Elements, so a resize mid-payment would blank the card field.
+ fontSizeBase: "16px",
  },
  rules: {
  ".Input": { border: "1px solid rgba(0,0,0,0.28)", boxShadow: "none" },

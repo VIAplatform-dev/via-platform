@@ -62,7 +62,27 @@ export default function SetupFunnelPage() {
      <TechCard className="p-5">
       <p className="text-[14px] font-semibold text-stone-900">Every store</p>
       <p className="text-[12px] text-stone-500">Longest stuck first. Days since the store’s workspace was created.</p>
-      <div className="overflow-x-auto">
+      {/* Phone: one block per store. Five columns in a 300px card scrolled sideways, which hid the
+          one thing each row is for — the link into that store's Home. */}
+      <ul className="mt-2 divide-y divide-stone-100 sm:hidden">
+       {data.stores.map((s) => (
+        <li key={s.slug} className="py-3">
+         <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+           <p className="truncate text-[13.5px] font-medium text-stone-900">{s.name}</p>
+           <p className="truncate font-mono text-[11px] text-stone-400">{s.slug}</p>
+          </div>
+          <Link href={`/admin/home?store=${encodeURIComponent(s.slug)}`} className="-my-1.5 inline-flex h-10 shrink-0 items-center text-[12.5px] font-medium text-[var(--accent-ink,#0b7a5c)] hover:underline">Open Home ›</Link>
+         </div>
+         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px]">
+          {s.complete ? <StatusPill tone="live" dot>Set up</StatusPill> : <span className="min-w-0 text-stone-700">{s.nextLabel ?? s.next}</span>}
+          <span className="tabular-nums text-stone-500"><span className="text-stone-400">Done</span> {s.done}/{s.total}</span>
+          {!s.complete && <span className="tabular-nums text-stone-500"><span className="text-stone-400">Days</span> {s.stuckSinceDays}</span>}
+         </div>
+        </li>
+       ))}
+      </ul>
+      <div className="hidden overflow-x-auto sm:block">
        <table className="mt-2 w-full">
         <thead><tr><TH>Store</TH><TH>Stuck on</TH><TH right>Done</TH><TH right>Days</TH><TH right></TH></tr></thead>
         <tbody>

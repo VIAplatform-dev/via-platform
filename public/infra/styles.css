@@ -65,7 +65,11 @@
   .btn-glass{background:rgba(255,255,255,0.14);color:#fff;backdrop-filter:blur(6px)}
   .btn-glass:hover{background:rgba(255,255,255,0.24)}
   .btn-lg{padding:13px 22px;font-size:15px}
-  .nav-toggle{display:none;background:none;border:0;color:inherit;font-size:22px;cursor:pointer}
+  /* The ☰ is a text glyph, so with no box of its own it was a ~19x27px tap target — and it is the
+     ONLY way into the menu on a phone, across all nine getvya.ai marketing pages. Sized to 44 so it
+     can actually be hit; `display:none` still hides it above the breakpoint (see the media query
+     further down, which flips it to `flex`). */
+  .nav-toggle{display:none;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-right:-10px;background:none;border:0;color:inherit;font-size:22px;line-height:1;cursor:pointer}
 
   /* ---------------- HERO ---------------- */
   .hero{position:relative;height:100svh;min-height:640px;display:flex;align-items:flex-end;overflow:hidden;background:#0b0b0b}
@@ -490,7 +494,7 @@
     .wrap,.nav-inner{padding:0 24px}
     .nav-links{display:none}
     .nav-inner{grid-template-columns:1fr auto}
-    .nav-toggle{display:block}
+    .nav-toggle{display:flex}
     .hero-links{display:none}
     .hero-grid{grid-template-columns:1fr}
     .panel-inner{grid-template-columns:1fr;gap:34px}
@@ -528,6 +532,10 @@
     .nav.theme-dark .nav-links a{border-bottom:1px solid var(--line-d2)}
     .nav.theme-light .nav-links a{border-bottom:1px solid var(--line-2)}
     .nav-links a:last-child{border-bottom:0}
+    /* Footer links were a 22px line box with a 13px margin below — a 35px pitch made of mostly
+       dead space. Turning the margin into padding grows each target to 44px while the column
+       barely gets taller, and leaves the desktop footer exactly as it was. */
+    .foot-col a{padding:12px 0;margin-bottom:0}
   }
 
   /* ============ SCROLL-REVEAL STATEMENT ============ */

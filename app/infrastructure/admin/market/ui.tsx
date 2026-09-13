@@ -137,11 +137,13 @@ export function ActionBar({ children }: { children: React.ReactNode }) {
  ro.observe(el);
  return () => ro.disconnect();
  }, []);
- // Fixed to the viewport, so on desktop it must start after the 228px sidebar to center under the page.
+ // Fixed to the viewport, so where the sidebar shows (lg, see layout.tsx) it must start after its 228px
+ // to center under the page; below that it sits on top of the tab bar.
  return (
  <>
  <div aria-hidden style={{ height: h + 12 }} />
- <div ref={ref} className="fixed bottom-[64px] left-0 right-0 z-30 bg-[#f7f6f3]/95 backdrop-blur md:bottom-0 md:left-[228px]">
+ {/* The tab bar is 64px PLUS the home-indicator inset on an iPhone, so sit above both. */}
+ <div ref={ref} className="fixed bottom-[calc(64px+env(safe-area-inset-bottom))] left-0 right-0 z-30 bg-[#f7f6f3]/95 backdrop-blur lg:bottom-0 lg:left-[228px]">
  <div className="mx-auto w-full max-w-lg space-y-2 px-4 pb-3 pt-2 sm:px-6">{children}</div>
  </div>
  </>
@@ -209,9 +211,10 @@ export function Thumb({ src, alt, size = 64, className, fill }: { src: string | 
 
 export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
  return (
- <div className="rounded-2xl border border-stone-200 bg-white p-4">
+ // Three across on a 360px phone leaves ~72px inside p-4 — too narrow for "$1,234" at 26px.
+ <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{label}</p>
- <p className="mt-1 text-[26px] font-semibold tracking-tight text-stone-900" style={{ fontFamily: "var(--font-display)" }}>{value}</p>
+ <p className="mt-1 text-[22px] font-semibold tracking-tight text-stone-900 sm:text-[26px]" style={{ fontFamily: "var(--font-display)" }}>{value}</p>
  {sub && <p className="text-[12px] text-stone-500">{sub}</p>}
  </div>
  );

@@ -257,6 +257,41 @@ export function worthImporting(p: { title: string; cents: number | null | undefi
 }
 
 /**
+ * What an import does with a piece her shop only RENTS (see variant-pricing.ts).
+ *
+ * A rent-only piece has no buy price, so it must never be for sale — but it is real inventory, with a
+ * real rental price, so it is written as a DRAFT (Store OS shows it to her; STOREFRONT_STATUSES keeps
+ * every shopper-facing grid, the hosted cart's live sections and cross-listing from ever seeing a
+ * draft) with its rental ladder saved to rental_terms. That is a holding pattern, not a launch: a
+ * draft never rents through VYA until a seller explicitly publishes it AND rental booking for
+ * imported pieces is built — this only keeps the data instead of throwing it away.
+ *
+ * "update-draft" exists because, before rental options were understood, some of these were imported
+ * at a RENTAL price as if it were the buy price (Venus Vintage's Dior tan gaucho heels, at $25) — a
+ * plain skip would leave those rows for sale at the wrong price forever, since the sweep deliberately
+ * leaves alone anything the shop still lists.
+ *
+ * Left alone ("skip"): a piece the seller edited (her version wins, as everywhere else in the
+ * importer), one held in someone's checkout (never pulled mid-payment), one already sold (real sale
+ * history), and one she has removed (her call, not the importer's to undo).
+ */
+export function rentOnlyAction(prior: { origin?: string | null; status?: string | null } | null): "create-draft" | "update-draft" | "skip" {
+ if (!prior) return "create-draft";
+ if (prior.origin === "user") return "skip";
+ return prior.status === "active" || prior.status === "draft" ? "update-draft" : "skip";
+}
+
+/** The import report's line about rent-only pieces, or null when there were none. */
+export function rentOnlyWarning(saved: number, movedBack: number): string | null {
+ if (saved <= 0) return null;
+ const pieces = `${saved} piece${saved === 1 ? "" : "s"}`;
+ const moved = movedBack > 0
+  ? ` ${movedBack} of them had been listed for sale here at the wrong price and ${movedBack === 1 ? "was" : "were"} moved back to a draft.`
+  : "";
+ return `${pieces} your store only rents ${saved === 1 ? "was" : "were"} saved as ${saved === 1 ? "a draft" : "drafts"} — not visible to shoppers, since renting imported pieces through VYA isn’t set up yet.${moved}`;
+}
+
+/**
  * The collections an item should end up in, after a membership read.
  *
  * `setItemCollections` REPLACES an item's collections, so this decides both what it joins and what

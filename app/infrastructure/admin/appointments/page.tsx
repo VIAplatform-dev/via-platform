@@ -130,16 +130,16 @@ export default function RentalCalendarPage() {
       <div className="flex overflow-hidden rounded-lg border border-stone-200">
        {(["week", "month"] as const).map((s) => (
         <button key={s} type="button" onClick={() => setSpan(s)}
-         className={cn("px-3 py-1.5 text-[12.5px] font-medium capitalize transition", span === s ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-50")}>{s}</button>
+         className={cn("px-3 py-1.5 text-[12.5px] font-medium capitalize transition max-sm:px-4 max-sm:py-2.5", span === s ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-50")}>{s}</button>
        ))}
       </div>
-      <TechButton variant="ghost" onClick={() => setFrom(span === "week" ? weekStart(today()) : monthStart(today()))}>Today</TechButton>
-      <TechButton variant="secondary" onClick={() => setFrom(step(-1))} aria-label={`Previous ${span}`}><ChevronLeft size={15} /></TechButton>
-      <TechButton variant="secondary" onClick={() => setFrom(step(1))} aria-label={`Next ${span}`}><ChevronRight size={15} /></TechButton>
+      <TechButton variant="ghost" className="max-sm:py-2.5" onClick={() => setFrom(span === "week" ? weekStart(today()) : monthStart(today()))}>Today</TechButton>
+      <TechButton variant="secondary" className="max-sm:px-4 max-sm:py-2.5" onClick={() => setFrom(step(-1))} aria-label={`Previous ${span}`}><ChevronLeft size={15} /></TechButton>
+      <TechButton variant="secondary" className="max-sm:px-4 max-sm:py-2.5" onClick={() => setFrom(step(1))} aria-label={`Next ${span}`}><ChevronRight size={15} /></TechButton>
       {/* The hours, deposits and approval rule that govern everything on this page live in
           settings — reachable from the thing they govern, not only from the settings index. */}
       <a href={withStore("/admin/settings/appointments")}
-       className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-[12.5px] font-medium text-stone-600 transition hover:bg-stone-50">
+       className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-[12.5px] font-medium text-stone-600 transition hover:bg-stone-50 max-sm:py-2.5">
        <Settings2 size={14} /> Settings
       </a>
      </div>
@@ -170,7 +170,7 @@ export default function RentalCalendarPage() {
        until it's dealt with. */}
    {pending.length > 0 && (
     <TechCard className="mb-5 overflow-hidden p-0">
-     <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-3">
+     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-amber-200 bg-amber-50 px-5 py-3">
       <Clock size={15} className="text-amber-700" />
       <p className="text-[13px] font-semibold text-amber-900">
        {pending.length} {pending.length === 1 ? "booking is" : "bookings are"} waiting on you
@@ -188,8 +188,8 @@ export default function RentalCalendarPage() {
          </p>
         </button>
         <div className="flex shrink-0 gap-2">
-         <TechButton onClick={() => mark(a.id, "booked")} disabled={busy}>Confirm</TechButton>
-         <TechButton variant="ghost" onClick={() => mark(a.id, "cancelled")} disabled={busy}>Decline</TechButton>
+         <TechButton className="max-sm:px-5 max-sm:py-2.5" onClick={() => mark(a.id, "booked")} disabled={busy}>Confirm</TechButton>
+         <TechButton variant="ghost" className="max-sm:py-2.5" onClick={() => mark(a.id, "cancelled")} disabled={busy}>Decline</TechButton>
         </div>
        </div>
       ))}
@@ -203,11 +203,13 @@ export default function RentalCalendarPage() {
     <TechCard className="px-5 py-10 text-center text-[13px] text-stone-400">Loading…</TechCard>
    ) : span === "month" ? (
     /* A month answers "how busy is September", not "what's at 2pm" — so a day is a count and a
-       date, and clicking one drops into that week where the times actually fit. */
+       date, and clicking one drops into that week where the times actually fit. On a phone the
+       whole month fits the screen: each day shows its date and a count, not the names — a month
+       you have to scroll sideways can't answer "how busy is September" at a glance. */
     <div className="overflow-x-auto">
-     <div className="grid min-w-[42rem] grid-cols-7 gap-px rounded-xl bg-stone-200 p-px">
+     <div className="grid grid-cols-7 gap-px rounded-xl bg-stone-200 p-px md:min-w-[42rem]">
       {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-       <div key={d} className="bg-stone-50 py-2 text-center text-[11px] font-medium uppercase tracking-[0.1em] text-stone-400">{d}</div>
+       <div key={d} className="bg-stone-50 py-2 text-center text-[11px] font-medium uppercase tracking-[0.1em] text-stone-400 max-sm:tracking-normal">{d}</div>
       ))}
       {days.map((d) => {
        const dayAppts = appts.filter((a) => a.day === d && a.status !== "cancelled");
@@ -216,11 +218,16 @@ export default function RentalCalendarPage() {
        const thisMonth = d.slice(0, 7) === addDays(from, 20).slice(0, 7);
        return (
         <button key={d} type="button" onClick={() => { setSpan("week"); setFrom(weekStart(d)); }}
-         className={cn("min-h-[5.5rem] bg-white p-2 text-left transition hover:bg-stone-50", !thisMonth && "bg-stone-50/60")}>
+         className={cn("min-h-[3.5rem] min-w-0 bg-white p-1.5 text-left transition hover:bg-stone-50 sm:min-h-[5.5rem] sm:p-2", !thisMonth && "bg-stone-50/60")}>
          <span className={cn("text-[12px] tabular-nums", isToday ? "font-semibold text-stone-900" : thisMonth ? "text-stone-500" : "text-stone-300")}>
           {Number(d.slice(8, 10))}
          </span>
-         <span className="mt-1.5 block space-y-1">
+         {dayAppts.length > 0 && (
+          <span className={cn("mt-1 flex h-5 w-fit min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-medium tabular-nums sm:hidden", waiting > 0 ? "bg-amber-100 text-amber-900" : "bg-stone-100 text-stone-700")}>
+           {dayAppts.length}
+          </span>
+         )}
+         <span className="mt-1.5 hidden space-y-1 sm:block">
           {dayAppts.slice(0, 3).map((a) => (
            <span key={a.id} className={cn("block truncate rounded px-1.5 py-0.5 text-[10.5px]", a.status === "pending" ? "bg-amber-100 text-amber-900" : "bg-stone-100 text-stone-700")}>
             {clock(a.start)} {a.customerName || a.customerEmail || "Booked"}
@@ -228,26 +235,28 @@ export default function RentalCalendarPage() {
           ))}
           {dayAppts.length > 3 && <span className="block px-1.5 text-[10.5px] text-stone-400">+{dayAppts.length - 3} more</span>}
          </span>
-         {waiting > 0 && <span className="mt-1 block text-[10px] font-medium text-amber-700">{waiting} to confirm</span>}
+         {waiting > 0 && <span className="mt-1 hidden text-[10px] font-medium text-amber-700 sm:block">{waiting} to confirm</span>}
         </button>
        );
       })}
      </div>
     </div>
    ) : (
+    /* Seven columns of times need ~56rem. Below lg the week is a list of days instead, each day's
+       slots in a grid, so a phone or iPad works it without scrolling sideways. */
     <div className="overflow-x-auto">
-     <div className="grid min-w-[56rem] grid-cols-7 gap-2">
+     <div className="grid grid-cols-1 gap-5 lg:min-w-[56rem] lg:grid-cols-7 lg:gap-2">
       {days.map((d) => {
        const daySlots = slots.filter((s) => s.day === d);
        const isToday = d === today();
        return (
         <div key={d} className="min-w-0">
-         <p className={cn("mb-2 text-[12px] font-medium", isToday ? "text-stone-900" : "text-stone-500")}>
+         <p className={cn("mb-2 text-[12px] font-medium max-lg:text-[13px]", isToday ? "text-stone-900" : "text-stone-500")}>
           {dayLabel(d)}{isToday && <span className="ml-1.5 text-[10px] uppercase tracking-[0.1em] text-[var(--accent-ink,#0b7a5c)]">today</span>}
          </p>
-         <div className="flex flex-col gap-1.5">
+         <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 lg:flex lg:flex-col">
           {daySlots.length === 0 && (
-           <p className="rounded-lg border border-dashed border-stone-200 px-2 py-3 text-center text-[11px] text-stone-300">Closed</p>
+           <p className="col-span-full rounded-lg border border-dashed border-stone-200 px-2 py-3 text-center text-[11px] text-stone-300">Closed</p>
           )}
           {daySlots.map((s) => {
            const a = apptAt(d, s.start);
@@ -256,7 +265,7 @@ export default function RentalCalendarPage() {
             return (
              <div key={s.start} onClick={() => setOpen(a)} role="button" tabIndex={0}
               onKeyDown={(e) => { if (e.key === "Enter") setOpen(a); }}
-              className={cn("cursor-pointer rounded-lg border p-2 transition hover:border-stone-400", waiting ? "border-amber-300 bg-amber-50" : "border-stone-200 bg-white")}>
+              className={cn("min-w-0 cursor-pointer rounded-lg border p-2 transition hover:border-stone-400", waiting ? "border-amber-300 bg-amber-50" : "border-stone-200 bg-white")}>
               <p className={cn("text-[11px] font-medium tabular-nums", waiting ? "text-amber-900" : "text-stone-900")}>{s.start}</p>
               <p className="mt-0.5 truncate text-[12px] text-stone-800">{a.customerName || a.customerEmail || "Booked"}</p>
               <p className="truncate text-[10.5px] text-stone-400">{a.kind}</p>
@@ -265,15 +274,15 @@ export default function RentalCalendarPage() {
               {waiting ? (
                // Someone booked this themselves. The slot is already held for them, so the only
                // question is whether the store wants it.
-               <div className="mt-1.5 flex gap-1">
-                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "booked"); }} disabled={busy} className="rounded bg-stone-900 px-2 py-0.5 text-[10px] font-medium text-white">Confirm</button>
-                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "cancelled"); }} disabled={busy} className="rounded px-1.5 py-0.5 text-[10px] text-stone-600 hover:bg-amber-100">Decline</button>
+               <div className="mt-1.5 flex flex-wrap gap-1">
+                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "booked"); }} disabled={busy} className="rounded bg-stone-900 px-2 py-0.5 text-[10px] font-medium text-white max-lg:px-2.5 max-lg:py-1.5 max-lg:text-[12px]">Confirm</button>
+                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "cancelled"); }} disabled={busy} className="rounded px-1.5 py-0.5 text-[10px] text-stone-600 hover:bg-amber-100 max-lg:px-2 max-lg:py-1.5 max-lg:text-[12px]">Decline</button>
                </div>
               ) : a.status === "booked" ? (
-               <div className="mt-1.5 flex gap-1">
-                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "attended"); }} disabled={busy} className="rounded px-1.5 py-0.5 text-[10px] text-stone-500 hover:bg-stone-100">Came</button>
-                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "no-show"); }} disabled={busy} className="rounded px-1.5 py-0.5 text-[10px] text-stone-500 hover:bg-stone-100">No-show</button>
-                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "cancelled"); }} disabled={busy} aria-label="Cancel" className="ml-auto rounded px-1 text-stone-400 hover:bg-stone-100"><X size={11} /></button>
+               <div className="mt-1.5 flex flex-wrap gap-1">
+                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "attended"); }} disabled={busy} className="rounded px-1.5 py-0.5 text-[10px] text-stone-500 hover:bg-stone-100 max-lg:px-2 max-lg:py-1.5 max-lg:text-[12px]">Came</button>
+                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "no-show"); }} disabled={busy} className="rounded px-1.5 py-0.5 text-[10px] text-stone-500 hover:bg-stone-100 max-lg:px-2 max-lg:py-1.5 max-lg:text-[12px]">No-show</button>
+                <button onClick={(e) => { e.stopPropagation(); mark(a.id, "cancelled"); }} disabled={busy} aria-label="Cancel" className="ml-auto rounded px-1 text-stone-400 hover:bg-stone-100 max-lg:px-2 max-lg:py-1.5"><X size={11} /></button>
                </div>
               ) : null}
              </div>
@@ -284,7 +293,7 @@ export default function RentalCalendarPage() {
              key={s.start}
              type="button"
              onClick={() => { setAdding({ day: d, start: s.start }); setForm((f) => ({ ...f, kind: cfg?.types[0] || "Try-on" })); }}
-             className="rounded-lg border border-stone-200 bg-stone-50/60 px-2 py-2 text-left transition hover:border-stone-300 hover:bg-white"
+             className="rounded-lg border border-stone-200 bg-stone-50/60 px-2 py-2 text-left transition hover:border-stone-300 hover:bg-white max-lg:py-2.5"
             >
              <span className="block text-[11px] tabular-nums text-stone-500">{s.start}</span>
              <span className="block text-[10.5px] text-stone-300">Free</span>
@@ -301,7 +310,7 @@ export default function RentalCalendarPage() {
 
    {adding && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onClick={() => setAdding(null)}>
-     <TechCard className="w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+     <TechCard className="max-h-[90dvh] w-full max-w-md overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center gap-2">
        <CalendarRange size={16} className="text-stone-400" />
        <h2 className="text-[15px] font-semibold text-stone-900">
@@ -315,7 +324,7 @@ export default function RentalCalendarPage() {
          {cfg.types.map((t) => (
           <button
            key={t} type="button" onClick={() => setForm((f) => ({ ...f, kind: t }))}
-           className={cn("rounded-full border px-3 py-1.5 text-[12px] transition",
+           className={cn("rounded-full border px-3 py-1.5 text-[12px] transition max-sm:py-2",
             form.kind === t ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 text-stone-600 hover:border-stone-300")}
           >{t}</button>
          ))}
@@ -323,14 +332,14 @@ export default function RentalCalendarPage() {
        )}
        {([["name", "Name"], ["email", "Email"], ["phone", "Phone (optional)"]] as const).map(([k, ph]) => (
         <input key={k} value={form[k]} onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))} placeholder={ph}
-         className="rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400" />
+         className="rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400 max-sm:py-3" />
        ))}
        <textarea value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} rows={2} placeholder="What it's for"
         className="rounded-lg border border-stone-200 px-3 py-2 text-[13px] outline-none focus:border-stone-400" />
       </div>
       <div className="mt-4 flex justify-end gap-3">
-       <TechButton variant="ghost" onClick={() => setAdding(null)}>Cancel</TechButton>
-       <TechButton onClick={book} disabled={busy}>{busy ? "Saving…" : "Add to the book"}</TechButton>
+       <TechButton variant="ghost" className="max-sm:py-2.5" onClick={() => setAdding(null)}>Cancel</TechButton>
+       <TechButton className="max-sm:py-2.5" onClick={book} disabled={busy}>{busy ? "Saving…" : "Add to the book"}</TechButton>
       </div>
      </TechCard>
     </div>

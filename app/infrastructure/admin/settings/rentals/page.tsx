@@ -70,12 +70,13 @@ const cents = (dollars: string) => {
 /** One setting: what it is on the left, the control on the right. */
 function Row({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
  return (
-  <div className={cn("flex items-start justify-between gap-6 border-t border-stone-100 py-3.5 first:border-t-0 first:pt-0", className)}>
+  // Wraps: on a phone a row of chips can't sit beside its label, so the control drops underneath.
+  <div className={cn("flex flex-wrap items-start justify-between gap-x-6 gap-y-2.5 border-t border-stone-100 py-3.5 first:border-t-0 first:pt-0", className)}>
    <div className="min-w-0">
     <p className="text-[13.5px] font-medium text-stone-900">{label}</p>
     {hint && <p className="mt-0.5 max-w-[46ch] text-[12.5px] leading-relaxed text-stone-500">{hint}</p>}
    </div>
-   <div className="flex shrink-0 items-center gap-2">{children}</div>
+   <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{children}</div>
   </div>
  );
 }
@@ -238,7 +239,7 @@ export default function RentalSettingsPage() {
 
     <Card title="Who can book" blurb="Whether anyone can book straight away, or you approve each booking first.">
      <Row label="Bookings" hint="“You approve each one” means every booking comes to you as a request to accept or decline.">
-      <span className="flex gap-1.5">
+      <span className="flex flex-wrap gap-1.5">
        <Tag on={s.bookingMode === "open"} onClick={() => set("bookingMode", "open")}>Anyone</Tag>
        <Tag on={s.bookingMode === "request"} onClick={() => set("bookingMode", "request")}>You approve each one</Tag>
        <Tag on={s.bookingMode === "both"} onClick={() => set("bookingMode", "both")}>Set per piece</Tag>
@@ -300,7 +301,7 @@ export default function RentalSettingsPage() {
        : "They choose at checkout: have it posted, or collect it from you."
       }
      >
-      <span className="flex gap-1.5">
+      <span className="flex flex-wrap gap-1.5">
        <Tag on={s.fulfilment === "ship"} onClick={() => set("fulfilment", "ship")}>Deliver</Tag>
        <Tag on={s.fulfilment === "pickup"} onClick={() => set("fulfilment", "pickup")}>Local pickup</Tag>
        <Tag on={s.fulfilment === "both"} onClick={() => set("fulfilment", "both")}>Both</Tag>
@@ -346,7 +347,7 @@ export default function RentalSettingsPage() {
 
     <Card title="Damage and late returns">
      <Row label="If a piece comes back damaged" hint="What you charge, if anything, to cover it.">
-      <span className="flex gap-1.5">
+      <span className="flex flex-wrap gap-1.5">
        <Tag on={s.security === "waiver"} onClick={() => set("security", "waiver")}>Waiver fee</Tag>
        <Tag on={s.security === "deposit"} onClick={() => set("security", "deposit")}>Deposit</Tag>
        <Tag on={s.security === "none"} onClick={() => set("security", "none")}>Nothing</Tag>

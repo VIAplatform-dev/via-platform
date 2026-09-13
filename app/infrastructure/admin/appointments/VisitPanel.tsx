@@ -129,21 +129,22 @@ export default function VisitPanel({ appt, withStore, onClose, onChanged }: {
 
       <div className="mt-3 space-y-2">
        {items.map((i) => (
-        <div key={i.itemId} className="flex items-center gap-3 rounded-lg border border-stone-200 p-2">
+        <div key={i.itemId} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-stone-200 p-2">
          {/* eslint-disable-next-line @next/next/no-img-element */}
          {i.image ? <img src={i.image} alt="" className="h-11 w-11 shrink-0 rounded object-cover" /> : <div className="h-11 w-11 shrink-0 rounded bg-stone-100" />}
          <div className="min-w-0 flex-1">
           <p className="truncate text-[12.5px] font-medium text-stone-800">{i.title || "A piece"}</p>
           <p className="text-[11.5px] tabular-nums text-stone-400">{money(i.priceCents, i.currency)}</p>
          </div>
-         <div className="flex shrink-0 gap-1">
+         {/* On a phone the outcomes drop under the title — beside it they left the title ~50px. */}
+         <div className="flex shrink-0 gap-1 max-sm:w-full max-sm:pl-14">
           {OUTCOMES.map((o) => (
            <button key={o.key} type="button" disabled={busy} onClick={() => tag(i.itemId, o.key)}
-            className={cn("rounded px-1.5 py-0.5 text-[10.5px] transition", i.outcome === o.key ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-100")}>
+            className={cn("rounded px-1.5 py-0.5 text-[10.5px] transition max-sm:px-2.5 max-sm:py-1.5 max-sm:text-[12px]", i.outcome === o.key ? "bg-stone-900 text-white" : "text-stone-500 hover:bg-stone-100")}>
             {o.label}
            </button>
           ))}
-          <button type="button" disabled={busy} onClick={() => tag(i.itemId, "remove")} aria-label="Remove" className="rounded px-1 text-stone-300 hover:text-rose-600"><X size={12} /></button>
+          <button type="button" disabled={busy} onClick={() => tag(i.itemId, "remove")} aria-label="Remove" className="rounded px-1 text-stone-300 hover:text-rose-600 max-sm:ml-auto max-sm:px-2.5"><X size={12} /></button>
          </div>
         </div>
        ))}

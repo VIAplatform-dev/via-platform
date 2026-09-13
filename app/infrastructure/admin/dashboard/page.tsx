@@ -704,9 +704,12 @@ function Analytics() {
       {loading && <span className="text-stone-300">· refreshing</span>}
      </div>
 
-     <div className="mb-6 flex gap-1 overflow-x-auto border-b border-stone-200">
+     {/* Eight report tabs are ~720px — wider than a phone or an iPad in portrait — so below lg the strip
+         runs to the screen edges and scrolls sideways (the tab cut off at the edge says there is more),
+         with taller tap targets. From lg it sits inside the page as it always did. */}
+     <div data-tab-strip className="-mx-6 mb-6 flex scroll-px-6 gap-1 overflow-x-auto border-b border-stone-200 px-6 sm:-mx-10 sm:scroll-px-10 sm:px-10 lg:mx-0 lg:scroll-px-0 lg:px-0">
       {TABS.map((t) => (
-       <button key={t.key} onClick={() => setTab(t.key)} className={cn("relative shrink-0 px-3.5 py-2 text-[13px] font-medium transition", tab === t.key ? "text-stone-900" : "text-stone-400 hover:text-stone-600")}>
+       <button key={t.key} data-active={tab === t.key || undefined} onClick={() => setTab(t.key)} className={cn("relative shrink-0 px-3.5 py-2.5 text-[13px] font-medium transition lg:py-2", tab === t.key ? "text-stone-900" : "text-stone-400 hover:text-stone-600")}>
         {t.label}
         {tab === t.key && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-stone-900" />}
        </button>

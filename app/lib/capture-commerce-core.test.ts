@@ -1,6 +1,43 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { membershipSubjects, mergeCapturedMembership, worthImporting, unreadCollectionSlugs, membershipToWrite, taggedSlugs, unfileVanished } from "./capture-commerce-core.ts";
+import { membershipSubjects, mergeCapturedMembership, worthImporting, unreadCollectionSlugs, membershipToWrite, taggedSlugs, unfileVanished, rentOnlyAction, rentOnlyWarning } from "./capture-commerce-core.ts";
+
+// ── a piece her shop only rents ──────────────────────────────────────────────────────────────────
+// Venus Vintage rents most of its pieces and sells only some. A rent-only piece has no buy price,
+// so it must never be for sale — but it is a real piece of her inventory, with a real rental price,
+// so it is imported as a DRAFT (visible to her, never to a shopper) with its rental ladder saved.
+// That is a data holding pattern, not a launch: nothing rents through VYA until she turns rentals on
+// AND the checkout/cross-listing paths are built for it — see the phase-2 report.
+test("a rent-only piece we have never imported is created as a new draft", () => {
+ assert.equal(rentOnlyAction(null), "create-draft");
+});
+
+test("a rent-only piece already held here — draft or wrongly for sale — is refreshed as a draft", () => {
+ // Five Venus pieces were imported at a RENTAL price as if it were the buy price — the Dior tan
+ // gaucho heels at $25. Leaving them alone would keep those rows for sale at the wrong price.
+ assert.equal(rentOnlyAction({ origin: "source", status: "active" }), "update-draft");
+ assert.equal(rentOnlyAction({ origin: "source", status: "draft" }), "update-draft");
+});
+
+test("a rent-only piece the seller edited herself is left alone — her version wins", () => {
+ assert.equal(rentOnlyAction({ origin: "user", status: "active" }), "skip");
+});
+
+test("a rent-only piece mid-checkout, already sold, or already removed is left alone", () => {
+ for (const status of ["reserved", "sold", "removed"]) assert.equal(rentOnlyAction({ origin: "source", status }), "skip", status);
+});
+
+test("the rent-only note says how many were saved as drafts, and nothing when there are none", () => {
+ assert.equal(rentOnlyWarning(0, 0), null);
+ const many = rentOnlyWarning(113, 5) || "";
+ assert.match(many, /113 pieces/);
+ assert.match(many, /5 /);
+ assert.match(many, /draft/i);
+ assert.match(many, /not visible to shoppers/i);
+ const one = rentOnlyWarning(1, 0) || "";
+ assert.match(one, /1 piece /);
+ assert.doesNotMatch(one, /moved back/);
+});
 
 // ── a piece she has sold and zeroed the price on ─────────────────────────────────────────────────
 test("a SOLD piece with no price is still imported", () => {

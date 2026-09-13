@@ -72,3 +72,32 @@ test("nothing at all still yields something sendable", () => {
  assert.deepEqual(d.itemIds, []);
  assert.deepEqual(d.links, []);
 });
+
+// ── Where the pieces go ─────────────────────────────────────────────────────────────────────────
+// Typing a heading above the pieces used to empty `products`, which silently broke the two layouts
+// built from them: Photo lost its lead image and Grid lost its grid, so both collapsed into
+// Standard and picking them "didn't change anything".
+import { bandsPieces } from "./campaign-design-core.ts";
+
+test("Photo and Grid keep their pieces even when a heading is set", () => {
+ for (const design of ["photo", "grid"] as const) {
+  assert.equal(bandsPieces(design, "Just in", 3), false, design);
+ }
+});
+
+test("the other layouts band the pieces under the heading, as before", () => {
+ for (const design of ["classic", "statement", "editorial"] as const) {
+  assert.equal(bandsPieces(design, "Just in", 3), true, design);
+ }
+});
+
+test("no heading means no band, whatever the layout", () => {
+ for (const design of ["classic", "statement", "photo", "editorial", "grid"] as const) {
+  assert.equal(bandsPieces(design, null, 3), false, design);
+  assert.equal(bandsPieces(design, "", 3), false, design);
+ }
+});
+
+test("a heading with nothing to head is not a band", () => {
+ assert.equal(bandsPieces("classic", "Just in", 0), false);
+});

@@ -682,7 +682,7 @@ export default function IntakePage() {
  : <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[12px] text-amber-800">🔍 Reverse image search found {reverseImage.matches} web {reverseImage.matches === 1 ? "match" : "matches"} but no confident brand{reverseImage.sampleTitles[0] ? <span className="text-amber-700/80"> — e.g. “{reverseImage.sampleTitles[0].slice(0, 70)}”</span> : null}. Confirm the brand below.</div>
  )}
 
- <div className="grid gap-6 sm:grid-cols-[240px_1fr]">
+ <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
  {/* Photos + AI */}
  <div>
  {photos.length ? (
@@ -699,7 +699,7 @@ export default function IntakePage() {
   <button
    type="button"
    onClick={() => setCropping(photos[selPhoto] || photos[0])}
-   className="absolute bottom-2 right-2 rounded-lg bg-black/65 px-2.5 py-1.5 text-[11.5px] font-medium text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+   className="absolute bottom-2 right-2 rounded-lg bg-black/65 px-2.5 py-1.5 text-[11.5px] font-medium text-white opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
   >Reposition</button>
  )}
  </div>
@@ -731,7 +731,7 @@ export default function IntakePage() {
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src={p} alt="" className="h-full w-full rounded object-cover ring-1 ring-stone-200" />
  {i === 0 && !ghost && <span className="absolute -left-1 -top-1 rounded bg-[var(--accent,#0e9f76)] px-1 text-[8px] leading-tight text-white">cover</span>}
- <button type="button" onClick={() => { setPhotos((ps) => ps.filter((_, j) => j !== i)); setSelPhoto((n) => (i < n ? n - 1 : Math.max(0, Math.min(n, photos.length - 2)))); }} className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] leading-none text-white group-hover:flex" aria-label="Remove">×</button>
+ <button type="button" onClick={() => { setPhotos((ps) => ps.filter((_, j) => j !== i)); setSelPhoto((n) => (i < n ? n - 1 : Math.max(0, Math.min(n, photos.length - 2)))); }} className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[10px] leading-none text-white group-hover:flex [@media(hover:none)]:flex [@media(hover:none)]:h-5 [@media(hover:none)]:w-5" aria-label="Remove">×</button>
  </div>
  ))}
  {photos.length < 8 && (
@@ -756,7 +756,9 @@ export default function IntakePage() {
  onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
  onDrop={(e) => { e.preventDefault(); setDragOver(false); if (!busy) onPick(e.dataTransfer.files); }}
  onClick={() => !busy && fileRef.current?.click()}
- className={cn("flex aspect-[3/4] w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 text-center transition-colors", dragOver ? "border-[var(--accent,#0e9f76)] bg-[var(--accent-soft,#eafaf3)]" : "border-stone-300 hover:border-stone-400")}
+ // Short on a phone: a full-width 3:4 box was ~450px of dashed outline and pushed the whole form
+ // below the fold. The portrait shape comes back beside the form at md.
+ className={cn("flex h-40 w-full cursor-pointer flex-col md:h-auto md:aspect-[3/4] items-center justify-center rounded-xl border-2 border-dashed px-4 text-center transition-colors", dragOver ? "border-[var(--accent,#0e9f76)] bg-[var(--accent-soft,#eafaf3)]" : "border-stone-300 hover:border-stone-400")}
  >
  <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-soft,#eafaf3)] text-[var(--accent,#0e9f76)]"><Camera size={20} /></span>
  <p className="text-[13px] font-medium text-stone-700">{busy ? busyMsg : "Add photos"}</p>
@@ -809,7 +811,7 @@ export default function IntakePage() {
  )}
  {/* Flaws are set by the AI from the photos and still show under Condition on the storefront.
      The hand-entry list came off the form: eleven fields before a price is too many. */}
- <div className="grid grid-cols-2 gap-3">
+ <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
  <div><label className={label}>Size <span className="font-normal text-stone-400">— as marked on the tag</span></label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="IT 40 / UK 12 / M" /></div>
  <div>
  <label className={label}>Category</label>
@@ -868,7 +870,7 @@ export default function IntakePage() {
  </div>
  {consigned && (
  <div className="mt-4 space-y-3">
- <div className="grid grid-cols-2 gap-3">
+ <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
  <div>
  <label className={label}>Consignor</label>
  {/* "Add a new consignor" lives IN the list rather than as a second field below it: one control,
@@ -927,7 +929,7 @@ export default function IntakePage() {
   {PACKAGING.map((b) => <option key={b.id} value={b.id}>{b.label} — {b.hint}</option>)}
  </select>
 
- <div className="mt-2.5 flex items-center gap-2">
+ <div className="mt-2.5 flex flex-wrap items-center gap-2">
   <label className="text-[12px] font-medium text-stone-700">Weight</label>
   {/* Shown and typed in the store's own unit; stored in ounces, which is what the tiers, the
       carriers and the label all speak. A London shop weighs a coat in grams — asking her for
@@ -1109,8 +1111,8 @@ export default function IntakePage() {
 
 
  <div className="flex flex-wrap items-center gap-4 border-t border-stone-100 pt-4">
- <TechButton onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>
- <TechButton variant="secondary" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</TechButton>
+ <TechButton className="h-11 sm:h-auto" onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>
+ <TechButton variant="secondary" className="h-11 sm:h-auto" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</TechButton>
  {/* Always available, not only when we happen to notice the photo changed — "start this piece
      again" is a thing a seller wants for plenty of reasons we can't detect. Confirms first,
      because it throws away written work. */}
@@ -1127,14 +1129,17 @@ export default function IntakePage() {
  {!allConfirmed && <span className="text-[11px] text-amber-600">Confirm the flagged fields to publish — or save as a draft for now</span>}
  {err && <span className="text-xs text-red-600">{err}</span>}
  {/* Schedule publish: pick a future time → saved as a draft now, auto-published then. */}
- <div className="flex w-full items-center gap-2 sm:w-auto sm:ml-auto">
- <span className="text-[11px] uppercase tracking-[0.14em] text-stone-400">Schedule</span>
+ {/* On a phone the label takes its own line and the picker takes the room left beside the button —
+     at its natural width the picker pushed Schedule 79px off the screen. */}
+ <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
+ <span className="basis-full text-[11px] uppercase tracking-[0.14em] text-stone-400 sm:basis-auto">Schedule</span>
  <input
  type="datetime-local" value={schedule} onChange={(e) => setSchedule(e.target.value)}
- className={cn(input, "w-auto py-1.5 text-[13px]")}
+ className={cn(input, "h-11 min-w-0 flex-1 py-1.5 text-[13px] sm:h-auto sm:w-auto sm:flex-none")}
  />
  <TechButton
  variant="secondary"
+ className="h-11 sm:h-auto"
  onClick={() => publish("active", schedule ? new Date(schedule).toISOString() : undefined)}
  disabled={busy || !schedule || !allConfirmed}
  >

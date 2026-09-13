@@ -39,7 +39,24 @@ export default async function FlyersPage() {
     </TechCard>
    </div>
 
-   <TechCard className="mt-4 overflow-x-auto p-0">
+   {/* A phone gets one card per flyer: six columns in a 340px card could only scroll sideways, and the
+       two numbers that matter (scans next to signups) were the ones pushed off the edge. */}
+   <div className="mt-4 space-y-2 sm:hidden">
+    {rows.map((r) => (
+     <TechCard key={r.slug} className="p-4">
+      <p className="text-[14px] font-medium text-stone-900">{r.headline}</p>
+      <code className="text-[12px] text-stone-500">/{r.slug}</code>
+      <dl className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
+       <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Scans</dt><dd className="mt-0.5 font-medium">{r.scans}</dd></div>
+       <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Signups</dt><dd className="mt-0.5 font-medium">{r.signups}</dd></div>
+       <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Converted</dt><dd className="mt-0.5 font-medium">{r.conversion === null ? "—" : `${r.conversion}%`}</dd></div>
+      </dl>
+      <p className="mt-2 text-[12px] text-stone-500">Last scan {r.lastScan ? new Date(r.lastScan).toLocaleDateString() : "never"}</p>
+     </TechCard>
+    ))}
+   </div>
+
+   <TechCard className="mt-4 hidden overflow-x-auto p-0 sm:block">
     <table className="w-full text-sm">
      <thead>
       <tr>

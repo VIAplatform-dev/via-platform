@@ -172,9 +172,39 @@ export default function ProfitPage() {
     </TechCard>
    ) : (
     <TechCard className="overflow-hidden">
+     {/* A phone can't show twelve columns, so below sm the same grid is read the other way round: one
+         block per period, Total first and open, each month folded to its net profit until tapped. */}
+     <div className="divide-y divide-stone-100 sm:hidden">
+      {[{ key: "total", label: "Total", pick: (r: GridRow) => r.total }, ...grid.months.map((m, i) => ({ key: m, label: grid.monthLabels[i], pick: (r: GridRow) => r.cells[i] }))].map((p, n) => {
+       const net = [...grid.rows].reverse().find((r) => r.direction === "net");
+       const isTotal = p.key === "total";
+       return (
+        <details key={p.key} open={n === 0}>
+         <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span className={cn("font-mono text-[10px] uppercase tracking-[0.13em]", isTotal ? "text-stone-500" : "text-stone-400")}>{p.label}</span>
+          {net && <span className={cn("text-[13px] font-semibold tabular-nums", p.pick(net) < 0 ? "text-rose-700" : "text-stone-900")}>{money(p.pick(net))}</span>}
+         </summary>
+         <div className="px-4 pb-3 text-[13px] tabular-nums">
+          {grid.rows.map((r) => {
+           const c = p.pick(r);
+           const isNet = r.direction === "net";
+           return (
+            <div key={r.key} className={cn("flex items-baseline justify-between gap-3 py-2", isNet ? "border-t-2 border-stone-900" : "border-b border-stone-100")}>
+             <span className={cn("min-w-0", isNet ? "font-semibold text-stone-900" : "text-stone-700")}>{r.label}</span>
+             <span className={cn("shrink-0 text-right", isNet ? "font-semibold" : isTotal ? "font-medium text-stone-700" : c === 0 ? "text-stone-300" : c < 0 ? "text-stone-500" : "text-stone-800", isNet && c < 0 && "text-rose-700")}>
+              {c === 0 && !isNet && !isTotal ? "—" : money(c)}
+             </span>
+            </div>
+           );
+          })}
+         </div>
+        </details>
+       );
+      })}
+     </div>
      {/* Wide by nature — a year is twelve columns — so the grid scrolls inside its own card and the
          first column stays put, the way a spreadsheet freezes panes. */}
-     <div className="overflow-x-auto">
+     <div className="hidden overflow-x-auto sm:block">
       <table className="w-full min-w-max text-[13px] tabular-nums">
        <thead>
         <tr className="border-b border-stone-200">

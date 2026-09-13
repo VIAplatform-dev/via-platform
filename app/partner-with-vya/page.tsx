@@ -22,46 +22,50 @@ export default function PartnerWithVYAPage() {
  >
 
  <div>
- <label className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
+ <label htmlFor="store_name" className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
  Store Name
  </label>
  <input
  type="text"
- name="store_name"
+ id="store_name"
+         name="store_name"
  required
  className="w-full border-b border-[#5D0F17] bg-transparent py-3 text-base focus:outline-none min-h-[48px] placeholder:text-[#5D0F17]/30"
  />
  </div>
 
  <div>
- <label className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
+ <label htmlFor="website" className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
  Website / Instagram
  </label>
  <input
  type="text"
- name="website"
+ id="website"
+         name="website"
  className="w-full border-b border-[#5D0F17] bg-transparent py-3 text-base focus:outline-none min-h-[48px] placeholder:text-[#5D0F17]/30"
  />
  </div>
 
  <div>
- <label className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
+ <label htmlFor="location" className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
  Store Location
  </label>
  <input
  type="text"
- name="location"
+ id="location"
+         name="location"
  required
  className="w-full border-b border-[#5D0F17] bg-transparent py-3 text-base focus:outline-none min-h-[48px] placeholder:text-[#5D0F17]/30"
  />
  </div>
 
  <div>
- <label className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
+ <label htmlFor="inventory_size" className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
  Approximate Inventory Size
  </label>
  <select
- name="inventory_size"
+ id="inventory_size"
+         name="inventory_size"
  required
  className="w-full border-b border-[#5D0F17] bg-transparent py-3 text-base focus:outline-none min-h-[48px]"
  >
@@ -73,11 +77,12 @@ export default function PartnerWithVYAPage() {
  </div>
 
  <div>
- <label className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
+ <label htmlFor="sells_online" className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
  Do you currently sell online?
  </label>
  <select
- name="sells_online"
+ id="sells_online"
+         name="sells_online"
  required
  className="w-full border-b border-[#5D0F17] bg-transparent py-3 text-base focus:outline-none min-h-[48px]"
  >
@@ -89,11 +94,12 @@ export default function PartnerWithVYAPage() {
  </div>
 
  <div>
- <label className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
+ <label htmlFor="notes" className="block text-sm uppercase tracking-wide mb-2 sm:mb-3">
  Anything else you&apos;d like us to know?
  </label>
  <textarea
- name="notes"
+ id="notes"
+         name="notes"
  rows={4}
  className="w-full border-b border-[#5D0F17] bg-transparent py-3 text-base focus:outline-none resize-none"
  />
