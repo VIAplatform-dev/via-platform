@@ -81,6 +81,10 @@ export default function RootLayout() {
               <Stack.Screen name="market/sales" options={{ headerShown: false }} />
               <Stack.Screen name="auth/login" options={{ headerShown: false, presentation: "modal" }} />
               <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+              {/* Registered so they inherit the sign-in's chrome rather than a default header. store
+                  is pushed from the login sheet; no-store is replaced to from the callback. */}
+              <Stack.Screen name="auth/store" options={{ headerShown: false, presentation: "modal" }} />
+              <Stack.Screen name="auth/no-store" options={{ headerShown: false }} />
               <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
               <Stack.Screen name="store/[slug]" options={{ headerShown: false }} />
               <Stack.Screen name="category/[slug]" options={{ headerShown: false }} />

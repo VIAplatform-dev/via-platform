@@ -151,24 +151,15 @@ export default function LoginScreen() {
   }
  }
 
- // SIGNING IN AS A STORE IS THE SAME LINK.
+ // SIGNING IN AS A STORE HAS ITS OWN DOOR.
  //
- // A store owner had nothing to press here: one button offered to make her a customer, the other
- // to start a store she already owns — and that one opened Safari, where the session then stayed.
+ // This used to be the same email box with a different label: press it, type an address, and if
+ // that address had no shop you landed in the shopper marketplace with nothing said — which reads
+ // as the app being broken. A link that looks like its own door should open one.
  //
- // There is one sign-in. The emailed link resolves whose address it is (storeSlugForMobileEmail)
- // and the callback routes a seller into the seller app. So this is the same action as the button
- // above, said in the words a store owner is looking for.
- //
- // CREATING a store is not here on purpose. That is a laptop job — a wizard, a catalogue import,
- // photographs — and pretending a phone can start it was what sent people to a browser.
- async function signInAsStore() {
-  if (!email.trim().includes("@")) {
-   setError("Enter the email your shop is registered to.");
-   return;
-  }
-  await send();
- }
+ // Still one magic link underneath (there is no separate store credential), but the screen says
+ // what it is for, and the sign-in remembers it so the callback can answer properly when an address
+ // has no shop against it. See app/auth/store.tsx and lib/signin-intent.ts.
 
  if (sent) {
   return (
@@ -285,7 +276,7 @@ export default function LoginScreen() {
     </Pressable>
 
     {/* Smaller, under the main action: a store owner is signing IN, not joining. */}
-    <Pressable onPress={signInAsStore} accessibilityRole="button" style={{ marginTop: spacing.lg, alignItems: "center" }}>
+    <Pressable onPress={() => router.push("/auth/store")} accessibilityRole="button" style={{ marginTop: spacing.lg, alignItems: "center" }}>
      <Text style={{ color: colors.textMuted, fontSize: 13, textDecorationLine: "underline" }}>Sign in as a store</Text>
     </Pressable>
 

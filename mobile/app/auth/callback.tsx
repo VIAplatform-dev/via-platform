@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "../../lib/auth";
+import { destinationFor, takeIntent } from "../../lib/signin-intent";
 import { colors, fonts, spacing } from "../../lib/theme";
 
 // Where the emailed link lands. The deep link carries the one-time token as `?token=`; exchanging it
@@ -12,7 +13,7 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // someone back on the sign-in form with no idea why.
 
 export default function AuthCallback() {
-  const { verifyMagicLink } = useAuth();
+  const { verifyMagicLink, user } = useAuth();
   const params = useLocalSearchParams<{ token?: string }>();
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +37,13 @@ export default function AuthCallback() {
         // was simply unreachable from a fresh sign-in. The verify call already knows which store the
         // address belongs to; the sign-in screen has always routed on it (app/auth/login.tsx) and
         // this is the same rule for the emailed link.
-        router.replace(slug ? "/(seller)" : "/(tabs)");
+        // WHICH DOOR SHE CAME THROUGH. A store sign-in that finds no shop must not quietly become
+        // a shopper sign-in — she asked for her shop and is owed a sentence. See signin-intent.ts.
+        void takeIntent().then((intent) => {
+          const to = destinationFor(slug, intent, user?.email ?? null);
+          if (to.route === "/auth/no-store") router.replace({ pathname: "/auth/no-store", params: { email: to.email ?? "" } });
+          else router.replace(to.route);
+        });
       })
       .catch(() => setError("That link has expired or was already used. Request a new one."));
   }, [params.token, verifyMagicLink]);
