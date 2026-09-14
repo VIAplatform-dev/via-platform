@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { StripeConnectInstance } from "@stripe/stripe-react-native";
 import { apiPost } from "../api";
+import { useAuth } from "../auth";
 import { colors } from "../theme";
 import { stripeNative, stripeAvailable, STRIPE_UNAVAILABLE } from "./stripe-native";
 
@@ -48,6 +49,7 @@ export function SellerConnectProvider({ children }: { children: ReactNode }) {
 const UNAVAILABLE: Ready = { instance: null, error: null, loading: false, unavailable: true };
 
 function LiveConnectProvider({ children }: { children: ReactNode }) {
+  const { token } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [publishableKey, setPublishableKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,9 +74,23 @@ function LiveConnectProvider({ children }: { children: ReactNode }) {
   // useEffect, NOT useMemo: this mints a Stripe session, which is a side effect with a cost. React is
   // free to run a useMemo body twice (StrictMode does exactly that in development), and two account
   // sessions per app launch is two more than anyone wants.
+  //
+  // WAITS FOR THE TOKEN, and that is the whole bug this once had. The bearer token is read out of
+  // SecureStore asynchronously at launch (lib/auth.tsx), so for the first moments of a cold start
+  // getAuthToken() is null. This effect used to run on mount with no dependencies at all: it raced
+  // that read, sent an unauthenticated POST, and /api/store/payments/account-session answered 401
+  // "Unauthorized". Because it ran exactly once, that single word then sat on the Payouts screen
+  // for the rest of the session, under a heading offering to set up payments — so the one screen
+  // telling a seller how to get paid was also the one refusing to let her.
+  //
+  // Every other caller in the app is a react-query query gated on `enabled: !!storeSlug`, which is
+  // why nothing else showed it. Depending on the token both delays the call until it can succeed
+  // and retries it the moment a sign-in produces one.
   useEffect(() => {
+    if (!token || instance) return;
     let alive = true;
     setLoading(true);
+    setError(null);
     apiPost<{ clientSecret: string; publishableKey: string }>("/api/store/payments/account-session", {})
       .then((r) => {
         if (!alive) return;
@@ -107,9 +123,10 @@ function LiveConnectProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-    // Once per mount of the seller area. A second call would mint a second session for nothing.
+    // Once per signed-in session: `instance` in the guard above means a second token change cannot
+    // mint a second Stripe session for nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token, instance]);
 
   const value = useMemo<Ready>(() => ({ instance, error, loading, unavailable: false }), [instance, error, loading]);
 

@@ -29,16 +29,17 @@ export default function ProductGrid({
   const { width } = useWindowDimensions();
   const cardWidth = (width - EDGE * 2 - GUTTER) / 2;
 
-  if (loading && !products.length) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
-        <ActivityIndicator color={colors.text} />
-      </View>
-    );
-  }
-
-  // Hoisted out of the JSX: an inline renderItem is a new function on every render, so FlatList
-  // treats every cell as changed and ProductCard's memo never gets a chance to work.
+  // BOTH HOOKS RUN BEFORE ANY EARLY RETURN, and must stay there.
+  //
+  // They used to sit below the spinner branch, which crashed every marketplace screen the moment
+  // its data arrived: the first render (loading, nothing yet) ran one hook, the next ran three, and
+  // React aborts the tree with "Rendered more hooks than during the previous render." It reached a
+  // seller as "everything I tap on the marketplace breaks" — the feed, collections, search, every
+  // store page, because all of them render through here and all of them start empty.
+  //
+  // Hoisted out of the JSX for the reason the perf pass added them: an inline renderItem is a new
+  // function on every render, so FlatList treats every cell as changed and ProductCard's memo never
+  // gets a chance to work. That reasoning was right. Its placement was what broke.
   const renderItem = useCallback(
     ({ item }: { item: Product }) => (
       <ProductCard
@@ -51,6 +52,14 @@ export default function ProductGrid({
     [cardWidth, favorited, onToggleFavorite],
   );
   const keyExtractor = useCallback((p: Product) => String(p.id), []);
+
+  if (loading && !products.length) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
+        <ActivityIndicator color={colors.text} />
+      </View>
+    );
+  }
 
   return (
     <FlatList

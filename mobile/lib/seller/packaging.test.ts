@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import fs from "node:fs";
 import path from "node:path";
-import { PACKAGING, packagingById, packedWeightOz, suggestPackaging, packagingFromDims, packagingSummary } from "./packaging.ts";
+import { PACKAGING, packagingById, packedWeightOz, suggestPackaging, packagingFromDims, packagingSummary, weightForPackaging } from "./packaging.ts";
 
 test("the phone's packaging list is IDENTICAL to the web's", () => {
   // This is the point of the file. The buyer pays a flat tier chosen by the larger of weight and
@@ -70,4 +70,13 @@ test("every option is a real, distinct id", () => {
   }
   assert.equal(packagingById("nope"), null);
   assert.equal(packagingById(null), null);
+});
+
+// A box and its weight move together — the same rule the web form follows.
+test("every box's weight lands back on that same box", () => {
+  for (const b of PACKAGING) {
+    assert.equal(suggestPackaging(weightForPackaging(b.id)), b.id, `${b.id} does not round-trip`);
+  }
+  assert.equal(weightForPackaging("not-a-box"), 44);
+  assert.equal(weightForPackaging(null), 44);
 });

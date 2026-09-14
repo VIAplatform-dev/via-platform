@@ -8,6 +8,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiPost, ApiError } from "../../lib/api";
 import { colors, spacing, fonts } from "../../lib/theme";
 import { uploadPhoto } from "../../lib/seller/intake";
+import { CATEGORY_GROUPS, CATEGORY_LABELS } from "../../lib/seller/categories";
+import { SelectRow } from "../../components/seller/Select";
 
 // Quick list — a piece that is on the table but not in the system.
 //
@@ -22,6 +24,19 @@ import { uploadPhoto } from "../../lib/seller/intake";
 // Card takes two calls, not one: quick-list/create only ever opens a CASH checkout (see its route),
 // so a card sale creates the piece first and then opens a `qr` checkout against it — the same two
 // steps the desktop takes when it hands the confirm screen `?go=qr`.
+//
+// IT ASKS WHAT KIND OF PIECE IT IS, and that is not a fourth optional box.
+//
+// Measurements are chosen by category (lib/seller/measurements.ts) — a dress is asked for a waist,
+// a bag for a strap drop, a piece with no category for a length and a width and nothing else. Every
+// piece this screen has ever made arrived in Drafts with `category` either empty or holding a typed
+// word the templates don't know, so finishing one later offered the generic pair no matter what it
+// was. The fix belongs HERE rather than in the editor: the piece is in her hands at this moment and
+// she will never again be as sure what it is.
+//
+// It asks; it does not block. The ask is the tender button opening the picker instead of listing,
+// once, with the tender remembered — so answering costs one tap and carries straight on into the
+// sale. "Not sure" is one of the answers, because a queue at a stall beats a taxonomy.
 
 export default function QuickList() {
   const insets = useSafeAreaInsets();
@@ -29,7 +44,12 @@ export default function QuickList() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [brand, setBrand] = useState("");
+  // "" = not answered yet, "skip" = answered "not sure". The two are different: one is a question
+  // still to ask, the other is an answer, and only the first one stops a tender button.
   const [category, setCategory] = useState("");
+  const [askCategory, setAskCategory] = useState(false);
+  /** The tender she reached for while the category was still unanswered, resumed once it is. */
+  const [pending, setPending] = useState<"card" | "cash" | null | undefined>(undefined);
   const [busy, setBusy] = useState<"list" | "sell" | "card" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,16 +60,26 @@ export default function QuickList() {
     if (!r.canceled && r.assets[0]?.uri) setPhoto(r.assets[0].uri);
   }
 
-  async function submit(tender: "card" | "cash" | null) {
+  /**
+   * `chosen` is passed explicitly when the picker resumes a sale, and ONLY then. setState is not
+   * synchronous: resuming on the state would read the empty category this call just set, decide the
+   * question was still unanswered and open the picker again, forever.
+   */
+  async function submit(tender: "card" | "cash" | null, chosen: string = category) {
     setError(null);
     const n = Number(price.replace(/[^0-9.]/g, ""));
     if (!(n > 0)) { setError("Enter a price."); return; }
+    // Ask once. Answering resumes this exact tender from the picker's onChange, so nothing is lost
+    // and nothing is repeated — and once answered, every later piece goes straight through.
+    if (!chosen) { setPending(tender); setAskCategory(true); return; }
     setBusy(tender === "cash" ? "sell" : tender === "card" ? "card" : "list");
     try {
       // Upload first: the route takes a hosted URL, not bytes.
       const imageUrl = photo ? await uploadPhoto(photo).catch(() => null) : null;
       const r = await apiPost<{ ok: boolean; item: { id: string }; checkout: { id: string } | null }>("/api/store/market/quick-list/create", {
-        price: n, brand, category, imageUrl,
+        // "Not sure" is stored as no category at all, never as the word — the storefront navigates
+        // by these slugs and "skip" is not one of them.
+        price: n, brand, category: chosen === "skip" ? "" : chosen, imageUrl,
         ...(tender === "cash" ? { startCheckout: "cash", clientKey: `phone-ql-${Date.now()}` } : {}),
       });
       void qc.invalidateQueries({ queryKey: ["store", "items"] });
@@ -112,8 +142,36 @@ export default function QuickList() {
         <View style={{ marginTop: spacing.lg }}>
           {field("Price", price, setPrice, { numeric: true, autoFocus: true })}
           {field("Brand", brand, setBrand)}
-          {field("Category", category, setCategory)}
+          {/* The taxonomy the storefront navigates by, grouped as its nav groups it — not a text
+              box, because "bag", "Bags" and "handbag" are three different category pages and two
+              of them are empty. */}
+          <SelectRow
+            label="Category"
+            title="What kind of piece?"
+            placeholder="Tap to choose"
+            value={category || null}
+            palette={colors}
+            groups={[
+              ...CATEGORY_GROUPS.map((g) => ({
+                label: g.label,
+                options: g.slugs.map((slug) => ({ key: slug, label: CATEGORY_LABELS[slug] })),
+              })),
+              { label: "", options: [{ key: "skip", label: "Not sure", hint: "Finish it from Drafts later" }] },
+            ]}
+            autoOpen={askCategory}
+            onAutoOpened={() => setAskCategory(false)}
+            onChange={(key) => {
+              setCategory(key);
+              // Straight on with whatever she reached for before the question. `undefined` means
+              // she opened the picker herself and is not mid-sale.
+              if (pending !== undefined) { const t = pending; setPending(undefined); void submit(t, key); }
+            }}
+          />
         </View>
+        <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+          It decides which measurements the draft asks you for later — a dress is asked for a waist,
+          a bag for its strap drop.
+        </Text>
 
         {error ? <Text style={{ fontSize: 13.5, color: colors.text, marginTop: spacing.md }}>{error}</Text> : null}
 

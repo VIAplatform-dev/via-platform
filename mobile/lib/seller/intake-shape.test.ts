@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeDraft, readEstimate, costFromText } from "./intake-shape.ts";
+import { normalizeDraft, readEstimate, costFromText, hasRealValue } from "./intake-shape.ts";
 
 // The real response, copied from a live production call — see intake-shape.ts for why this
 // fixture is written out rather than paraphrased.
@@ -107,4 +107,15 @@ test("cost is what she typed, in major units, and a blank is unknown rather than
   assert.equal(costFromText("   "), undefined);
   assert.equal(costFromText(undefined), undefined);
   assert.equal(costFromText(-4), undefined);
+});
+
+test("an AI placeholder is not a value", () => {
+  assert.equal(hasRealValue("Prada"), true);
+  assert.equal(hasRealValue("  Re-Nylon  "), true);
+  for (const v of ["N/A", "n/a", "na", "None", "unknown", "Unsure", "not sure", "Not applicable", "n.a."]) {
+    assert.equal(hasRealValue(v), false, `${v} should not count as a value`);
+  }
+  assert.equal(hasRealValue(""), false);
+  assert.equal(hasRealValue(null), false);
+  assert.equal(hasRealValue(undefined), false);
 });

@@ -1,7 +1,13 @@
 // Measurements per category — the phone's mirror of app/lib/measurements-core.ts. Pure.
 //
-// The keys and labels are the server's; the template is matched by a few words because the phone
-// has no category taxonomy. The unit is the store's: inches for a US ship-from, cm elsewhere.
+// The keys and labels are the server's. A category is matched TWO ways, in order: the canonical
+// slug map first (the web's BY_SLUG, verbatim), then the words. The slug map is what makes a
+// category chosen from lib/seller/categories.ts measure exactly as the same category does on the
+// web; the word matching stays because plenty of stored categories are not slugs at all — the AI
+// intake writes "jackets", a Shopify import writes whatever the seller typed years ago, and both
+// still have to produce a sensible template.
+//
+// The unit is the store's: inches for a US ship-from, cm elsewhere.
 
 export type MeasurementUnit = "cm" | "in";
 export type MeasurementKey = "pitToPit" | "shoulder" | "sleeve" | "length" | "waist" | "hip" | "rise" | "inseam" | "insole" | "width" | "height" | "depth" | "strapDrop";
@@ -31,9 +37,26 @@ const TEMPLATES: [RegExp, MeasurementKey[]][] = [
   [/bag|tote|clutch|crossbody|purse/i, BAG],
 ];
 
+// The canonical slugs, mapped exactly as app/lib/measurements-core.ts maps them. Checked before
+// the word matching because the words disagree with the web on some of them: "other-clothing" is
+// a garment and measures like a top, but contains none of the words that would say so.
+const BY_SLUG: Record<string, MeasurementKey[]> = {
+  tops: TOP, sweaters: TOP, "coats-jackets": TOP, "other-clothing": TOP,
+  dresses: DRESS, jumpsuits: DRESS, lingerie: DRESS, swimwear: DRESS,
+  pants: TROUSERS, jeans: TROUSERS, shorts: TROUSERS,
+  skirts: SKIRT,
+  boots: SHOE, heels: SHOE, sneakers: SHOE, sandals: SHOE, flats: SHOE, shoes: SHOE,
+  handbags: BAG, totes: BAG, clutches: BAG, "crossbody-bags": BAG, bags: BAG,
+  scarves: FLAT, belts: FLAT, home: FLAT, wallets: FLAT, accessories: FLAT,
+  jewelry: [], hats: [], sunglasses: [],
+};
+
 export function templateFor(category: string | null | undefined): MeasurementKey[] {
   const c = String(category ?? "");
-  const hit = c ? TEMPLATES.find(([re]) => re.test(c)) : undefined;
+  if (!c) return FLAT;
+  const bySlug = BY_SLUG[c.trim().toLowerCase()];
+  if (bySlug) return bySlug;
+  const hit = TEMPLATES.find(([re]) => re.test(c));
   return hit ? hit[1] : FLAT;
 }
 

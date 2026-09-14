@@ -43,6 +43,26 @@ export function packedWeightOz(pieceOz: number | null | undefined, packing: Pack
   return Math.round(piece + (packing?.tareOz ?? 0));
 }
 
+/**
+ * The weight that goes WITH a box — the inverse of suggestPackaging.
+ *
+ * Each answer is the TOP of that box's band, so suggestPackaging(weightForPackaging(id)) === id.
+ * That exactness is what lets the box and the weight drive each other without fighting: pick a box
+ * and it fills the weight, type a weight and it moves the box. Mirrors app/lib/packaging.ts.
+ */
+export function weightForPackaging(id: string | null | undefined): number {
+  switch (id) {
+    case "mailer-s": return 8;
+    case "padded": return 16;
+    case "mailer-l": return 28;
+    case "box-s": return 44;
+    case "box-m": return 72;
+    case "box-l": return 120;
+    case "box-xl": return 160;
+    default: return 44;
+  }
+}
+
 /** The packaging a piece most likely needs, from its weight. Only ever a starting point. */
 export function suggestPackaging(weightOz: number | null | undefined): string {
   const w = Number(weightOz);

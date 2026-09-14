@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { apiGet, ApiError, API_BASE_URL } from "../../lib/api";
+import { storefrontAddress, type DomainState, type StorefrontState } from "../../lib/seller/storefront";
 import { rentalDay, rentalsTileLine, todayDay, type Booking } from "../../lib/seller/rentals";
 import { daySchedule, appointmentsTileLine, type Appointment } from "../../lib/seller/appointments";
 import { useAuth } from "../../lib/auth";
@@ -110,6 +111,18 @@ export default function SellerHome() {
   const insets = useSafeAreaInsets();
 
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<Me>("/api/store/me"), enabled: !!storeSlug });
+  // Both only for the address on the Storefront tile. A store with no domain connected answers 404
+  // here, which is the ordinary case, not a failure — hence the catches.
+  const domain = useQuery({
+    queryKey: ["store", "domain"],
+    queryFn: () => apiGet<DomainState>("/api/store/domain").catch(() => null),
+    enabled: !!storeSlug,
+  });
+  const sf = useQuery({
+    queryKey: ["store", "storefront"],
+    queryFn: () => apiGet<StorefrontState>("/api/store/storefront").catch(() => null),
+    enabled: !!storeSlug,
+  });
   // ONE REQUEST FOR THE WHOLE SCREEN.
   //
   // This was fifteen: takings, orders, consignment, inbox, holds, inventory, setup, attention,
@@ -371,18 +384,22 @@ export default function SellerHome() {
         <Feather name="chevron-right" size={18} color={colors.textDim} />
       </Tile>
 
-      {/* storefront */}
+      {/* storefront — the address is HER VYA SHOP, never me.website.
+          
+          `me.website` is the seller's own external site (the Shopify or Squarespace shop VYA syncs
+          from), and printing it here told her that was her VYA address. lib/seller/storefront.ts
+          has the rule; this line and the Store tab are the two places that used to get it wrong. */}
       <Tile onPress={() => router.push("/(seller)/store")} style={{ marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md }}>
         <Feather name="home" size={18} color={colors.text} />
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, color: colors.textMuted }}>Storefront</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.positive }} />
-            <Text style={{ fontSize: 13, color: colors.textMuted }} numberOfLines={1}>
-              Live{me.data?.storeFollowers ? ` · ${me.data.storeFollowers} follows` : ""}
-              {me.data?.website ? ` · ${me.data.website.replace(/^https?:\/\//, "")}` : ""}
-            </Text>
-          </View>
+          {/* No "Live" dot here. This tile cannot know: a storefront answers when it is switched on
+              OR when a capture of her old site exists, and the tile that claimed Live unconditionally
+              is part of how a 404 went unnoticed. The Store tab checks the address and says. */}
+          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 3 }} numberOfLines={1}>
+            {storefrontAddress(sf.data, domain.data)?.host ?? "Open to see your shop"}
+            {me.data?.storeFollowers ? ` · ${me.data.storeFollowers} follows` : ""}
+          </Text>
         </View>
         <Feather name="chevron-right" size={18} color={colors.textDim} />
       </Tile>

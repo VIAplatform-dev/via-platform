@@ -58,6 +58,20 @@ export function normalizeCondition(text: string | null | undefined): ConditionGr
   return null;
 }
 
+/**
+ * Whether a drafted value is worth writing into a field.
+ *
+ * The model answers "N/A" or "Unknown" when it cannot tell — a sentence, not a value. Written into
+ * a blank field it reads as an answer, and a listing that says its material is "Unknown" is worse
+ * than one that says nothing: the blank invites her to fill it, the word closes the question.
+ * Mirrors hasRealValue in app/infrastructure/admin/add-listing/page.tsx.
+ */
+const NO_VALUE_RE = /^(n\/?a|none|unknown|unsure|not sure|not applicable|n\.a\.)$/i;
+export function hasRealValue(v: string | null | undefined): boolean {
+  const s = String(v ?? "").trim();
+  return s.length > 0 && !NO_VALUE_RE.test(s);
+}
+
 /** A field that may be a bare string, or the model's {value, confidence} wrapper, or absent. */
 function flat(v: unknown): string | undefined {
   if (typeof v === "string") return v.trim() || undefined;

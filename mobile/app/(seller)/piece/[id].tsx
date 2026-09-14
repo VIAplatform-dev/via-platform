@@ -1,24 +1,26 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { pickPhotos, remainingSlots } from "../../../lib/seller/pick-photos";
 import { liveCrossListPlatforms, crossListNote, crossListFootnote, type CrossListPlatform } from "../../../lib/seller/cross-listing";
-import { useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost, apiPut, apiDelete, ApiError } from "../../../lib/api";
-import { uploadPhoto } from "../../../lib/seller/intake";
+import { uploadPhoto, draftListing } from "../../../lib/seller/intake";
 import { useAuth } from "../../../lib/auth";
 import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
 import { formatMoney } from "../../../lib/seller/home";
 import { daysListed } from "../../../lib/seller/aging";
 import { describeHold, HOLD_LENGTHS } from "../../../lib/seller/holds";
 import { flawsFromLine, flawsToLine } from "../../../lib/seller/intake-shape";
+import { fillBlanks, fillSummary } from "../../../lib/seller/fill";
 import { templateFor, unitFor, measurementsFromForm, measurementsToForm, formatMeasurements, MEASUREMENT_LABELS, type MeasurementKey, type Measurement } from "../../../lib/seller/measurements";
 import { SellerScreen } from "../../../components/seller/Screen";
 import { FIELDS, PARCEL_KEYS, MAX_PHOTOS, type FieldKey } from "../../../lib/seller/listing-fields";
-import { PACKAGING, packagingById, packagingFromDims, packagingSummary } from "../../../lib/seller/packaging";
+import { PACKAGING, packagingById, packagingFromDims, packagingSummary, suggestPackaging, weightForPackaging } from "../../../lib/seller/packaging";
 import { TIER_DAYS, tierLabel, starterTiers, formFromTiers, termsProblem, termsPayload, termsSummary, type TermsForm } from "../../../lib/seller/rental-terms";
 import { schedulePresets, parseScheduleInput, describeSchedule } from "../../../lib/seller/schedule";
 import { InlineField } from "../../../components/seller/Form";
+import { SelectRow, MultiSelectRow } from "../../../components/seller/Select";
 
 // One piece, reached by tapping anything in Inventory.
 //
@@ -95,7 +97,6 @@ export default function PieceScreen() {
   const [uploading, setUploading] = useState(false);
   // Collections: null until touched, like photos and measurements.
   const [cols, setCols] = useState<string[] | null>(null);
-  const [newCol, setNewCol] = useState("");
   // undefined = untouched; null = "clear it"; a Date = this time. Three states, because clearing a
   // schedule and never touching one must not look the same to the route.
   const [when, setWhen] = useState<Date | null | undefined>(undefined);
@@ -105,6 +106,19 @@ export default function PieceScreen() {
   const [packing, setPacking] = useState<string | null>(null);
   const [renting, setRenting] = useState<boolean | null>(null);
   const [terms, setTerms] = useState<TermsForm | null>(null);
+  // What the AI pass did, in a line, so a screen full of freshly filled boxes says where they came
+  // from. Cleared when the edits are (saved, or discarded).
+  const [filling, setFilling] = useState(false);
+  const [filledNote, setFilledNote] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Still on screen? An exit save finishes after this component is gone, and touching state then is
+  // a warning and a leak. The query cache is safe to write to — it outlives the screen.
+  const onScreen = useRef(true);
+  useEffect(() => () => { onScreen.current = false; }, []);
+  // One write at a time. Tapping Done and immediately swiping back would otherwise send the same
+  // patch twice, and the second one races the refetch the first kicked off.
+  const inFlight = useRef(false);
 
   const q = useQuery({
     queryKey: ["store", "items"],
@@ -150,9 +164,15 @@ export default function PieceScreen() {
   const hold = (holds.data?.holds ?? []).find((h) => h.itemId === id) ?? null;
   const unit = unitFor({ country: shipping.data?.shipFrom?.country, currency: shipping.data?.currency ?? item?.currency });
 
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ["store", "items"] });
-    void qc.invalidateQueries({ queryKey: ["store", "holds"] });
+  // Awaited by the save path, so the fresh row is in hand BEFORE the local edits are dropped.
+  // Clearing first — which is what this screen used to do — shows the pre-edit values for as long
+  // as the refetch takes, and a field that flickers back to its old text reads as a failed save.
+  const refresh = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["store", "items"] }),
+      qc.invalidateQueries({ queryKey: ["store", "holds"] }),
+      qc.invalidateQueries({ queryKey: ["store", "rental-terms", id] }),
+    ]);
   };
   const fail = (e: unknown, fallback: string) => setError(e instanceof ApiError && e.message ? e.message : fallback);
 
@@ -160,53 +180,111 @@ export default function PieceScreen() {
     mutationFn: () => apiPost(`/api/store/items/${id}`, { action: "sold" }),
     // Refetch rather than patching the cache by hand: the server decides what "sold" implies
     // (a hold to close, a cross-listing pull) and guessing here would drift.
-    onSuccess: refresh,
+    onSuccess: () => { void refresh(); },
     onError: (e) => fail(e, "Couldn't mark it sold. Try again."),
   });
-  const save = useMutation({
-    mutationFn: () => {
-      // The route takes price in whole currency and turns it into cents itself.
-      const body: Record<string, unknown> = {};
-      for (const f of FIELDS) {
-        const v = form[f.key];
-        if (v === undefined) continue;
-        if (f.key === "price") { const n = Number(v.replace(/[^0-9.]/g, "")); if (Number.isFinite(n) && n > 0) body.price = n; }
-        // Cost may be cleared: an empty box means "I don't know", which the route stores as null.
-        else if (f.key === "cost") { const t = v.replace(/[^0-9.]/g, ""); const n = Number(t); body.cost = t === "" ? null : (Number.isFinite(n) && n >= 0 ? n : undefined); if (body.cost === undefined) delete body.cost; }
-        else if (f.key === "flaws") body.flaws = flawsFromLine(v);
-        // Blank means "unknown" and the route stores null; a non-number is dropped rather than
-        // sent, so a stray character can't wipe a weight that was right.
-        else if (PARCEL_KEYS.includes(f.key)) { const t = v.replace(/[^0-9]/g, ""); if (t === "") body[f.key] = null; else { const n = Number(t); if (Number.isFinite(n) && n > 0) body[f.key] = n; } }
-        else body[f.key] = v;
+  /** Every edit buffer back to untouched. Called once the server has the changes, and by Discard. */
+  const clearEdits = () => {
+    setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null);
+    setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined);
+    setPacking(null); setRenting(null); setTerms(null); setFilledNote(null);
+  };
+
+  /** What she has changed, as the body the route takes. Untouched things are absent, not null. */
+  const patchBody = () => {
+    // The route takes price in whole currency and turns it into cents itself.
+    const body: Record<string, unknown> = {};
+    for (const f of FIELDS) {
+      const v = form[f.key];
+      if (v === undefined) continue;
+      if (f.key === "price") { const n = Number(v.replace(/[^0-9.]/g, "")); if (Number.isFinite(n) && n > 0) body.price = n; }
+      // Cost may be cleared: an empty box means "I don't know", which the route stores as null.
+      else if (f.key === "cost") { const t = v.replace(/[^0-9.]/g, ""); const n = Number(t); body.cost = t === "" ? null : (Number.isFinite(n) && n >= 0 ? n : undefined); if (body.cost === undefined) delete body.cost; }
+      else if (f.key === "flaws") body.flaws = flawsFromLine(v);
+      // Blank means "unknown" and the route stores null; a non-number is dropped rather than
+      // sent, so a stray character can't wipe a weight that was right.
+      else if (PARCEL_KEYS.includes(f.key)) { const t = v.replace(/[^0-9]/g, ""); if (t === "") body[f.key] = null; else { const n = Number(t); if (Number.isFinite(n) && n > 0) body[f.key] = n; } }
+      else body[f.key] = v;
+    }
+    // The template's numbers as the list the route stores (empties omitted), only once touched.
+    if (measureForm) body.measurements = measurementsFromForm(measureForm, unit);
+    if (photos) body.images = photos;
+    if (cols) body.collections = cols;
+    if (when !== undefined) body.publishAt = when === null ? null : when.toISOString();
+    if (channels) body.channels = channels;
+    if (consignor !== undefined) body.consignorId = consignor;
+    return body;
+  };
+
+  /**
+   * THE WHOLE SAVE, callable from anywhere — including from a screen that is already unmounting.
+   *
+   * It is not a mutation body because the most important time it runs is on the way out: react-query
+   * tears an observer down with its component, and a callback that fires after that is a callback
+   * that does not fire. This is a plain async function closing over the current edits; the mutation
+   * below only wraps it so the Done button has something to show a spinner from.
+   *
+   * NOTHING HERE CHANGES THE PIECE'S STATUS. A draft stays a draft; a live listing stays live. An
+   * auto-save is for the words and the numbers — taking a listing off the storefront is a decision,
+   * and a decision has to be made on purpose.
+   */
+  async function persist() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      await apiPatch(`/api/store/items/${id}`, patchBody());
+      // RENTING IS ITS OWN RESOURCE, not a field on the item: terms exist or they don't, and
+      // that is what makes a piece rentable. Saved after the item so a failed patch never
+      // leaves a piece rentable with the wrong price on it.
+      if (renting !== null || terms !== null) {
+        if (isRentable && rentProblem) {
+          // The one part that can be half-finished. Everything else is already saved, so say
+          // exactly what did not go rather than failing the lot — the words and the price are
+          // worth more than the rental tiers she was still typing.
+          if (onScreen.current) setError(`Saved — except the rental prices. ${rentProblem}`);
+        } else if (isRentable) {
+          await apiPut(`/api/store/rentals/terms/${id}`, termsPayload(rentForm, true));
+        } else {
+          await apiDelete(`/api/store/rentals/terms/${id}`);
+        }
       }
-      // The template's numbers as the list the route stores (empties omitted), only once touched.
-      if (measureForm) body.measurements = measurementsFromForm(measureForm, unit);
-      if (photos) body.images = photos;
-      if (cols) body.collections = cols;
-      if (when !== undefined) body.publishAt = when === null ? null : when.toISOString();
-      if (channels) body.channels = channels;
-      if (consignor !== undefined) body.consignorId = consignor;
-      return apiPatch(`/api/store/items/${id}`, body).then(async () => {
-        // RENTING IS ITS OWN RESOURCE, not a field on the item: terms exist or they don't, and
-        // that is what makes a piece rentable. Saved after the item so a failed patch never
-        // leaves a piece rentable with the wrong price on it.
-        if (renting === null && terms === null) return;
-        if (isRentable) await apiPut(`/api/store/rentals/terms/${id}`, termsPayload(rentForm, true));
-        else await apiDelete(`/api/store/rentals/terms/${id}`);
-        await rental.refetch();
-      });
-    },
-    onSuccess: () => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); setPacking(null); setRenting(null); setTerms(null); refresh(); },
+      await refresh();
+      if (onScreen.current) { clearEdits(); setSavedAt(Date.now()); }
+    } finally {
+      inFlight.current = false;
+    }
+  }
+
+  const save = useMutation({
+    mutationFn: persist,
+    onSuccess: () => { setMode("view"); },
     onError: (e) => fail(e, "Couldn't save that. Try again."),
   });
+
+  /**
+   * LEAVING THE SCREEN IS THE SAVE.
+   *
+   * The Save button is gone. It was the only way out that kept anything, and everything else a
+   * phone does to a screen — the back chevron, the swipe from the left edge, the hardware back,
+   * tapping through to Consignors to add someone — threw the edit away without a word. On a laptop
+   * that costs a moment; on a phone, where leaving a screen is a gesture you make without deciding
+   * to, it costs the description she just typed with one hand on a bus.
+   *
+   * The blur cleanup fires for all of those, and for an unmount, which is why the write is a plain
+   * function rather than a mutation. What it CANNOT do is tell her about a failure she has already
+   * walked away from — the screen is gone and this app has no toast. She would find the old text
+   * when she next opened the piece. Worth knowing; still better than losing every edit every time.
+   */
+  const onExit = useRef<() => void>(() => {});
+  useFocusEffect(useCallback(() => () => onExit.current(), []));
   const placeHold = useMutation({
     mutationFn: () => apiPost(`/api/store/items/${id}`, { action: "hold", name: holdName, days: holdDays }),
-    onSuccess: () => { setMode("view"); setHoldName(""); refresh(); },
+    onSuccess: () => { setMode("view"); setHoldName(""); void refresh(); },
     onError: (e) => fail(e, "Couldn't hold it. Try again."),
   });
   const release = useMutation({
     mutationFn: () => apiPost(`/api/store/items/${id}`, { action: "release" }),
-    onSuccess: refresh,
+    onSuccess: () => { void refresh(); },
     onError: (e) => fail(e, "Couldn't release it. Try again."),
   });
 
@@ -244,6 +322,9 @@ export default function PieceScreen() {
   const storedMeasurementsLine = formatMeasurements(item.measurementsJson);
   const dirty = Object.keys(form).length > 0 || measureForm !== null || photos !== null || cols !== null
     || when !== undefined || channels !== null || consignor !== undefined || packing !== null || renting !== null || terms !== null;
+  // Assigned here rather than where the ref is declared: `dirty` and `persist` close over values
+  // that do not exist until this point in the render, and reading them earlier is a crash.
+  onExit.current = () => { if (dirty && !inFlight.current) void persist().catch(() => {}); };
   // The three that can be set here but only ACT at publish.
   const scheduledAt = when !== undefined ? when : (item.publishAt ? new Date(item.publishAt) : null);
   const chosenChannels = channels ?? (Array.isArray(item.crossListChannels) ? item.crossListChannels : []);
@@ -269,7 +350,6 @@ export default function PieceScreen() {
   const chosenConsignor = consignor !== undefined ? consignor : (item.consignorId ?? null);
   const isDraft = item.status === "draft";
   const chosen = cols ?? (Array.isArray(item.collections) ? item.collections : []);
-  const toggleCol = (t: string) => setCols(chosen.includes(t) ? chosen.filter((c) => c !== t) : [...chosen, t]);
   const shots = photos ?? (Array.isArray(item.images) ? item.images : []);
 
   /** Camera or library — a piece with no photo is usually one sitting right in front of her.
@@ -288,6 +368,56 @@ export default function PieceScreen() {
       fail(e, "Couldn't upload those photos.");
     } finally {
       setUploading(false);
+    }
+  }
+
+  /**
+   * FILL WITH AI — the add-listing page's button, on a piece that already exists.
+   *
+   * The listing flow has always been able to read a photograph; the editor never could. So a piece
+   * that arrived thin — a Market Mode quick list, a Shopify import, anything typed at a stall —
+   * could only be finished by hand, field by field, even though the photographs were sitting right
+   * there at the top of this very screen.
+   *
+   * TWO RULES, BOTH THE WEB'S. Everything already written is sent as `filled`, which the route
+   * treats as authoritative and does not spend a pass generating. And the answer only ever lands in
+   * an EMPTY field: her words are never overwritten, which is what makes it safe to tap on a piece
+   * that is already half described and already live.
+   *
+   * It does not re-price. The web fills and prices in one go because it is drafting something that
+   * has no price yet; this piece has one, chosen by a person, and quietly moving it would be the
+   * single worst thing this button could do.
+   */
+  async function fillWithAI() {
+    if (shots.length === 0) { setError("Add a photo first — it reads the photographs."); return; }
+    setError(null);
+    setFilledNote(null);
+    setFilling(true);
+    try {
+      // Everything already written goes up as `filled`: the route only drafts what it is NOT given,
+      // so her words are authoritative and cost nothing to compute. The same bargain the web makes.
+      const known: Record<string, string | undefined> = {};
+      for (const f of FIELDS) { const v = current(f.key).trim(); if (v) known[f.key] = v; }
+      const { fields } = await draftListing(shots, known);
+
+      // The rule about what may be written lives in lib/seller/fill.ts, where a test holds it.
+      const { values, filled, parcelFilled } = fillBlanks(fields, (key) => current(key));
+      setForm({ ...form, ...values });
+      // The box follows the numbers. Filling three dimensions and leaving "Ships in" on its old
+      // answer would put two contradicting claims about the same parcel on one screen.
+      if (parcelFilled) {
+        setPacking(packagingFromDims({
+          lengthIn: values.lengthIn ?? (rec.lengthIn as number | null),
+          widthIn: values.widthIn ?? (rec.widthIn as number | null),
+          heightIn: values.heightIn ?? (rec.heightIn as number | null),
+          weightOz: values.weightOz ?? (rec.weightOz as number | null),
+        }));
+      }
+      setFilledNote(fillSummary(filled));
+    } catch (e) {
+      fail(e, "Couldn't read the photos. Try again.");
+    } finally {
+      setFilling(false);
     }
   }
 
@@ -369,6 +499,25 @@ export default function PieceScreen() {
             {shots.length > 1 ? (
               <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm }}>Tap a photo to make it the cover.</Text>
             ) : null}
+            <View style={{ flexDirection: "row", marginTop: spacing.md }}>
+              <Button
+                label={filling ? "Reading the photos…" : "Fill with AI"}
+                disabled={busy || filling || uploading || shots.length === 0}
+                onPress={() => void fillWithAI()}
+              />
+            </View>
+            {filledNote ? (
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 }}>{filledNote}</Text>
+            ) : shots.length === 0 ? (
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+                Add a photo and it can fill the empty fields for you.
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+                Fills the empty fields only — anything you have written is left alone, and the price
+                is never touched.
+              </Text>
+            )}
           </View>
           {FIELDS.map((f) => (
             <InlineField
@@ -376,37 +525,46 @@ export default function PieceScreen() {
               label={f.label}
               labelWidth={92}
               value={current(f.key)}
-              onChangeText={(v) => setForm({ ...form, [f.key]: v })}
+              onChangeText={(v) => {
+                setForm({ ...form, [f.key]: v });
+                // Typing a weight moves "Ships in" to the box that weight belongs to. She is the
+                // one holding the piece: heavier than the selected box means the box was wrong.
+                if (f.key === "weightOz") {
+                  const oz = Number(v.replace(/[^0-9]/g, ""));
+                  if (Number.isFinite(oz) && oz > 0) setPacking(suggestPackaging(oz));
+                }
+              }}
               keyboardType={f.numeric ? "decimal-pad" : "default"}
               multiline={f.multiline}
               placeholder={f.placeholder}
             />
           ))}
 
-          {/* SHIPS IN — the web's one question instead of the phone's three boxes. Choosing a
-              preset writes its L/W/H onto the piece, which is exactly what the web does; the
-              line underneath shows the size and the packed weight so nothing is decided out of
-              sight. */}
-          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
-            <Text style={{ fontSize: 14, color: colors.textMuted }}>Ships in</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
-              {PACKAGING.map((b) => {
-                const on = b.id === currentPacking;
-                return (
-                  <Pressable
-                    key={b.id}
-                    onPress={() => {
-                      setPacking(b.id);
-                      setForm({ ...form, lengthIn: String(b.lengthIn), widthIn: String(b.widthIn), heightIn: String(b.heightIn) });
-                    }}
-                    style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border, backgroundColor: on ? colors.chipActive : colors.chip }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{b.label}</Text>
-                    <Text style={{ fontSize: 11, marginTop: 1, color: on ? colors.chipActiveText : colors.textDim, opacity: on ? 0.8 : 1 }}>{b.hint}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+          {/* SHIPS IN — the web's one question instead of the phone's three boxes, and a row
+              instead of seven chips. Choosing a preset writes its L/W/H onto the piece, which is
+              exactly what the web does; the line underneath shows the size and the packed weight so
+              nothing is decided out of sight. */}
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.md }}>
+            <SelectRow
+              label="Ships in"
+              title="What does it ship in?"
+              value={currentPacking}
+              options={PACKAGING.map((b) => ({ key: b.id, label: b.label, hint: b.hint }))}
+              onChange={(key) => {
+                const b = packagingById(key);
+                if (!b) return;
+                // The weight comes with the box — unless she weighed it herself. A hand-typed
+                // weight is a measurement; a box picked afterwards must not overwrite it.
+                const hers = current("weightOz").trim();
+                const wasStandard = hers === "" || hers === String(weightForPackaging(currentPacking));
+                setPacking(b.id);
+                setForm({
+                  ...form,
+                  lengthIn: String(b.lengthIn), widthIn: String(b.widthIn), heightIn: String(b.heightIn),
+                  ...(wasStandard ? { weightOz: String(weightForPackaging(b.id)) } : {}),
+                });
+              }}
+            />
             {packagingSummary(currentPacking, current("weightOz")) ? (
               <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
                 {packagingSummary(currentPacking, current("weightOz"))}
@@ -447,42 +605,17 @@ export default function PieceScreen() {
             </View>
           ) : null}
           {/* Collections — the same grouping the storefront and the web editor use. Titles, not ids:
-              the route creates one that doesn't exist yet, so "Add" is both pick and create. */}
-          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
-            <Text style={{ fontSize: 14, color: colors.textMuted }}>Collections</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
-              {Array.from(new Set([...(collections.data?.collections ?? []).map((c) => c.title), ...chosen])).map((t) => {
-                const on = chosen.includes(t);
-                return (
-                  <Pressable
-                    key={t}
-                    onPress={() => toggleCol(t)}
-                    style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
-                  >
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{t}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm }}>
-              <TextInput
-                value={newCol}
-                onChangeText={setNewCol}
-                placeholder="New collection"
-                placeholderTextColor={colors.textDim}
-                autoCapitalize="words"
-                onSubmitEditing={() => { const t = newCol.trim(); if (t && !chosen.includes(t)) { setCols([...chosen, t]); setNewCol(""); } }}
-                style={{ flex: 1, fontSize: 15, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.xs }}
-              />
-              <Pressable
-                hitSlop={8}
-                disabled={!newCol.trim()}
-                onPress={() => { const t = newCol.trim(); if (t && !chosen.includes(t)) { setCols([...chosen, t]); setNewCol(""); } }}
-              >
-                <Text style={{ fontSize: 14, color: colors.accent, fontWeight: "600", opacity: newCol.trim() ? 1 : 0.4 }}>Add</Text>
-              </Pressable>
-            </View>
-          </View>
+              the route creates one that doesn't exist yet, so the box inside the sheet is both pick
+              and create. A store with twenty collections drew twenty chips here. */}
+          <MultiSelectRow
+            label="Collections"
+            title="Which collections?"
+            values={chosen}
+            options={Array.from(new Set([...(collections.data?.collections ?? []).map((c) => c.title), ...chosen])).map((t) => ({ key: t, label: t }))}
+            onChange={setCols}
+            onCreate={(t) => { if (!chosen.includes(t)) setCols([...chosen, t]); }}
+            createPlaceholder="New collection"
+          />
 
           {/* WHEN IT GOES LIVE. Drafts only — the cron that flips a schedule looks at drafts, so
               offering this on a live piece would be offering something that cannot happen. */}
@@ -523,36 +656,37 @@ export default function PieceScreen() {
             </View>
           ) : null}
 
-          {/* WHOSE PIECE IT IS. */}
-          {(consignors.data?.consignors ?? []).length > 0 ? (
-            <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
-              <Text style={{ fontSize: 14, color: colors.textMuted }}>Consignor</Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
-                <Pressable
-                  onPress={() => setConsignor(null)}
-                  style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: chosenConsignor == null ? colors.chipActive : colors.chip }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: chosenConsignor == null ? colors.chipActiveText : colors.text }}>Mine</Text>
-                </Pressable>
-                {(consignors.data?.consignors ?? []).map((c) => {
-                  const on = chosenConsignor === c.id;
-                  return (
-                    <Pressable
-                      key={c.id}
-                      onPress={() => setConsignor(c.id)}
-                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{c.name}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
-                Their cut comes from the split on their record. A piece that has already sold keeps
-                the consignor it sold under.
-              </Text>
-            </View>
-          ) : null}
+          {/* WHOSE PIECE IT IS — asked whether or not anybody has been added yet.
+              
+              This section used to appear only once a store had at least one consignor, which is
+              exactly backwards: a shop takes its first consigned piece BEFORE it has a consignor
+              record, usually with the person standing at the counter holding the coat. With the
+              section hidden there was nothing on the screen to say the app could do this at all,
+              so the piece went in as the store's own and the split was reconstructed later, by
+              memory. The row is always here now, and the sheet's last line is the way in. */}
+          <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
+            <SelectRow
+              label="Consignor"
+              title="Whose piece is it?"
+              value={chosenConsignor == null ? "" : String(chosenConsignor)}
+              options={[
+                { key: "", label: "Mine", hint: "Bought for the shop" },
+                ...(consignors.data?.consignors ?? []).map((c) => ({ key: String(c.id), label: c.name })),
+              ]}
+              onChange={(key) => setConsignor(key === "" ? null : Number(key))}
+              action={{
+                label: "+ Add someone…",
+                // The edit is not at risk: leaving this screen saves it (see onExit), so she comes
+                // back to the piece as she left it with the new person in the list.
+                onPress: () => router.push("/(seller)/consignors"),
+              }}
+            />
+            <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
+              {(consignors.data?.consignors ?? []).length === 0
+                ? "Nobody added yet — open this to add the person who brought it in, and their split."
+                : "Their cut comes from the split on their record. A piece that has already sold keeps the consignor it sold under."}
+            </Text>
+          </View>
 
           {/* CROSS-LISTING. Stored here, pushed when the piece publishes — never from the phone. */}
           {platforms.length > 0 ? (
@@ -633,10 +767,25 @@ export default function PieceScreen() {
             ) : null}
           </View>
 
+          {/* Done, not Save — the changes are already going whether or not this is tapped, and a
+              button that promises to do something that has happened anyway is a button that teaches
+              her to distrust the screen. Discard is the one that changes the outcome, so it says
+              what it does rather than "Cancel". */}
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
-            <Button label={save.isPending ? "Saving…" : "Save"} primary disabled={busy || !dirty || rentProblem !== null} onPress={() => save.mutate()} />
-            <Button label="Cancel" disabled={busy} onPress={() => { setMode("view"); setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null); setNewCol(""); setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined); setPacking(null); setRenting(null); setTerms(null); setError(null); }} />
+            <Button label={save.isPending ? "Saving…" : "Done"} primary disabled={busy || filling} onPress={() => (dirty ? save.mutate() : setMode("view"))} />
+            {dirty ? (
+              <Button label="Discard changes" disabled={busy || filling} onPress={() => { setMode("view"); clearEdits(); setError(null); }} />
+            ) : null}
           </View>
+          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+            {save.isPending
+              ? "Saving…"
+              : dirty
+                ? `Changes save themselves when you leave${isDraft ? " — it stays a draft until you list it" : ""}.`
+                : savedAt
+                  ? "Saved."
+                  : "Changes save themselves when you leave."}
+          </Text>
         </View>
       ) : mode === "hold" ? (
         <View style={{ marginTop: spacing.lg }}>
