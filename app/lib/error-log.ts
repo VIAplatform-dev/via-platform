@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { neon } from "@neondatabase/serverless";
 import { sendOpsAlert } from "./ops-alert";
+import { describeError } from "./error-message";
 
 // Error-monitoring foundation. The codebase had no telemetry, so failures on important paths
 // vanished into swallowed catches (the sold_items bug hid for MONTHS this way). logError() records
@@ -44,12 +45,13 @@ const ALERT_THROTTLE_MS = 10 * 60 * 1000;
  */
 export async function logError(source: string, err: unknown, opts?: { context?: Record<string, unknown>; severity?: ErrorSeverity }): Promise<void> {
  const severity = opts?.severity ?? "error";
- const message = err instanceof Error ? err.message : String(err);
+ // Not err.message: an ORM wrapper says "Failed query: …" and keeps the reason in `cause`.
+ const message = describeError(err);
  console.error(`[${source}] ${message}`, opts?.context ?? "");
  try {
  await ensureTable();
  await db()`INSERT INTO error_log (source, severity, message, context)
-  VALUES (${source}, ${severity}, ${message.slice(0, 2000)}, ${opts?.context ? JSON.stringify(opts.context).slice(0, 4000) : null}::jsonb)`;
+  VALUES (${source}, ${severity}, ${message}, ${opts?.context ? JSON.stringify(opts.context).slice(0, 4000) : null}::jsonb)`;
  } catch { /* the logger must never throw */ }
  if (severity === "critical") {
  const now = Date.now();

@@ -2,6 +2,7 @@ import { and, desc, eq, isNull, inArray, sql } from "drizzle-orm";
 import { neon } from "@neondatabase/serverless";
 import { getDb, orders, payouts, items, sellers } from "./index";
 import type { Order } from "./index";
+import { logError } from "@/app/lib/error-log";
 
 // Raw client for the additive refund/return columns that aren't in the drizzle schema yet
 // (tagged-template queries return a plain rows array, no execute-shape ambiguity).
@@ -178,6 +179,8 @@ export async function createPaidOrder(o: {
  stripePaymentIntent: string | null;
 }): Promise<Order> {
  const db = getDb();
+ // Before the insert, not after it — see ensureTaxOrderCols for the two weeks this cost.
+ await ensureTaxOrderCols();
  const [row] = await db
  .insert(orders)
  .values({
@@ -629,15 +632,42 @@ export async function setOrderNote(orderId: string, note: string | null): Promis
  * of this table handles newer fields.
  */
 let taxColsEnsured = false;
+
+/**
+ * The two sales-tax columns, added if they aren't there. Called by BOTH the writer that fills them
+ * in and createPaidOrder, which is the fix for how they came to be missing in the first place.
+ *
+ * THE DEADLOCK THIS ENDS. These columns used to be created here and nowhere else — inside
+ * setOrderTax, which only ever runs AFTER an order exists. Drizzle names every column of the table
+ * in its INSERT, so the moment `taxJurisdiction` entered the schema (31 Aug 2026) and the column
+ * did not exist, every insert into `orders` was rejected: "column tax_jurisdiction does not exist".
+ * No order could be created, so setOrderTax never ran, so the column was never added. Two weeks of
+ * sales — $2,665 across six Market Mode checkouts, one of them a cash sale at a counter — were
+ * taken with no order row behind them, and the reconciler correctly alarmed about all of them.
+ *
+ * Ensuring from the CREATE path breaks the circle: the first sale after a deploy heals the table.
+ * The two ALTERs are separate statements and a connection can drop between them (the Neon HTTP
+ * driver opens one per query), which is exactly how `tax_cents` came to exist while
+ * `tax_jurisdiction` did not — so the latch is only set once BOTH have gone through, and a failure
+ * is reported rather than swallowed. Silence here is what made this take a fortnight to find.
+ */
+export async function ensureTaxOrderCols(): Promise<void> {
+ if (taxColsEnsured) return;
+ const db = getDb();
+ try {
+  await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_cents integer`);
+  await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_jurisdiction text`);
+  taxColsEnsured = true;
+ } catch (e) {
+  // Not thrown: a sale must not fail because a column could not be added. Said out loud, though —
+  // an order insert is about to fail for a reason nobody could see last time.
+  await logError("orders-ensure-tax-cols", e, { severity: "critical" }).catch(() => {});
+ }
+}
+
 export async function setOrderTax(orderId: string, taxCents: number | null, jurisdiction: string | null): Promise<void> {
  const db = getDb();
- if (!taxColsEnsured) {
-  try {
-   await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_cents integer`);
-   await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_jurisdiction text`);
-   taxColsEnsured = true;
-  } catch { /* db:push covers it */ }
- }
+ await ensureTaxOrderCols();
  await db.update(orders)
   .set({ taxCents: taxCents == null ? null : Math.round(taxCents), taxJurisdiction: jurisdiction })
   .where(eq(orders.id, orderId));

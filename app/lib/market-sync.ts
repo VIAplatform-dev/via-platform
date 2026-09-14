@@ -6,6 +6,7 @@ import { getItem, markSold } from "./db/inventory";
 import { delistEverywhere, getCrossListingsForItem, type CrossListing } from "./cross-listing-db";
 import { creditConsignedSale } from "./consignment-db";
 import { pushSellerSale } from "./seller-push";
+import { logError } from "./error-log";
 
 // "Sold anywhere → pulled everywhere", as one function instead of two crons.
 //
@@ -56,7 +57,18 @@ export async function syncMarketplaceSalesForStore(slug: string, sinceISO: strin
   await delistEverywhere(s.sku, s.channel).catch(() => {});
   // Consigned? Credit the consignor their split. Payout stays manual — the marketplace paid the
   // store, not VYA, so there is no routed balance to auto-transfer from.
-  await creditConsignedSale({ productId: s.sku, orderId: `${s.channel}-${s.orderId}`, soldPriceCents: s.soldPriceCents, channel: s.channel }).catch(() => {});
+  //
+  // A FAILURE HERE IS SOMEBODY'S MONEY. This used to be `.catch(() => {})`, which is worse than it
+  // looks: markSold has already run, so the next pass sees status === "sold" and skips the piece
+  // entirely (the `continue` above). One dropped connection and the consignor is never credited,
+  // permanently, with nothing written down anywhere. The credit itself is idempotent — it keys on
+  // the product — so the only thing needed is to say so loudly enough that someone can put it
+  // right by hand.
+  await creditConsignedSale({ productId: s.sku, orderId: `${s.channel}-${s.orderId}`, soldPriceCents: s.soldPriceCents, channel: s.channel })
+   .catch((e) => logError("market-sync-consignor-credit", e, {
+    context: { itemId: s.sku, channel: s.channel, orderId: s.orderId, soldPriceCents: s.soldPriceCents, storeSlug: slug },
+    severity: "critical",
+   }));
   // Her phone: a sale she did not see happen, because it happened on eBay or Depop. Fire-and-forget,
   // gated by her preferences inside. (A Market Mode sale or a manual "mark sold" never pushes — she
   // was there for those; see seller-push.ts.)

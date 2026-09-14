@@ -294,12 +294,22 @@ export async function finalizeMarketSale(o: { checkoutId: string; paymentIntent:
  const refundCents = conflicts.reduce((s, l) => s + l.saleCents, 0);
  await db()`UPDATE market_checkouts SET status = 'paid_conflict', updated_at = now() WHERE id = ${c.id} AND status = 'paid'`;
  await logEvent(c.id, o.source, "paid", "paid_conflict", { items: conflicts.map((l) => l.itemId), refundCents });
- await logError("market-paid-conflict", new Error("payment received for an unsellable item"), { context: { checkoutId: c.id, items: conflicts.map((l) => l.itemId) }, severity: "critical" });
- sendOpsAlert("Market Mode: payment for an unsellable item", `Checkout ${c.id}: ${conflicts.length} item(s) were paid for but no longer sellable. Auto-refund of ${refundCents} ${c.currency} attempted — verify in Stripe.`).catch(() => {});
+ // LOGGED, NOT EMAILED — AND ONLY ONCE.
+ //
+ // This sent TWO emails per checkout: an ops alert, and a `critical` error log which emails again.
+ // When the reconcile cron was first scheduled it worked through a backlog and sent a dozen at
+ // once, each reading "Auto-refund of 57800 USD attempted — verify in Stripe". Wrong three ways:
+ // the figure is cents, no refund had been attempted (none of those checkouts had a payment
+ // intent), and nothing needed a human at 11pm. The row is already marked paid_conflict and the
+ // event log already records it — that is where this belongs.
+ //
+ // A refund that genuinely FAILS still shouts, because that is money stuck in the wrong place.
  const pi = o.paymentIntent || c.stripePaymentIntent;
- if (pi && refundCents > 0 && o.tender !== "cash") {
+ const canRefund = Boolean(pi) && refundCents > 0 && o.tender !== "cash";
+ await logError("market-paid-conflict", new Error("payment received for an unsellable item"), { context: { checkoutId: c.id, items: conflicts.map((l) => l.itemId), refundCents, willRefund: canRefund }, severity: "warn" });
+ if (canRefund) {
  const acct = seller ? await sellerAccount(seller.slug) : null;
- if (acct) await refundMarketPayment({ paymentIntent: pi, acct: acct.acct, amountCents: refundCents }).then(() => logEvent(c.id, o.source, "paid_conflict", "paid_conflict", { refunded: pi, refundCents })).catch((e) => logError("market-conflict-refund", e, { context: { checkoutId: c.id, pi }, severity: "critical" }));
+ if (acct) await refundMarketPayment({ paymentIntent: pi!, acct: acct.acct, amountCents: refundCents }).then(() => logEvent(c.id, o.source, "paid_conflict", "paid_conflict", { refunded: pi, refundCents })).catch((e) => logError("market-conflict-refund", e, { context: { checkoutId: c.id, pi, refundCents }, severity: "critical" }));
  }
  return { status: "paid_conflict", checkout: { ...c, status: "paid_conflict", orderId: orderIds[0] ?? null }, orderId: orderIds[0] ?? null, orderIds };
  }
