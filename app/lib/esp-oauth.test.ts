@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { authorizeUrl, tokenRequest, refreshRequest, makePkce, expiryFrom, isExpired, authHeader, redirectUri, espBaseUrl, KLAVIYO_SCOPES } from "./esp-oauth.ts";
+import { authorizeUrl, tokenRequest, refreshRequest, makePkce, expiryFrom, isExpired, authHeader, redirectUri, espBaseUrl, KLAVIYO_SCOPES , connectableProviders } from "./esp-oauth.ts";
 
 const base = "https://getvya.ai";
 
@@ -89,4 +89,17 @@ test("the base URL is usable even when the environment omits the scheme", () => 
  assert.equal(espBaseUrl({ ESP_BASE_URL: "http://localhost:3333" } as NodeJS.ProcessEnv), "http://localhost:3333");
  // ESP_BASE_URL wins, so testing locally doesn't mean editing the site-wide value.
  assert.equal(espBaseUrl({ ESP_BASE_URL: "http://localhost:3333", NEXT_PUBLIC_BASE_URL: "vyaplatform.com" } as NodeJS.ProcessEnv), "http://localhost:3333");
+});
+
+test("only the email tools we have an app for are offered", () => {
+ // Klaviyo was listed and greyed out, saying "we're finishing the approval with them" — which was
+ // not true. A shop that uses Klaviyo read that as "next week" and waited for something nobody was
+ // building. If it cannot be connected it is not offered.
+ const both = { MAILCHIMP_CLIENT_ID: "a", MAILCHIMP_CLIENT_SECRET: "b", KLAVIYO_CLIENT_ID: "c", KLAVIYO_CLIENT_SECRET: "d" };
+ assert.deepEqual(connectableProviders(both), ["mailchimp", "klaviyo"]);
+ // Today: the Mailchimp app exists, the Klaviyo one does not.
+ assert.deepEqual(connectableProviders({ MAILCHIMP_CLIENT_ID: "a", MAILCHIMP_CLIENT_SECRET: "b" }), ["mailchimp"]);
+ // Half a set of credentials is not an app.
+ assert.deepEqual(connectableProviders({ MAILCHIMP_CLIENT_ID: "a" }), []);
+ assert.deepEqual(connectableProviders({}), []);
 });

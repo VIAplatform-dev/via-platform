@@ -60,6 +60,18 @@ async function ensureTables() {
   price_cents INTEGER NOT NULL DEFAULT 0, sold_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_cross_listing_sales_store ON cross_listing_sales (store_slug)`;
+ // WHAT SOLD, kept rather than borrowed. The title used to be fetched by joining `items` at read
+ // time, which works right up until the item is gone — and a piece that sold on eBay six months ago
+ // is exactly the kind of thing that gets tidied out of inventory. Both of the real eBay sales in
+ // this database already point at items that no longer exist, so their titles are lost for good.
+ // A sale is a historical fact; it keeps its own copy, the same way imported_orders does.
+ await sql`ALTER TABLE cross_listing_sales ADD COLUMN IF NOT EXISTS item_title TEXT`;
+ await sql`ALTER TABLE cross_listing_sales ADD COLUMN IF NOT EXISTS currency TEXT`;
+ // Rescue what can still be rescued: rows recorded before the title was kept, whose piece is
+ // somehow still in inventory. Idempotent and cheap (only ever touches NULLs), and it runs once per
+ // process. Rows whose item has already gone cannot be recovered — that is the bug, not an oversight.
+ await sql`UPDATE cross_listing_sales c SET item_title = i.title, currency = COALESCE(c.currency, i.currency)
+  FROM items i WHERE i.id::text = c.item_id AND c.item_title IS NULL AND COALESCE(i.title, '') <> ''`.catch(() => {});
  ensured = true;
 }
 
@@ -324,9 +336,13 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
 export async function recordCrossListingSale(storeSlug: string, itemId: string, platform: string): Promise<void> {
  await ensureTables();
  const sql = db();
- const rows = (await sql`SELECT price_cents FROM items WHERE id::text = ${itemId}`.catch(() => [])) as any[];
+ // Title and currency are copied NOW, while the piece still exists. See the ALTER above for why.
+ const rows = (await sql`SELECT price_cents, title, currency FROM items WHERE id::text = ${itemId}`.catch(() => [])) as any[];
  const priceCents = Number(rows[0]?.price_cents || 0);
- await sql`INSERT INTO cross_listing_sales (store_slug, item_id, platform, price_cents) VALUES (${storeSlug}, ${itemId}, ${platform}, ${priceCents})`.catch(() => {});
+ const title = String(rows[0]?.title || "").trim().slice(0, 300) || null;
+ const currency = String(rows[0]?.currency || "").trim().toUpperCase().slice(0, 3) || null;
+ await sql`INSERT INTO cross_listing_sales (store_slug, item_id, platform, price_cents, item_title, currency)
+  VALUES (${storeSlug}, ${itemId}, ${platform}, ${priceCents}, ${title}, ${currency})`.catch(() => {});
 }
 
 export type MarketplaceRollup = {

@@ -5,7 +5,7 @@ import { verify, pushContacts } from "@/app/lib/esp-client";
 import { espAuth } from "@/app/lib/esp-auth";
 import { setEspHandover } from "@/app/lib/esp-db";
 import { describe as describeOwnership, TRANSACTIONAL_EXAMPLES, MARKETING_EXAMPLES } from "@/app/lib/email-ownership";
-import { oauthConfigured } from "@/app/lib/esp-oauth";
+import { oauthConfigured, connectableProviders } from "@/app/lib/esp-oauth";
 import { getEspConnection, setEspList, setEspAutoSync, recordEspSync, disconnectEsp } from "@/app/lib/esp-db";
 import { listCustomerProfiles } from "@/app/lib/store-customers-db";
 import { syncStore, syncProducts, syncCustomers, syncOrders } from "@/app/lib/esp-client";
@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
  const r = await espAuth(slug);
  // What VYA itself can offer — missing app credentials is our problem to fix, not something to show
  // a seller as a broken button.
- const available = PROVIDERS.map((p) => ({ ...p, available: oauthConfigured(p.key) }));
+ // Only what a store can actually connect to — see connectableProviders. Klaviyo used to be listed
+ // greyed out with "we're finishing the approval with them", which was not true of anything.
+ const offer = new Set(connectableProviders());
+ const available = PROVIDERS.filter((p) => offer.has(p.key)).map((p) => ({ ...p, available: true }));
  if (!r) return NextResponse.json({ ok: true, connected: null, providers: available });
  const c = r.conn;
  if (!r.auth) {
@@ -70,14 +73,15 @@ export async function GET(request: NextRequest) {
  });
 }
 
-/** POST { provider, apiKey } — connect. POST { listId } — choose the list. POST { sync: true } — send everyone. */
+/** POST { listId } — choose the audience. { autoSync } / { handOverMarketing } — switches.
+ *  { sync: true } — send everyone now. Connecting itself is OAuth: see connect/[provider]. */
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => null);
 
  const r0 = await espAuth(slug);
- if (!r0) return NextResponse.json({ error: "Connect Klaviyo or Mailchimp first." }, { status: 400 });
+ if (!r0) return NextResponse.json({ error: "Connect Mailchimp first." }, { status: 400 });
  const c = r0.conn;
 
  if (body?.listId) {

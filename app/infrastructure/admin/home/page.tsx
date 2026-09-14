@@ -15,6 +15,9 @@ import { SectionLabel, TechCard, BarChart, SegmentedControl, StatusPill, TH, TD 
 
 type Overview = {
  revenueCents: number; orders: number; inventory: { active: number }; customers: number;
+ /** Revenue per channel — her shop, in person, Depop, the Shopify she came from. All of it is in
+  *  the totals; this says which door each sale came through. See analytics/channels.ts. */
+ byChannel?: { channel: string; label: string; revenueCents: number; orders: number }[];
  productViews: number; favorites: number;
 };
 type Item = { id: string; title: string; priceCents: number; status: string; images?: string[]; createdAt?: string };
@@ -396,6 +399,20 @@ export default function WorkspaceHome() {
  <span className="text-[44px] leading-none tracking-[-0.01em] text-stone-900" style={serif}>{money(revC)}</span>
  {revDelta !== null && <span className={`mb-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${revDelta >= 0 ? "bg-[var(--accent-soft)] text-[var(--accent-ink)]" : "bg-rose-50 text-rose-500"}`}>{revDelta >= 0 ? "↑" : "↓"} {Math.abs(revDelta)}%</span>}
  </div>
+ {/* WHERE THE MONEY CAME FROM. Everything is in the figure above — one continuous line across the
+     move — and this says which door each part came through: her shop, the market stall, Depop, the
+     Shopify she came from. It replaces a footnote about "imported" revenue, because history she
+     brought over is not a special case, it is a channel she used to sell through, and it belongs
+     next to Depop answering the same question. Only shown once there is more than one door. */}
+ {ov?.byChannel && ov.byChannel.length > 1 && (
+  <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+   {ov.byChannel.map((c) => (
+    <span key={c.channel} className="text-[11.5px] text-stone-400">
+     <span className="text-stone-600">{c.label}</span> {money(c.revenueCents)}
+    </span>
+   ))}
+  </div>
+ )}
  </div>
  <StatusPill tone="live" dot>Live</StatusPill>
  </div>

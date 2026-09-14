@@ -6,6 +6,7 @@ import { daysListed, AGING_THRESHOLDS } from "@/app/lib/aging-core";
 import { holdPill, HOLD_LENGTHS } from "@/app/lib/holds-core";
 import { Package, Search, List, LayoutGrid, Check, X, SlidersHorizontal } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, ConfirmDialog, cn } from "../ui";
+import DepopImportPrompt from "../DepopImportPrompt";
 import { shipFromGate, type ShipFromGate } from "@/app/lib/setup-gate-core";
 import { toCsv, downloadCsv, datedFilename } from "@/app/lib/csv-export";
 import { CategoryBreadcrumb, HeaderFilter, HeaderFilterItem, CategoryFilterMenu } from "../CategoryPicker";
@@ -758,6 +759,11 @@ export default function ItemsPage() {
  </>
  }
  />
+
+ {/* "Are your products on Depop?" — asked once, and only of a store building from scratch. This is
+     the screen where an empty inventory is actually felt, so it is where the offer belongs. The card
+     decides for itself whether to appear; see DepopImportPrompt. */}
+ <DepopImportPrompt />
 
  {importOpen && (
  <ImportModal

@@ -165,8 +165,23 @@ export function authHeader(provider: EspProvider, token: string): Record<string,
 }
 
 /** Whether VYA itself is set up to offer this. Missing credentials is our problem, not the seller's. */
-export function oauthConfigured(provider: EspProvider): boolean {
+export function oauthConfigured(provider: EspProvider, env: Record<string, string | undefined> = process.env): boolean {
  return provider === "mailchimp"
-  ? Boolean(process.env.MAILCHIMP_CLIENT_ID && process.env.MAILCHIMP_CLIENT_SECRET)
-  : Boolean(process.env.KLAVIYO_CLIENT_ID && process.env.KLAVIYO_CLIENT_SECRET);
+  ? Boolean(env.MAILCHIMP_CLIENT_ID && env.MAILCHIMP_CLIENT_SECRET)
+  : Boolean(env.KLAVIYO_CLIENT_ID && env.KLAVIYO_CLIENT_SECRET);
+}
+
+/**
+ * The email tools a store can ACTUALLY connect to — the ones we have a registered app for.
+ *
+ * ONLY WHAT EXISTS. Both providers were listed and Klaviyo was shown greyed out, saying "we're
+ * finishing the approval with them" — which was not true: there is no Klaviyo app, registered or in
+ * progress. A shop that uses Klaviyo read that as "next week" and waited.
+ *
+ * Connecting is OAuth through our own app now (there is no API-key path left), so "do we have an
+ * app for this?" IS the question of whether it can be offered. Register a Klaviyo app and it
+ * appears on its own; until then it is not a thing VYA does.
+ */
+export function connectableProviders(env: Record<string, string | undefined> = process.env): EspProvider[] {
+ return (["mailchimp", "klaviyo"] as EspProvider[]).filter((p) => oauthConfigured(p, env));
 }
