@@ -2385,8 +2385,17 @@ export default function StorefrontStudio() {
  // saw a five-item menu while editing and a seven-item one on its own site. Collections aren't
  // editable pages — they're generated from inventory — so an entry opens the real page in a new tab
  // rather than switching the canvas to something that can't be edited.
+ // Her address, not ours — the same rule as View below. A relative /s/ path here opened
+ // getvya.ai/s/{handle}/collections/… in a new tab, which is a VYA address for her own shop. The
+ // proxy redirects that to her origin now anyway; building it right saves the hop, and a seller who
+ // hovers the link sees her own domain rather than ours.
  const collectionNav: ChromeNav[] = handle
- ? collections.filter((c) => c.itemCount > 0).map((c) => ({ label: c.title, href: `/s/${handle}/collections/${c.slug}?preview=1` }))
+ ? collections.filter((c) => c.itemCount > 0).map((c) => ({
+  label: c.title,
+  href: publicHost
+   ? `https://${publicHost}${settings?.enabled ? "" : "/preview"}/collections/${c.slug}`
+   : `/s/${handle}/collections/${c.slug}?preview=1`,
+ }))
  : [];
  // pageNav is [Home, Shop, ...extraPages] once the product template is dropped, so index 2 is where
  // the collections go.
@@ -2398,12 +2407,25 @@ export default function StorefrontStudio() {
   : activeSlug === "shop" ? "/shop"
   : activeSlug === "product" ? (sampleProduct ? `/p/${sampleProduct.id}` : "/shop")
   : `/${activeSlug}`;
- // A LIVE store's real address is its own — that's the URL to check, to share, and the one Google
- // indexes. The /s/ path is the preview: it renders a store that isn't published yet, which its own
- // address (correctly) will not. Sending a seller to /s/ for a live store meant the editor handed
- // out a link to the copy rather than to their shop.
+ // HER OWN ADDRESS, PUBLISHED OR NOT. A store's address is {handle}.vyasites.com and that is the
+ // only address the editor should ever hand her — to check, to share, and the one Google indexes.
+ //
+ // A DRAFT USED TO BREAK THAT. `/s/{handle}?preview=1` is relative, so it resolved against whatever
+ // host the editor was on, and View opened `getvya.ai/s/hanas-store?preview=1` — a VYA address for
+ // her shop, on the OS host, which is exactly what Plan B exists to avoid. Her own origin serves the
+ // preview perfectly well: ?preview= lifts the publish gate, and the host has nothing to do with it.
+ //
+ //     live    hanas-store.vyasites.com/shop
+ //     draft   hanas-store.vyasites.com/preview/shop
+ //
+ // A PATH, NOT A QUERY STRING. This is an address a seller reads out, remembers, and sends to
+ // somebody for a second opinion before she opens. "?preview=1" bolted on the end looks like
+ // something internal got out. The proxy maps /preview and everything under it — see proxy.ts.
+ //
+ // The relative path survives only as the fallback for when Plan B is unconfigured and there is no
+ // store origin to send her to — locally, mostly.
  const viewHref = !handle ? "#"
-  : settings?.enabled && publicHost ? `https://${publicHost}${viewPath}`
+  : publicHost ? `https://${publicHost}${settings?.enabled ? (viewPath || "/") : `/preview${viewPath}`}`
   : `/s/${handle}${viewPath}?preview=1`;
  const headerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: l.href }))];
  const footerChromeNav: ChromeNav[] = [...chromeNav, ...navLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: l.href }))];

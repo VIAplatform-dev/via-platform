@@ -6,14 +6,14 @@
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront, revertStorefrontTheme } from "./storefront-db";
 import { getTemplate, STOREFRONT_TEMPLATES, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
 import { resolveEffects, type SiteEffects } from "./storefront-effects";
-import { storePublicOrigin } from "./plan-b/store-host";
+import { storeAddress } from "./plan-b/store-host";
 import { sanitizeCode } from "./storefront-code";
 
-/** Where a shopper actually reaches this store: its own domain, else its own origin, else VYA's
- *  internal path. One definition, so no caller has to assemble a URL out of a handle. */
-function storefrontUrl(customDomain: string | null | undefined, slug: string, handle: string | null | undefined): string {
- if (customDomain) return `https://${customDomain}`;
- return storePublicOrigin(slug) ?? `https://vyaplatform.com/s/${handle || slug}`;
+/** Where a shopper actually reaches this store — or null when it has no public address yet. See
+ *  storeAddress: it used to end in `vyaplatform.com/s/{handle}`, which is a path on the marketplace
+ *  and not a shop, and the assistant would happily tell a seller that was her address. */
+function storefrontUrl(customDomain: string | null | undefined, slug: string, _handle?: string | null): string | null {
+ return storeAddress(slug, customDomain);
 }
 import { makeBlock, sanitizeBlocks, sanitizePages, pageSlugify, BLOCK_TYPE_IDS } from "./storefront-blocks";
 import { checkCustomHtml } from "./custom-html-guard";

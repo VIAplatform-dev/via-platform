@@ -14,6 +14,9 @@ import { searchItems, applySearchChrome, pickSearchTemplatePath } from "@/app/li
 import { getCartItemIds } from "@/app/lib/storefront-cart-db";
 import { applyCartBadge } from "@/app/lib/plan-b/cart-badge";
 import { injectAccountPanel } from "@/app/lib/plan-b/account-panel";
+import { injectWishlist } from "@/app/lib/plan-b/wishlist";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
+import { storeAddress } from "@/app/lib/plan-b/store-host";
 import { retagFavourites } from "@/app/lib/plan-b/favourites-icon";
 import { normaliseBuyButtons } from "@/app/lib/plan-b/button-parity";
 import { readShopperToken, SHOPPER_COOKIE } from "@/app/lib/shopper-session";
@@ -434,12 +437,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  };
  if (setCookie) headers["Set-Cookie"] = setCookie;
 
- // Canonical + indexable, so the re-hosted site ranks as itself. Served on the seller's own domain
- // → self-canonical to that domain (the real public address); served on a VYA host → the /site path.
+ // Canonical + indexable, so the re-hosted site ranks as itself — AT HER OWN ADDRESS.
+ //
+ // This used to canonicalise to `vyaplatform.com/site/{slug}` whenever the page was served from a
+ // VYA host, which told Google that the canonical home of a seller's shop was a path on the
+ // marketplace. It is not, and never was: her shop is {slug}.vyasites.com (or the domain she
+ // connected). Pointing search engines at the marketplace copy is the SEO version of the same
+ // mistake the redirect above fixes — one shop, one address.
  const host = (req.headers.get("host") || "").toLowerCase().split(":")[0];
  const isVyaHost = !host || host === "vyaplatform.com" || host === "www.vyaplatform.com" || host.endsWith(".vercel.app") || host === "localhost";
  const cleanPath = pathname === "/" || pathname === "" ? "" : pathname;
- const canonicalUrl = isVyaHost ? `https://vyaplatform.com/site/${slug}${cleanPath}` : `https://${host}${cleanPath}`;
+ // NULL rather than a marketplace path when there is no store origin: a canonical tag naming the
+ // wrong home is worse than none at all, because search engines act on it. injectSeo omits the tag
+ // when this is null.
+ const storeOrigin = storeAddress(slug);
+ const canonicalUrl = isVyaHost ? (storeOrigin ? `${storeOrigin}${cleanPath}` : null) : `https://${host}${cleanPath}`;
 
  // The CART PAGE. Its contents belong to this visitor, never to the capture, so the theme's frozen
  // (empty) cart form is replaced with their real VYA cart. Without this the theme's own "add to
@@ -542,6 +554,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const session = authSecret && cookie ? readShopperToken(cookie, slug, authSecret) : null;
   const shopName = (await getSellerBySlug(slug).catch(() => null))?.name || slug;
   base = injectAccountPanel(base, { signedInAs: session?.email ?? null, shopName });
+ }
+
+ // SAVED PIECES, when she has turned them on. Both kinds of storefront reach this line — the
+ // imported copy of her shop and the one built from sections — so the feature arrives on both from
+ // one place. Nothing is added to her markup: the browser finds product links and lays a heart over
+ // each. See wishlist.ts. A failure to read the setting means off, which is the safe way round.
+ const wishlist = await getStorefrontBySlug(slug).catch(() => null);
+ if (wishlist?.wishlistEnabled) {
+  const shopName = (await getSellerBySlug(slug).catch(() => null))?.name || slug;
+  base = injectWishlist(base, { slug, shopName });
  }
 
  // VYA OWNS COMMERCE ON EVERY STORE.

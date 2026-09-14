@@ -3211,9 +3211,13 @@ export function injectPoweredBy(html: string): string {
  * (so the page has one authoritative address) and an indexable robots directive. Both are ADDED
  * ONLY when the captured HTML doesn't already declare them — we never override the seller's own
  * canonical/robots. Injected right after <head> so crawlers read it early. */
-export function injectSeo(html: string, opts: { canonicalUrl: string }): string {
+export function injectSeo(html: string, opts: { canonicalUrl: string | null }): string {
  const tags: string[] = [];
- if (!/<link[^>]+rel=["']?canonical/i.test(html)) {
+ // NO CANONICAL AT ALL when we cannot name the right one. A canonical tag is an instruction to a
+ // search engine about where a page really lives; pointing it at a marketplace path — which is what
+ // the old fallback did — actively tells Google a seller's shop belongs to us. Silence leaves the
+ // page to be indexed as itself, which is the correct outcome and the safe one.
+ if (opts.canonicalUrl && !/<link[^>]+rel=["']?canonical/i.test(html)) {
   tags.push(`<link rel="canonical" href="${opts.canonicalUrl.replace(/"/g, "%22")}">`);
  }
  if (!/<meta[^>]+name=["']?robots/i.test(html)) {

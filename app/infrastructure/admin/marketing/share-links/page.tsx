@@ -47,16 +47,14 @@ export default function ShareLinksPage() {
  // A store on its own domain must get links to THAT domain — sending their audience
  // to vyaplatform.com is the fastest way to make them stop using these. Matches how
  // instagram-publish.ts already builds a shareable item URL.
- const baseUrl = customDomain
- ? `https://${customDomain}`
- : publicOrigin
-  ? publicOrigin
-  : handle
-   ? `https://vyaplatform.com/s/${handle}`
-   : "https://vyaplatform.com";
+ // NO VYA FALLBACK. These links are for a seller's own audience — a bio link, a Story — and one
+ // that lands on vyaplatform.com sends the people she brought to the marketplace instead of to her
+ // shop. When there is no address yet there is nothing to copy, and the panel says so rather than
+ // handing her a link she would regret posting.
+ const baseUrl = customDomain ? `https://${customDomain}` : publicOrigin || null;
  // Product pages live at /p/<id> under whichever base the store publishes on.
- const target = itemId ? `${baseUrl}/p/${itemId}` : baseUrl;
- const linkFor = (src: string) => `${target}?utm_source=${src}&utm_medium=social&utm_campaign=${itemId ? "product" : "bio"}`;
+ const target = baseUrl ? (itemId ? `${baseUrl}/p/${itemId}` : baseUrl) : "";
+ const linkFor = (src: string) => (target ? `${target}?utm_source=${src}&utm_medium=social&utm_campaign=${itemId ? "product" : "bio"}` : "");
  const chosen = items.find((i) => i.id === itemId) ?? null;
  const matches = query.trim()
  ? items.filter((i) => i.title.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 8)
@@ -73,6 +71,15 @@ export default function ShareLinksPage() {
  title="Share links"
  subtitle="One link to your own shop, written out once per platform. They all open the same page — the tag on the end is what tells you which post someone came from."
  />
+ {/* Rather than handing her a link to the marketplace, which is what this page used to do when a
+     store had no address of its own. A link she posts to her audience is not a place to guess. */}
+ {!baseUrl && (
+  <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-relaxed text-amber-900">
+   Your shop doesn&rsquo;t have a public address yet, so there&rsquo;s nothing to share here.{" "}
+   <a href="/admin/storefront" className="font-medium underline underline-offset-2">Set up your storefront</a>{" "}
+   and these links will fill in.
+  </div>
+ )}
  <p className="mb-4 text-[12px] leading-relaxed text-stone-500">
   These aren&rsquo;t links to your Instagram or Pinterest — they&rsquo;re links <b>to your store</b>, for you to
   paste <i>into</i> those places. Put the Instagram one in your Instagram bio, the TikTok one in your

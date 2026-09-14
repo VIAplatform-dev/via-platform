@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { storePublicOrigin, storeSlugForHost, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
+import { storeSlugForHost, canonicalStoreRedirect, isRefusedOnStoreHost, shopifyThemeRoute, shopifyCartSubmitRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath } from "@/app/lib/plan-b/store-host";
 import type { NextRequest } from "next/server";
 import { verifyRecipientTokenEdge } from "@/app/lib/recipientToken-edge";
 import { capturedSlugForDomain, storeHasCapture } from "@/app/lib/domain-routing-edge";
@@ -374,7 +374,21 @@ export async function proxy(request: NextRequest) {
     if (!pathname.startsWith("/_next") && !pathname.startsWith("/api")) {
       const url = request.nextUrl.clone();
       const base = (await storeHasCapture(planBSlug)) ? `/site/${planBSlug}` : `/s/${planBSlug}`;
-      url.pathname = `${base}${pathname === "/" ? "" : pathname}`;
+
+      // /preview — HER address for an unpublished shop.
+      //
+      // A draft is served by the same page as a live one; ?preview= is what lifts the publish gate.
+      // But a query string is not an address a seller can read out, remember or send to a friend for
+      // a second opinion, and "?preview=1" bolted onto a URL looks like something internal escaped.
+      // hanas-store.vyasites.com/preview is the shop, before it opens.
+      //
+      // /preview/shop, /preview/collections/summer and so on work the same way, so a seller can walk
+      // the whole draft without the address turning back into a query string.
+      const preview = pathname === "/preview" || pathname.startsWith("/preview/");
+      const rest = preview ? pathname.slice("/preview".length) : pathname;
+      if (preview) url.searchParams.set("preview", "1");
+
+      url.pathname = `${base}${rest === "/" || rest === "" ? "" : rest}`;
       return NextResponse.rewrite(url);
     }
     return NextResponse.next();
@@ -386,22 +400,36 @@ export async function proxy(request: NextRequest) {
     host === "localhost" ||
     host.endsWith(".vercel.app");
 
+  // Local dev convenience, and the OS host — see the block further down that uses this. Hoisted so
+  // the canonical-address redirect below can exempt it: the storefront editor loads a capture at
+  // /site/{slug} in a same-origin iframe on this host.
+  const isOsHost = host === "getvya.ai" || host === "www.getvya.ai" || localPort === "3333";
+
   // ── One public address per store ───────────────────────────────────────────
-  // A storefront is the seller's, and it has ONE address: {slug}.vyasites.com. /s/{slug} is how VYA
-  // renders it internally and how the editor previews a store that isn't published yet — it is not
-  // a URL to hand anyone. Left reachable, it's a second copy of every shop competing with the real
-  // one in search and turning up in shared links.
+  // A storefront is the seller's, and it has ONE address: {slug}.vyasites.com. VYA renders it
+  // internally at /s/{handle} (built from sections) and /site/{slug} (an imported capture), and
+  // neither is a URL to hand anyone. Left reachable they are a second copy of every shop competing
+  // with the real one in search, turning up in shared links — and, worse, serving her shop from the
+  // MARKETPLACE's own origin, which is the one thing Plan B exists to prevent.
   //
-  // `?preview=` is exempt: that IS the editor's preview, and a draft store has nothing to redirect
-  // to yet. Everything else moves, permanently, keeping the rest of the path.
-  if (pathname.startsWith("/s/") && !request.nextUrl.searchParams.has("preview")) {
-    const rest = pathname.slice("/s/".length);
-    const slug = rest.split("/")[0];
-    const origin = storePublicOrigin(slug);
-    if (origin) {
-      const tail = rest.slice(slug.length); // "" | "/shop" | "/p/{id}" | …
-      return NextResponse.redirect(`${origin}${tail}${request.nextUrl.search}`, 308);
-    }
+  // /s/ has redirected since it was written. /site/ had not, and imported captures are most of the
+  // shops — so most storefronts had a live duplicate on vyaplatform.com. Both go through one pure,
+  // tested decision now: see canonicalStoreRedirect.
+  //
+  // A PREVIEW MOVES TOO, carrying its query. An unpublished store still answers on its own address
+  // when asked with ?preview=1 — that parameter lifts the publish gate, not the host — so a draft
+  // gets her address just as a live shop does. Only ?edit=1 stays put: that is the captured-site
+  // editor's same-origin iframe, which has to stay on the host the editor is reading it from.
+  const editing = request.nextUrl.searchParams.get("edit") === "1";
+  const previewing = request.nextUrl.searchParams.has("preview");
+  const canonical = canonicalStoreRedirect(pathname, { isOsHost, editing, previewing });
+  if (canonical) {
+    // ?preview= has become /preview in the path; carrying it as well would be the same instruction
+    // said twice, in the address bar, on a link a seller shares.
+    const q = new URLSearchParams(request.nextUrl.searchParams);
+    q.delete("preview");
+    const search = q.size ? `?${q}` : "";
+    return NextResponse.redirect(`${canonical.origin}${canonical.tail}${search}`, 308);
   }
 
   // ── getvya.ai — the operating-system product ────────────────────────────────
@@ -413,7 +441,6 @@ export async function proxy(request: NextRequest) {
   // Local dev convenience: hitting the app on port 3333 (`npm run dev:os`) behaves like the getvya.ai
   // OS host — marketing homepage, /admin workspace, /company, etc. — so the OS surface is previewable
   // locally without editing /etc/hosts. Marketplace stays on the default port (localhost:3000).
-  const isOsHost = host === "getvya.ai" || host === "www.getvya.ai" || localPort === "3333";
   if (isOsHost) {
     const passthrough =
       pathname.startsWith("/api") ||

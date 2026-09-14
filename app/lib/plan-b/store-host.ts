@@ -252,3 +252,90 @@ export function isVyaOwnedPath(pathname: string): boolean {
  const p = (pathname || "/").toLowerCase().replace(/\/+$/, "") || "/";
  return p === "/checkout" || p.startsWith("/checkout/");
 }
+
+/**
+ * When a requested path is a SECOND copy of a storefront, the one address it should be at instead.
+ *
+ * ONE PUBLIC ADDRESS PER STORE. A storefront is the seller's and it has one address:
+ * {slug}.vyasites.com. VYA renders it internally at two paths — /s/{handle} for a storefront built
+ * from sections, /site/{slug} for an imported capture — and both were reachable on the marketplace's
+ * own host. That is three things at once, all bad:
+ *
+ *   • a second copy of every shop competing with the real one in search, and turning up in links
+ *     people share;
+ *   • her shop served from vyaplatform.com, which is the marketplace's origin — the very thing Plan
+ *     B exists to avoid. Isolation is why a store gets its own registrable domain (see the header of
+ *     this file); an address that puts her theme back on VYA's origin gives that up, which is why
+ *     everything served there has to have its scripts stripped to be safe at all;
+ *   • cookies set on that page are VYA's cookies, shared with the marketplace, rather than hers.
+ *
+ * /s/ already redirected. /site/ did not, and imported captures are most of the shops — so the
+ * majority of storefronts had a live duplicate on the marketplace. This answers for both.
+ *
+ * A PREVIEW OF A DRAFT IS STILL HER ADDRESS. ?preview=1 used to be exempt here, on the reasoning
+ * that an unpublished store has no public address to be sent to. That was wrong: the store origin
+ * serves a draft perfectly well when asked — it is ?preview= that lifts the publish gate, and the
+ * host has nothing to do with it. Left exempt, the studio's View button opened
+ * `getvya.ai/s/hanas-store?preview=1`, handing a seller a VYA address for her own shop. So a preview
+ * moves too, carrying its query.
+ *
+ * WHAT DOES NOT REDIRECT:
+ *   • `editing` — the captured-site editor loads /site/{slug}?edit=1 in a SAME-ORIGIN iframe and
+ *     reads into it. Sending that frame to another origin would leave the editor unable to see the
+ *     page it is editing. This is the one exemption, and it is about the browser, not about drafts;
+ *   • /site on the OS host, which is where that iframe lives;
+ *   • anything at all when Plan B is unconfigured (storePublicOrigin returns null) — locally there
+ *     is no store host to send anyone to, and these paths are the only way in.
+ *
+ * A store's own origin never reaches this: the proxy handles that host and returns first.
+ */
+export function canonicalStoreRedirect(
+ pathname: string,
+ opts: { isOsHost?: boolean; editing?: boolean; previewing?: boolean } = {},
+ env: Record<string, string | undefined> = process.env,
+): { origin: string; tail: string } | null {
+ if (opts.editing) return null;
+ const prefix = pathname.startsWith("/s/") ? "/s/" : pathname.startsWith("/site/") ? "/site/" : null;
+ if (!prefix) return null;
+ // The editor previews captures in a same-origin iframe on the OS host; see above.
+ if (prefix === "/site/" && opts.isOsHost) return null;
+ const rest = pathname.slice(prefix.length);
+ const slug = rest.split("/")[0];
+ if (!slug) return null;
+ const origin = storePublicOrigin(slug, env);
+ if (!origin) return null;
+ // A preview lands on the readable path the store origin serves it at, not on the query string it
+ // arrived as — one address for a draft, the same one the editor hands out. The caller drops the
+ // now-redundant ?preview= from what it appends.
+ const path = rest.slice(slug.length);
+ return { origin, tail: opts.previewing ? `/preview${path}` : path };
+}
+
+/**
+ * The address a shopper reaches this store on, or NULL when it has none.
+ *
+ * THE ONLY WAY TO NAME A STORE'S ADDRESS. Four places used to end with the same fallback —
+ * `https://vyaplatform.com/s/{handle}` or `/site/{slug}` — for the case where Plan B is
+ * unconfigured. Each was locally reasonable and collectively they meant a seller's shop could be
+ * advertised at a path on the marketplace: in the assistant's replies, in her share links, in the
+ * editor's "View live", and in the canonical tag that tells Google where her shop lives.
+ *
+ * NULL IS THE HONEST ANSWER, and the reason this returns it. When there is no store origin
+ * configured there is genuinely no public address, and a caller that is handed one anyway will
+ * cheerfully print it. A link that goes nowhere is better than a link to the wrong shop: callers
+ * hide the control instead.
+ *
+ * A VYA HOST IS NEVER AN ADDRESS, even one a seller typed into her own custom-domain box. Left
+ * through, "vyaplatform.com" in that field would send her audience to the marketplace home.
+ */
+export function storeAddress(
+ slug: string | null | undefined,
+ customDomain?: string | null,
+ env: Record<string, string | undefined> = process.env,
+): string | null {
+ const cd = (customDomain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "").trim().toLowerCase();
+ if (cd && cd.includes(".") && !VYA_HOSTS.some((v) => cd === v || cd.endsWith(`.${v}`))) {
+  return `https://${cd}`;
+ }
+ return storePublicOrigin(slug, env);
+}

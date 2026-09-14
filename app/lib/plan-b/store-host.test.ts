@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { storeSlugForHost, storePublicOrigin, storeEmailLinkOrigin, isStoreHost, storeHostSuffix, normalizeHost, isRefusedOnStoreHost, isAllowedStoreApi, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath, shopifyCartSubmitRoute } from "./store-host.ts";
+import { storeSlugForHost, storePublicOrigin, storeEmailLinkOrigin, isStoreHost, storeHostSuffix, normalizeHost, isRefusedOnStoreHost, isAllowedStoreApi, shopifyThemeRoute, squarespaceThemeRoute, squarespaceCheckoutRedirect, isVyaOwnedPath, shopifyCartSubmitRoute , canonicalStoreRedirect , storeAddress } from "./store-host.ts";
 
 const env = { STORE_HOST_SUFFIX: "vyasites.test" };
 
@@ -290,4 +290,104 @@ test("a store's own origin is what the mirror points at", () => {
  // A slug that would never be served must never be advertised either.
  assert.equal(storePublicOrigin("www", env), null);
  assert.equal(storePublicOrigin("", env), null);
+});
+
+// ── One public address per store ──────────────────────────────────────────────────────────────
+
+const PLAN_B = { STORE_HOST_SUFFIX: ".vyasites.com" };
+
+test("an imported storefront on the marketplace host is sent to its own address", () => {
+ // THE GAP THIS CLOSES. /s/ redirected and /site/ did not, and imported captures are most of the
+ // shops — so most storefronts had a live duplicate served from vyaplatform.com's own origin.
+ const r = canonicalStoreRedirect("/site/blummier", {}, PLAN_B);
+ assert.deepEqual(r, { origin: "https://blummier.vyasites.com", tail: "" });
+ // The rest of the path comes with it, so a deep link lands where it was going.
+ assert.deepEqual(canonicalStoreRedirect("/site/blummier/collections/dresses", {}, PLAN_B), {
+  origin: "https://blummier.vyasites.com", tail: "/collections/dresses",
+ });
+ assert.deepEqual(canonicalStoreRedirect("/site/blummier/products/silk-slip", {}, PLAN_B)?.tail, "/products/silk-slip");
+});
+
+test("a built storefront redirects the same way, as it already did", () => {
+ assert.deepEqual(canonicalStoreRedirect("/s/blummier", {}, PLAN_B), {
+  origin: "https://blummier.vyasites.com", tail: "",
+ });
+ assert.equal(canonicalStoreRedirect("/s/blummier/shop", {}, PLAN_B)?.tail, "/shop");
+});
+
+test("a preview redirect lands on the readable path, not the query string", () => {
+ // One address for a draft — the same one the editor hands out, and the same one a seller can read
+ // out to somebody. The caller drops the now-redundant ?preview= it arrived as.
+ assert.deepEqual(canonicalStoreRedirect("/s/hanas-store", { previewing: true }, PLAN_B), {
+  origin: "https://hanas-store.vyasites.com", tail: "/preview",
+ });
+ assert.equal(canonicalStoreRedirect("/s/hanas-store/shop", { previewing: true }, PLAN_B)?.tail, "/preview/shop");
+ assert.equal(canonicalStoreRedirect("/site/blummier/collections/dresses", { previewing: true }, PLAN_B)?.tail, "/preview/collections/dresses");
+ // A live store is not a preview and keeps the plain path.
+ assert.equal(canonicalStoreRedirect("/s/hanas-store/shop", {}, PLAN_B)?.tail, "/shop");
+});
+
+test("a preview of a draft is still sent to her own address", () => {
+ // THE BUG THIS CLOSES. ?preview= used to be exempt, so the studio's View button opened
+ // `getvya.ai/s/hanas-store?preview=1` — a VYA address for a seller's own shop. The store origin
+ // serves a draft perfectly well when asked; ?preview= lifts the publish gate, not the host.
+ assert.deepEqual(canonicalStoreRedirect("/s/hanas-store", {}, PLAN_B), {
+  origin: "https://hanas-store.vyasites.com", tail: "",
+ });
+ assert.equal(canonicalStoreRedirect("/s/hanas-store/collections/summer", {}, PLAN_B)?.tail, "/collections/summer");
+});
+
+test("the captured editor's same-origin iframe is the one thing that stays put", () => {
+ // /site/{slug}?edit=1 is loaded in an iframe the editor reads into. Sent to another origin, the
+ // editor could no longer see the page it is editing. About the browser, not about drafts.
+ assert.equal(canonicalStoreRedirect("/site/blummier", { editing: true }, PLAN_B), null);
+ assert.equal(canonicalStoreRedirect("/s/blummier", { editing: true }, PLAN_B), null);
+});
+
+test("the OS host keeps serving /site, because the editor's iframe is same-origin there", () => {
+ assert.equal(canonicalStoreRedirect("/site/blummier", { isOsHost: true }, PLAN_B), null);
+ // /s/ has redirected there since it was written; not quietly changed here.
+ assert.deepEqual(canonicalStoreRedirect("/s/blummier", { isOsHost: true }, PLAN_B)?.origin, "https://blummier.vyasites.com");
+});
+
+test("with Plan B unconfigured nothing is redirected", () => {
+ // Locally there is no store host to send anyone to, and these paths are the only way in.
+ assert.equal(canonicalStoreRedirect("/site/blummier", {}, {}), null);
+ assert.equal(canonicalStoreRedirect("/s/blummier", {}, {}), null);
+});
+
+test("paths that are not a storefront are left alone", () => {
+ assert.equal(canonicalStoreRedirect("/collections/all", {}, PLAN_B), null);
+ assert.equal(canonicalStoreRedirect("/site/", {}, PLAN_B), null);
+ assert.equal(canonicalStoreRedirect("/s/", {}, PLAN_B), null);
+ assert.equal(canonicalStoreRedirect("/", {}, PLAN_B), null);
+ // A slug that could never be served must not be advertised either.
+ assert.equal(canonicalStoreRedirect("/site/admin", {}, PLAN_B), null);
+ assert.equal(canonicalStoreRedirect("/site/Not A Slug", {}, PLAN_B), null);
+});
+
+test("a store's address is its own domain, then its own origin, then nothing", () => {
+ assert.equal(storeAddress("blummier", "blummier.com", PLAN_B), "https://blummier.com");
+ assert.equal(storeAddress("blummier", null, PLAN_B), "https://blummier.vyasites.com");
+ // Nothing configured: NULL, never a path on the marketplace. Callers hide the link instead.
+ assert.equal(storeAddress("blummier", null, {}), null);
+ assert.equal(storeAddress(null, null, PLAN_B), null);
+ assert.equal(storeAddress("", "", PLAN_B), null);
+});
+
+test("a VYA host typed into the custom-domain box is not an address", () => {
+ // Left through, this sends a seller's audience to the marketplace home instead of her shop.
+ assert.equal(storeAddress("blummier", "vyaplatform.com", PLAN_B), "https://blummier.vyasites.com");
+ assert.equal(storeAddress("blummier", "www.vyaplatform.com", PLAN_B), "https://blummier.vyasites.com");
+ assert.equal(storeAddress("blummier", "getvya.ai", PLAN_B), "https://blummier.vyasites.com");
+ assert.equal(storeAddress("blummier", "shop.getvya.ai", PLAN_B), "https://blummier.vyasites.com");
+ // And with nothing to fall back to, still nothing.
+ assert.equal(storeAddress("blummier", "vyaplatform.com", {}), null);
+});
+
+test("a domain is normalised the way a seller might have typed it", () => {
+ assert.equal(storeAddress("b", "https://Blummier.com/", PLAN_B), "https://blummier.com");
+ assert.equal(storeAddress("b", "  blummier.com  ", PLAN_B), "https://blummier.com");
+ // Not a domain at all — fall through rather than build https://nonsense.
+ assert.equal(storeAddress("blummier", "nonsense", PLAN_B), "https://blummier.vyasites.com");
 });

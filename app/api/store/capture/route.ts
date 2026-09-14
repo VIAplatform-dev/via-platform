@@ -10,7 +10,7 @@ import { runImportJob } from "@/app/lib/import-engine/wire";
 import { createJob, getActiveJob, getLatestJob, getJob, saveJob } from "@/app/lib/import-engine/jobs-db";
 import { listCaptureOrigins } from "@/app/lib/site-capture-db";
 import { describeError, isResumable, reportLine, type ImportJob } from "@/app/lib/import-engine/report";
-import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
+import { storeAddress } from "@/app/lib/plan-b/store-host";
 import { shouldReuseExistingCapture } from "@/app/lib/import-engine/reuse-capture";
 import { conflictingOwner } from "@/app/lib/import-engine/origin-owner";
 
@@ -23,15 +23,11 @@ import { conflictingOwner } from "@/app/lib/import-engine/origin-owner";
 // the Plan B suffix ({slug}.vyasites.com) — the origin the proxy actually serves her store from,
 // and the only one where her theme's own JavaScript runs (see app/lib/plan-b/store-host.ts). The
 // marketplace path is the last resort, for a deployment with Plan B switched off.
-async function siteViewUrl(slug: string): Promise<string> {
- const sf = await getStorefrontBySlug(slug).catch(() => null); /* allow-swallow: cosmetic — the fallback URL below is always valid */
- const cd = (sf?.customDomain || "").replace(/^https?:\/\//, "").replace(/\/+$/, "").trim().toLowerCase();
- // Use a connected domain ONLY if it's a real external domain. A VYA host (or a bare
- // "vyaplatform.com" left in custom_domain) would send the seller to the marketplace
- // home instead of her captured site — fall through to the store host in that case.
- const isVyaHost = cd === "vyaplatform.com" || cd.endsWith(".vyaplatform.com") || cd === "getvya.ai" || cd.endsWith(".getvya.ai");
- if (cd && cd.includes(".") && !isVyaHost) return `https://${cd}`;
- return storePublicOrigin(slug) ?? `https://vyaplatform.com/site/${slug}`;
+/** Her site's address, or null when there is none to give. The editor hides "View live" on null —
+ *  see storeAddress for why a marketplace path is not an acceptable stand-in. */
+async function siteViewUrl(slug: string): Promise<string | null> {
+ const sf = await getStorefrontBySlug(slug).catch(() => null); /* allow-swallow: cosmetic — storeAddress falls back to the store origin */
+ return storeAddress(slug, sf?.customDomain);
 }
 
 
