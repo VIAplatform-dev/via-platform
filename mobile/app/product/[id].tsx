@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, PixelRatio, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from "react-native";
 import { Image } from "expo-image";
 import { Feather } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
@@ -11,7 +11,7 @@ import { useCart } from "../../lib/cart";
 import { useFavorites } from "../../lib/useFavorites";
 import { htmlToText } from "../../lib/html";
 import { useTrackedView } from "../../lib/track";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, widthForLayout } from "../../lib/imageUrl";
 import Accordion from "../../components/Accordion";
 import ProductRail from "../../components/ProductRail";
 import HeartButton from "../../components/HeartButton";
@@ -49,6 +49,9 @@ function FloatingPill({ children, style }: { children: React.ReactNode; style?: 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
+  // The photograph fills the width of the phone, so this is the one place that asks for a big
+  // image — but still the size it is drawn at, not the multi-megabyte original off the store's CDN.
+  const px = widthForLayout(width, PixelRatio.get());
   const insets = useSafeAreaInsets();
   const cart = useCart();
   const { isFavorited, toggleFavorite } = useFavorites();
@@ -122,7 +125,7 @@ export default function ProductScreen() {
           onMomentumScrollEnd={(e) => setActive(Math.round(e.nativeEvent.contentOffset.x / width))}
         >
           {gallery.map((uri) => (
-            <Image key={uri} source={{ uri: imageUrl(uri) }} style={{ width, height: width * 1.2, backgroundColor: colors.bgCard }} contentFit="cover" transition={180} />
+            <Image key={uri} source={{ uri: imageUrl(uri, px) }} style={{ width, height: width * 1.2, backgroundColor: colors.bgCard }} contentFit="cover" transition={180} />
           ))}
         </ScrollView>
 

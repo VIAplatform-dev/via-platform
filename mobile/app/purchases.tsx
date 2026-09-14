@@ -4,7 +4,7 @@ import { Link, Redirect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { ApiError, apiGet } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { imageUrl } from "../lib/imageUrl";
+import { imageUrl, IMG } from "../lib/imageUrl";
 import { colors, fonts, spacing } from "../lib/theme";
 
 // Everything bought on VYA.
@@ -69,7 +69,7 @@ export default function PurchasesScreen() {
         const row = (
           <View style={{ flexDirection: "row", gap: spacing.md, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <View style={{ width: 64, height: 80, borderRadius: 6, overflow: "hidden", backgroundColor: colors.bgCard }}>
-              {item.image ? <Image source={{ uri: imageUrl(item.image) }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
+              {item.image ? <Image source={{ uri: imageUrl(item.image, IMG.thumb) }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
             </View>
             <View style={{ flex: 1 }}>
               {item.storeName ? (

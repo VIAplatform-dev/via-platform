@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiPost } from "../../lib/api";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
 // Asking a store about one specific piece.
@@ -39,7 +39,7 @@ export default function NewMessageScreen() {
       {title ? (
         <View style={{ flexDirection: "row", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
           <View style={{ width: 60, height: 74, backgroundColor: colors.bgCard, overflow: "hidden" }}>
-            {image ? <Image source={{ uri: imageUrl(String(image)) }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
+            {image ? <Image source={{ uri: imageUrl(String(image), IMG.thumb) }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={eyebrow}>About</Text>

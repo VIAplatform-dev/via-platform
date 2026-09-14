@@ -29,8 +29,10 @@ type AuthState = {
   loading: boolean;
   /** Development build with dev-login configured: the sign-in screen is bypassed. */
   devMode: boolean;
+  /** Re-read the session — after creating a store, so `storeSlug` stops being null. */
+  refresh: () => Promise<void>;
   requestMagicLink: (email: string) => Promise<void>;
-  verifyMagicLink: (token: string) => Promise<void>;
+  verifyMagicLink: (token: string) => Promise<string | null>;
   signInWithGoogle: (idToken: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -96,11 +98,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // BOTH sign-in paths must set storeSlug, not just the launch check above. It is what the app
   // routes a seller on, so leaving it null here would land a store owner in the shopper tabs and
   // only correct itself when they next relaunch.
+  // Returns the store, so the callback screen can send a seller to her own app rather than reading
+  // state that has not re-rendered yet.
   const verifyMagicLink = useCallback(async (linkToken: string) => {
     const r = await apiPost<{ token: string; user: User; storeSlug?: string | null }>("/api/mobile/auth/magic-link/verify", { token: linkToken });
     setStoreSlug(r.storeSlug ?? null);
     await applyToken(r.token, r.user);
     if (r.storeSlug) void registerForPush();
+    return r.storeSlug ?? null;
   }, [applyToken]);
 
   const signInWithGoogle = useCallback(async (idToken: string) => {
@@ -118,9 +123,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Surfaced so the sign-in screen can say why it's being skipped rather than flashing past.
   const devMode = devLoginConfigured();
 
+  // Asking the server again, rather than guessing locally: creating a store is the server's decision
+  // (it may have adopted an existing one, or repaired a missing access row), so the answer to "which
+  // store am I now" has to come from it.
+  const refresh = useCallback(async () => {
+    const me = await apiGet<{ user: User; token: string; storeSlug: string | null }>("/api/mobile/auth/me").catch(() => null);
+    if (!me?.user) return;
+    setUser(me.user);
+    setStoreSlug(me.storeSlug ?? null);
+  }, []);
+
   const value = useMemo<AuthState>(
-    () => ({ user, token, storeSlug, loading, devMode, requestMagicLink, verifyMagicLink, signInWithGoogle, signOut }),
-    [user, token, storeSlug, loading, devMode, requestMagicLink, verifyMagicLink, signInWithGoogle, signOut],
+    () => ({ user, token, storeSlug, loading, devMode, refresh, requestMagicLink, verifyMagicLink, signInWithGoogle, signOut }),
+    [user, token, storeSlug, loading, devMode, refresh, requestMagicLink, verifyMagicLink, signInWithGoogle, signOut],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { imageUrl } from "../lib/imageUrl";
+import { imageUrl, IMG } from "../lib/imageUrl";
 import { colors, fonts, spacing } from "../lib/theme";
 
 // The horizontally-scrolling collection cards. Text sits ON the photograph — "CURATED BY …" small
@@ -24,7 +24,7 @@ export default function CollectionRail({ collections }: { collections: Collectio
           <Pressable style={{ width: 300, height: 380 }}>
             <View style={{ width: 300, height: 380, backgroundColor: colors.bgCard, overflow: "hidden" }}>
               {c.coverImage ? (
-                <Image source={{ uri: imageUrl(c.coverImage) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
+                <Image source={{ uri: imageUrl(c.coverImage, IMG.card) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
               ) : null}
               <View style={{ position: "absolute", left: spacing.lg, right: spacing.lg, bottom: spacing.lg }}>
                 {c.curatedBy ? (

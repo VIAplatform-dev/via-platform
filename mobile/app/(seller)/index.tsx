@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
 import { apiGet, ApiError, API_BASE_URL } from "../../lib/api";
-import { storefrontAddress, type DomainState, type StorefrontState } from "../../lib/seller/storefront";
 import { rentalDay, rentalsTileLine, todayDay, type Booking } from "../../lib/seller/rentals";
 import { daySchedule, appointmentsTileLine, type Appointment } from "../../lib/seller/appointments";
 import { useAuth } from "../../lib/auth";
@@ -111,31 +110,6 @@ export default function SellerHome() {
   const insets = useSafeAreaInsets();
 
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<Me>("/api/store/me"), enabled: !!storeSlug });
-  // Both only for the address on the Storefront tile. A store with no domain connected answers 404
-  // here, which is the ordinary case, not a failure — hence the catches.
-  const domain = useQuery({
-    queryKey: ["store", "domain"],
-    queryFn: () => apiGet<DomainState>("/api/store/domain").catch(() => null),
-    enabled: !!storeSlug,
-  });
-  const sf = useQuery({
-    queryKey: ["store", "storefront"],
-    queryFn: () => apiGet<StorefrontState>("/api/store/storefront").catch(() => null),
-    enabled: !!storeSlug,
-  });
-  // ONE REQUEST FOR THE WHOLE SCREEN.
-  //
-  // This was fifteen: takings, orders, consignment, inbox, holds, inventory, setup, attention,
-  // margin, market mode, and two settings calls whose only job was deciding whether to show a tile
-  // before two more fetched what went in it. Fifteen round trips fired at once, and Home rendered
-  // at the speed of the slowest — which at a market, on cellular, is not a detail.
-  //
-  // The worst of them was /api/store/items: the WHOLE inventory, downloaded so the phone could
-  // count live pieces and work out what had been sitting over ninety days. That arithmetic now
-  // happens next to the database and three numbers cross the wire.
-  //
-  // /api/store/me stays separate — store identity has one home (see the route), it is cached, and
-  // every other screen shares the answer.
   const home = useQuery({ queryKey: ["store", "home"], queryFn: () => apiGet<HomeData>("/api/store/home"), enabled: !!storeSlug });
   const setup = useQuery({ queryKey: ["store", "onboarding-status"], queryFn: () => apiGet<{ setup: SetupStep[]; setupComplete: boolean }>("/api/store/onboarding-status"), enabled: !!storeSlug });
   const profit = useQuery({ queryKey: ["store", "suite", "margin", "30d"], queryFn: () => apiGet<{ margin?: MarginSection }>("/api/store/analytics/suite?sections=margin&period=30d"), enabled: !!storeSlug });
@@ -396,9 +370,15 @@ export default function SellerHome() {
           {/* No "Live" dot here. This tile cannot know: a storefront answers when it is switched on
               OR when a capture of her old site exists, and the tile that claimed Live unconditionally
               is part of how a 404 went unnoticed. The Store tab checks the address and says. */}
+          {/* NO ADDRESS HERE, AND THAT IS THE POINT.
+              
+              Printing the real one cost two extra requests — /api/store/domain and
+              /api/store/storefront — on every single open of the busiest screen in the app, to
+              render a line of text on a tile nobody opens Home to read. The Store tab needs both
+              anyway and fetches them there. What Home owes this tile is that the shop exists and
+              how many people follow it. */}
           <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 3 }} numberOfLines={1}>
-            {storefrontAddress(sf.data, domain.data)?.host ?? "Open to see your shop"}
-            {me.data?.storeFollowers ? ` · ${me.data.storeFollowers} follows` : ""}
+            {me.data?.storeFollowers ? `${me.data.storeFollowers} ${me.data.storeFollowers === 1 ? "follower" : "followers"}` : "Your shop, as buyers see it"}
           </Text>
         </View>
         <Feather name="chevron-right" size={18} color={colors.textDim} />

@@ -65,9 +65,12 @@ export default function InventoryScreen() {
   const params = useLocalSearchParams<{ missing?: string }>();
   const [missing, setMissing] = useState(() => parseMissing(params.missing));
 
+  // ?view=list — photo, name, price, cost, state, dates, and nothing else. The whole row is 44
+  // columns and 12.5 MB on the largest store on the platform, most of it descriptions this screen
+  // never draws. Opening a piece fetches that piece. See app/lib/item-list-shape.ts.
   const q = useQuery({
-    queryKey: ["store", "items"],
-    queryFn: () => apiGet<{ items: Item[] }>("/api/store/items"),
+    queryKey: ["store", "items", "list"],
+    queryFn: () => apiGet<{ items: Item[] }>("/api/store/items?view=list"),
     enabled: !!storeSlug,
   });
   // Which reserved pieces a PERSON is holding — the rest are buyers mid-checkout, and the two

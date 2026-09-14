@@ -192,10 +192,11 @@ export function visibleNavGroups({ isOwner, rentalsOn = null, apptsOn = null, in
 /**
  * The section a path belongs to, and the pages inside it.
  *
- * WHY: on a phone the sidebar is a drawer, so reaching Drafts from Inventory meant opening the
- * drawer, finding Inventory, then its child — three taps and a full-screen panel to move one page
- * sideways. The children are already written down here; this is what lets a screen show them along
- * the bottom, the way Market Mode shows its own tabs.
+ * NOT CURRENTLY RENDERED. It drove a row of pills along the bottom of the phone layout, which was
+ * removed: six children don't fit across a phone either, so the bar scrolled sideways with a word
+ * cut off at each edge — the same fault the analytics tab strip had. Kept because the lookup is
+ * right and tested, and the problem it was aimed at (reaching Drafts from Inventory without opening
+ * a full-screen drawer) is still real; the next attempt needs a shape that fits, not new data.
  *
  * Matching order matters: a child's href is the most specific claim, then the item's own `match`
  * list, then its href as a prefix. Checking the prefix first would put /inventory/drafts in

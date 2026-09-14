@@ -120,10 +120,14 @@ export default function PieceScreen() {
   // patch twice, and the second one races the refetch the first kicked off.
   const inFlight = useRef(false);
 
+  // THIS PIECE, not the inventory it sits in. This used to fetch every item the store has and pick
+  // one out of the list — 12.5 MB on the largest store here, downloaded to open one dress, and the
+  // same list the Inventory screen had already loaded in its lighter form. One piece comes whole:
+  // description, measurements, collections and whose piece it is, which a list does not carry.
   const q = useQuery({
-    queryKey: ["store", "items"],
-    queryFn: () => apiGet<{ items: Item[] }>("/api/store/items"),
-    enabled: !!storeSlug,
+    queryKey: ["store", "item", id],
+    queryFn: () => apiGet<{ item: Item }>(`/api/store/items/${id}`),
+    enabled: !!storeSlug && !!id,
   });
   const holds = useQuery({
     queryKey: ["store", "holds"],
@@ -160,7 +164,7 @@ export default function PieceScreen() {
     queryFn: () => apiGet<{ currency?: string; shipFrom?: { country?: string | null } | null }>("/api/store/shipping"),
     enabled: !!storeSlug,
   });
-  const item = (q.data?.items ?? []).find((i) => i.id === id);
+  const item = q.data?.item;
   const hold = (holds.data?.holds ?? []).find((h) => h.itemId === id) ?? null;
   const unit = unitFor({ country: shipping.data?.shipFrom?.country, currency: shipping.data?.currency ?? item?.currency });
 
@@ -169,6 +173,8 @@ export default function PieceScreen() {
   // as the refetch takes, and a field that flickers back to its old text reads as a failed save.
   const refresh = async () => {
     await Promise.all([
+      qc.invalidateQueries({ queryKey: ["store", "item", id] }),
+      // A prefix, so it catches both the full inventory and the list projection under it.
       qc.invalidateQueries({ queryKey: ["store", "items"] }),
       qc.invalidateQueries({ queryKey: ["store", "holds"] }),
       qc.invalidateQueries({ queryKey: ["store", "rental-terms", id] }),

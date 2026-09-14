@@ -7,7 +7,7 @@ import { useAuth } from "../../lib/auth";
 import AppHeader from "../../components/AppHeader";
 import SectionHeading from "../../components/SectionHeading";
 import CollectionRail, { type CollectionCard } from "../../components/CollectionRail";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 import { colors, fonts, spacing } from "../../lib/theme";
 
 // Shop is browsing by curation: one store held up for the day, the collections, the categories, and
@@ -49,7 +49,7 @@ export default function ShopScreen() {
               <Pressable style={{ marginHorizontal: spacing.lg }}>
                 <View style={{ height: 300, backgroundColor: colors.bgAlt, overflow: "hidden" }}>
                   {store.image ? (
-                    <Image source={{ uri: imageUrl(store.image) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
+                    <Image source={{ uri: imageUrl(store.image, IMG.hero) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
                   ) : null}
                   <View style={{ position: "absolute", left: spacing.lg, bottom: spacing.lg }}>
                     <Text style={{ fontFamily: fonts.serif, fontSize: 32, color: "#FFFFFF" }}>{store.name}</Text>
@@ -77,7 +77,7 @@ export default function ShopScreen() {
               <Link key={c.slug} href={`/category/${c.slug}`} asChild>
                 <Pressable style={{ width: 190 }}>
                   <View style={{ width: 190, height: 260, backgroundColor: colors.bgCard, overflow: "hidden" }}>
-                    <Image source={{ uri: imageUrl(c.image) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
+                    <Image source={{ uri: imageUrl(c.image, IMG.card) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
                   </View>
                   <Text style={{ marginTop: spacing.md, textAlign: "center", fontFamily: fonts.serif, fontSize: 19, color: colors.text }}>{c.label}</Text>
                 </Pressable>
@@ -94,7 +94,7 @@ export default function ShopScreen() {
                 <Pressable style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg, paddingVertical: spacing.md }}>
                   <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.bgAlt, overflow: "hidden" }}>
                     {s.image || s.logo ? (
-                      <Image source={{ uri: imageUrl(s.image || s.logo) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
+                      <Image source={{ uri: imageUrl(s.image || s.logo, IMG.thumb) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} />
                     ) : null}
                   </View>
                   <View style={{ flex: 1 }}>

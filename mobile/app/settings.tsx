@@ -19,7 +19,7 @@ function Row({ label, onPress, href, hint }: { label: string; onPress?: () => vo
 }
 
 export default function SettingsScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, storeSlug } = useAuth();
   const version = Constants.expoConfig?.version ?? "1.0.0";
 
   return (
@@ -31,6 +31,10 @@ export default function SettingsScreen() {
         </View>
       ) : null}
 
+      {/* THE ROW SHE CAME HERE FOR. Switching to the shop lived only on Account, so a store owner
+          who opened Settings — a reasonable place to look for "which side am I on" — found nothing
+          and concluded her account wasn't connected to a store at all. */}
+      {storeSlug ? <Row label="Switch to my store" href="/(seller)" hint={`Sell, list and manage ${storeSlug}`} /> : null}
       <Row label="Sizes" href="/account/sizes" hint="What we filter your feed by" />
       <Row label="Saved Searches" href="/account/saved-searches" />
       <Row

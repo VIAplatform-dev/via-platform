@@ -1,9 +1,7 @@
 import { ScrollView, Pressable, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { API_BASE_URL } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { colors, fonts, spacing } from "../lib/theme";
 
@@ -58,18 +56,12 @@ export default function BecomeAStoreScreen() {
  const insets = useSafeAreaInsets();
  const { storeSlug } = useAuth();
 
- // Someone already signed in against a store shouldn't be pitched to — send them to the workspace.
- async function openWorkspace() {
-  await WebBrowser.openBrowserAsync(`${API_BASE_URL}/admin`, {
-   presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-  }).catch(() => {});
- }
-
- async function openSignup() {
-  await WebBrowser.openBrowserAsync(`${API_BASE_URL}/store/signup`, {
-   presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-  }).catch(() => {});
- }
+ // NEITHER OF THESE OPENS A BROWSER ANY MORE.
+ //
+ // The workspace is in this app — that is the whole seller half of it — and creating a store is
+ // now a screen here too. Sending someone to Safari left their session in Safari, so they came back
+ // to an app that still didn't know who they were.
+ const openWorkspace = () => router.push("/(seller)");
 
  return (
   <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -160,18 +152,22 @@ export default function BecomeAStoreScreen() {
        </Text>
       </Pressable>
      ) : (
-      <Pressable
-       onPress={openSignup}
-       accessibilityRole="button"
-       style={{
-        backgroundColor: colors.accent, borderRadius: 999,
-        paddingVertical: spacing.lg, alignItems: "center",
-       }}
-      >
-       <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "500" }}>
-        Set up a store
+      // SETTING UP A SHOP IS A LAPTOP JOB, and saying so is better than either of the two things
+      // this did before: opening Safari (where the sign-in then stranded itself) or offering a
+      // phone-sized version of a wizard that wants a catalogue, photographs and a bank account.
+      //
+      // No button, because there is nothing here to press — the address is the instruction, and a
+      // seller reading this on her phone will do it later at a desk. Signing IN to a shop she
+      // already has is on the sign-in screen and needs no laptop.
+      <View style={{ backgroundColor: colors.bgCard, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: spacing.lg }}>
+       <Text style={{ fontSize: 15, color: colors.text, lineHeight: 22 }}>
+        Setting up a shop is done on a computer.
        </Text>
-      </Pressable>
+       <Text style={{ fontSize: 14, color: colors.textMuted, lineHeight: 20, marginTop: spacing.xs }}>
+        Go to getvya.ai on a laptop — it takes about ten minutes, and you&apos;ll want your photographs
+        and bank details to hand. Once it&apos;s set up, sign in here and your shop is in your pocket.
+       </Text>
+      </View>
      )}
 
      <Pressable

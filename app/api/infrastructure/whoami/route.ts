@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest, resolveStoreSlug } from "@/app/lib/storeAuth";
+import { getStoreProfile } from "@/app/lib/store-profile-db";
 import { auth } from "@/app/lib/auth";
 import { getStoreAccountByOwner } from "@/app/lib/store-accounts-db";
 import { addStoreUser } from "@/app/lib/store-users-db";
@@ -46,7 +47,10 @@ export async function GET(request: NextRequest) {
  // `email` on every answer, not just the onboarding one. A seller could not see which address she
  // was signed in with anywhere in the workspace — and with two accounts (a personal one and the
  // shop's) that is the first thing you need when something is missing from a screen.
- if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug, staff, email: session.user.email });
+ if (slug && slug !== "via-admin") {
+  const storeName = await getStoreProfile(slug).then((p) => p.displayName).catch(() => slug);
+  return NextResponse.json({ admin: false, slug, staff, email: session.user.email, storeName });
+ }
 
  // SECOND PLACE TO LOOK, before declaring she has no shop.
  //
@@ -67,7 +71,8 @@ export async function GET(request: NextRequest) {
   // row had gone missing came back through the repair path with staff undefined, so the onboarding
   // gate read her as an ordinary seller with a shop and bounced her to Home — the exact symptom
   // reported. Every path that can describe a signed-in person has to describe them the same way.
-  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff, email: session.user.email });
+  const repairedName = await getStoreProfile(account.slug).then((p) => p.displayName).catch(() => account.slug);
+  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff, email: session.user.email, storeName: repairedName });
  }
 
  // Authenticated but genuinely attached to nothing → the signup wizard.

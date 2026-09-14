@@ -23,13 +23,20 @@ export default function AuthCallback() {
       return;
     }
     verifyMagicLink(token)
-      .then(() => {
+      .then((slug) => {
         // DISMISS THE SHEET FIRST. The emailed link can open the app while auth/login is
         // presented as a modal, and replacing from inside a modal keeps the presentation — so
         // the whole signed-in app rendered in a card with a grey gutter above it that could be
         // swiped away. Dismiss back to the root, then replace.
         try { router.dismissAll(); } catch { /* nothing presented — a cold open from the link */ }
-        router.replace("/(tabs)");
+        // A SELLER LANDS IN HER OWN APP.
+        //
+        // This replaced to /(tabs) whatever the link was for, so a store owner who signed in ended
+        // up in the shopper marketplace with no route to her workspace — the seller half of the app
+        // was simply unreachable from a fresh sign-in. The verify call already knows which store the
+        // address belongs to; the sign-in screen has always routed on it (app/auth/login.tsx) and
+        // this is the same rule for the emailed link.
+        router.replace(slug ? "/(seller)" : "/(tabs)");
       })
       .catch(() => setError("That link has expired or was already used. Request a new one."));
   }, [params.token, verifyMagicLink]);

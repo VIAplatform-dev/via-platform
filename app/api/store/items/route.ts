@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny, isOwner } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
-import { listSellerItems, deleteAllItems, publishItems, removeItems, setItemCosts, priceWeights, updateItem, getItem } from "@/app/lib/db/inventory";
+import { listSellerItems, listSellerItemsForList, deleteAllItems, publishItems, removeItems, setItemCosts, priceWeights, updateItem, getItem } from "@/app/lib/db/inventory";
 import { findBelowFloor, describeBelowFloor, floorFor } from "@/app/lib/price-floor-core";
 import { getMinMarkupBps } from "@/app/lib/store-pricing-db";
 import { getCollectionTitlesForItems, addItemsToCollection, deleteAllCollections } from "@/app/lib/db/collections";
@@ -12,17 +12,31 @@ import { publishRefusal } from "@/app/lib/setup-gate-core";
 export const dynamic = "force-dynamic";
 
 // GET — all of the acting store's VYA-native items (any status).
+// GET — every one of the store's pieces.
+//
+// ?view=list gives the projection a LIST draws: photo, title, price, cost, category, state, dates.
+// See app/lib/item-list-shape.ts for the measurements — the whole row is 12.5 MB on the largest
+// store here, and the list reads about a tenth of it. Opt-in, because the desktop Inventory edits
+// in place and does read most of the rest; a caller that asks for nothing gets what it always got.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
  const seller = await getSellerBySlug(slug);
+ // isAdmin gates the owner-only "clear all inventory" reset.
+ const isAdmin = isOwner(request, slug);
+
+ if (request.nextUrl.searchParams.get("view") === "list") {
+  // No collections here: a list draws none, and skipping them is a second query saved as well as
+  // the bytes. The editor asks for the piece it has open, which comes with its own.
+  return NextResponse.json({ ok: true, items: seller ? await listSellerItemsForList(seller.id) : [], isAdmin });
+ }
+
  const items = seller ? await listSellerItems(seller.id) : [];
  // Attach each item's collections (titles) so the editor's picker can prefill.
  const colMap = items.length ? await getCollectionTitlesForItems(items.map((i) => i.id)).catch(() => ({} as Record<string, string[]>)) : {};
  const withCols = items.map((i) => ({ ...i, collections: colMap[i.id] || [] }));
- // isAdmin gates the owner-only "clear all inventory" reset.
- return NextResponse.json({ ok: true, items: withCols, isAdmin: isOwner(request, slug) });
+ return NextResponse.json({ ok: true, items: withCols, isAdmin });
 }
 
 // POST { action: "publish" | "remove" | "addToCollection" | "cost" | "raiseToFloor", ids: string[] } — bulk

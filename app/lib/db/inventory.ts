@@ -5,6 +5,7 @@ import { DEFAULT_RESERVATION_TTL_SECONDS, reservationExpiry } from "./inventory-
 import { logError } from "@/app/lib/error-log";
 import { cleanDescription } from "@/app/lib/clean-description";
 import { reasonForVanished } from "../unavailable-label";
+import { toListItem, type ListItem } from "../item-list-shape";
 
 // ───────────────────────────────────────────────────────────────────────────
 // One-of-one inventory engine. Every mutation that changes availability is a
@@ -422,6 +423,30 @@ export async function countAvailableItems(sellerId: string): Promise<number> {
  const db = getDb();
  const [row] = await db.select({ n: count() }).from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));
  return Number(row?.n ?? 0);
+}
+
+/**
+ * All of a seller's items, any status, projected to what a LIST draws — see item-list-shape.ts for
+ * the measurements that made this necessary. Same rows and same order as listSellerItems; a tenth
+ * of the bytes, because the columns nobody draws are never read.
+ *
+ * `images` still comes whole from the database — jsonb has no "first element" to select — and is
+ * cut down in toListItem. The three heavy text columns (description, variants, source_url) are the
+ * ones that never leave Postgres.
+ */
+export async function listSellerItemsForList(sellerId: string): Promise<ListItem[]> {
+ await ensurePublishAtColumn();
+ const db = getDb();
+ const rows = await db
+ .select({
+ id: items.id, title: items.title, priceCents: items.priceCents, costCents: items.costCents,
+ currency: items.currency, images: items.images, category: items.category, status: items.status,
+ soldAt: items.soldAt, createdAt: items.createdAt,
+ })
+ .from(items)
+ .where(eq(items.sellerId, sellerId))
+ .orderBy(desc(items.createdAt));
+ return rows.map(toListItem);
 }
 
 /** All of a seller's items, any status — for the manage view. `sku` is a per-store sequence by

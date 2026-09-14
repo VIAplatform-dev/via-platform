@@ -4,7 +4,7 @@ import { Link } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import AppHeader from "../../components/AppHeader";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 import { colors, fonts, spacing } from "../../lib/theme";
 
 // Browse — the way in when you don't have a search term: designers, and the curated collections.
@@ -32,7 +32,7 @@ export default function BrowseScreen() {
           <Link key={c.slug} href={`/collection/${c.slug}`} asChild>
             <Pressable style={{ width: 220 }}>
               <View style={{ width: 220, height: 150, borderRadius: 8, overflow: "hidden", backgroundColor: colors.bgCard }}>
-                {c.coverImage ? <Image source={{ uri: imageUrl(c.coverImage) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} /> : null}
+                {c.coverImage ? <Image source={{ uri: imageUrl(c.coverImage, IMG.card) }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={180} /> : null}
               </View>
               <Text numberOfLines={1} style={{ marginTop: spacing.sm, fontFamily: fonts.serif, fontSize: 16, color: colors.text }}>{c.name}</Text>
               <Text style={{ marginTop: 1, fontSize: 12, color: colors.textDim }}>

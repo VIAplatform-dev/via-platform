@@ -7,7 +7,7 @@ import { useCart } from "../../lib/cart";
 import { API_BASE_URL } from "../../lib/api";
 import AppHeader from "../../components/AppHeader";
 import { formatPrice, priceToNumber } from "../../lib/types";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
 // Your Bag.
@@ -67,7 +67,7 @@ export default function CartScreen() {
                   <Link href={`/product/${line.productId}`} asChild>
                     <Pressable>
                       <View style={{ width: 84, height: 100, backgroundColor: colors.bgCard, overflow: "hidden" }}>
-                        {line.image ? <Image source={{ uri: imageUrl(line.image) }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
+                        {line.image ? <Image source={{ uri: imageUrl(line.image, IMG.thumb) }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : null}
                       </View>
                     </Pressable>
                   </Link>

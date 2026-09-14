@@ -7,7 +7,7 @@ import { apiGet } from "../../lib/api";
 import { colors, spacing, radius } from "../../lib/portal-theme";
 import { flattenHits, hitTarget, isPiece, searchPlaceholder, type SearchGroup } from "../../lib/seller/search";
 import { matchDestinations } from "../../lib/seller/destinations";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 
 // The search box — the same "look up anything" the desktop has, on Home and Inventory.
 //
@@ -94,7 +94,7 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
                     because there is no picture of a customer and a blank square would be worse. */}
                 {isPiece(r.group) ? (
                   r.image ? (
-                    <Image source={{ uri: imageUrl(r.image) }} style={{ width: 44, height: 44, borderRadius: 6, backgroundColor: colors.chip }} />
+                    <Image source={{ uri: imageUrl(r.image, IMG.thumb) }} style={{ width: 44, height: 44, borderRadius: 6, backgroundColor: colors.chip }} />
                   ) : (
                     <View style={{ width: 44, height: 44, borderRadius: 6, backgroundColor: colors.chip }} />
                   )

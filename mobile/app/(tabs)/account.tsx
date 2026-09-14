@@ -60,8 +60,11 @@ export default function AccountScreen() {
         {/* The way back to the seller side. The marketplace used to bounce a store owner out of it
             on sight, so no route back was needed; now that she can browse, she needs one that
             survives switching tabs — a back gesture doesn't. */}
-        {storeSlug ? <Row href="/(seller)" icon="briefcase" label="My store" hint={`Your dashboard for ${storeSlug}`} /> : null}
-        {storeSlug ? <Row href="/store-inbox" icon="inbox" label="Store Inbox" hint={`Customer messages for ${storeSlug}`} /> : null}
+        {/* "Switch to", not "My store". This is a change of MODE — out of the marketplace and into
+            the shop — and naming it after the destination made it read as one more page about her
+            store, alongside Purchases and Saved items. She went looking for "switch to store". */}
+        {storeSlug ? <Row href="/(seller)" icon="briefcase" label="Switch to my store" hint={`Sell, list and manage ${storeSlug}`} /> : null}
+        {storeSlug ? <Row href="/store-inbox" icon="inbox" label="Store inbox" hint={`Customer messages for ${storeSlug}`} /> : null}
       </ScrollView>
     </View>
   );

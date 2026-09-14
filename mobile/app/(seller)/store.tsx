@@ -11,7 +11,7 @@ import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { filterItems } from "../../lib/seller/inventory";
 import { storefrontAddress, describeReach, describeServeMode, shopLine, NO_ADDRESS, type DomainState, type StorefrontState } from "../../lib/seller/storefront";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 
 // The Store tab — her storefront, running inside the app.
 //
@@ -67,15 +67,25 @@ export default function StoreScreen() {
     queryFn: () => apiGet<DomainState>("/api/store/domain").catch(() => null),
     enabled: !!storeSlug,
   });
-  // Only read for the fallback below — the storefront itself renders her pieces its own way.
-  const items = useQuery({ queryKey: ["store", "items"], queryFn: () => apiGet<{ items: Item[] }>("/api/store/items"), enabled: !!storeSlug });
-
   const address = storefrontAddress(sf.data, domain.data);
   const reached = describeReach(status, domain.data);
   const kind = describeServeMode(sf.data);
   // A status we have and that is not a success means the page she asked for is not there. Anything
   // still in flight is not a failure yet.
   const broken = status !== undefined && (status === 0 || status >= 400);
+
+  // ONLY WHEN THE FALLBACK IS ACTUALLY NEEDED.
+  //
+  // This fetched the whole inventory on every visit to the tab, to have a grid ready in case the
+  // storefront failed to load. For a shop with real stock that is 4.3 MB of JSON downloaded and
+  // parsed on a phone — measured, not guessed — to render something usually never shown. The
+  // storefront draws her pieces itself; this list is the remainder for when it can't.
+  const needFallback = !address || broken;
+  const items = useQuery({
+    queryKey: ["store", "items", "list"],
+    queryFn: () => apiGet<{ items: Item[] }>("/api/store/items?view=list"),
+    enabled: !!storeSlug && needFallback,
+  });
 
   const retry = () => { setStatus(undefined); setLoading(true); webRef.current?.reload(); };
 
@@ -188,7 +198,7 @@ function Window({ items, followers, loading }: { items: Item[]; followers?: numb
             <Link key={it.id} href={{ pathname: "/(seller)/piece/[id]", params: { id: it.id } }} asChild>
               <Pressable style={{ width: `${(100 - 4) / 2}%` }}>
                 {it.images?.[0] ? (
-                  <Image source={{ uri: imageUrl(it.images[0]) }} style={{ width: "100%", aspectRatio: 0.8, borderRadius: radius, backgroundColor: colors.chip }} />
+                  <Image source={{ uri: imageUrl(it.images[0], IMG.card) }} style={{ width: "100%", aspectRatio: 0.8, borderRadius: radius, backgroundColor: colors.chip }} />
                 ) : (
                   <View style={{ width: "100%", aspectRatio: 0.8, borderRadius: radius, backgroundColor: colors.chip }} />
                 )}

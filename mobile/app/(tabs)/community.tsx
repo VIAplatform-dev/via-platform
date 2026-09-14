@@ -8,7 +8,7 @@ import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import AppHeader from "../../components/AppHeader";
 import SubTabs from "../../components/SubTabs";
-import { imageUrl } from "../../lib/imageUrl";
+import { imageUrl, IMG } from "../../lib/imageUrl";
 import { colors, fonts, spacing } from "../../lib/theme";
 
 // Community and Messages share a tab: both are "people talking", one in public and one to a store.
@@ -90,7 +90,7 @@ export default function CommunityScreen() {
                   <Text style={{ marginTop: spacing.md, fontSize: 16, lineHeight: 22, color: colors.text }}>{item.content}</Text>
                 ) : null}
                 {item.image_url ? (
-                  <Image source={{ uri: imageUrl(item.image_url) }} style={{ marginTop: spacing.md, width: "100%", aspectRatio: 1, backgroundColor: colors.bgCard }} contentFit="cover" transition={180} />
+                  <Image source={{ uri: imageUrl(item.image_url, IMG.hero) }} style={{ marginTop: spacing.md, width: "100%", aspectRatio: 1, backgroundColor: colors.bgCard }} contentFit="cover" transition={180} />
                 ) : null}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.md }}>
                   <Ionicons name={item.liked_by_me ? "heart" : "heart-outline"} size={20} color={item.liked_by_me ? colors.accent : colors.textMuted} />

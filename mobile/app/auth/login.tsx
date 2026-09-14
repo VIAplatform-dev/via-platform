@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, Text, TextInput, useWindowDimensions, View, KeyboardAvoidingView } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import * as WebBrowser from "expo-web-browser";
-import { Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import Animated, {
  Easing,
@@ -14,7 +13,6 @@ import Animated, {
  withTiming,
  type SharedValue,
 } from "react-native-reanimated";
-import { API_BASE_URL } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, fonts, spacing } from "../../lib/theme";
 
@@ -153,11 +151,23 @@ export default function LoginScreen() {
   }
  }
 
- // Creating a store is a web flow (/store/signup); there is no native equivalent to send her to.
- async function openStoreSignup() {
-  await WebBrowser.openBrowserAsync(`${API_BASE_URL}/store/signup`, {
-   presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-  }).catch(() => setError("Couldn’t open store sign-up. Try again."));
+ // SIGNING IN AS A STORE IS THE SAME LINK.
+ //
+ // A store owner had nothing to press here: one button offered to make her a customer, the other
+ // to start a store she already owns — and that one opened Safari, where the session then stayed.
+ //
+ // There is one sign-in. The emailed link resolves whose address it is (storeSlugForMobileEmail)
+ // and the callback routes a seller into the seller app. So this is the same action as the button
+ // above, said in the words a store owner is looking for.
+ //
+ // CREATING a store is not here on purpose. That is a laptop job — a wizard, a catalogue import,
+ // photographs — and pretending a phone can start it was what sent people to a browser.
+ async function signInAsStore() {
+  if (!email.trim().includes("@")) {
+   setError("Enter the email your shop is registered to.");
+   return;
+  }
+  await send();
  }
 
  if (sent) {
@@ -165,7 +175,8 @@ export default function LoginScreen() {
    <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.xl, justifyContent: "center" }}>
     <Text style={{ fontFamily: fonts.serif, fontSize: 26, color: colors.text }}>Check your email</Text>
     <Text style={{ marginTop: spacing.md, fontSize: 15, lineHeight: 22, color: colors.textMuted }}>
-     We sent a link to {email.trim()}. Tap the link from this device to sign in.
+     We sent a link to {email.trim()}. Open it on this phone — it signs you straight into the app, and
+     if that address runs a shop it opens your store.
     </Text>
     <Pressable onPress={() => { setSent(false); setError(null); }} style={{ marginTop: spacing.xl }}>
      <Text style={{ fontSize: 15, color: colors.text, textDecorationLine: "underline" }}>Back to Sign In</Text>
@@ -270,18 +281,12 @@ export default function LoginScreen() {
     >
      {busy
       ? <ActivityIndicator color={colors.accentText} />
-      : <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "500" }}>Join as a customer</Text>}
+      : <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "500" }}>Join now or log in to shop</Text>}
     </Pressable>
 
-    <Pressable
-     onPress={openStoreSignup}
-     accessibilityRole="button"
-     style={{
-      marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 999,
-      paddingVertical: spacing.lg, alignItems: "center", backgroundColor: colors.bgCard,
-     }}
-    >
-     <Text style={{ color: colors.text, fontSize: 15, fontWeight: "500" }}>Get started as a store</Text>
+    {/* Smaller, under the main action: a store owner is signing IN, not joining. */}
+    <Pressable onPress={signInAsStore} accessibilityRole="button" style={{ marginTop: spacing.lg, alignItems: "center" }}>
+     <Text style={{ color: colors.textMuted, fontSize: 13, textDecorationLine: "underline" }}>Sign in as a store</Text>
     </Pressable>
 
     <Text
