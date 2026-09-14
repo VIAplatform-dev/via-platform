@@ -9,7 +9,7 @@ import CommandBar from "./CommandBar";
 import { loginHref } from "@/app/store/auth-route";
 import StoreAnalytics from "@/app/components/StoreAnalytics";
 import { signOut } from "next-auth/react";
-import { B, M, MARKET_GROUPS, MARKET_TABS, visibleNavGroups } from "./nav";
+import { B, M, MARKET_GROUPS, MARKET_TABS, visibleNavGroups, sectionFor } from "./nav";
 
 // What the sidebar contains lives in ./nav.ts as data (and is tested there); this file only knows
 // how to draw it. Icons arrive as names so that file stays loadable without React.
@@ -25,6 +25,8 @@ function withPreview(path: string): string {
 
 export default function InfrastructureLayout({ children }: { children: React.ReactNode }) {
  const pathname = usePathname();
+ // Which section this page belongs to, and which of its pages is open (nav.ts).
+ const section = sectionFor(pathname ?? "");
  const router = useRouter();
  const [ok, setOk] = useState<boolean | null>(null);
  const [navOpen, setNavOpen] = useState(false); // mobile drawer
@@ -401,7 +403,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </aside>
  {/* min-w-0: a flex child's min-width defaults to its content's, which let a long unbreakable row push
  the whole page wider than a phone; clipping the root stops any stray overflow from adding a sideways scroll. */}
- <main className={`ml-0 min-w-0 flex-1 pt-14 lg:ml-[228px] lg:pt-0 ${marketMode && inMarketArea ? "pb-16 lg:pb-0" : ""}`}>{children}</main>
+ <main className={`ml-0 min-w-0 flex-1 pt-14 lg:ml-[228px] lg:pt-0 ${marketMode && inMarketArea ? "pb-16 lg:pb-0" : !marketMode && section ? "pb-20 lg:pb-0" : ""}`}>{children}</main>
  {/* Phone bottom tab bar — Market Mode is used one-handed at a table, so the core loop is thumb-reachable. */}
  {marketMode && inMarketArea && (
  <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
@@ -415,6 +417,36 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  );
  })}
  </nav>
+ )}
+ {/* THE SECTION'S OWN PAGES, ALONG THE BOTTOM.
+     
+     On a phone the sidebar is a drawer, so moving from Inventory to Drafts meant opening it,
+     finding Inventory, then its child — a full-screen panel and three taps to go one page sideways.
+     The children are already written down in nav.ts; this puts the current section's along the
+     bottom, the way Market Mode already does with its own tabs.
+     
+     Hidden from lg, where the sidebar shows the same children expanded and this would be a second
+     copy of a menu already on screen. Never shown in Market Mode, which has its own bar there. */}
+ {!marketMode && section && (
+  <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+   <div className="flex items-center gap-1 overflow-x-auto px-2 py-2">
+    <Link
+     href={withPreview(section.item.href)}
+     className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium ${section.current === section.item.href ? "bg-stone-900 text-white" : "text-stone-500"}`}
+    >
+     {section.item.label}
+    </Link>
+    {section.item.children!.map((c) => (
+     <Link
+      key={c.href}
+      href={withPreview(c.href)}
+      className={`shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium ${section.current === c.href ? "bg-stone-900 text-white" : "text-stone-500"}`}
+     >
+      {c.label}
+     </Link>
+    ))}
+   </div>
+  </nav>
  )}
  {!marketMode && <Sidekick />}
  <CommandBar hidden={inboxOff ? ["p-inbox"] : undefined} />

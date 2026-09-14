@@ -4,6 +4,7 @@ import { getProductById } from "@/app/lib/db";
 import { deriveSize } from "@/app/lib/inventory";
 import { formatPrice } from "@/app/lib/formatPrice";
 import { stores } from "@/app/lib/stores";
+import { getStoreProfile } from "@/app/lib/store-profile-db";
 import { inferBroadCategory } from "@/app/lib/publicFilters";
 
 export const dynamic = "force-dynamic";
@@ -34,15 +35,21 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
  }
  if (images.length === 0 && p.image) images = [p.image];
 
- // Pull store policies if available
+ // Store policies: WHAT THE SELLER WROTE first, then what VYA recorded at onboarding.
+ //
+ // This served the hardcoded text from app/lib/stores.ts and nothing else, so a seller could
+ // rewrite her policies in Settings → Policies and the app's product page — which reads this
+ // route — would still show the paragraph VYA typed for her when she joined.
+ //
+ // `authenticity` has no seller-editable field yet, so it stays curated; it is VYA's claim about
+ // how the shop is vetted rather than the shop's promise to a buyer.
  const storeInfo = stores.find((s) => s.slug === p.store_slug);
- const storePolicies = storeInfo
- ? {
-  authenticity: (storeInfo as { authenticityPolicy?: string }).authenticityPolicy ?? null,
-  shipping: (storeInfo as { shippingPolicy?: string }).shippingPolicy ?? null,
-  returns: (storeInfo as { returnPolicy?: string }).returnPolicy ?? null,
- }
- : { authenticity: null, shipping: null, returns: null };
+ const profile = await getStoreProfile(String(p.store_slug)).catch(() => null);
+ const storePolicies = {
+  authenticity: (storeInfo as { authenticityPolicy?: string } | undefined)?.authenticityPolicy ?? null,
+  shipping: profile?.policies?.shipping?.trim() || (storeInfo as { shippingPolicy?: string } | undefined)?.shippingPolicy || null,
+  returns: profile?.policies?.returns?.trim() || (storeInfo as { returnPolicy?: string } | undefined)?.returnPolicy || null,
+ };
 
  return NextResponse.json({
  id: p.id,

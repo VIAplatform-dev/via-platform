@@ -167,12 +167,20 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
  if (settings && !settings.enabled) {
   return (
    <div className="mt-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
-    <p className="flex items-center gap-2 text-[12.5px] text-stone-600">
-     <CalendarRange size={14} className="shrink-0 text-stone-400" />
-     Renting is off for your store.{" "}
-     <a href={withStore("/admin/settings/rentals")} className="font-medium text-stone-900 underline underline-offset-2">Turn it on in Settings</a>
-     {" "}to rent pieces out.
-    </p>
+    {/* ONE SENTENCE, NOT THREE COLUMNS.
+        
+        `flex` on the <p> made every text node its own flex item, so on a phone the sentence broke
+        into three stacked columns — "Renting is off for your store." | "Turn it on in Settings" |
+        "to rent pieces out." The icon is the only thing that wants to be a flex item; the words
+        want to be a paragraph. */}
+    <div className="flex items-start gap-2">
+     <CalendarRange size={14} className="mt-0.5 shrink-0 text-stone-400" />
+     <p className="text-[12.5px] leading-relaxed text-stone-600">
+      Renting is off for your store.{" "}
+      <a href={withStore("/admin/settings/rentals")} className="font-medium text-stone-900 underline underline-offset-2">Turn it on in Settings</a>
+      {" "}to rent pieces out.
+     </p>
+    </div>
    </div>
   );
  }

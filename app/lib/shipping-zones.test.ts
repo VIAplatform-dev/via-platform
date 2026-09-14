@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { zoneFor, quoteShipping, servedZones, normalizeZones, tierPriceCents, DEFAULT_ZONES } from "./shipping-zones.ts";
+import { zoneFor, quoteShipping, servedZones, normalizeZones, tierPriceCents, DEFAULT_ZONES, shipsTo, describeServedZones, shippingReach } from "./shipping-zones.ts";
 
 const MEDIUM = { weightOz: 30, lengthIn: 14, widthIn: 10, heightIn: 4 };
 
@@ -89,4 +89,47 @@ test("junk from a form doesn't become a rate", () => {
 test("normalising nothing gives the closed default", () => {
  assert.deepEqual(servedZones(normalizeZones(null)), ["domestic"]);
  assert.deepEqual(servedZones(normalizeZones(undefined)), ["domestic"]);
+});
+
+// ── Telling a shopper where a store posts, before she types an address ───────
+// The rule already existed at checkout and nowhere earlier: a shopper in a country a store doesn't
+// serve chose a piece, filled in a full address and was refused at the card.
+
+test("shipsTo answers the checkout question without an address", () => {
+ const uk = { domestic: { enabled: true }, europe: { enabled: true }, north_america: { enabled: false }, rest_of_world: { enabled: false } };
+ assert.equal(shipsTo(uk, "GB", "GB"), true);
+ assert.equal(shipsTo(uk, "GB", "FR"), true);
+ assert.equal(shipsTo(uk, "GB", "US"), false);
+ assert.equal(shipsTo(uk, "GB", "AU"), false);
+ // A US store with the same config reads its OWN country as domestic.
+ assert.equal(shipsTo(uk, "US", "US"), true);
+ assert.equal(shipsTo(uk, "US", "GB"), true);
+});
+
+test("where a store ships, as a phrase", () => {
+ assert.equal(describeServedZones({ domestic: { enabled: true }, europe: { enabled: false }, north_america: { enabled: false }, rest_of_world: { enabled: false } }, "GB"), "GB");
+ assert.equal(
+  describeServedZones({ domestic: { enabled: true }, europe: { enabled: true }, north_america: { enabled: true }, rest_of_world: { enabled: true } }, "GB"),
+  "worldwide",
+ );
+ assert.equal(
+  describeServedZones({ domestic: { enabled: true }, europe: { enabled: true }, north_america: { enabled: false }, rest_of_world: { enabled: false } }, "GB"),
+  "GB and Europe",
+ );
+});
+
+test("with no idea where she is, it says where the store ships and claims nothing about her", () => {
+ const uk = { domestic: { enabled: true }, europe: { enabled: true }, north_america: { enabled: false }, rest_of_world: { enabled: false } };
+ const unknown = shippingReach(uk, "GB");
+ assert.equal(unknown.ships, null);
+ assert.match(unknown.line, /^Ships to GB and Europe\.$/);
+ // A junk country is not a guess either.
+ assert.equal(shippingReach(uk, "GB", "not-a-country").ships, null);
+
+ const outside = shippingReach(uk, "GB", "US");
+ assert.equal(outside.ships, false);
+ assert.match(outside.line, /doesn't post to US/);
+ assert.match(outside.line, /GB and Europe/);
+
+ assert.equal(shippingReach(uk, "GB", "FR").ships, true);
 });

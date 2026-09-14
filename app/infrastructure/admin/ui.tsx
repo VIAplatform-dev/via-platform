@@ -135,9 +135,9 @@ export function StatusPill({ tone = "neutral", dot, children, className, title }
 }
 
 // ── Toggle — green when on ──
-export function Toggle({ on, onClick, className }: { on: boolean; onClick?: () => void; className?: string }) {
+export function Toggle({ on, onClick, disabled, className }: { on: boolean; onClick?: () => void; disabled?: boolean; className?: string }) {
  return (
- <button type="button" onClick={onClick} aria-pressed={on} className={cn("relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition", on ? "bg-[var(--accent,#0e9f76)]" : "bg-stone-200", className)}>
+ <button type="button" onClick={onClick} disabled={disabled} aria-pressed={on} className={cn("relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition", on ? "bg-[var(--accent,#0e9f76)]" : "bg-stone-200", disabled && "cursor-not-allowed opacity-50", className)}>
  <span className={cn("inline-block h-[17px] w-[17px] rounded-full bg-white shadow transition", on ? "translate-x-[19px]" : "translate-x-[3px]")} />
  </button>
  );

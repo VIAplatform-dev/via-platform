@@ -47,13 +47,15 @@ test("a mismatch is only a mismatch when the tiers differ", () => {
  assert.deepEqual(m, {
   typedTier: "small",
   estimatedTier: "large",
-  message: "You typed 8 oz, but this looks like a coat (large parcel). Buyers get quoted the small tier and you pay the difference.",
+  // Her weight is what gets used — the note says so first, then flags the cost. It used to open
+  // with "You typed 8 oz, but…", which was read as a refusal rather than a warning.
+  message: "Using your 8 oz — buyers pay the small tier. Worth a check: from the photos this looks like a coat (large parcel), and if it is, you'd cover the difference on postage.",
  });
 });
 
 test("the mismatch message names the piece when it can, and the tier when it can't", () => {
  const m = parcelMismatch({ typedWeightOz: 60, estimate: { tier: "small", weightOz: 8, source: "ai" } });
- assert.equal(m?.message, "You typed 60 oz, but this looks like a small parcel. Buyers get quoted the large tier — that's more than it needs.");
+ assert.equal(m?.message, "Using your 60 oz — buyers pay the large tier. From the photos this looks like a small parcel, so buyers may be paying more postage than it needs.");
 });
 
 test("describeParcel reads as a label: tier, and the weight in pounds when it's over one", () => {

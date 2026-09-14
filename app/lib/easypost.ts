@@ -56,6 +56,9 @@ function toEpCustoms(d: CustomsDeclaration) {
   non_delivery_option: d.nonDeliveryOption,
   customs_certify: true,
   customs_signer: d.certifySigner,
+  // The seller's VAT registration, when she gave us one. EasyPost takes it on the customs info
+  // as a tax identifier; omitted entirely when absent, never sent blank.
+  ...(d.exporterTaxId ? { customs_info_tax_ids: [{ entity: "SENDER", tax_id: d.exporterTaxId.number, tax_id_type: "VAT" }] } : {}),
   // Null means the seller owes an AES filing we can't invent — send nothing rather than a false one.
   ...(d.eelPfc ? { eel_pfc: d.eelPfc } : {}),
   customs_items: d.lines.map((l) => ({

@@ -1,7 +1,7 @@
 import { getInboxSettings } from "./storefront-settings-db";
 import { sendStoreMessageNotification } from "./email";
 import { sendLinqText, linqConfigured } from "./linq";
-import { stores, storeContactEmails } from "./stores";
+import { stores } from "./stores";
 import { pushSellerMessage } from "./seller-push";
 
 // The store's inbox lives in the getvya.ai Owner Workspace (not the marketplace host).
@@ -19,7 +19,12 @@ export async function notifyStoreOfMessage(
  try {
  const store = stores.find((s) => s.slug === storeSlug);
  const storeName = store?.name || storeSlug;
- const storeEmail = storeContactEmails[storeSlug];
+ // The address SHE can set, then the one we recorded, then the one she signs in with. Reading the
+ // hardcoded map alone meant a shop that signed up for itself had no entry, `storeEmail` was
+ // undefined, the `if` below never ran — and a shopper's message was sent to nobody while the
+ // screen said it had been delivered.
+ const { storeContactOrNone } = await import("./email");
+ const storeEmail = await storeContactOrNone(storeSlug);
  const settings = await getInboxSettings(storeSlug).catch(() => null);
 
  if (storeEmail) {

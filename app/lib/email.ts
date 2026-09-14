@@ -5,7 +5,6 @@ import type { ReminderCategory } from "@/app/lib/giveaway-db";
 import type { DBProduct } from "@/app/lib/db";
 import { makeRecipientToken } from "@/app/lib/recipientToken";
 import { signUnsubToken } from "@/app/lib/buyer-auth";
-import { storeContactEmails } from "@/app/lib/stores";
 import { storeEmailHtml } from "@/app/lib/email-template";
 import type { Offer } from "@/app/lib/offers-db";
 
@@ -76,14 +75,32 @@ export function routableEmail(email: string | null | undefined): string | null {
 }
 
 /**
- * Where a store's OWN notifications land — the address it already sends from, else the curated
- * contact, else ops. One definition, so a store that sets a reply-to gets its alerts there too
- * instead of us quietly mailing a hardcoded list.
+ * Where a store's OWN notifications land. One definition — store-contact.ts holds the order.
+ *
+ * IT USED TO STOP AT THE HARDCODED MAP, which meant it only worked for the shops VYA onboarded by
+ * hand. Every store that signed up for itself fell through to ops, so its offers and order alerts
+ * came to us instead of to the seller. It now also reads the support address she can actually edit
+ * (Settings → Store details) and, failing everything, the address she signs in with.
+ *
+ * Ops remains the last resort HERE, because this function's callers are VYA's own alerting and mail
+ * that reaches nobody is worse than mail that reaches us. Anything addressed to the store AS the
+ * store should call storeContactOrNone instead.
  */
 export async function storeOwnerInbox(storeSlug: string): Promise<string> {
- const { resolveStoreSender } = await import("./email-settings-db");
- const sender = await resolveStoreSender(storeSlug).catch(() => null);
- return routableEmail(sender?.replyTo) || routableEmail(storeContactEmails[storeSlug]) || OPS_ALERT_EMAIL;
+ const { getStoreContactEmail } = await import("./store-contact-db");
+ const found = await getStoreContactEmail(storeSlug).catch(() => null);
+ return routableEmail(found) || OPS_ALERT_EMAIL;
+}
+
+/**
+ * The store's own address, or null when it truly has none.
+ *
+ * For mail that is FOR the seller and meaningless to anyone else — a shopper's message, an offer.
+ * Sending those to ops doesn't help the seller and does put a buyer's words in VYA's inbox.
+ */
+export async function storeContactOrNone(storeSlug: string): Promise<string | null> {
+ const { getStoreContactEmail } = await import("./store-contact-db");
+ return routableEmail(await getStoreContactEmail(storeSlug).catch(() => null));
 }
 
 /**
@@ -135,7 +152,7 @@ export async function sendNewOfferToStore(offer: Offer): Promise<void> {
  const item = offer.itemTitle || "one of your pieces";
  await getResend().emails.send({
  from: FROM_EMAIL,
- to: storeContactEmails[offer.storeSlug] || OPS_ALERT_EMAIL,
+ to: await storeOwnerInbox(offer.storeSlug),
  subject: `New offer: ${offerMoney(offer.amountCents)} on ${item}`,
  html: `<p><b>${offer.buyerName || "A shopper"}</b> offered <b>${offerMoney(offer.amountCents)}</b> on <b>${item}</b> (asking ${offerMoney(offer.listPriceCents)}).</p>
  <p>${offerBtn(`${BASE_URL}/infrastructure/admin/inbox`, "Review in your inbox")}</p>`,
@@ -153,7 +170,7 @@ export async function sendOfferUpdateToStore(offer: Offer): Promise<void> {
  : offer.status === "withdrawn" ? "withdrew their offer" : "passed on the deal";
  await getResend().emails.send({
  from: FROM_EMAIL,
- to: storeContactEmails[offer.storeSlug] || OPS_ALERT_EMAIL,
+ to: await storeOwnerInbox(offer.storeSlug),
  subject: `Offer update on ${item}`,
  html: `<p>The buyer ${line} on <b>${item}</b>.</p><p>${offerBtn(`${BASE_URL}/infrastructure/admin/inbox`, "Open your inbox")}</p>`,
  });
@@ -178,7 +195,7 @@ export async function sendConsignmentExpiryDigest(
  const n = items.length;
  await getResend().emails.send({
  from: FROM_EMAIL,
- to: storeContactEmails[storeSlug] || OPS_ALERT_EMAIL,
+ to: await storeOwnerInbox(storeSlug),
  subject: `${n} consignment${n === 1 ? "" : "s"} reached ${n === 1 ? "its" : "their"} end date`,
  html: `<p>${n === 1 ? "A consignment" : `${n} consignments`} hit the end date you agreed with the consignor. Return the piece${n === 1 ? "" : "s"}, or renew the terms to keep ${n === 1 ? "it" : "them"} listed.</p>
  <table style="border-collapse:collapse;width:100%;max-width:520px;font-size:14px;margin:14px 0;"><thead><tr><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ddd;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#a29b93;">Item</th><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ddd;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#a29b93;">Consignor</th><th style="text-align:left;padding:8px 12px;border-bottom:2px solid #ddd;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:#a29b93;">Ended</th></tr></thead><tbody>${rows}</tbody></table>
@@ -215,7 +232,7 @@ export async function sendSourcingAlert(
  ).join("");
  await getResend().emails.send({
  from: FROM_EMAIL,
- to: storeContactEmails[storeSlug] || OPS_ALERT_EMAIL,
+ to: await storeOwnerInbox(storeSlug),
  subject,
  html: `<p>New sourcing opportunities on VYA — where buyers' demand is rising and few stores carry it. Worth sourcing while the window's still open.</p>
   <table style="border-collapse:collapse;width:100%;max-width:560px;margin:14px 0;">${rows}</table>
@@ -3234,8 +3251,16 @@ export async function sendBuyerOrderConfirmation(p: {
  if (!p.buyerEmail) return;
  const resend = getResend();
  const { resolveStoreSender } = await import("./email-settings-db");
- const [sender, brand] = await Promise.all([resolveStoreSender(p.storeSlug), getStoreEmailBrand(p.storeSlug)]);
+ const [sender, brand, profile] = await Promise.all([
+ resolveStoreSender(p.storeSlug),
+ getStoreEmailBrand(p.storeSlug),
+ // The business behind the shop. A receipt is a document from a business to its customer, and a
+ // seller who filled in her company and VAT numbers was told they would appear on exactly this.
+ import("./store-profile-db").then((m) => m.getStoreProfile(p.storeSlug)).catch(() => null),
+ ]);
  const storeName = sender.fromName || p.storeName;
+ const { receiptLegalLine } = await import("./legal-identity");
+ const legalLine = profile ? receiptLegalLine(profile, storeName) : "";
  const t = txnTokens(brand);
  const totalCents = p.subtotalCents + p.shippingCents;
  const { makeOrderToken } = await import("./orderToken");
@@ -3275,6 +3300,7 @@ export async function sendBuyerOrderConfirmation(p: {
  </div>` : ""}
  <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 22px;">${p.collect ? `Your piece is being held for you at ${escapeHtml(storeName)} — nothing to post, just come and collect it.` : `${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.`}</p>
  <div style="text-align:center;margin:4px 0;"><a href="${orderUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 34px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;">View your order →</a></div>
+ ${legalLine ? `<p style="font-size:11px;color:${t.muted};line-height:1.6;margin:22px 0 0;text-align:center;">${escapeHtml(legalLine)}</p>` : ""}
  `;
  const html = storeTransactionalShell(brand, storeName, "Order confirmed", content);
  // From the STORE the buyer ordered from (their verified domain when set, else VYA's shared

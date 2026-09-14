@@ -241,6 +241,13 @@ export type CustomsDeclaration = {
  /** null when the shipment needs an AES filing the seller has to make themselves. */
  eelPfc: string | null;
  certifySigner: string;
+ /**
+  * The exporter's tax identifier, when the store gave us one (Settings → Store details).
+  *
+  * VAT only — a company registration number is not a tax id, and putting one in this field is a
+  * wrong answer on a legal declaration rather than a harmless extra. See legal-identity.ts.
+  */
+ exporterTaxId: { number: string; type: "VAT" } | null;
  /** Return it rather than abandon it: an abandoned parcel is a lost item AND a refund. */
  nonDeliveryOption: "return";
  totalValueCents: number;
@@ -259,6 +266,8 @@ export function buildDeclaration(opts: {
  dutyMode: DutyMode;
  signer: string;
  parcelWeightOz: number;
+ /** The store's VAT number, when it has one. Optional: most sellers won't be VAT registered. */
+ exporterTaxId?: { number: string; type: "VAT" } | null;
 }): CustomsDeclaration {
  const items = opts.items.filter(Boolean);
  const from = String(opts.fromCountry || "").trim().toUpperCase();
@@ -282,6 +291,7 @@ export function buildDeclaration(opts: {
   contentsType: "merchandise",
   eelPfc: eelPfc(totalValueCents, from),
   certifySigner: String(opts.signer || "").slice(0, 80) || "Seller",
+  exporterTaxId: opts.exporterTaxId ?? null,
   nonDeliveryOption: "return",
   totalValueCents,
  };

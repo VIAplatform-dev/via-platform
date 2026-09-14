@@ -9,7 +9,7 @@ import { toCategorySlug } from "@/app/lib/item-tags";
 import { PriceScale } from "../PriceScale";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 import { ConditionChips, MeasurementFields, measurementsFromForm, useStoreUnits } from "../ListingStructure";
-import { PACKAGING, packagingById, packedWeightOz, suggestPackaging } from "@/app/lib/packaging";
+import { PACKAGING, packagingById, packedWeightOz, suggestPackaging, weightForPackaging } from "@/app/lib/packaging";
 import { toOz, fromOz } from "@/app/lib/weight-units";
 import { assignTier } from "@/app/lib/shipping-tiers";
 import { normalizeCondition } from "@/app/lib/condition-core";
@@ -822,8 +822,11 @@ export default function IntakePage() {
  <MeasurementFields category={form.category} values={measurements} onChange={setMeasurements} unit={units.unit} />
  {!Object.values(measurements).some((v) => v && v.trim()) && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on — listings with measurements sell faster. Add the key ones.</p>}
  </div>
- <div className="grid grid-cols-2 gap-3">
- <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, Math.round(rawMarketCents / 100), priceLow, priceHigh)); if (floorUsd) setBelowFloor((Number(v) || 0) > 0 && (Number(v) || 0) < floorUsd); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="You set it, or AI estimates" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
+ {/* ONE COLUMN ON A PHONE. Side by side at 390px left each field about 170px wide: the price
+     placeholder truncated mid-word ("You set it, or AI estin") and the cost label wrapped onto two
+     lines, which pushed its input below the price input. Two columns from `sm` up, where they fit. */}
+ <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+ <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, Math.round(rawMarketCents / 100), priceLow, priceHigh)); if (floorUsd) setBelowFloor((Number(v) || 0) > 0 && (Number(v) || 0) < floorUsd); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="Your price, or leave for AI" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
  <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
  </div>
  {/* Raw market, not the suggestion — the band either side of it is built from raw market, so a
@@ -922,8 +925,18 @@ export default function IntakePage() {
   value={packing}
   onChange={(e) => {
    const box = packagingById(e.target.value);
+   const prevStandard = String(weightForPackaging(packing));
    setPacking(e.target.value);
-   if (box) { set("lengthIn", String(box.lengthIn)); set("widthIn", String(box.widthIn)); set("heightIn", String(box.heightIn)); }
+   if (box) {
+    set("lengthIn", String(box.lengthIn)); set("widthIn", String(box.widthIn)); set("heightIn", String(box.heightIn));
+    // THE WEIGHT COMES WITH THE BOX. Reported from a real listing: picking medium, then changing to
+    // small, left the medium weight behind — a parcel quoted at one tier and posted at another.
+    //
+    // Only when she hasn't set a weight of her own. A hand-typed weight is a measurement, and a
+    // box she picked afterwards must not silently overwrite something she weighed.
+    const hers = String(form.weightOz || "").trim();
+    if (!hers || hers === prevStandard) set("weightOz", String(weightForPackaging(box.id)));
+   }
   }}
  >
   {PACKAGING.map((b) => <option key={b.id} value={b.id}>{b.label} — {b.hint}</option>)}
@@ -941,7 +954,11 @@ export default function IntakePage() {
    value={form.weightOz ? String(fromOz(form.weightOz, units.weightUnit)) : ""}
    onChange={(e) => {
     const typed = e.target.value.replace(/[^\d]/g, "");
-    set("weightOz", typed ? String(toOz(typed, units.weightUnit)) : "");
+    const oz = typed ? toOz(typed, units.weightUnit) : null;
+    set("weightOz", oz ? String(oz) : "");
+    // AND THE BOX FOLLOWS THE WEIGHT. Heavier than the box she has selected can hold means the
+    // box was wrong, not the scale — she is the one holding the piece.
+    if (oz) setPacking(suggestPackaging(oz));
    }}
    placeholder={aiParcel?.weightOz ? String(fromOz(aiParcel.weightOz, units.weightUnit)) : units.weightUnit}
    aria-label={`Weight of the piece in ${units.weightUnit === "g" ? "grams" : "ounces"}`}

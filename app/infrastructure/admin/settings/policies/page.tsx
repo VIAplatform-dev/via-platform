@@ -74,7 +74,7 @@ export default function PoliciesPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Policies" subtitle="Your terms and privacy policy. Linked from every page of your storefront." />
+   <AdminHeader eyebrow="Settings" title="Policies" subtitle="What you write here is what buyers are shown and what they agree to at checkout. Linked from every page of your storefront." />
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
 
    {!p ? (
@@ -103,6 +103,13 @@ export default function PoliciesPage() {
        <ScrollText size={15} className="mt-0.5 shrink-0 text-stone-400" />
        <p className="text-[12.5px] leading-relaxed text-stone-500">{current.blurb}</p>
       </div>
+      {tab === "returns" && (
+       <p className="mb-3 rounded-lg bg-stone-50 px-3 py-2.5 text-[12px] leading-relaxed text-stone-500">
+        This is the page buyers read, and the same text as the returns box under General → Returns —
+        edit it in either place. The <span className="font-medium text-stone-700">rules</span> a refund
+        actually follows — how many days, any restocking fee, who pays return postage — are set there too.
+       </p>
+      )}
       <textarea
        value={p[tab]}
        onChange={(e) => { setP({ ...p, [tab]: e.target.value }); setSaved(null); }}
@@ -116,7 +123,7 @@ export default function PoliciesPage() {
       <TechButton onClick={save} disabled={busy}>{busy ? "Saving…" : `Save ${current.label.toLowerCase()}`}</TechButton>
       {saved === tab && <StatusPill tone="live">Saved</StatusPill>}
       <span className="ml-auto text-[11.5px] text-stone-400">
-       {written(tab) ? "Live on your storefront." : "Not written yet — your storefront won’t link to it."}
+       {written(tab) ? "Live on your storefront — on VYA pages. A site you imported keeps its own policy pages." : "Not written yet — your storefront won’t link to it."}
       </span>
      </div>
     </TechCard>

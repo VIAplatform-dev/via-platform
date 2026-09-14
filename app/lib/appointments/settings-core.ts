@@ -17,6 +17,13 @@ export type AppointmentSettings = {
  openingHours: OpeningWindow[];
  blackoutDates: string[];
  slotMinutes: number;
+ /**
+  * Quiet minutes after each appointment before the next can start. 0 = back to back.
+  *
+  * The appointment itself is still `slotMinutes` long — this is the gap AFTER it, for putting the
+  * rail back, steaming what was tried on, and not having the next person walk in on the last one.
+  */
+ bufferMinutes: number;
  /** How many people the shop can see at once. */
  slotCapacity: number;
  types: string[];
@@ -48,6 +55,9 @@ export const DEFAULT_APPOINTMENT_SETTINGS: AppointmentSettings = {
  openingHours: [],
  blackoutDates: [],
  slotMinutes: 45,
+ // Back to back unless a shop asks otherwise: a default gap would quietly cut the bookable day
+ // of every store already taking appointments.
+ bufferMinutes: 0,
  slotCapacity: 1,
  types: ["Try-on", "Pickup", "Return"],
  leadHours: 12,
@@ -121,6 +131,8 @@ export function resolveAppointmentSettings(stored?: Partial<AppointmentSettings>
    ? s.blackoutDates.filter((x) => typeof x === "string" && DAY.test(x)).slice(0, 366)
    : d.blackoutDates,
   slotMinutes: Math.min(Math.max(count(s.slotMinutes, d.slotMinutes, 480), 5), 480),
+  // No floor of 5 here, unlike the slot length: 0 is the ordinary answer and means "no gap".
+  bufferMinutes: Math.min(count(s.bufferMinutes, d.bufferMinutes, 480), 480),
   slotCapacity: Math.min(Math.max(count(s.slotCapacity, d.slotCapacity, 50), 1), 50),
   types: Array.isArray(s.types)
    ? (s.types.filter((t) => typeof t === "string" && t.trim()).map((t) => String(t).trim().slice(0, 40)).slice(0, 8) || d.types)

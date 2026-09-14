@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Mail, Activity, Bell } from "lucide-react";
 import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid, ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SETTINGS_GROUPS, sectionFor } from "./sections";
+import { SETTINGS_GROUPS, sectionFor, groupFor, groupSlug } from "./sections";
 import { cn } from "../ui";
 
 // Settings gets its own left rail, the way Shopify's does.
@@ -51,6 +51,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
  const pathname = usePathname() || "";
  const current = sectionFor(pathname);
  const onIndex = !current;
+ const group = groupFor(pathname);
 
  return (
   <div className="mx-auto flex w-full max-w-[1120px] gap-0 px-6 py-9 max-lg:flex-col max-lg:gap-4 max-lg:px-5 sm:px-8">
@@ -90,7 +91,36 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     )}
    </nav>
 
-   <div className="min-w-0 flex-1 pl-8 max-lg:pl-0">{children}</div>
+   {/* Room for the bar below, so the last setting on a page can scroll clear of it. */}
+   <div className="min-w-0 flex-1 pl-8 max-lg:pb-20 max-lg:pl-0">{children}</div>
+
+   {/* THE GROUPS, ALONG THE BOTTOM.
+       
+       Sixteen sections in one scrolling list means scrolling past most of them to reach any of them,
+       and on a phone the left rail is hidden entirely — so the only way around Settings was back to
+       the index and down. These are the three or four names a seller actually thinks in ("that's a
+       selling thing"), and each jumps to that group on the index.
+       
+       Not the sections themselves: sixteen chips is the same scroll, moved to the bottom. */}
+   <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Settings groups">
+    <div className="flex items-center gap-1 overflow-x-auto px-2 py-2">
+     <Link
+      href={INDEX_HREF}
+      className={cn("shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium", onIndex ? "bg-stone-900 text-white" : "text-stone-500")}
+     >
+      All
+     </Link>
+     {groups.map((g) => (
+      <Link
+       key={g.label}
+       href={`${INDEX_HREF}#${groupSlug(g.label)}`}
+       className={cn("shrink-0 rounded-full px-3.5 py-2 text-[13px] font-medium", group?.label === g.label ? "bg-stone-900 text-white" : "text-stone-500")}
+      >
+       {g.label}
+      </Link>
+     ))}
+    </div>
+   </nav>
   </div>
  );
 }

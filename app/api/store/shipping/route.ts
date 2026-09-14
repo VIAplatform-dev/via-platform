@@ -6,6 +6,7 @@ import { isDutyMode, resolveDutyMode, DEFAULT_DUTY_MODE } from "@/app/lib/custom
 import { isLabelPrinter, DEFAULT_LABEL_PRINTER } from "@/app/lib/label-format-core";
 import { normalizeZones, DEFAULT_ZONES } from "@/app/lib/shipping-zones";
 import { SHIPPING_TIERS } from "@/app/lib/shipping-tiers";
+import { storeHasCardOnFile, billsTheStore } from "@/app/lib/store-card";
 import { validateZoneRates } from "@/app/lib/shipping-prices-core";
 import { stores } from "@/app/lib/stores";
 import { ensureTaxHeadOffice } from "@/app/lib/store-tax-db";
@@ -45,6 +46,9 @@ export async function GET(request: NextRequest) {
   expeditedOffered: s.expeditedOffered === true,
   pricing: s.pricing ?? "live",
   zones: s.zones ?? DEFAULT_ZONES,
+  // Whether VYA can bill this store for a label. The two "you absorb it" modes are refused without
+  // it — app/lib/store-card.ts says why that belongs here rather than at the printer.
+  canAbsorb: await storeHasCardOnFile(slug),
   tiers: SHIPPING_TIERS.map((t) => ({ id: t.id, label: t.label, priceCents: t.priceCents, examples: t.examples })),
  });
 }
@@ -62,6 +66,20 @@ export async function POST(request: NextRequest) {
  const has = (k: string) => body != null && Object.prototype.hasOwnProperty.call(body, k);
 
  const mode = (MODES.includes(body?.mode) ? body.mode : existing?.mode ?? "buyer_pays") as ShipMode;
+
+ // A store cannot promise free postage it has no way to pay for: both "you absorb it" modes put
+ // the label on its own card. The form disables them; this is the same rule behind the form,
+ // because a disabled radio is a suggestion and a route is a rule.
+ //
+ // Only on the way IN to one of those modes. Blocking every save while the mode is already set
+ // would refuse an unrelated address edit from Locations, and punish a store for a card that
+ // expired rather than telling it.
+ if (has("mode") && billsTheStore(mode) && existing?.mode !== mode && !(await storeHasCardOnFile(slug))) {
+  return NextResponse.json(
+   { error: "Add a card under Billing first — when you absorb shipping, the label is charged to it the moment you print it." },
+   { status: 400 },
+  );
+ }
  const threshUsd = Number(body?.freeThresholdUsd);
  const freeThresholdCents = mode === "free_over"
   ? (Number.isFinite(threshUsd) && threshUsd > 0 ? Math.round(threshUsd * 100) : existing?.freeThresholdCents ?? null)

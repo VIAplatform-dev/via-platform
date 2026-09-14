@@ -118,6 +118,49 @@ export function servedZones(zones?: ZoneConfig | null): ZoneId[] {
  return ZONE_IDS.filter((z) => cfg[z]?.enabled);
 }
 
+/**
+ * Does this store post to that country?
+ *
+ * THE QUESTION A SHOPPER ASKS FIRST AND WAS ANSWERED LAST. A store that doesn't serve a region was
+ * refused at CHECKOUT — after choosing a piece, filling in a name, a street and a postcode, and
+ * reaching the card. Everything above this line already knew; nothing told her. So the same rule is
+ * available to a product page, in one call, with no address typed.
+ */
+export function shipsTo(zones: ZoneConfig | null | undefined, fromCountry: unknown, toCountry: unknown): boolean {
+ const cfg = { ...DEFAULT_ZONES, ...(zones || {}) };
+ return cfg[zoneFor(fromCountry, toCountry)]?.enabled === true;
+}
+
+/** "the UK, Europe and North America" — the places a store posts to, as a phrase. */
+export function describeServedZones(zones: ZoneConfig | null | undefined, fromCountry?: unknown): string {
+ const served = servedZones(zones);
+ if (served.length === 0) return "nowhere yet";
+ if (served.length === ZONE_IDS.length) return "worldwide";
+ const home = String(fromCountry ?? "").trim().toUpperCase();
+ const names = served.map((z) => (z === "domestic" ? (/^[A-Z]{2}$/.test(home) ? home : ZONE_LABELS.domestic.toLowerCase()) : ZONE_LABELS[z]));
+ if (names.length === 1) return names[0];
+ return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * What to tell a shopper about postage before she has typed anything.
+ *
+ * `toCountry` is wherever we think she is — a geo header, a saved address, or nothing at all. With
+ * nothing, it says where the store ships and makes no claim about her; a guess dressed as a fact
+ * ("we don't ship to you") would be worse than silence when the guess is wrong.
+ */
+export function shippingReach(
+ zones: ZoneConfig | null | undefined,
+ fromCountry: unknown,
+ toCountry?: unknown,
+): { ships: boolean | null; line: string } {
+ const where = describeServedZones(zones, fromCountry);
+ const to = String(toCountry ?? "").trim().toUpperCase();
+ if (!/^[A-Z]{2}$/.test(to)) return { ships: null, line: `Ships to ${where}.` };
+ if (shipsTo(zones, fromCountry, to)) return { ships: true, line: `Ships to ${to}.` };
+ return { ships: false, line: `This shop doesn't post to ${to} — it ships to ${where}.` };
+}
+
 /** Normalise whatever a settings form posted into something safe to store. */
 export function normalizeZones(raw: unknown): ZoneConfig {
  const out: ZoneConfig = {};

@@ -7,6 +7,8 @@
 
 import { getItem } from "./db/inventory";
 import { getShippingSettings } from "./store-shipping-db";
+import { getStoreProfile } from "./store-profile-db";
+import { customsSigner, customsTaxId } from "./legal-identity";
 import { buildDeclaration, isInternational, restrictedMaterials, resolveDutyMode, type CustomsDeclaration, type RestrictionWarning, DEFAULT_DUTY_MODE } from "./customs";
 
 export type OrderCustoms = {
@@ -45,6 +47,7 @@ export async function customsForOrder(opts: {
  const priceCents = item?.priceCents ?? opts.fallbackValueCents ?? 0;
 
  const shipping = await getShippingSettings(opts.storeSlug).catch(() => null);
+ const profile = await getStoreProfile(opts.storeSlug).catch(() => null);
  // A store may only promise "duties covered" when the carrier bills IT, not VYA — see
  // resolveDutyMode. On the shared wallet this silently becomes buyer-pays, and `dutyDowngraded`
  // says so, because a seller who thinks she's covering duty will say so on her storefront.
@@ -63,7 +66,11 @@ export async function customsForOrder(opts: {
   }],
   fromCountry: opts.fromCountry,
   dutyMode,
-  signer: opts.sellerName,
+  // The registered business signs it, not the shop's trading name — and her VAT number travels
+  // with it. Both come from Settings → Store details, which promised exactly this and, until now,
+  // did nothing with either. See legal-identity.ts.
+  signer: customsSigner(profile ?? {}, opts.sellerName),
+  exporterTaxId: customsTaxId(profile ?? {}),
   parcelWeightOz: opts.parcelWeightOz,
  });
 

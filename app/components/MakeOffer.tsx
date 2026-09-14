@@ -16,23 +16,31 @@ export default function MakeOffer({ storeSlug, itemId, itemTitle, listPriceCents
  const [busy, setBusy] = useState(false);
  const [err, setErr] = useState("");
  const [token, setToken] = useState<string | null>(null);
+ // The lowest this store will look at. Told up front rather than discovered by being refused.
+ const [minPct, setMinPct] = useState(0);
 
  useEffect(() => {
  let active = true;
  fetch(`/api/storefront/offer?slug=${encodeURIComponent(storeSlug)}`)
  .then((r) => (r.ok ? r.json() : null))
- .then((d) => { if (active && d?.offersEnabled) setEnabled(true); })
+ .then((d) => { if (active && d?.offersEnabled) { setEnabled(true); setMinPct(Number(d.minOfferPct) || 0); } })
  .catch(() => {});
  return () => { active = false; };
  }, [storeSlug]);
 
  if (!enabled) return null;
  const list = `$${Math.round(listPriceCents / 100).toLocaleString()}`;
+ // The floor as money, because nobody offers in percentages.
+ const minCents = minPct > 0 ? Math.round((listPriceCents * minPct) / 100) : 0;
+ const minMoney = `$${Math.round(minCents / 100).toLocaleString()}`;
 
  async function submit(e: React.FormEvent) {
  e.preventDefault();
  const amountCents = Math.round(parseFloat(price) * 100);
  if (!amountCents || amountCents <= 0) { setErr("Enter an offer amount."); return; }
+ // Caught here as well as on the server. The server is the rule; this is so she finds out while
+ // she is still looking at the box, rather than after filling in her name and email.
+ if (minCents > 0 && amountCents < minCents) { setErr(`This seller takes offers from ${minMoney}.`); return; }
  setBusy(true); setErr("");
  try {
  const r = await fetch("/api/storefront/offer", {
@@ -56,7 +64,7 @@ export default function MakeOffer({ storeSlug, itemId, itemTitle, listPriceCents
  const field = "w-full border border-black/20 bg-white/70 px-2.5 py-1.5 text-[12px] outline-none focus:border-black/50";
  return (
  <form onSubmit={submit} className="mt-2 flex flex-col gap-1.5">
- <input type="number" min="1" step="1" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder={`Your offer (asking ${list})`} className={field} />
+ <input type="number" min={minCents > 0 ? Math.round(minCents / 100) : 1} step="1" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder={minCents > 0 ? `Your offer (from ${minMoney}, asking ${list})` : `Your offer (asking ${list})`} className={field} />
  <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Your email (for the reply)" className={field} />
  <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className={field} />
  <button type="submit" disabled={busy} className="self-start px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white disabled:opacity-50" style={{ background: accent }}>

@@ -22,6 +22,10 @@ import TrackProductView from "@/app/components/TrackProductView";
 import TrackedStoreLink from "@/app/components/TrackedStoreLink";
 import AddToCollectionButton from "@/app/components/AddToCollectionButton";
 import { formatPrice } from "@/app/lib/formatPrice";
+import { headers } from "next/headers";
+import { getShippingSettings } from "@/app/lib/store-shipping-db";
+import { shippingReach } from "@/app/lib/shipping-zones";
+import { getStoreProfile } from "@/app/lib/store-profile-db";
 import VyaVerifiedBadge from "@/app/components/VyaVerifiedBadge";
 
 type ProductPageProps = {
@@ -218,6 +222,25 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  const recommendations = finalPool.slice(0, 4).map((s) => s.product);
 
  const storeConfig = stores.find((s) => s.slug === storeSlug);
+
+ // WHERE THIS SHOP POSTS, SAID HERE RATHER THAN AT THE CARD.
+ //
+ // A store that doesn't serve a region refused the order at CHECKOUT — after the shopper had chosen
+ // the piece, typed a name, a street and a postcode, and reached payment. The rule was knowable from
+ // the first page view and nothing said it until the last one. The country is whatever the edge saw
+ // (the header store-visits already reads); with no country, shippingReach says where the shop posts
+ // and claims nothing about the reader, because a wrong "we don't ship to you" costs a sale that was
+ // never in doubt.
+ // WHAT THE SELLER WROTE, NOT WHAT WE TYPED FOR HER.
+ //
+ // This page read `stores[].shippingPolicy` and `.returnPolicy` — text hardcoded in the repo when
+ // each partner was onboarded — and never looked at store_profiles.policies, which is what
+ // Settings → Policies saves. So a seller rewrote her returns policy, saw it live on her own
+ // storefront, and the marketplace kept showing the words VYA wrote for her months earlier.
+ const profile = await getStoreProfile(storeSlug).catch(() => null);
+ const shopperCountry = (await headers()).get("x-vercel-ip-country");
+ const storeShipping = await getShippingSettings(storeSlug).catch(() => null);
+ const reach = shippingReach(storeShipping?.zones, storeShipping?.shipFrom?.country, shopperCountry);
  const store = storeConfig ?? {
  slug: product.store_slug,
  name: product.store_name,
@@ -467,13 +490,21 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  <p className="mb-3 font-medium text-black">{storeConfig.perk}</p>
  )}
  <p className="mb-1 font-medium text-black text-xs uppercase tracking-wide">Shipping</p>
- <p className="mb-4">
- {storeConfig?.shippingPolicy ??
+ {/* The one line a shopper outside the shipping area needs — before she spends ten minutes
+     on an address that will be refused at the card. */}
+ <p className={`mb-2 ${reach.ships === false ? "font-medium text-black" : ""}`}>{reach.line}</p>
+ <p className="mb-4 whitespace-pre-line">
+ {profile?.policies?.shipping?.trim() ||
+ storeConfig?.shippingPolicy ||
  `This item ships directly from ${store.name}${storeConfig?.location ? ` (${storeConfig.location})` : ""}. Shipping rates and delivery times are determined by the store at checkout.`}
  </p>
  <p className="mb-1 font-medium text-black text-xs uppercase tracking-wide">Returns</p>
- <p>
- {storeConfig?.returnPolicy ??
+ {/* Her policy first, then what VYA recorded at onboarding, then the safe generic line. `??`
+     was part of the bug: a store whose hardcoded policy was an empty string still beat the
+     fallback, so the section rendered blank. */}
+ <p className="whitespace-pre-line">
+ {profile?.policies?.returns?.trim() ||
+ storeConfig?.returnPolicy ||
  `All sales are final. Please review all item details carefully before purchasing.`}
  </p>
  </div>

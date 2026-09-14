@@ -188,3 +188,36 @@ export function visibleNavGroups({ isOwner, rentalsOn = null, apptsOn = null, in
   }))
   .filter((g) => g.items.length > 0);
 }
+
+/**
+ * The section a path belongs to, and the pages inside it.
+ *
+ * WHY: on a phone the sidebar is a drawer, so reaching Drafts from Inventory meant opening the
+ * drawer, finding Inventory, then its child — three taps and a full-screen panel to move one page
+ * sideways. The children are already written down here; this is what lets a screen show them along
+ * the bottom, the way Market Mode shows its own tabs.
+ *
+ * Matching order matters: a child's href is the most specific claim, then the item's own `match`
+ * list, then its href as a prefix. Checking the prefix first would put /inventory/drafts in
+ * Inventory via the wrong route and lose which child is current.
+ */
+export function sectionFor(pathname: string, groups: NavGroup[] = GROUPS): { item: NavItem; current: string } | null {
+ const path = (pathname || "").split("?")[0].replace(/\/+$/, "") || "/";
+ // Settings has its own bar (settings/layout.tsx) listing its GROUPS — Store, Selling, Channels —
+ // because sixteen sections don't fit along the bottom and the five children below are an arbitrary
+ // handful of them. Two bars stacked is worse than either.
+ if (path === `${B}/settings` || path.startsWith(`${B}/settings/`)) return null;
+ const items = groups.flatMap((g) => g.items).filter((i) => (i.children?.length ?? 0) > 0);
+
+ for (const item of items) {
+  const child = item.children!.find((c) => c.href === path);
+  if (child) return { item, current: child.href };
+ }
+ for (const item of items) {
+  if (item.href === path || (item.match ?? []).some((m) => path === m || path.startsWith(`${m}/`))) return { item, current: path };
+ }
+ for (const item of items) {
+  if (path.startsWith(`${item.href}/`)) return { item, current: path };
+ }
+ return null;
+}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GROUPS, MARKET_GROUPS, MARKET_TABS, visibleNavGroups, type NavGroup } from "./nav.ts";
+import { GROUPS, MARKET_GROUPS, MARKET_TABS, visibleNavGroups, type NavGroup, sectionFor } from "./nav.ts";
 
 // The sidebar is the one from before the owner audit, restored on 2026-09-08 at the owner's
 // request ("restore the old sidebar, don't change it"). This test pins it so a later cleanup has
@@ -81,4 +81,31 @@ test("every child points somewhere under /admin", () => {
  for (const g of GROUPS) for (const i of g.items) for (const c of i.children ?? []) {
   assert.match(c.href, /^\/admin\//, `${c.label} → ${c.href}`);
  }
+});
+
+// ── The section bar along the bottom of a phone ─────────────────────────────
+test("a path finds its section, and which page in it is current", () => {
+ const inv = sectionFor("/admin/inventory/drafts");
+ assert.equal(inv?.item.label, "Inventory");
+ assert.equal(inv?.current, "/admin/inventory/drafts");
+ // The section's own page counts as being in the section.
+ assert.equal(sectionFor("/admin/inventory")?.item.label, "Inventory");
+ // `match` keeps a related page inside its section — adding a listing is Inventory's work.
+ assert.equal(sectionFor("/admin/add-listing")?.item.label, "Inventory");
+ assert.equal(sectionFor("/admin/bulk-upload")?.item.label, "Inventory");
+ assert.equal(sectionFor("/admin/cross-listing/analytics")?.item.label, "Cross-listing");
+ assert.equal(sectionFor("/admin/consignment/payouts")?.item.label, "Consignment");
+});
+
+test("a page with no section of its own gets no bar", () => {
+ assert.equal(sectionFor("/admin"), null);
+ assert.equal(sectionFor(""), null);
+ // Trailing slashes and query strings don't change the answer.
+ assert.equal(sectionFor("/admin/inventory/drafts/")?.current, "/admin/inventory/drafts");
+ assert.equal(sectionFor("/admin/inventory/drafts?filter=x")?.current, "/admin/inventory/drafts");
+});
+
+test("Settings brings its own bar, so the generic one stays out of its way", () => {
+ assert.equal(sectionFor("/admin/settings"), null);
+ assert.equal(sectionFor("/admin/settings/shipping"), null);
 });

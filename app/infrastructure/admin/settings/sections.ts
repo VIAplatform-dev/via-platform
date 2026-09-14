@@ -77,3 +77,20 @@ export function sectionFor(pathname: string): SettingsSection | null {
    .find((s) => pathname === s.href || pathname.startsWith(`${s.href}/`)) ?? null
  );
 }
+
+/** A group's anchor on the Settings index — "Store" → "store". */
+export const groupSlug = (label: string): string => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/**
+ * Which GROUP a settings page belongs to — Store, Selling, Channels.
+ *
+ * The sixteen sections are too many to put along the bottom of a phone, and the five in nav.ts are
+ * an arbitrary handful of them. The groups are the level a seller actually thinks in ("that's a
+ * selling thing"), and there are only a few, so they fit.
+ */
+export function groupFor(pathname: string): { label: string; slug: string } | null {
+  const section = sectionFor(pathname);
+  if (!section) return null;
+  const group = SETTINGS_GROUPS.find((g) => g.items.some((i) => i.href === section.href));
+  return group?.label ? { label: group.label, slug: groupSlug(group.label) } : null;
+}

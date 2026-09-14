@@ -43,7 +43,10 @@ export async function GET(request: NextRequest) {
 
  // Signed-in partner: resolve their store (session email → store_users / static map).
  const slug = await resolveStoreSlug(request);
- if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug, staff });
+ // `email` on every answer, not just the onboarding one. A seller could not see which address she
+ // was signed in with anywhere in the workspace — and with two accounts (a personal one and the
+ // shop's) that is the first thing you need when something is missing from a screen.
+ if (slug && slug !== "via-admin") return NextResponse.json({ admin: false, slug, staff, email: session.user.email });
 
  // SECOND PLACE TO LOOK, before declaring she has no shop.
  //
@@ -64,7 +67,7 @@ export async function GET(request: NextRequest) {
   // row had gone missing came back through the repair path with staff undefined, so the onboarding
   // gate read her as an ordinary seller with a shop and bounced her to Home — the exact symptom
   // reported. Every path that can describe a signed-in person has to describe them the same way.
-  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff });
+  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff, email: session.user.email });
  }
 
  // Authenticated but genuinely attached to nothing → the signup wizard.

@@ -89,9 +89,17 @@ export function parcelMismatch(args: { typedWeightOz: number | null | undefined;
  const idx = (t: TierId) => SHIPPING_TIERS.findIndex((x) => x.id === t);
  const under = idx(typedTier) < idx(est.tier);
  const looks = pieceWord(args.category);
+ // HER NUMBER IS USED EITHER WAY, and the wording has to say so.
+ //
+ // This is a guess from a photograph set against a number typed by the person holding the piece.
+ // She is more likely to be right, and nothing here blocks or overrides her — resolveParcelAtPublish
+ // takes the typed weight. But the old wording ("You typed 16 oz, but this looks like…") read as a
+ // refusal, and was taken as one: "it wouldn't let me post it." So it now says what it is — a note
+ // about what it will cost, with her weight kept.
+ const guess = looks ? `${looks} (${est.tier} parcel)` : `a ${est.tier} parcel`;
  const message = under
-  ? `You typed ${args.typedWeightOz} oz, but this looks like ${looks ? `${looks} (${est.tier} parcel)` : `a ${est.tier} parcel`}. Buyers get quoted the ${typedTier} tier and you pay the difference.`
-  : `You typed ${args.typedWeightOz} oz, but this looks like ${looks ? `${looks} (${est.tier} parcel)` : `a ${est.tier} parcel`}. Buyers get quoted the ${typedTier} tier — that's more than it needs.`;
+  ? `Using your ${args.typedWeightOz} oz — buyers pay the ${typedTier} tier. Worth a check: from the photos this looks like ${guess}, and if it is, you'd cover the difference on postage.`
+  : `Using your ${args.typedWeightOz} oz — buyers pay the ${typedTier} tier. From the photos this looks like ${guess}, so buyers may be paying more postage than it needs.`;
  return { typedTier, estimatedTier: est.tier, message };
 }
 

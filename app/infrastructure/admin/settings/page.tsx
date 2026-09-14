@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Mail, Activity, Bell } from "lucide-react";
 import { Store, Sparkles, CreditCard, Truck, Receipt, Globe, Share2, Handshake, Users, Building2, MapPin, ScrollText, CalendarRange, CalendarClock, MessageCircle, LayoutGrid, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
-import { SETTINGS_GROUPS } from "./sections";
+import { SETTINGS_GROUPS, groupSlug } from "./sections";
 import { AdminHeader, TechCard } from "../ui";
 
 // The Settings landing page: every section a store has, in one list.
@@ -27,25 +27,48 @@ const ICONS: Record<string, React.ComponentType<{ size?: number; className?: str
  */
 function useSettingsGroups() {
  const [isVyaOwner, setIsVyaOwner] = useState(false);
+ // Who this is. The same call already ran for the owner check — it simply threw the identity away.
+ const [me, setMe] = useState<{ email?: string | null; slug?: string | null } | null>(null);
  useEffect(() => {
   /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
   fetch("/api/infrastructure/whoami", { cache: "no-store" })
    .then((r) => (r.ok ? r.json() : null))
-   .then((d) => setIsVyaOwner(d?.admin === true))
+   .then((d) => { setIsVyaOwner(d?.admin === true); setMe(d ? { email: d.email ?? null, slug: d.slug ?? null } : null); })
    .catch(() => {});
  }, []);
- return SETTINGS_GROUPS
+ const groups = SETTINGS_GROUPS
   .map((g) => ({ ...g, items: g.items.filter((i) => isVyaOwner || !i.vyaOnly) }))
   .filter((g) => g.items.length > 0);
+ return { groups, me };
 }
 
 export default function SettingsIndex() {
- const groups = useSettingsGroups();
+ const { groups, me } = useSettingsGroups();
  return (
   <>
    <AdminHeader eyebrow="Your store" title="Settings" subtitle="How your store runs: your details, payments, shipping, tax and the rest." />
+
+   {/* WHICH ACCOUNT THIS IS.
+       
+       Nowhere in the workspace said which address you were signed in with. With two accounts — a
+       personal one and the shop's — that is the first thing you need when a screen is missing
+       something, and the only way to check was to sign out and watch which address the link went to. */}
+   {me?.email && (
+    <TechCard className="mb-6 flex items-center gap-3.5 px-5 py-4">
+     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-stone-100">
+      <Mail size={16} className="text-stone-500" />
+     </span>
+     <span className="min-w-0 flex-1">
+      <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">Signed in as</span>
+      <span className="block truncate text-[14px] font-medium text-stone-800">{me.email}</span>
+     </span>
+     {me.slug && <span className="shrink-0 text-[12.5px] text-stone-500">{me.slug}</span>}
+    </TechCard>
+   )}
+   {/* Each group gets an id: the bottom bar on a phone jumps straight to one, and scroll-mt keeps
+       the heading clear of the sticky header it lands under. */}
    {groups.map((g) => (
-    <div key={g.label} className="mb-6">
+    <div key={g.label} id={groupSlug(g.label)} className="mb-6 scroll-mt-20">
      <p className="mb-2 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-stone-400">{g.label}</p>
      <TechCard className="overflow-hidden">
       <div className="divide-y divide-stone-100">

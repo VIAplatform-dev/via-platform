@@ -16,13 +16,22 @@ import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
 type Addr = { name?: string; street1?: string; street2?: string; city?: string; state?: string; zip?: string; country?: string; phone?: string };
 type Pickup = { enabled: boolean; address: Addr; instructions: string | null } | null;
 
-const LINE: { key: keyof Addr; label: string; wide?: boolean }[] = [
- { key: "street1", label: "Street address", wide: true },
- { key: "street2", label: "Apt, suite (optional)", wide: true },
- { key: "city", label: "City" },
- { key: "state", label: "State / region" },
- { key: "zip", label: "Postcode" },
- { key: "country", label: "Country (2 letters)" },
+// THE `autocomplete` TOKENS ARE WHAT MAKE AN ADDRESS FILL ITSELF.
+//
+// These fields had none, so iOS and Chrome had no idea what any of the boxes were and offered
+// nothing — the seller typed her own address by hand, every time, on a phone. The tokens below are
+// the standard names browsers look for; with them, one tap on the keyboard's suggestion fills the
+// whole block from the address she already has saved on the device. No API, no key, no cost.
+//
+// (The BUYER's address at checkout is Stripe's Address Element, which brings Google-powered
+// search of its own — see app/checkout/page.tsx. This is the seller typing her own.)
+const LINE: { key: keyof Addr; label: string; wide?: boolean; autoComplete: string }[] = [
+ { key: "street1", label: "Street address", wide: true, autoComplete: "address-line1" },
+ { key: "street2", label: "Apt, suite (optional)", wide: true, autoComplete: "address-line2" },
+ { key: "city", label: "City", autoComplete: "address-level2" },
+ { key: "state", label: "State / region", autoComplete: "address-level1" },
+ { key: "zip", label: "Postcode", autoComplete: "postal-code" },
+ { key: "country", label: "Country (2 letters)", autoComplete: "country" },
 ];
 
 export default function LocationsPage() {
@@ -115,17 +124,17 @@ export default function LocationsPage() {
       <div className="grid grid-cols-2 gap-4 px-5 py-5 max-sm:grid-cols-1">
        <label className="col-span-2 max-sm:col-span-1">
         <span className="mb-1 block text-[12px] font-medium text-stone-700">Name on the parcel</span>
-        <input value={from.name ?? ""} onChange={(e) => setA("name", e.target.value)} className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
+        <input value={from.name ?? ""} onChange={(e) => setA("name", e.target.value)} autoComplete="name" className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
        </label>
        {LINE.map((f) => (
         <label key={f.key} className={f.wide ? "col-span-2 max-sm:col-span-1" : ""}>
          <span className="mb-1 block text-[12px] font-medium text-stone-700">{f.label}</span>
-         <input value={(from[f.key] as string) ?? ""} onChange={(e) => setA(f.key, e.target.value)} className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
+         <input value={(from[f.key] as string) ?? ""} onChange={(e) => setA(f.key, e.target.value)} autoComplete={f.autoComplete} className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
         </label>
        ))}
        <label className="col-span-2 max-sm:col-span-1">
         <span className="mb-1 block text-[12px] font-medium text-stone-700">Phone</span>
-        <input value={from.phone ?? ""} onChange={(e) => setA("phone", e.target.value)} inputMode="tel" className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
+        <input value={from.phone ?? ""} onChange={(e) => setA("phone", e.target.value)} inputMode="tel" autoComplete="tel" className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
         <span className="mt-1 block text-[11.5px] text-stone-400">Couriers require one on international parcels.</span>
        </label>
       </div>
@@ -154,7 +163,7 @@ export default function LocationsPage() {
         {LINE.map((f) => (
          <label key={f.key} className={f.wide ? "col-span-2 max-sm:col-span-1" : ""}>
           <span className="mb-1 block text-[12px] font-medium text-stone-700">{f.label}</span>
-          <input value={(pickup.address[f.key] as string) ?? ""} onChange={(e) => setP(f.key, e.target.value)} className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
+          <input value={(pickup.address[f.key] as string) ?? ""} onChange={(e) => setP(f.key, e.target.value)} autoComplete={f.autoComplete} className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
          </label>
         ))}
         <label className="col-span-2 max-sm:col-span-1">

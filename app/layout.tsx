@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { headers } from "next/headers";
 import { isStoreHost } from "./lib/plan-b/store-host";
@@ -17,6 +17,13 @@ import FeedbackModal from "./components/FeedbackModal";
 import GlobalPageTracker from "./components/GlobalPageTracker";
 import { Analytics } from "@vercel/analytics/next";
 import FirebaseAnalyticsProvider from "./components/FirebaseAnalyticsProvider";
+
+// Tints Safari's own chrome to the page colour, so the toolbar and the strip around it stop
+// reading as a grey band bolted onto the bottom of every screen. Paired with the html background
+// in globals.css: the CSS covers overscroll, this covers the browser's own furniture.
+export const viewport: Viewport = {
+ themeColor: "#FFFDF8",
+};
 
 export const metadata: Metadata = {
  metadataBase: new URL("https://vyaplatform.com"),

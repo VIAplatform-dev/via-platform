@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
  const slug = new URL(request.url).searchParams.get("slug") || "";
  if (!slug) return NextResponse.json({ offersEnabled: false });
  const s = await getInboxSettings(slug);
- return NextResponse.json({ offersEnabled: s.offersEnabled });
+ // The floor travels with the answer. The POST has always refused an offer below it — but only
+ // AFTER the shopper wrote a number, her name and her email, which is a rejection she could have
+ // been spared. Public on purpose: it is a rule she is subject to, not a secret about the store.
+ return NextResponse.json({ offersEnabled: s.offersEnabled, minOfferPct: s.offersEnabled ? s.minOfferPct : 0 });
 }
 
 // Public: a shopper makes a price offer on a piece.

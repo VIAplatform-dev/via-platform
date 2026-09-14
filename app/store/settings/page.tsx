@@ -115,6 +115,12 @@ export default function SettingsPage() {
  fetch("/api/store/email-domain").then((r) => (r.ok ? r.json() : null)).then((d) => d && applySender(d)).catch(() => {});
  }, []);
 
+ // What is in the boxes, against what is actually saved.
+ const unsavedIdentity = Boolean(sender) && (
+  (fromName || "").trim() !== ((snd?.fromName ?? sender?.fromName ?? "") || "").trim() ||
+  (replyTo || "").trim() !== ((snd?.replyTo ?? sender?.replyTo ?? "") || "").trim()
+ );
+
  async function saveIdentity() {
  setEBusy("identity"); setEMsg(null);
  try {
@@ -414,12 +420,12 @@ export default function SettingsPage() {
   {/* Returns / refund policy — buyer-facing, per store */}
   {tab === "policy" && (
   <Card className="mb-5">
-  <CardHeader title="Returns & refunds" subtitle="Your returns policy, shown on your storefront before someone buys." />
+  <CardHeader title="Returns & refunds" subtitle="The rules: how long buyers have, what it costs them, and who pays the postage back. Your storefront shows these before anyone buys." />
   <div className="space-y-5 px-5 py-4">
    <div className="flex items-center justify-between gap-4">
    <div>
     <p className="text-[13px] font-medium text-stone-800">Accept returns</p>
-    <p className="text-[12px] text-stone-500">Off shows “All sales final.” On lets buyers return within your window.</p>
+    <p className="text-[12px] text-stone-500">On: buyers can send a piece back within the window you set. Off: your storefront says “All sales final.” You can still refund any order by hand either way.</p>
    </div>
    <button
     type="button" onClick={() => { setRefundsEnabled((v) => !v); setPolSaved(false); }} aria-pressed={refundsEnabled}
@@ -431,7 +437,7 @@ export default function SettingsPage() {
 
    {refundsEnabled && (
    <div className="grid grid-cols-2 gap-4">
-    <Field label="Return window (days)">
+    <Field label="Return window (days)" hint="How long after it arrives a buyer can start a return.">
     <Input value={returnWindowDays} onChange={(e) => { setReturnWindowDays(e.target.value.replace(/[^0-9]/g, "")); setPolSaved(false); }} inputMode="numeric" placeholder="14" />
     </Field>
     <Field label="Restocking fee (%)" hint="Kept from the item price on a return. 0 = none.">
@@ -441,7 +447,7 @@ export default function SettingsPage() {
    )}
 
    {refundsEnabled && (
-   <Field label="Return shipping" hint="We generate a prepaid return label and email it to the buyer.">
+   <Field label="Return shipping" hint="Who pays to send it back. Either way VYA makes the label and emails it to the buyer — nobody queues at a post office counter.">
     <div className="flex gap-2">
     {(["buyer", "store"] as const).map((who) => (
      <button key={who} type="button" onClick={() => { setReturnShippingPaidBy(who); setPolSaved(false); }}
@@ -450,11 +456,14 @@ export default function SettingsPage() {
      </button>
     ))}
     </div>
-    <span className="mt-1 block text-xs text-stone-400">{returnShippingPaidBy === "buyer" ? "Return-label cost is deducted from the buyer’s refund." : "You cover return shipping."}</span>
+    <span className="mt-1 block text-xs text-stone-400">{returnShippingPaidBy === "buyer" ? "The label costs them: it comes out of the refund, so they get back the price minus postage." : "The label costs you: they get a full refund and you pay to bring it back."}</span>
    </Field>
    )}
 
-   <Field label="Policy details (optional)" hint="Shown to buyers on your storefront.">
+   {/* ONE record. This box and the Returns tab under Settings → Policies edit the same text
+       (store_profiles.policies.returns) — see app/lib/returns-policy.ts. They were two separate
+       paragraphs in two tables until the merge, which let a store hold two contradicting policies. */}
+   <Field label="Your returns policy" hint="The words buyers read on your returns page. This is the same text as Settings → Policies → Returns — edit it in either place.">
     <textarea value={policyText} onChange={(e) => { setPolicyText(e.target.value); setPolSaved(false); }} rows={3} className={ta}
     placeholder={refundsEnabled ? "e.g. Returns accepted on unworn items within 14 days; buyer pays return shipping." : "e.g. All sales are final — message us with any questions before you buy."} />
    </Field>
@@ -484,7 +493,17 @@ export default function SettingsPage() {
     <Field label="Reply-to email" hint="Where customer replies land."><Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="you@yourstore.com" /></Field>
     <div className="flex flex-wrap items-center gap-3">
     <Button onClick={saveIdentity} disabled={eBusy === "identity"}>{eBusy === "identity" ? "Saving…" : "Save"}</Button>
-    {sender && <span className="text-xs text-stone-500">Currently sends as <b className="text-stone-700">{sender.fromName}</b> &lt;{sender.fromAddress}&gt;</span>}
+    {/* SAVED vs TYPED, said out loud.
+        
+        The box showed what she had typed and this line showed what was saved, with nothing marking
+        the difference — so changing the name and not pressing Save looked exactly like changing the
+        name and having it ignored. That was the report: "I changed it to gianna and it didn't
+        reflect." */}
+    {sender && (
+     unsavedIdentity
+      ? <span className="text-xs text-amber-700">Not saved yet — press Save to send as <b>{fromName || sender.fromName}</b>.</span>
+      : <span className="text-xs text-stone-500">Currently sends as <b className="text-stone-700">{sender.fromName}</b> &lt;{sender.fromAddress}&gt;</span>
+    )}
     </div>
    </div>
    </Card>
@@ -526,13 +545,20 @@ export default function SettingsPage() {
     </div>
     )}
     {eMsg && <p className="mt-3 text-xs text-stone-600">{eMsg}</p>}
-    <p className="mt-3 text-[11px] text-stone-400">Until you authenticate a domain, emails send from your name via VYA’s shared sending domain — replies still route to you.</p>
+    <p className="mt-3 text-[11px] text-stone-400">Until you authenticate a domain, emails send from your name via VYA’s shared sending domain — replies still route to your reply-to address. Authenticate a domain and, if your reply-to is on it, emails send from that address too.</p>
    </div>
    </Card>
   </div>
   )}
 
-  <p className="mt-4 text-xs text-stone-400">You can change any of this by asking VYA instead — say something like &ldquo;price my archival pieces higher&rdquo; or &ldquo;free shipping over $150&rdquo; and it will set it for you.</p>
+  {/* Only under the tabs it is actually about.
+      
+      It sat outside every tab, so it turned up under "Email sender" too — offering to set pricing
+      and free shipping on a screen about which address your mail goes out from. Asking VYA does not
+      authenticate a sending domain, so on that tab the line was an offer nothing could honour. */}
+  {(tab === "brief" || tab === "pricing" || tab === "shipping") && (
+   <p className="mt-4 text-xs text-stone-400">You can change any of this by asking VYA instead — say something like &ldquo;price my archival pieces higher&rdquo; or &ldquo;free shipping over $150&rdquo; and it will set it for you.</p>
+  )}
  </div>
  );
 }

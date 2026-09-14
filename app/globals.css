@@ -62,6 +62,17 @@ body {
   height: 100%;
 }
 
+/* THE GREY BAND UNDER MOBILE SAFARI.
+   
+   Only `body` carried the page colour. Safari paints the strip behind its bottom toolbar — and the
+   overscroll area at either end — from the ROOT element, so with html unset it used its own default
+   grey and every page on a phone ended in a grey band that belongs to no part of the design.
+   `background` on html alone is not enough either: html inherits body's when body has one, and the
+   reverse is what is needed here. */
+html {
+  background-color: var(--background);
+}
+
 html.lenis, html.lenis body {
   height: auto;
 }

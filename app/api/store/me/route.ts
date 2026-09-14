@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stores, convertCurrencyToUSD } from "@/app/lib/stores";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { neon } from "@neondatabase/serverless";
+import { getDisplayNameOverride } from "@/app/lib/store-profile-db";
 
 function getDatabaseUrl() {
  const url = process.env.DATABASE_URL;
@@ -45,9 +46,13 @@ export async function GET(request: NextRequest) {
  const named = await neon(getDatabaseUrl())`SELECT name FROM sellers WHERE slug = ${storeSlug} LIMIT 1`
   .then((r) => (r[0]?.name as string | undefined) || null)
   .catch(() => null);
+ // What she renamed the shop to, if she did. Settings → Store details writes this override and
+ // this route never read it, so a rename showed on her storefront and nowhere in her own
+ // workspace — the greeting kept using the name from before.
+ const renamed = await getDisplayNameOverride(storeSlug).catch(() => null);
  return NextResponse.json({
  storeSlug,
- storeName: named || storeSlug,
+ storeName: renamed || named || storeSlug,
  location: "",
  currency: "USD",
  website: "",
@@ -119,9 +124,13 @@ export async function GET(request: NextRequest) {
  // Non-fatal — dashboard still loads without these figures
  }
 
+ // Her own name for her shop beats the one VYA typed at onboarding — the same order
+ // getStoreProfile resolves (override → static → slug), so the workspace, the app and the
+ // storefront finally agree on what this shop is called.
+ const renamedStore = await getDisplayNameOverride(storeSlug).catch(() => null);
  return NextResponse.json({
  storeSlug: store.slug,
- storeName: store.name,
+ storeName: renamedStore || store.name,
  location: store.location,
  currency: store.currency,
  website: store.website,

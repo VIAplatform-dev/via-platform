@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Mail, Smartphone } from "lucide-react";
+import { Mail, Smartphone } from "lucide-react";
 import { AdminHeader, TechCard, Toggle, cn } from "../../ui";
 import { PUSH_EVENTS, EMAIL_EVENTS, PUSH_LABELS, EMAIL_LABELS, normalizePrefs, mergePrefs, type NotificationPrefs, type NotificationPrefsPatch, type PushEvent, type EmailEvent } from "@/app/lib/notification-prefs-core";
 
@@ -55,7 +55,7 @@ export default function NotificationsSettingsPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Notifications" subtitle="Which sales, messages and summaries reach your phone and your inbox." />
+   <AdminHeader eyebrow="Settings" title="Notifications" subtitle="What VYA tells you about your own shop — which sales, messages and summaries reach your phone and your inbox. Nothing here is sent to your customers." />
    {err && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700">{err}</div>}
    {msg && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">{msg}</div>}
 
@@ -75,7 +75,6 @@ export default function NotificationsSettingsPage() {
     </div>
    </TechCard>
 
-   <p className="mt-4 flex items-start gap-2 text-[12px] text-stone-400"><Bell size={13} className="mt-0.5 shrink-0" /> Sales and messages are on by default. Everything else you opt into — a phone that buzzes for nothing gets silenced, and then the two that matter are lost with it.</p>
   </>
  );
 }

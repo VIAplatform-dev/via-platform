@@ -59,6 +59,9 @@ function toShippoCustoms(d: CustomsDeclaration) {
   certify: true,
   certify_signer: d.certifySigner,
   incoterm: d.incoterm,
+  // The seller's own VAT registration, when she gave us one. Omitted entirely rather than sent
+  // empty: a blank identification block is a different declaration from no declaration.
+  ...(d.exporterTaxId ? { exporter_identification: { tax_id: { number: d.exporterTaxId.number, type: d.exporterTaxId.type } } } : {}),
   ...(d.eelPfc ? { eel_pfc: "NOEEI_30_37_a" } : {}),
   items: d.lines.map((l) => ({
    description: l.description,

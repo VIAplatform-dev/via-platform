@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PACKAGING, packagingById, packedWeightOz, girthOf, suggestPackaging } from "./packaging.ts";
+import { PACKAGING, packagingById, packedWeightOz, girthOf, suggestPackaging, weightForPackaging } from "./packaging.ts";
 import { assignTier, SHIPPING_TIERS } from "./shipping-tiers.ts";
 
 const byId = (id: string) => packagingById(id)!;
@@ -69,4 +69,25 @@ test("suggested packaging never undercharges the weight it was suggested from", 
 test("an unknown id is null, not a wrong box", () => {
  assert.equal(packagingById("envelope"), null);
  assert.equal(packagingById(null), null);
+});
+
+// ── A box and its weight move together ──────────────────────────────────────
+// Reported from a real listing: "I said Poly mailer medium, then changed it to small, and the
+// weight didn't change." A box whose weight belongs to a different box is a parcel quoted at one
+// tier and posted at another, and the store eats the difference.
+
+test("every box's weight lands back on that same box", () => {
+ // The property that lets the two controls drive each other without fighting.
+ for (const b of PACKAGING) {
+  assert.equal(suggestPackaging(weightForPackaging(b.id)), b.id, `${b.id} does not round-trip`);
+ }
+});
+
+test("a smaller box means a lighter weight", () => {
+ assert.ok(weightForPackaging("mailer-s") < weightForPackaging("padded"));
+ assert.ok(weightForPackaging("padded") < weightForPackaging("mailer-l"));
+ assert.ok(weightForPackaging("box-l") < weightForPackaging("box-xl"));
+ // An id nobody recognises gets the safe middle rather than 0.
+ assert.equal(weightForPackaging("not-a-box"), 44);
+ assert.equal(weightForPackaging(null), 44);
 });

@@ -48,6 +48,30 @@ export function packedWeightOz(pieceOz: number | null | undefined, packing: Pack
  * The packaging a piece most likely needs, from the weight the AI judged it to be. Only ever a
  * starting point — the seller can see the tier it produces and change it.
  */
+/**
+ * The weight that goes WITH a box — the inverse of suggestPackaging below.
+ *
+ * Choosing "Poly mailer — small" and being left with the weight from the medium one is how a
+ * parcel gets quoted at one tier and posted at another, with the store paying the difference. So
+ * picking a box fills the weight in, and typing a weight moves the box.
+ *
+ * Each answer is the TOP of that box's band, which makes the round trip exact:
+ * suggestPackaging(weightForPackaging(id)) === id for every box. Without that property the two
+ * controls fight — you pick a box, it writes a weight, the weight picks a different box.
+ */
+export function weightForPackaging(id: string | null | undefined): number {
+ switch (id) {
+  case "mailer-s": return 8;
+  case "padded": return 16;
+  case "mailer-l": return 28;
+  case "box-s": return 44;
+  case "box-m": return 72;
+  case "box-l": return 120;
+  case "box-xl": return 160;
+  default: return 44;
+ }
+}
+
 export function suggestPackaging(weightOz: number | null | undefined): string {
  const w = Number(weightOz);
  if (!Number.isFinite(w) || w <= 0) return "box-s";

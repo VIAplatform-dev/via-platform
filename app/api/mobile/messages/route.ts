@@ -8,8 +8,7 @@ import {
  listCustomerConversations,
  getMessages,
 } from "@/app/lib/messages-db";
-import { storeContactEmails } from "@/app/lib/stores";
-import { sendStoreMessageNotification } from "@/app/lib/email";
+import { sendStoreMessageNotification, storeContactOrNone } from "@/app/lib/email";
 import { pushSellerMessage } from "@/app/lib/seller-push";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +76,9 @@ export async function POST(request: Request) {
  const user = await getUserById(userId).catch(() => null);
  const customerName = user?.name ?? user?.email ?? null;
  try {
- const storeEmail = storeContactEmails[conv.storeSlug];
+ // Resolved, not the hardcoded map: a shop that signed up for itself has no entry there, so this
+ // was undefined, the `if` never ran, and her buyer's message was delivered nowhere.
+ const storeEmail = await storeContactOrNone(conv.storeSlug);
  if (storeEmail) {
  await sendStoreMessageNotification({
  storeEmail,

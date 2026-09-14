@@ -97,15 +97,25 @@ export default function InboxSettingsPage() {
      <Row label="Let shoppers message me" hint="Adds a message button to every product page.">
       <Toggle on={s.messagingEnabled} onClick={() => set({ messagingEnabled: !s.messagingEnabled })} />
      </Row>
+     {/* COMING SOON MEANS THE SWITCH IS OFF, NOT THAT THE LABEL SAYS SO.
+         
+         Texting isn't live. The row still offered a working toggle and saved the preference, so a
+         seller switched it on, read "your preference is saved", and reasonably expected texts —
+         which is a promise nothing behind this screen can keep. Until it ships it is an
+         announcement, not a setting. */}
      <Row
       label="Text me new messages"
       hint={s.smsAvailable === false
-       ? "Not switched on yet — we'll start texting once it goes live. Your preference is saved."
+       ? "Coming soon — we'll let you know when texting goes live."
        : "A text the moment a shopper writes, so you can answer fast."}
      >
-      <Toggle on={s.notifySms} onClick={() => set({ notifySms: !s.notifySms })} />
+      {s.smsAvailable === false ? (
+       <span className="rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-stone-500">Coming soon</span>
+      ) : (
+       <Toggle on={s.notifySms} onClick={() => set({ notifySms: !s.notifySms })} />
+      )}
      </Row>
-     {s.notifySms && (
+     {s.smsAvailable !== false && s.notifySms && (
       <Row label="Text this number">
        <input
         defaultValue={s.notifyPhone || ""}
@@ -132,7 +142,7 @@ export default function InboxSettingsPage() {
        >
         <Toggle on={s.offersBinding} onClick={() => set({ offersBinding: !s.offersBinding })} />
        </Row>
-       <Row label="Don’t show me offers below" hint="As a percentage of the asking price. 0 means you see every offer.">
+       <Row label="Lowest offer you'll take" hint="As a percentage of the asking price. Anything lower is turned away when a shopper tries to send it — she is told the minimum rather than getting silence. 0 lets every offer through.">
         <span className="flex items-center gap-1.5">
          <input
           inputMode="decimal"

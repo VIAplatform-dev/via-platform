@@ -32,7 +32,8 @@ export const addDays = (d: Day, n: number) => new Date(Date.parse(`${d}T00:00:00
 /** 0 = Sunday … 6 = Saturday, read in UTC so it can't drift with the viewer's clock. */
 export const weekdayOf = (d: Day) => new Date(`${d}T00:00:00Z`).getUTCDay();
 
-export type Settings = Pick<AppointmentSettings, "openingHours" | "blackoutDates" | "slotMinutes" | "slotCapacity">;
+export type Settings = Pick<AppointmentSettings, "openingHours" | "blackoutDates" | "slotMinutes" | "slotCapacity"> &
+ Partial<Pick<AppointmentSettings, "bufferMinutes">>;
 /** An appointment already on the books, as far as the scheduler cares. */
 export type Booked = { day: Day; start: Time };
 
@@ -57,6 +58,9 @@ export function slotsOn(day: Day, s: Settings, booked: Booked[] = []): Slot[] {
  if ((s.blackoutDates || []).includes(day)) return [];
 
  const size = Math.max(5, Math.round(s.slotMinutes || 45));
+ // The quiet gap a shop keeps after each appointment. It moves the NEXT start; it does not make
+ // the appointment longer, so what a customer is told they are booking stays what they booked.
+ const gap = Math.max(0, Math.round(s.bufferMinutes || 0));
  const capacity = Math.max(1, Math.round(s.slotCapacity || 1));
  const takenAt = new Map<string, number>();
  for (const b of booked) {
@@ -67,7 +71,10 @@ export function slotsOn(day: Day, s: Settings, booked: Booked[] = []): Slot[] {
  const out: Slot[] = [];
  for (const w of windowsOn(day, s.openingHours)) {
   const close = minutes(w.end);
-  for (let m = minutes(w.start); m + size <= close; m += size) {
+  // The APPOINTMENT has to finish before closing; the gap after it does not. A shop that shuts at
+  // six can still see someone at 17:15 for forty-five minutes and tidy up afterwards — refusing
+  // that slot would be enforcing a tidy-up against a door that is already locked.
+  for (let m = minutes(w.start); m + size <= close; m += size + gap) {
    const start = clock(m);
    const taken = takenAt.get(start) ?? 0;
    out.push({ day, start, end: clock(m + size), taken, capacity, free: taken < capacity });

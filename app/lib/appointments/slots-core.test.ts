@@ -94,3 +94,35 @@ test("the past can't be booked, including earlier today", () => {
  assert.deepEqual(canBook(THU, "11:45", S(), [], now), { ok: true }); // still to come
  assert.deepEqual(canBook("2026-09-03", "11:00", S(), [], now), { ok: false, reason: "past" }); // yesterday
 });
+
+// ── The gap a shop keeps after each appointment ──────────────────────────────
+// Added because a fitting needs the rail put back before the next person walks in. It moves the
+// next START; it must never change what the customer was told they were booking.
+
+test("a buffer spaces the next appointment without lengthening this one", () => {
+ // 11–1, 45-minute appointments, 15 minutes to tidy up: 11:00, 12:00 — and 13:00 would run past.
+ const slots = slotsOn(THU, S({ bufferMinutes: 15 }));
+ assert.deepEqual(slots.map((x) => x.start), ["11:00", "12:00"]);
+ // Still a 45-minute appointment. The gap is after it, not inside it.
+ assert.deepEqual(slots.map((x) => x.end), ["11:45", "12:45"]);
+});
+
+test("no buffer books back to back, exactly as before", () => {
+ const before = slotsOn(THU, S());
+ assert.deepEqual(slotsOn(THU, S({ bufferMinutes: 0 })), before);
+ // Absent entirely — an older stored settings row — must behave the same way.
+ assert.deepEqual(slotsOn(THU, S({ bufferMinutes: undefined })), before);
+});
+
+test("the appointment must fit before closing; the tidy-up afterwards need not", () => {
+ // 11–12 with a 45-minute appointment and a 30-minute gap: 11:00 fits and finishes at 11:45.
+ // The gap runs to 12:15, past the door being locked, and that is not a reason to refuse it.
+ const slots = slotsOn(THU, S({ openingHours: [{ day: 4, start: "11:00", end: "12:00" }], bufferMinutes: 30 }));
+ assert.deepEqual(slots.map((x) => x.start), ["11:00"]);
+ assert.equal(slots[0].end, "11:45");
+});
+
+test("a buffer longer than the day still yields the one appointment that fits", () => {
+ const slots = slotsOn(THU, S({ bufferMinutes: 600 }));
+ assert.deepEqual(slots.map((x) => x.start), ["11:00"]);
+});

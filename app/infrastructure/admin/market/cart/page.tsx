@@ -143,7 +143,21 @@ function CartInner() {
  const active = carts.find((c) => c.id === activeId) ?? null;
  return (
  <MarketPage title={active ? `Cart ${active.number}` : "Cart"} back={`${B}/find`}>
- {err && <div className="mb-3"><Notice tone="danger">{err}</Notice></div>}
+ {/* A WARNING THAT NAMES A SCREEN NOW OPENS IT. "Card payments are off — finish Stripe setup in
+     Payments" left her to go and find Payments herself, mid-sale, with a customer waiting. */}
+ {err && (
+  <div className="mb-3">
+   <Notice tone="danger">
+    {err}
+    {/^card payments are off/i.test(err) && (
+     <>
+      {" "}
+      <a href={href("/admin/settings/payments")} className="font-semibold underline underline-offset-2">Set up payments</a>
+     </>
+    )}
+   </Notice>
+  </div>
+ )}
  {savedOffline && (
  <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-center">
  <p className="text-[26px] font-medium text-emerald-900" style={{ fontFamily: "var(--font-display)" }}>Saved offline</p>

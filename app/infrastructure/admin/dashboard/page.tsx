@@ -704,10 +704,24 @@ function Analytics() {
       {loading && <span className="text-stone-300">· refreshing</span>}
      </div>
 
-     {/* Eight report tabs are ~720px — wider than a phone or an iPad in portrait — so below lg the strip
-         runs to the screen edges and scrolls sideways (the tab cut off at the edge says there is more),
-         with taller tap targets. From lg it sits inside the page as it always did. */}
-     <div data-tab-strip className="-mx-6 mb-6 flex scroll-px-6 gap-1 overflow-x-auto border-b border-stone-200 px-6 sm:-mx-10 sm:scroll-px-10 sm:px-10 lg:mx-0 lg:scroll-px-0 lg:px-0">
+     {/* EIGHT REPORTS DON'T FIT ON A PHONE, AND A SIDEWAYS-SCROLLING STRIP ISN'T THE ANSWER.
+         
+         It was a strip that ran off both screen edges: half a word at each end, no way to see what
+         the eight were without dragging, and a tab you had already chosen could scroll out of sight.
+         On a phone the whole set becomes one select — every report named, the current one shown,
+         nothing hidden past an edge. The strip returns from `md` up, where all eight genuinely fit. */}
+     <div className="mb-6 md:hidden">
+      <label htmlFor="report-tab" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400">Report</label>
+      <select
+       id="report-tab"
+       value={tab}
+       onChange={(e) => setTab(e.target.value as TabKey)}
+       className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-[14px] font-medium text-stone-900 outline-none focus:border-stone-500"
+      >
+       {TABS.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+      </select>
+     </div>
+     <div data-tab-strip className="mb-6 hidden gap-1 border-b border-stone-200 md:flex lg:mx-0 lg:px-0">
       {TABS.map((t) => (
        <button key={t.key} data-active={tab === t.key || undefined} onClick={() => setTab(t.key)} className={cn("relative shrink-0 px-3.5 py-2.5 text-[13px] font-medium transition lg:py-2", tab === t.key ? "text-stone-900" : "text-stone-400 hover:text-stone-600")}>
         {t.label}

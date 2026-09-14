@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getConversationForStore, getMessages, addMessage, markStoreRead } from "@/app/lib/messaging-db";
-import { sendBuyerReplyNotification } from "@/app/lib/email";
-import { stores, storeContactEmails } from "@/app/lib/stores";
+import { sendBuyerReplyNotification, storeContactOrNone } from "@/app/lib/email";
+import { stores } from "@/app/lib/stores";
 import { BASE_URL } from "@/app/lib/base-url";
 import { signBuyerToken } from "@/app/lib/buyer-auth";
 import { getStorefrontBySlug } from "@/app/lib/storefront-db";
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  productTitle: conv.itemTitle,
  replyBody: text.slice(0, 5000),
  threadUrl: link,
- replyTo: storeContactEmails[slug] || null,
+ replyTo: await storeContactOrNone(slug),
  }).catch(() => {});
  }
  return NextResponse.json({ ok: true });

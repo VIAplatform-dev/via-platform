@@ -9,6 +9,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, Toggle } 
 // review passes; the ID is fixed from the dev-console item.
 const EXTENSION_URL = "https://chromewebstore.google.com/detail/jcbjeoingkdkodflfbachfpllmkgojkp";
 import { Input } from "@/app/store/ui";
+import { describeOptIn } from "@/app/lib/marketplace-optin";
 
 type Platform = { key: string; name: string; hasApi: boolean; mode: "api" | "extension" | "soon" };
 type Account = { platform: string; handle: string; autoList: boolean };
@@ -46,6 +47,27 @@ export default function CrossListingSettingsPage() {
  if (r) { setPlatforms(r.platforms); setAccounts(r.accounts); setEbay(r.ebay);  setExtInReview(!!r.extensionInReview); }
  setLoading(false);
  }
+ // ── The VYA marketplace ────────────────────────────────────────────────────
+ // Not a cross-listing channel, and deliberately first: the others POST her pieces to somebody
+ // else's site using her own account there. This is whether vyaplatform.com — a separate product
+ // from the shop she runs here — may show the pieces she already has on VYA. Nothing is copied.
+ const [mkt, setMkt] = useState<{ listed: boolean; livePieces: number } | null>(null);
+ const [mktBusy, setMktBusy] = useState(false);
+ useEffect(() => {
+  let active = true;
+  fetch("/api/store/marketplace").then((r) => (r.ok ? r.json() : null)).then((d) => { if (active && d) setMkt({ listed: !!d.listed, livePieces: Number(d.livePieces) || 0 }); }).catch(() => {});
+  return () => { active = false; };
+ }, []);
+ async function setListed(next: boolean) {
+  if (mktBusy) return;
+  setMktBusy(true);
+  const prev = mkt;
+  setMkt((m) => (m ? { ...m, listed: next } : m));
+  const r = await fetch("/api/store/marketplace", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ listed: next }) }).catch(() => null);
+  if (!r?.ok) setMkt(prev); // put the switch back rather than claim a change that never saved
+  setMktBusy(false);
+ }
+
  useEffect(() => {
  let active = true;
  (async () => {
@@ -124,6 +146,25 @@ export default function CrossListingSettingsPage() {
  <Link href="/admin/cross-listing" className="mb-3 inline-flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800"><ArrowLeft size={13} /> Cross-listing</Link>
  <AdminHeader eyebrow="Sell · Cross-listing · Settings" title="Connected marketplaces" subtitle="Connect the other sites you sell on. New listings are sent to them automatically, and when a piece sells anywhere it comes down everywhere, so you can’t sell it twice." />
 
+ {/* The VYA marketplace. Off until she says otherwise — see app/lib/marketplace-optin.ts. */}
+ <TechCard className="mb-5 p-5">
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   <div className="min-w-0">
+    <p className="text-[14px] font-medium text-stone-900">Sell on the VYA marketplace</p>
+    <p className="mt-1 max-w-[70ch] text-[12.5px] leading-relaxed text-stone-500">
+     vyaplatform.com is VYA&apos;s own marketplace, separate from the shop you run here. Switch this
+     on and your live pieces show there too — bought through your VYA checkout, same orders, same
+     payouts. Nothing is posted to another site.
+    </p>
+   </div>
+   <Toggle on={!!mkt?.listed} disabled={!mkt || mktBusy} onClick={() => setListed(!mkt?.listed)} />
+  </div>
+  {mkt && (
+   <p className="mt-3 border-t border-stone-100 pt-3 text-[12px] leading-relaxed text-stone-500">
+    {describeOptIn({ listed: mkt.listed, decidedAt: null }, mkt.livePieces)}
+   </p>
+  )}
+ </TechCard>
  {/* Extension install — required for the Depop/Vestiaire (extension) channels to auto-fill. */}
  <TechCard className="mb-5 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
  <div className="flex items-start gap-3">

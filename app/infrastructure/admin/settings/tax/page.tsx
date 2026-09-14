@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Receipt } from "lucide-react";
-import { AdminHeader, TechCard, TechButton, StatusPill, Toggle, cn } from "../../ui";
+import { AdminHeader, TechCard, TechButton, TechButtonLink, StatusPill, Toggle, cn } from "../../ui";
 import { authorityFor } from "@/app/lib/tax-authorities";
 
 // Sales tax. VYA calculates nothing: storefront sales are direct charges on the
@@ -82,9 +82,12 @@ export default function TaxSettingsPage() {
     </div>
 
     {!s.payoutsReady ? (
-     <p className="text-[12.5px] leading-relaxed text-stone-600">
-      Finish setting up payments first — tax is calculated on your own Stripe account, so there needs to be one.
-     </p>
+     // A SENTENCE THAT NAMED A TASK AND OFFERED NO WAY TO DO IT. Twice on this page, in fact, and in
+     // both places the next step was a screen the seller then had to go and find. Say it, then open it.
+     <div className="text-[12.5px] leading-relaxed text-stone-600">
+      <p>Set up payments first — tax is worked out on your own Stripe account, so there has to be one.</p>
+      <TechButtonLink href="/admin/settings/payments" className="mt-3 inline-flex">Set up payments</TechButtonLink>
+     </div>
     ) : collecting ? (
      <p className="text-[12.5px] leading-relaxed text-stone-600">
       You&apos;re registered in {s.registrations} {s.registrations === 1 ? "jurisdiction" : "jurisdictions"}, and buyers there are charged
@@ -104,31 +107,17 @@ export default function TaxSettingsPage() {
     )}
    </TechCard>
 
+   {/* TAXED BY CATEGORY, in one line.
+       
+       This was a paragraph about New York's $110 clothing threshold, Pennsylvania and New Jersey,
+       then a six-row table of categories and how each is treated. All true, none of it a decision
+       the seller makes here — she chooses a category when she lists a piece, and everything else
+       follows from Stripe's own rules. Reference material shown as if it needed reading. */}
    <TechCard className="mt-4 p-5">
-    <p className="text-[13px] font-medium text-stone-700">How your pieces are taxed</p>
+    <p className="text-[13px] font-medium text-stone-700">Taxed by category</p>
     <p className="mt-1 text-[12.5px] leading-relaxed text-stone-500">
-     Each listing is taxed as what it actually is, from its category. That matters more here than in most shops:
-     New York exempts clothing and footwear under $110, and Pennsylvania and New Jersey exempt most apparel outright —
-     but none of that covers bags, jewellery or sunglasses, which stay taxable everywhere.
-    </p>
-    <div className="mt-3 grid gap-x-6 gap-y-1.5 text-[12.5px] sm:grid-cols-2">
-     {[
-      ["Clothing & footwear", "Exempt in some states"],
-      ["Bags, wallets, luggage", "Always taxable"],
-      ["Jewellery & watches", "Always taxable"],
-      ["Sunglasses", "Always taxable"],
-      ["Belts & scarves", "Treated as apparel"],
-      ["Anything else", "Ordinary goods"],
-     ].map(([what, how]) => (
-      <div key={what} className="flex items-baseline justify-between gap-3 border-b border-stone-100 pb-1.5">
-       <span className="text-stone-700">{what}</span>
-       <span className="shrink-0 text-[11.5px] text-stone-400">{how}</span>
-      </div>
-     ))}
-    </div>
-    <p className="mt-3 text-[11.5px] text-stone-400">
-     Categorise a piece correctly when you list it and the rest follows.
-     {s.productTaxCode ? " This store overrides all of the above with a single code." : ""}
+     Each piece is taxed as what it is — clothing is exempt in some states, bags and jewellery are taxable
+     everywhere. Categorise a piece correctly when you list it and the rest follows.
     </p>
    </TechCard>
 
@@ -232,7 +221,10 @@ function Registrations() {
    {loading ? (
     <p className="px-5 py-6 text-[13px] text-stone-400">Loading…</p>
    ) : !connected ? (
-    <p className="px-5 py-6 text-[13px] text-stone-400">Connect payments first — registrations live on your Stripe account.</p>
+    <div className="px-5 py-6">
+     <p className="text-[13px] text-stone-500">Set up payments first — where you&apos;re registered lives on your own Stripe account.</p>
+     <TechButtonLink href="/admin/settings/payments" className="mt-3 inline-flex">Set up payments</TechButtonLink>
+    </div>
    ) : (
     <>
      {regs.length > 0 && (

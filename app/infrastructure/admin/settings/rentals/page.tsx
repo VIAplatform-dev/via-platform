@@ -27,20 +27,32 @@ const WARNING_TEXT: Record<Warning, string> = {
  "late-fee-without-late-fees": "Late fees are turned off, so this amount isn't charged.",
 };
 
+// NAMED AFTER WHAT THEY DO, NOT WHO THEY IMAGINE IS RENTING.
+//
+// These were "Direct to consumer", "Stylists only" and "Showroom pickup", and the names described
+// an audience and a venue while the settings underneath describe two mechanics: whether a booking
+// is confirmed instantly or comes to you first, and whether the piece is posted or collected. A
+// boutique renting to ordinary customers who wants to approve each booking had to pick the one
+// called "Stylists only" — and, worse, could reasonably read that name as restricting WHO may
+// rent, which no setting here does. Nothing on this page gates access; "Stylists only" changed the
+// booking mode and nothing else.
+//
+// So each one is named for its booking mechanic and says both answers out loud. Everything stays
+// changeable below — a preset writes the block once and locks nothing.
 const PRESETS: { name: string; blurb: string; values: Partial<RentalSettings> }[] = [
  {
-  name: "Direct to consumer",
-  blurb: "Anyone can book online. You post it out, they post it back.",
+  name: "On demand",
+  blurb: "Anyone books online and it's confirmed straight away. You post it out, they post it back.",
   values: { bookingMode: "open", minDays: 4, maxDays: 28, leadDays: 2, shipOutDays: 1, shipBackDays: 2, turnaroundDays: 2, dryCleaning: true, prepaidLabel: true, fulfilment: "ship", lateFees: true, security: "waiver", appointments: false },
  },
  {
-  name: "Stylists only",
-  blurb: "You approve every booking. No deposits taken.",
+  name: "On request",
+  blurb: "Every booking comes to you to accept or decline first. Posted or collected, whichever they choose. No deposits.",
   values: { bookingMode: "request", requestHoldsDates: true, requestHoldHours: 48, minDays: 1, maxDays: 14, leadDays: 1, security: "none", lateFees: true, fulfilment: "both", appointments: true },
  },
  {
-  name: "Showroom pickup",
-  blurb: "They collect and return in person. Nothing is posted.",
+  name: "Collected in person",
+  blurb: "They collect and return it themselves; nothing is posted. You decide per piece whether it books instantly.",
   values: { bookingMode: "both", minDays: 1, maxDays: 7, leadDays: 0, shipOutDays: 0, shipBackDays: 0, turnaroundDays: 1, dryCleaning: false, prepaidLabel: false, fulfilment: "pickup", appointments: true },
  },
 ];
@@ -82,12 +94,25 @@ function Row({ label, hint, children, className }: { label: string; hint?: strin
 }
 
 function Num({ value, onChange, suffix, width = "w-20" }: { value: number | string; onChange: (v: string) => void; suffix?: string; width?: string }) {
+ // A BOX YOU CAN EMPTY.
+ //
+ // Every caller clamps on the way in — Math.max(1, …) for "how many at once", Math.max(5, …) for
+ // the slot length. With the input fully controlled, that clamp ran on each keystroke, so pressing
+ // backspace turned "" into the minimum and the box refilled itself instantly. The seller could see
+ // the 1, could not delete the 1, and had no way to type a 2 except in front of it.
+ //
+ // While the box has focus it shows what she typed, empty included; the clamped value is what she
+ // gets back the moment she leaves. The clamp still happens on every keystroke — it just isn't what
+ // is on screen while she is mid-edit.
+ const [draft, setDraft] = useState<string | null>(null);
  return (
   <span className="flex items-center gap-1.5">
    <input
     inputMode="decimal"
-    value={String(value)}
-    onChange={(e) => onChange(e.target.value)}
+    value={draft ?? String(value)}
+    onChange={(e) => { setDraft(e.target.value); onChange(e.target.value); }}
+    onFocus={(e) => setDraft(e.target.value)}
+    onBlur={() => setDraft(null)}
     className={cn(width, "rounded-lg border border-stone-200 px-2.5 py-1.5 text-right text-[13.5px] tabular-nums outline-none focus:border-stone-400")}
    />
    {suffix && <span className="text-[12.5px] text-stone-500">{suffix}</span>}
@@ -207,8 +232,8 @@ export default function RentalSettingsPage() {
     <Card
      title="Common setups"
      blurb={matched
-      ? "Your settings match this setup. Change anything below and this will update on its own."
-      : "Your settings are a mix, which is fine. Pick one of these to replace them all."}
+      ? "A starting point for the two questions that matter — who can book, and how they get it. Yours match this one. Change anything below and it updates on its own."
+      : "A starting point for the two questions that matter — who can book, and how they get it. Yours are a mix, which is fine. Pick one to replace them all, or leave it and set them below."}
     >
      <div className="grid gap-2.5 sm:grid-cols-3">
       {PRESETS.map((p) => {

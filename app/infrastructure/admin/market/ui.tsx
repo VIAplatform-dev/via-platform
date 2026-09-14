@@ -118,11 +118,23 @@ const BIG: Record<BigVariant, string> = {
  danger: "bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300",
  ghost: "bg-transparent text-stone-500 hover:bg-stone-100",
 };
+// HOW BIG EACH ONE NEEDS TO BE.
+//
+// Everything was 56px tall, which is right for the one button you press at a market with a customer
+// waiting and wrong for the three sitting under it — the screen ended up as a stack of slabs. The
+// action that takes the money keeps the big target; Cash steps down, and Clear cart is a way out
+// rather than a thing to hit.
+const BIG_HEIGHT: Record<BigVariant, string> = {
+ primary: "min-h-[56px] text-[16px]",
+ danger: "min-h-[56px] text-[16px]",
+ secondary: "min-h-[48px] text-[15px]",
+ ghost: "min-h-[44px] text-[14px]",
+};
 export function BigButton({ variant = "primary", className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BigVariant }) {
- return <button className={cn("flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl px-5 text-[16px] font-semibold transition active:scale-[0.99] disabled:cursor-not-allowed", BIG[variant], className)} {...props} />;
+ return <button className={cn("flex w-full items-center justify-center gap-2 rounded-2xl px-5 font-semibold transition active:scale-[0.99] disabled:cursor-not-allowed", BIG_HEIGHT[variant], BIG[variant], className)} {...props} />;
 }
 export function BigLink({ variant = "primary", className, ...props }: React.ComponentProps<typeof Link> & { variant?: BigVariant }) {
- return <Link className={cn("flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl px-5 text-[16px] font-semibold transition active:scale-[0.99]", BIG[variant], className)} {...props} />;
+ return <Link className={cn("flex w-full items-center justify-center gap-2 rounded-2xl px-5 font-semibold transition active:scale-[0.99]", BIG_HEIGHT[variant], BIG[variant], className)} {...props} />;
 }
 
 /** Sticky action bar at the bottom of a phone screen (above the tab bar). Renders an in-flow spacer

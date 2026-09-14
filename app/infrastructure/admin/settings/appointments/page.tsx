@@ -39,10 +39,27 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
  );
 }
 function Num({ value, onChange, suffix, width = "w-20" }: { value: number | string; onChange: (v: string) => void; suffix?: string; width?: string }) {
+ // A BOX YOU CAN EMPTY.
+ //
+ // Every caller clamps on the way in — Math.max(1, …) for "how many at once", Math.max(5, …) for
+ // the slot length. With the input fully controlled, that clamp ran on each keystroke, so pressing
+ // backspace turned "" into the minimum and the box refilled itself instantly. The seller could see
+ // the 1, could not delete the 1, and had no way to type a 2 except in front of it.
+ //
+ // While the box has focus it shows what she typed, empty included; the clamped value is what she
+ // gets back the moment she leaves. The clamp still happens on every keystroke — it just isn't what
+ // is on screen while she is mid-edit.
+ const [draft, setDraft] = useState<string | null>(null);
  return (
   <span className="flex items-center gap-1.5">
-   <input inputMode="decimal" value={String(value)} onChange={(e) => onChange(e.target.value)}
-    className={cn(width, "rounded-lg border border-stone-200 px-2.5 py-1.5 text-right text-[13.5px] tabular-nums outline-none focus:border-stone-400")} />
+   <input
+    inputMode="decimal"
+    value={draft ?? String(value)}
+    onChange={(e) => { setDraft(e.target.value); onChange(e.target.value); }}
+    onFocus={(e) => setDraft(e.target.value)}
+    onBlur={() => setDraft(null)}
+    className={cn(width, "rounded-lg border border-stone-200 px-2.5 py-1.5 text-right text-[13.5px] tabular-nums outline-none focus:border-stone-400")}
+   />
    {suffix && <span className="text-[12.5px] text-stone-500">{suffix}</span>}
   </span>
  );
@@ -257,6 +274,12 @@ export default function AppointmentSettingsPage() {
      <Card title="How long each appointment is">
       <Row label="How long is an appointment" hint="Every appointment is this long. The last one of the day has to finish before you close.">
        <Num value={s.slotMinutes} onChange={(v) => set("slotMinutes", Math.max(5, Math.round(Number(v) || 0)))} suffix="minutes" />
+      </Row>
+      <Row
+       label="Gap after each one"
+       hint="Quiet time before the next appointment can start — for putting the rail back and steaming what was tried on. 0 books them back to back. The appointment itself stays the length above."
+      >
+       <Num value={s.bufferMinutes} onChange={(v) => set("bufferMinutes", Math.max(0, Math.round(Number(v) || 0)))} suffix="minutes" />
       </Row>
       <Row label="How many at once" hint="How many people can book the same time.">
        <Num value={s.slotCapacity} onChange={(v) => set("slotCapacity", Math.max(1, Math.round(Number(v) || 0)))} suffix="at a time" width="w-16" />

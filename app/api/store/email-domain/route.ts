@@ -38,7 +38,26 @@ export async function PATCH(request: NextRequest) {
  const b = await request.json().catch(() => ({}));
  const patch: any = {};
  if (typeof b?.fromName === "string") patch.fromName = b.fromName.trim().slice(0, 80) || null;
- if (typeof b?.replyTo === "string") patch.replyTo = b.replyTo.trim().slice(0, 160) || null;
+ if (typeof b?.replyTo === "string") {
+ patch.replyTo = b.replyTo.trim().slice(0, 160) || null;
+ // THE SENDING ADDRESS FOLLOWS THE REPLY-TO WHERE IT CAN.
+ //
+ // A seller who sets replies to go to hello@hershop.com and then reads "sends as
+ // campaigns@vyaplatform.com" reasonably reads that as her setting being ignored. Where the
+ // reply-to is on a domain she has already authenticated, it becomes the sending address too, so
+ // the two agree without her finding a third box.
+ //
+ // Where it is NOT — a gmail address, or a domain she hasn't authenticated — the sending address
+ // cannot follow it. Mail from an address we aren't authorised to send as fails SPF and DKIM and
+ // lands in spam, which costs her the campaign rather than annoying her. That case is explained
+ // on the page instead of being silently half-applied.
+ const reply = patch.replyTo as string | null;
+ if (reply) {
+  const cur = await getEmailSettings(slug);
+  const domain = cur?.domain?.toLowerCase();
+  if (cur?.verified && domain && reply.toLowerCase().endsWith(`@${domain}`)) patch.sendingEmail = reply.toLowerCase();
+ }
+ }
  if (typeof b?.sendingEmail === "string") {
  const cur = await getEmailSettings(slug);
  const email = b.sendingEmail.trim().toLowerCase();
