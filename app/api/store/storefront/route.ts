@@ -10,6 +10,7 @@ import {
  upsertStorefront,
  deleteStorefront,
  normalizeHandle,
+ setWishlistEnabled,
  type StorefrontSettings,
 } from "@/app/lib/storefront-db";
 import { deleteCaptures } from "@/app/lib/site-capture-db";
@@ -34,6 +35,7 @@ function defaultsFor(slug: string): StorefrontSettings {
  customDomain: null,
  theme: null,
  serveMode: null,
+ wishlistEnabled: false,
  };
 }
 
@@ -111,6 +113,16 @@ export async function POST(request: NextRequest) {
  heroImage: str(body.heroImage, 600),
  about: str(body.about, 1000),
  });
+
+ // Saved pieces is deliberately NOT part of upsertStorefront. The editor posts its whole form on
+ // every save, and a switch that lives on a different screen would be turned back off by a save
+ // that never mentioned it. Only an explicit key changes it — and after the upsert, so a store
+ // whose row is being created here has one to update.
+ if (body.wishlistEnabled !== undefined) {
+  const on = Boolean(body.wishlistEnabled);
+  await setWishlistEnabled(slug, on);
+  saved.wishlistEnabled = on;
+ }
 
  return NextResponse.json({ ok: true, settings: saved });
 }

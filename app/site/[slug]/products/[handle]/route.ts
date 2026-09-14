@@ -13,6 +13,8 @@ import { pageNamesProduct, pickCapturedProductPath, slugifyTitle } from "@/app/l
 import { pickIndexedPath, productIndexFor } from "@/app/lib/plan-b/product-index";
 import { sameOriginAssets } from "@/app/lib/plan-b/same-origin-assets";
 import { injectAccountPanel } from "@/app/lib/plan-b/account-panel";
+import { injectWishlist } from "@/app/lib/plan-b/wishlist";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { readShopperToken, SHOPPER_COOKIE } from "@/app/lib/shopper-session";
 import { retagFavourites } from "@/app/lib/plan-b/favourites-icon";
 import { normaliseBuyButtons } from "@/app/lib/plan-b/button-parity";
@@ -94,6 +96,20 @@ async function withAccountPanel(html: string, slug: string, cookie: string, onSt
   const shopName = (await getSellerBySlug(slug).catch(() => null))?.name || slug;
   return injectAccountPanel(html, { signedInAs: session?.email ?? null, shopName });
  } catch {
+  return html;
+ }
+}
+
+/** Saved pieces, when she has turned them on. See wishlist.ts — the heart is placed by the browser,
+ *  so the product page she wrote is not edited to make room for it. */
+async function withWishlist(html: string, slug: string): Promise<string> {
+ try {
+  const settings = await getStorefrontBySlug(slug);
+  if (!settings?.wishlistEnabled) return html;
+  const shopName = (await getSellerBySlug(slug).catch(() => null))?.name || slug;
+  return injectWishlist(html, { slug, shopName });
+ } catch {
+  // Off is the safe way round: a shopper never sees a heart that cannot save.
   return html;
  }
 }
@@ -291,7 +307,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  const safeHtml = onStoreOrigin ? stripVendorScripts(html) : stripScripts(html);
  // The theme's own cart drives VYA on a store origin, so our injected drawer would only duplicate it.
  const withPanel = await withAccountPanel(safeHtml, slug, req.cookies.get(SHOPPER_COOKIE)?.value || "", onStoreOrigin);
- const out = injectPoweredBy(retagFavourites(injectCss(injectCart(withPanel), css)));
+ const withSaved = await withWishlist(withPanel, slug);
+ const out = injectPoweredBy(retagFavourites(injectCss(injectCart(withSaved), css)));
  // The VYA item behind this page is encoded in its buy link — used to record a product view for
  // the store's analytics.
  const itemId = (out.match(/\/checkout\?item=([a-zA-Z0-9-]+)/) || [])[1] || null;

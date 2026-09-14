@@ -46,6 +46,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
    { href: `${B}/shipping`, label: "Shipping & duties", blurb: "Where you ship, what postage costs, and who pays customs.", icon: "Truck" },
    { href: `${B}/tax`, label: "Sales tax", blurb: "Where you’re registered to collect, and how each piece is taxed.", icon: "Receipt" },
    { href: `${B}/inbox`, label: "Messages & offers", blurb: "Whether shoppers can message you or name their price — and how offers work.", icon: "MessageCircle" },
+   { href: `${B}/saved-pieces`, label: "Saved pieces", blurb: "Whether shoppers can save pieces on your storefront and come back to them.", icon: "Heart" },
    { href: `${B}/policies`, label: "Policies", blurb: "Returns, shipping, privacy and terms — linked from every storefront page.", icon: "ScrollText" },
    { href: `${B}/appointments`, label: "Appointments", blurb: "Let people book a time with you — fittings, collections, sourcing chats. Yours whether or not you rent.", icon: "CalendarClock" },
    { href: `${B}/rentals`, label: "Rentals", blurb: "Rent pieces out instead of selling them once — who can book, for how long, and on what terms.", icon: "CalendarRange" },

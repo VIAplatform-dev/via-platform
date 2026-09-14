@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem, markSold, removeItem, publishItem, updateItem, deleteItemForever, setCrossListChannels } from "@/app/lib/db/inventory";
-import { getConsignor, createConsignmentItem, removeConsignmentItemByProduct, resolveSplitForIntake } from "@/app/lib/consignment-db";
-import { getOrCreateCollection, setItemCollections } from "@/app/lib/db/collections";
+import { getConsignor, createConsignmentItem, removeConsignmentItemByProduct, resolveSplitForIntake, getConsignmentItemByProduct } from "@/app/lib/consignment-db";
+import { getOrCreateCollection, setItemCollections, getCollectionTitlesForItems } from "@/app/lib/db/collections";
 import { delistEverywhere } from "@/app/lib/cross-listing-db";
 import { placeHold, releaseHold } from "@/app/lib/holds-db";
 import { normalizeFlaws } from "@/app/lib/flaws-core";
 import { normalizeMeasurements, unitFor, type Measurement } from "@/app/lib/measurements-core";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
+import { itemInterest } from "@/app/lib/store-favorites-db";
 import { publishRefusal } from "@/app/lib/setup-gate-core";
 import { stores } from "@/app/lib/stores";
 
@@ -18,9 +19,16 @@ type Ctx = { params: Promise<{ id: string }> };
 
 // POST { action: "sold" | "remove" | "publish" | "hold" | "release" } — run a lifecycle transition
 // on one of the acting store's items (ownership-scoped). `hold` takes { name?, days? | until? }.
-// GET — one piece, for anywhere that needs to show it without loading the whole inventory. The
-// storefront editor uses it: a product card there is captured markup, so the panel has to ask what
-// the piece actually says right now.
+// GET — one piece, whole, for anywhere that needs to show or edit it without loading the whole
+// inventory. The storefront editor uses it: a product card there is captured markup, so the panel
+// has to ask what the piece actually says right now. So does the phone's piece editor, which used
+// to find its piece inside the full inventory — 12.5 MB on the largest store, downloaded to open
+// one dress.
+//
+// It comes with what the editor needs and the row itself cannot carry: the collection titles the
+// picker prefills from, and WHOSE PIECE IT IS. The consignor was writable through PATCH and
+// readable through nothing, so assigning one and reopening the piece showed the field empty again —
+// the assignment lives in `consignment_items`, not on the item, and no GET had ever joined it.
 export async function GET(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,10 +37,24 @@ export async function GET(request: NextRequest, { params }: Ctx) {
  if (!seller) return NextResponse.json({ error: "Not found" }, { status: 404 });
  const item = await getItem(id);
  if (!item || item.sellerId !== seller.id) return NextResponse.json({ error: "Not found" }, { status: 404 });
+ // Neither is worth failing the piece over: a picker with no titles and a blank consignor are both
+ // survivable, a screen that will not open is not.
+ const [colMap, consignment, interest] = await Promise.all([
+  getCollectionTitlesForItems([id]).catch(() => ({} as Record<string, string[]>)),
+  getConsignmentItemByProduct(id).catch(() => null),
+  // Views and saves have been collected for months and read by nothing — the editor's
+  // "0 views · 0 saves" was a field no route returned. See itemInterest.
+  itemInterest(slug, id).catch(() => ({ views: 0, favorites: 0 })),
+ ]);
  return NextResponse.json({
+  ok: true,
   item: {
-   id: item.id, title: item.title, priceCents: item.priceCents, currency: item.currency,
-   images: Array.isArray(item.images) ? item.images : [], status: item.status,
+   ...item,
+   images: Array.isArray(item.images) ? item.images : [],
+   collections: colMap[id] || [],
+   consignorId: consignment?.consignorId ?? null,
+   views: interest.views,
+   favorites: interest.favorites,
   },
  });
 }

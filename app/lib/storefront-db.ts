@@ -51,6 +51,9 @@ export type StorefrontSettings = {
  // Which storefront is live: the imported copy of their site, or the design they built. Null on
  // stores that predate storefront versions — serving then falls back to the old capture check.
  serveMode: "imported" | "built" | null;
+ // Can her shoppers save pieces? Off until she turns it on: a heart on every card is a promise
+ // that someone will come back for the piece, and that is the seller's call to make, not ours.
+ wishlistEnabled: boolean;
  updatedAt?: string;
 };
 
@@ -82,6 +85,7 @@ function ensureTable(): Promise<void> {
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme JSONB`;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme_prev JSONB`;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS serve_mode TEXT`;
+ await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS wishlist_enabled BOOLEAN NOT NULL DEFAULT FALSE`;
  })().catch((e) => {
  tableReady = null; // allow retry on transient failure
  throw e;
@@ -103,6 +107,7 @@ function rowToSettings(r: any): StorefrontSettings {
  customDomain: r.custom_domain ?? null,
  theme: (r.theme as StorefrontTheme) ?? null,
  serveMode: r.serve_mode === "imported" || r.serve_mode === "built" ? r.serve_mode : null,
+ wishlistEnabled: r.wishlist_enabled === true,
  updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
  };
 }
@@ -135,6 +140,21 @@ export async function setServeMode(storeSlug: string, mode: "imported" | "built"
  await ensureTable();
  const sql = neon(getDatabaseUrl());
  await sql`UPDATE storefront_settings SET serve_mode = ${mode}, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
+}
+
+/**
+ * Turn saved pieces on or off for a store's shoppers.
+ *
+ * A switch and not a default, because it is a promise about the future: a heart says "come back for
+ * this" and a shop that sells one-of-one vintage cannot always keep it. The seller decides.
+ *
+ * Off does NOT delete anything. What shoppers already saved stays where it is, so a seller who
+ * turns it off for a season and back on has not thrown away her customers' lists.
+ */
+export async function setWishlistEnabled(storeSlug: string, on: boolean): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`UPDATE storefront_settings SET wishlist_enabled = ${on}, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
 }
 
 export async function deleteStorefront(storeSlug: string): Promise<void> {

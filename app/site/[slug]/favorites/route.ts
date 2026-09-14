@@ -3,9 +3,17 @@ import { getCaptureOrigin } from "@/app/lib/site-capture-db";
 
 export const dynamic = "force-dynamic";
 
-// A shopper's "Saved" page on a store's own storefront. Self-contained VYA page that
-// client-side fetches the shopper's favorites (credentialed → via_shopper cookie) and
-// renders them with buy links. Works on the seller's own domain too.
+// A shopper's "Saved" page on a store's own storefront, reachable at {slug}.vyasites.com/favorites
+// — which is where a theme's own favourites link points, so shoppers do land here.
+//
+// Mostly superseded by the drawer (see plan-b/wishlist.ts), which opens over her own shop instead of
+// navigating away from it and is bound to those same links when saved pieces are switched on. This
+// page is what remains for the case where it is not, and for anyone who types the address.
+//
+// TWO THINGS WERE WRONG WITH IT. It fetched from a hardcoded https://vyaplatform.com, which is a
+// different origin from the store the shopper is on, so the session cookie was never sent and the
+// page was permanently empty. And it had no answer for a signed-out shopper beyond "nothing saved
+// yet" — a dead end, now that saving requires signing in to the shop.
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
  const { slug } = await params;
  const origin = (await getCaptureOrigin(slug).catch(() => null)) || "";
@@ -38,13 +46,16 @@ h1{font-size:24px;font-weight:600;letter-spacing:-.01em;margin:0 0 20px}
 <div id="content"><p style="color:var(--muted);font-size:14px">Loading…</p></div>
 </div>
 <script>(function(){
-var API="https://vyaplatform.com/api/storefront/favorite/list?slug="+encodeURIComponent(${JSON.stringify(slug)});
+/* Relative: the API is same-origin on the store's own host, which is the only place the session
+   cookie is sent. The absolute vyaplatform.com URL here guaranteed an empty page. */
+var API="/api/storefront/favorite/list?slug="+encodeURIComponent(${JSON.stringify(slug)});
 var el=document.getElementById('content');
 function money(c){return '$'+Math.round((c||0)/100).toLocaleString();}
 function esc(s){return String(s||'').replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m];});}
 fetch(API,{credentials:'include'}).then(function(r){return r.json()}).then(function(d){
  var f=(d&&d.favorites)||[];
- if(!f.length){el.innerHTML='<div class="empty">Nothing saved yet.<br/>Tap “♡ Save” on any piece to keep it here.<br/><br/><a href="${backHref}">Browse the store →</a></div>';return;}
+ if(d&&d.signedIn===false){el.innerHTML='<div class="empty">Sign in to see your saved pieces.<br/><br/><a href="${backHref}">Back to the store →</a></div>';return;}
+ if(!f.length){el.innerHTML='<div class="empty">Nothing saved yet.<br/>Tap the heart on any piece to keep it here.<br/><br/><a href="${backHref}">Browse the store →</a></div>';return;}
  el.innerHTML='<div class="grid">'+f.map(function(it){
   var img=it.image?'<img src="'+esc(it.image)+'" alt=""/>':'';
   var buy=it.status==='active'?'<a class="cta" href="/checkout?item='+encodeURIComponent(it.itemId)+'">View</a>':'<div class="sold">Sold</div>';
