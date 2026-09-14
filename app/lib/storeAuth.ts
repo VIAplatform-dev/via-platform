@@ -4,7 +4,8 @@ import { auth } from "./auth";
 import { storeContactEmails } from "./stores";
 import { getMobilePayload } from "./mobileAuth";
 import { pickStoreSlug } from "./store-slug-core";
-import { storeSlugForEmail, emailBelongsToStore } from "./store-users-db";
+import { storeSlugForEmail, emailBelongsToStore, addStoreUser } from "./store-users-db";
+import { getStoreAccountByOwner } from "./store-accounts-db";
 
 // ───────────────────────────────────────────────────────────────────────────
 // Store-portal auth resolution. Normally the store is the logged-in partner
@@ -112,13 +113,35 @@ export async function resolveStoreSlugAny(request: NextRequest): Promise<string 
 }
 
 /**
- * The store a MOBILE session acts as. store_users first, the hardcoded map second — the same
- * order resolveStoreSlug uses for web sessions, for the same reason: a curated seller who later
- * brought her own site over has two slugs, and the static map would sign her phone into the
- * marketplace one, where her inventory isn't. The DB lookup degrades to the map, never to nothing.
+ * The store a MOBILE session acts as.
+ *
+ * THREE PLACES SAY WHO OWNS A SHOP, and they can disagree:
+ *   · store_users     — access. Who may work on this shop.
+ *   · store_accounts  — the account itself, written at signup, with an owner_email.
+ *   · storeContactEmails — the hardcoded map, from before either existed.
+ *
+ * The WEB gate (whoami) reads all three and, when it finds an account with no access row, writes
+ * the missing row back rather than reporting a problem. This read only the first and the third. So
+ * a seller whose access row never got written — the exact case whoami exists to repair — could sign
+ * in on her laptop and not on her phone, and the app told her she had no shop while the website was
+ * showing it to her. Nothing about that looks like one bug; it looks like the app being broken.
+ *
+ * Same three places now, same repair. The lookups are ordered as resolveStoreSlug orders them, for
+ * the same reason: a curated seller who later brought her own site over has two slugs, and the
+ * static map would sign her phone into the marketplace one, where her inventory isn't.
  */
 export async function storeSlugForMobileEmail(email: string): Promise<string | null> {
  /* allow-swallow: DB unreachable must degrade to the static map, not lock the phone out */
  const dbSlug = await storeSlugForEmail(email).catch(() => null);
- return pickStoreSlug({ dbSlug, staticSlug: storeSlugFromEmail(email) });
+ const fromAccess = pickStoreSlug({ dbSlug, staticSlug: storeSlugFromEmail(email) });
+ if (fromAccess) return fromAccess;
+
+ // She owns the account but has no access row. The row should have existed; write it and carry on,
+ // exactly as the web gate does — repairing costs one insert and ends the mismatch for good.
+ const account = await getStoreAccountByOwner(email).catch(() => null);
+ if (account?.slug) {
+  await addStoreUser(account.slug, email, "owner").catch(() => {}); /* allow-swallow: signing her in matters more than the repair */
+  return account.slug;
+ }
+ return null;
 }

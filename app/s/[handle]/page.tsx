@@ -2,7 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { storePublicOrigin } from "@/app/lib/plan-b/store-host";
 import type { Metadata } from "next";
 import { stores } from "@/app/lib/stores";
-import { getStorefrontByHandle, getStorefrontByHandleAny } from "@/app/lib/storefront-db";
+import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
+import { storefrontVisibility } from "@/app/lib/storefront-visibility";
+import { viewerCanEdit } from "@/app/lib/storefront-viewer";
+import NotOpenYet from "@/app/s/NotOpenYet";
 import { hasCaptures } from "@/app/lib/site-capture-db";
 import { servesCapture } from "@/app/lib/storefront-versions";
 import StorefrontView from "../StorefrontView";
@@ -52,19 +55,26 @@ export default async function StorefrontPage({ params, searchParams }: Props) {
  const { handle } = await params;
  const { preview } = await searchParams;
 
- // Public access only resolves *live* storefronts; ?preview resolves it even when
- // off (the owner previewing), with a "not live yet" ribbon.
- const sf = preview
- ? await getStorefrontByHandleAny(handle).catch(() => null)
- : await getStorefrontByHandle(handle).catch(() => null);
- if (!sf) return notFound();
+ // The shop is resolved whether or not it is published; WHO IS ASKING decides what is shown.
+ // See storefront-visibility.ts — an unpublished shop used to answer its own address with Next's
+ // black 404, to the person who built it.
+ const sf = await getStorefrontByHandleAny(handle).catch(() => null);
+ if (!sf) return notFound(); // no such handle — that genuinely is nothing
+
+ const visibility = storefrontVisibility(!!sf.enabled, {
+  previewing: !!preview,
+  hasAccess: await viewerCanEdit(sf.storeSlug),
+ });
+ if (visibility === "closed") return <NotOpenYet name={storeDisplayName(sf, handle)} />;
+ // Everything below treats "preview" the way it always treated ?preview.
+ const previewing = visibility === "preview";
 
  // Which storefront is live is the seller's choice now, not a consequence of what she happens to
  // have. This used to be "any captured pages? then serve those", which meant a store that had ever
  // imported its site could never publish a design built here — the captures always won. The
  // published version decides; the capture check is only the fallback for stores that predate
  // versions and so have no published row yet. See storefront-versions.ts.
- if (!preview && servesCapture(sf.serveMode, await hasCaptures(sf.storeSlug).catch(() => false))) {
+ if (!previewing && servesCapture(sf.serveMode, await hasCaptures(sf.storeSlug).catch(() => false))) {
   redirect(`/site/${sf.storeSlug}`);
  }
 
@@ -85,16 +95,16 @@ export default async function StorefrontPage({ params, searchParams }: Props) {
 
  return (
  <>
- {sf.enabled && !preview && (
+ {visibility === "live" && (
  <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(storeLd) }} />
  )}
- {sf.enabled && !preview && <StorefrontTracker slug={sf.storeSlug} pageType="home" />}
- {!sf.enabled && (
+ {visibility === "live" && <StorefrontTracker slug={sf.storeSlug} pageType="home" />}
+ {previewing && (
  <div className="bg-[#5D0F17] py-1.5 text-center text-[11px] uppercase tracking-[0.2em] text-[#FFFDF8]">
  Preview · not live yet
  </div>
  )}
- <StorefrontView settings={sf} preview={!!preview} />
+ <StorefrontView settings={sf} preview={previewing} />
  </>
  );
 }

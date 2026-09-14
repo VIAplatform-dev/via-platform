@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
+import { storefrontVisibility } from "@/app/lib/storefront-visibility";
+import { viewerCanEdit } from "@/app/lib/storefront-viewer";
+import NotOpenYet from "@/app/s/NotOpenYet";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem } from "@/app/lib/db/inventory";
 import { getInboxSettings } from "@/app/lib/storefront-settings-db";
@@ -99,6 +102,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const { preview } = await searchParams;
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
  if (!sf) return notFound();
+ // Same rule as the shop's home page: an unpublished shop shows itself to the person who
+ // built it, and says "not open yet" to anyone else, rather than a developer's 404.
+ const visibility = storefrontVisibility(!!sf.enabled, { previewing: !!preview, hasAccess: await viewerCanEdit(sf.storeSlug) });
+ if (visibility === "closed") return <NotOpenYet />;
+ const previewing = visibility === "preview";
  const seller = await getSellerBySlug(sf.storeSlug).catch(() => null);
  const item = await getItem(id).catch(() => null);
  if (!item || !seller || item.sellerId !== seller.id || item.status === "removed") return notFound();
