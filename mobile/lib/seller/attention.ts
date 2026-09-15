@@ -8,7 +8,7 @@
 export type AttentionRow = { id: string; label: string; count: number; href: string; urgent: boolean };
 
 /** An in-app destination: the screen, and the filter it should open on. */
-export type RowRoute = { pathname: "/(seller)/orders" | "/(seller)/inbox" | "/(seller)/consignment" | "/(seller)/inventory"; params?: Record<string, string> };
+export type RowRoute = { pathname: "/(seller)/orders" | "/(seller)/inbox" | "/(seller)/consignment" | "/(seller)/inventory" | "/(seller)/cross-listing"; params?: Record<string, string> };
 
 export type NeedsYouRow = {
   key: string;
@@ -36,7 +36,10 @@ const SHAPE: Record<string, { icon: string; route: RowRoute | null }> = {
   pickupsWaiting: { icon: "package", route: { pathname: "/(seller)/orders", params: { filter: "pickup" } } },
   unanswered24h: { icon: "mail", route: { pathname: "/(seller)/inbox" } },
   payoutsDue: { icon: "archive", route: { pathname: "/(seller)/consignment" } },
-  crossListingFailed: { icon: "alert-circle", route: null },
+  // It used to be `route: null`, which meant the browser fallback: /admin/cross-listing in a
+  // sheet, a wide board on a phone. It has a screen now that names the pieces and says which of
+  // them the phone can retry and which need the extension on a computer.
+  crossListingFailed: { icon: "alert-circle", route: { pathname: "/(seller)/cross-listing" } },
   // "aging" is deliberately absent: the Inventory tile already carries that line.
 };
 

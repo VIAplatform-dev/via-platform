@@ -1,69 +1,110 @@
-// The seller portal's visual language, taken from getvya.ai.
+// The seller workspace's visual language, taken from the workspace itself.
 //
-// Two products, two identities. The shopper side of this app is vyaplatform.com: cream ground,
-// one deep burgundy carrying every piece of ink (see ./theme.ts). The seller side is getvya.ai,
-// which is warmer, browner and quieter. Ink is a soft near-black, oxblood is reserved for the
-// things you act on, and the whole thing sits on paper rather than cream.
+// THIS FILE USED TO BE READ OFF THE WRONG PAGE. The values were lifted from
+// app/infrastructure/infrastructure.css, which is getvya.ai the MARKETING SITE: serif throughout,
+// wine accent, corners at 3px, uppercase labels letter-spaced at .2em. That is a real identity and
+// it is not the one a seller works in. The workspace she actually uses, /admin, is
+// app/infrastructure/admin/layout.tsx and admin/ui.tsx: Hanken Grotesk, a GREEN accent, white cards
+// at rounded-2xl on #f7f6f3, and buttons that are fully round. The app looked like a different
+// product from the one on her laptop, which is exactly what it had been drawn from.
 //
-// The values below are lifted verbatim from app/infrastructure/infrastructure.css, the getvya.ai
-// stylesheet, so the site and the portal cannot drift apart by eye. Its custom-property name is
-// kept in a comment beside each one.
+// Everything below is read off those two files. Where a value here differs from them, that is a
+// bug rather than a preference.
 //
-// The exported NAMES match ./theme.ts exactly. Colors, spacing, fonts, eyebrow, with the same
-// keys. That is deliberate: a seller screen swaps one import path and needs no other edit, and a
-// screen can never half-adopt the portal identity.
+// The exported NAMES still match ./theme.ts (the shopper side) key for key, so a seller screen
+// swaps one import path and needs no other edit, and can never half-adopt an identity.
+
+import { Platform } from "react-native";
+
+/** The platform's monospace. The workspace's eyebrows are `font-mono`, and "monospace" is not a
+ *  family iOS knows: an unrecognised family there is silently ignored rather than substituted. */
+const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
 
 export const colors = {
-  bg: "#FBF8F2", //        --paper
-  bgCard: "#FFFFFF", //    --card
-  /** The warmer ground behind grouped rows and tiles. */
-  bgAlt: "#F5EFE4", //     --cream
-  text: "#2C241D", //      --ink
-  /** Secondary lines: a store's location, a row's supporting sentence. */
-  textMuted: "#574D43", // --ink-soft
-  /** Placeholder copy, inactive icons, the dimmest tier. */
-  textDim: "#8D8478", //   --mute
-  border: "#E8E0D1", //    --line
-  accent: "#5D1620", //    --oxblood
-  accentText: "#F7EFE6",
-  /** Pressed state for an oxblood button. */
-  accentDeep: "#46101A", // --oxblood-deep
-  /** getvya.ai's third colour. Eyebrows and the quietest metadata only. */
-  mauve: "#9B7D83", //     --mauve
-  taupe: "#CDC1B0", //     --taupe
-  taupeDeep: "#6F6153", // --taupe-deep
-  overlayChip: "rgba(44, 36, 29, 0.22)",
+  bg: "#F7F6F3", //        admin/layout.tsx: bg-[#f7f6f3]
+  bgCard: "#FFFFFF",
+  /** The ground behind grouped rows and inset blocks. Tailwind stone-100. */
+  bgAlt: "#F5F5F4",
 
-  /** Positive movement only: the ↑ delta, the live dot, "Label sent to you". Never decoration. */
-  positive: "#3A6B45", //  getvya.ai's .pos
-  /** Ground behind an unselected filter chip and the tiles on Home. */
-  chip: "#F5EFE4", //      --cream
-  /** Ground behind a SELECTED filter chip. Oxblood, not near-black: on getvya.ai the thing you
-   *  have chosen is the thing wearing the brand colour. */
-  chipActive: "#5D1620",
-  chipActiveText: "#F7EFE6",
+  // The stone ramp the workspace writes in. Not a cream ramp: the workspace ground is neutral, and
+  // warm-grey text on it is what keeps a forty-row table readable one-handed.
+  text: "#1C1917", //      stone-900
+  /** Secondary lines: a store's location, a row's supporting sentence. */
+  textMuted: "#57534E", // stone-600
+  /** Placeholder copy, inactive icons, the dimmest tier. */
+  textDim: "#A8A29E", //   stone-400
+  border: "#E7E5E4", //    stone-200
+  /** A hairline INSIDE a card, between its rows. Lighter than the card's own edge. */
+  borderSoft: "#F5F5F4", //stone-100
+
+  // THE ACCENT IS GREEN. admin/layout.tsx sets --accent #0e9f76 and every shared component reads
+  // it. The wine below is not the accent; see `wine`.
+  accent: "#0E9F76",
+  accentText: "#FFFFFF",
+  /** Pressed state for an accent button. --accent-hover. */
+  accentDeep: "#0B8A66",
+  /** The tint behind a live pill, or the selected row in the drawer. --accent-soft. */
+  accentSoft: "#EAFAF3",
+  /** Accent text ON accentSoft, and the colour of a positive number. --accent-ink. */
+  accentInk: "#0B7A5C",
+  /** The lit dot on a "live" pill. --accent-bright. */
+  accentBright: "#2FD39B",
+
+  /**
+   * ONE THING WEARS WINE, here and in the workspace: selling in person.
+   *
+   * admin/layout.tsx paints the status dot #5D0F17 when Market Mode is on and the accent green
+   * otherwise. Spending it anywhere else is what made the whole app read as the marketing site.
+   */
+  wine: "#5D0F17",
+
+  /** Positive movement only: the ↑ delta, a piece that is free, "Label sent to you". */
+  positive: "#0B7A5C",
+  /** Something is late or failing. rose-500 on rose-50, the workspace's `down` pill. */
+  negative: "#F43F5E",
+  negativeSoft: "#FFF1F2",
+  /** Worth a look, but nothing is wrong: reserved, booked, AI unsure. amber-600 on amber-50. */
+  warning: "#D97706",
+  warningSoft: "#FFFBEB",
+
+  /** Ground behind an unselected chip in a segmented control. */
+  chip: "#F5F5F4",
+  /** Ground behind a SELECTED one. Stone-900, as the workspace's TagRow draws it: the choice is
+   *  near-black, and green stays reserved for state rather than selection. */
+  chipActive: "#1C1917",
+  chipActiveText: "#FFFFFF",
+
+  overlayChip: "rgba(28, 25, 23, 0.22)",
+
+  // Kept so a screen still written against the old palette compiles while it is converted. Both
+  // now point into the stone ramp rather than the cream one.
+  mauve: "#A8A29E",
+  taupe: "#D6D3D1",
+  taupeDeep: "#57534E",
 };
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
-// getvya.ai runs three faces: Playfair Display for headings, Cormorant for the uppercase
-// letter-spaced labels on every eyebrow and button, and a serif body.
-//
-// The body face is where the portal departs from the site, on purpose. getvya.ai is a marketing
-// page read once at leisure; this is a dashboard read at a glance, in a shop, one-handed. A serif
-// body at 13px in a dense table is the wrong tool, and the existing shopper theme already makes
-// this call for the same reason. So the brand faces dress the CHROME. Titles, eyebrows, buttons,
-// section headings, and the numbers and rows a seller scans stay in the system sans.
-// THE SAME TWO FACES AS getvya.ai. The workspace on a laptop is set in Newsreader and Hanken
-// Grotesk; the app was in Playfair Display and Cormorant, so the same product read as two products
-// depending on which screen a seller was looking at. One pair, both places.
+/**
+ * NOTHING SHE READS IS A SERIF.
+ *
+ * The workspace sets its UI in Hanken Grotesk and reaches for Newsreader once per page, on the
+ * title. The app had it the other way round: serif titles AND serif product names AND Cormorant
+ * labels tracked at .2em, which is handsome at 40px on a marketing page and hard work at 13px in
+ * a shop.
+ *
+ * `label` is the small uppercase eyebrow, and in the workspace it is MONOSPACE at 10px. Left
+ * undefined so React Native falls back to the platform mono, which costs no bundled font.
+ */
 export const fonts = {
-  /** Screen titles, section headings, the wordmark. --font-display on the web. */
+  /** Page titles only. --font-display on the web. */
   serif: "Newsreader_500Medium",
-  /** Uppercase, letter-spaced labels: eyebrows, buttons, tab bar. */
-  label: "HankenGrotesk_600SemiBold",
-  /** Dense data: prices, counts, product titles, table rows. --font-sans on the web. */
+  /** The small uppercase eyebrow above a section. Platform monospace. */
+  label: MONO,
+  /** Everything else: rows, prices, buttons, body. */
   sans: "HankenGrotesk_400Regular" as string | undefined,
+  medium: "HankenGrotesk_500Medium" as string | undefined,
+  semibold: "HankenGrotesk_600SemiBold" as string | undefined,
 };
 
 /** Every font family the portal needs, for useFonts() at the root.
@@ -79,25 +120,49 @@ export const PORTAL_FONTS = {
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
-/** The uppercase, letter-spaced label above every section heading.
- *  getvya.ai sets these in Cormorant 600 at .2em, in oxblood, not in the body grey. */
+/**
+ * The uppercase label above a section.
+ *
+ * admin/ui.tsx: `font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-400`.
+ * It was Cormorant at 13px, .2em tracking, in oxblood: three separate things louder than the
+ * workspace's, on a label whose entire job is to be quiet.
+ */
 export const eyebrow = {
-  fontFamily: fonts.label,
-  fontSize: 13,
-  letterSpacing: 2.2,
+  fontFamily: MONO,
+  fontSize: 10,
+  fontWeight: "600" as const,
+  letterSpacing: 1.6,
   textTransform: "uppercase" as const,
-  color: colors.accent,
+  color: colors.textDim,
 };
 
-/** getvya.ai's buttons: Cormorant 600, .18em tracking, uppercase, and a 2px radius. Corners just
- *  soft enough to read as deliberate rather than rounded. */
+/** The workspace's buttons: fully round, 13px, weight 500, sentence case. Not uppercase and not
+ *  letter-spaced. ADMIN_BTN_BASE in admin/ui.tsx. */
 export const button = {
-  fontFamily: fonts.label,
-  fontSize: 14,
-  letterSpacing: 2.5,
-  textTransform: "uppercase" as const,
-  borderRadius: 2,
+  fontSize: 13,
+  fontWeight: "500" as const,
+  borderRadius: 999,
 };
 
-/** --rad. The site rounds almost nothing; cards are 3px, not 12px. */
-export const radius = 3;
+/**
+ * THREE RADII, because the workspace uses three and one number cannot stand in for them.
+ *
+ * `radius` is the CARD: rounded-2xl, 16. `pill` is every button, chip and status badge:
+ * rounded-full. `radiusSm` is a thumbnail or an inset tile: rounded-lg, 8.
+ *
+ * It used to be a single `radius: 3`, the marketing site's `--rad`, applied to cards, buttons and
+ * photographs alike. Almost nothing in the workspace is 3px.
+ */
+export const radius = 16;
+export const pill = 999;
+export const radiusSm = 8;
+
+/** The workspace's card: white, a hairline edge, and a shadow that lifts it barely off the ground.
+ *  TechCard in admin/ui.tsx carries two layers; React Native takes the outer one. */
+export const cardShadow = {
+  shadowColor: "#101828",
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 1,
+};

@@ -32,13 +32,24 @@ type Request = {
  status: string; quotedCents: number | null; holdsDates: boolean; holdExpiresAt: string | null;
 };
 
-const TABS = ["today", "upcoming", "out", "inspect", "requests"] as const;
+/** One rentable piece, as GET /api/store/rentals/terms lists them. */
+type RentalItem = {
+ itemId: string; title: string | null; image: string | null; itemStatus: string | null;
+ tiers: { days: number; cents: number }[]; replacementCents: number | null;
+ bookingStatus: string | null; dueBack: string | null; shipBy: string | null; renterName: string | null;
+};
+
+const TABS = ["items", "today", "upcoming", "out", "inspect", "requests"] as const;
 type Tab = (typeof TABS)[number];
 // Named for the STAGE THE PIECE IS AT, in the order it travels: pack it, it's booked, it's away,
 // it's back. The old set mixed three vocabularies. "Today" and "Upcoming" are times, "With
 // customers" is a place, "To check" is a job, so nothing told you they were one sequence.
 const TAB_LABEL: Record<Tab, string> = {
- today: "Pack today",
+ // FIRST, AND THE DEFAULT. The other five are all about BOOKINGS, so a shop that rents pieces but
+ // has a quiet week opened this page and read five zeroes: accurate, and no answer to any question
+ // a seller actually has. "What do I rent out" is the one she arrives with.
+ items: "Items for rent",
+ today: "To ship",
  upcoming: "Booked ahead",
  out: "Away",
  inspect: "Returned",
@@ -46,7 +57,8 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 /** One line under the row, so a tab never has to carry the whole explanation in two words. */
 const TAB_HINT: Record<Tab, string> = {
- today: "Going out today: pack these and get them posted or ready to collect.",
+ items: "Every piece you rent out, and where each one is right now. Turn renting on for a piece from its listing.",
+ today: "Leaving today. Get these posted, or ready for the customer to collect.",
  upcoming: "Paid and dated, leaving another day. Nothing to do yet.",
  out: "Out with a customer now. Anything past its return date is marked overdue.",
  inspect: "Returned by the renter and waiting on you. Check them over, then put them back on the rack.",
@@ -74,21 +86,25 @@ const NEXT: Record<string, { to: string; label: string } | undefined> = {
 };
 
 export default function RentalsQueuePage() {
- const [tab, setTab] = useState<Tab>("today");
+ const [tab, setTab] = useState<Tab>("items");
  const [bookings, setBookings] = useState<Booking[] | null>(null);
  const [requests, setRequests] = useState<Request[] | null>(null);
+ // Pieces with rental terms, whether or not anything is booked on them.
+ const [forRent, setForRent] = useState<RentalItem[] | null>(null);
  const [busy, setBusy] = useState<string | null>(null);
  const [err, setErr] = useState<string | null>(null);
  const [damaging, setDamaging] = useState<string | null>(null);
  const [damageAmt, setDamageAmt] = useState("");
 
  const load = useCallback(async () => {
-  const [b, r] = await Promise.all([
+  const [b, r, t] = await Promise.all([
    fetch(withStore("/api/store/rentals/bookings")).then((x) => (x.ok ? x.json() : null)).catch(() => null),
    fetch(withStore("/api/store/rentals/requests?status=new")).then((x) => (x.ok ? x.json() : null)).catch(() => null),
+   fetch(withStore("/api/store/rentals/terms")).then((x) => (x.ok ? x.json() : null)).catch(() => null),
   ]);
   setBookings(b?.bookings ?? []);
   setRequests(r?.requests ?? []);
+  setForRent(t?.items ?? []);
  }, []);
 
  useEffect(() => { void Promise.resolve().then(() => { void load(); }); }, [load]);
@@ -119,7 +135,10 @@ export default function RentalsQueuePage() {
  const t = todayIso();
  const all = bookings ?? [];
  const overdue = all.filter((b) => (b.status === "out" || b.status === "due") && b.dueBack && b.dueBack < t);
+ // "Items for rent" is not a bucket of bookings: it is a list of PIECES, so it carries an empty
+ // one here and is rendered from `forRent` instead.
  const buckets: Record<Tab, Booking[]> = {
+  items: [],
   today: all.filter((b) => (b.status === "booked" || b.status === "picking") && b.shipBy && b.shipBy <= t),
   upcoming: all.filter((b) => (b.status === "booked" || b.status === "picking") && (!b.shipBy || b.shipBy > t)),
   out: all.filter((b) => b.status === "out" || b.status === "due"),
@@ -127,6 +146,7 @@ export default function RentalsQueuePage() {
   requests: [],
  };
  const counts: Record<Tab, number> = {
+  items: (forRent ?? []).length,
   today: buckets.today.length, upcoming: buckets.upcoming.length,
   out: buckets.out.length, inspect: buckets.inspect.length, requests: (requests ?? []).length,
  };
@@ -230,6 +250,52 @@ export default function RentalsQueuePage() {
   );
  };
 
+ /**
+  * One piece you rent out: what it is, where it is, and what it rents for.
+  *
+  * The status is derived exactly as the phone derives it (mobile/lib/seller/rentals.ts), so the
+  * two surfaces cannot disagree about whether a piece is available. Deliberately fewer states than
+  * the booking table has: a seller looking over her pieces wants available / booked / out / overdue,
+  * not the difference between "requested" and "held".
+  */
+ const forRentRow = (it: RentalItem) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const live = (it.bookingStatus ?? "").toLowerCase();
+  const away = live === "out" || live === "due";
+  const state =
+   it.itemStatus && it.itemStatus !== "active" && it.itemStatus !== "reserved" ? "unavailable"
+   : away ? (it.dueBack && it.dueBack < today ? "overdue" : "out")
+   : live ? "booked"
+   : "available";
+  const cheapest = it.tiers.filter((t) => t.cents > 0).sort((a, b) => a.cents - b.cents)[0];
+  return (
+   <TechCard key={it.itemId} className="p-4">
+    <div className="flex items-center gap-4">
+     {it.image
+      // eslint-disable-next-line @next/next/no-img-element -- a seller's own photo, already sized by the CDN
+      ? <img src={it.image} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+      : <div className="h-14 w-14 shrink-0 rounded-lg bg-stone-100" />}
+     <div className="min-w-[12rem] flex-1">
+      <a href={withStore(`/admin/inventory?item=${it.itemId}`)} className="text-[14px] font-medium text-stone-900 hover:underline">
+       {it.title || "Untitled piece"}
+      </a>
+      <p className="mt-0.5 text-[12px] text-stone-500">
+       {cheapest ? `From $${Math.round(cheapest.cents / 100)} for ${cheapest.days} ${cheapest.days === 1 ? "day" : "days"}` : "No rental price set"}
+       {it.replacementCents ? ` · $${Math.round(it.replacementCents / 100)} if lost` : ""}
+      </p>
+     </div>
+     <div className="shrink-0">
+      {state === "overdue" ? <StatusPill tone="pending">Overdue{it.dueBack ? ` since ${it.dueBack}` : ""}</StatusPill>
+       : state === "out" ? <StatusPill tone="neutral">Out{it.dueBack ? ` until ${it.dueBack}` : ""}</StatusPill>
+       : state === "booked" ? <StatusPill tone="pending">Booked{it.renterName ? ` · ${it.renterName}` : ""}</StatusPill>
+       : state === "unavailable" ? <StatusPill tone="neutral">{it.itemStatus === "sold" ? "Sold" : "Not listed"}</StatusPill>
+       : <StatusPill tone="live">Available</StatusPill>}
+     </div>
+    </div>
+   </TechCard>
+  );
+ };
+
  const reqRow = (q: Request) => (
   <TechCard key={q.id} className="p-4">
    <div className="flex flex-wrap items-start gap-4">
@@ -298,6 +364,14 @@ export default function RentalsQueuePage() {
 
    {loading ? (
     <TechCard className="px-5 py-10 text-center text-[13px] text-stone-400">Loading…</TechCard>
+   ) : tab === "items" ? (
+    (forRent ?? []).length === 0
+     ? <TechEmpty
+        icon={<CalendarRange size={20} />}
+        title="Nothing is set up to rent yet"
+        body="Open a piece, or list a new one, and switch “Rent it out” on. It shows here with its rental price the moment it has one."
+       />
+     : <div className="flex flex-col gap-3">{(forRent ?? []).map(forRentRow)}</div>
    ) : tab === "requests" ? (
     (requests ?? []).length === 0
      ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="Approve or decline rental requests. Choose whether dates are held while they wait under Rental settings › Who can book." />

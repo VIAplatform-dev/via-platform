@@ -91,6 +91,9 @@ export default function SellerTabsLayout() {
        * the bar grows a nameless icon per screen. Orders comes off the Home tile; Piece and Message
        * come off a list; the rest come off the ☰ menu on the Store tab. Five tabs is the design. */}
       <Tabs.Screen name="orders" options={{ href: null }} />
+      {/* Ask VYA. Reached from the sparkle in Home's header and the drawer's first row, never a
+       * tab: it is where she goes with a question, not one of the five places she lives. */}
+      <Tabs.Screen name="assistant" options={{ href: null }} />
       {/* Named "menu", not "settings": app/settings.tsx (the SHOPPER settings screen) already
        * owns /settings, and expo-router resolves that one first. The seller drawer was simply
        * unreachable, and the ☰ opened the shopper's Sizes and Saved Searches instead. */}
@@ -111,11 +114,19 @@ export default function SellerTabsLayout() {
       <Tabs.Screen name="tax" options={{ href: null }} />
       <Tabs.Screen name="appointments" options={{ href: null }} />
       <Tabs.Screen name="rentals" options={{ href: null }} />
-      <Tabs.Screen name="new/details" options={{ href: null }} />
       <Tabs.Screen name="new/bulk" options={{ href: null }} />
-      <Tabs.Screen name="new/loading" options={{ href: null }} />
+      {/* The listing form. ONE screen: Capture uploads the photos and lands here, and this
+       * asks every question, AI or no AI. There used to be a "new/details" form and a "new/loading"
+       * page between the two, the first asking a subset of the same fields this one asks again. */}
       <Tabs.Screen name="new/review" options={{ href: null }} />
       <Tabs.Screen name="piece/[id]" options={{ href: null }} />
+      {/* Named "store-collection", not "collection", for exactly the reason "menu" is not
+       * "settings": (seller) is a route GROUP and adds no path segment, so a file at
+       * (seller)/collection/[id] and the SHOPPER's app/collection/[slug] both resolve to
+       * /collection/:x. Expo-router picks one, and it picked this one: tapping "Everyone's
+       * Favorites" in the marketplace opened the seller's collection editor. */}
+      <Tabs.Screen name="store-collection/[id]" options={{ href: null }} />
+      <Tabs.Screen name="cross-listing" options={{ href: null }} />
       <Tabs.Screen name="message/[id]" options={{ href: null }} />
     </Tabs>
     </SellerConnectProvider>

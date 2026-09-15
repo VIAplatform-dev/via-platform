@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,8 +35,13 @@ type Checkout = {
   items: { itemId: string; title?: string | null; saleCents?: number | null }[];
   tenderedCents: number | null; changeCents: number | null;
 };
-// The route answers { checkout, item, items }. The titles live on `items`, not on the lines.
-type CheckoutResponse = { checkout: Checkout; items?: { id: string; title: string }[] };
+// The route answers { checkout, item, items }, where each `items` entry is the LINE spread with
+// the looked-up piece nested under `item`. This used to be typed as { id, title } read off the top
+// level: both were undefined at runtime, `titleOf` always returned null, and every line in a market
+// checkout rendered as the literal word "Piece". At a market, with three half-finished checkouts
+// open, that is the one thing a seller needs the screen to tell her apart.
+type CheckoutLine = { itemId: string; item?: { id: string; title: string | null; images?: string[] | null } | null };
+type CheckoutResponse = { checkout: Checkout; items?: CheckoutLine[] };
 
 export default function CashCheckout() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,7 +64,9 @@ export default function CashCheckout() {
     },
   });
   const c = q.data?.checkout;
-  const titleOf = (itemId: string) => q.data?.items?.find((i) => i.id === itemId)?.title ?? null;
+  const lineFor = (itemId: string) => q.data?.items?.find((i) => i.itemId === itemId)?.item ?? null;
+  const titleOf = (itemId: string) => lineFor(itemId)?.title ?? null;
+  const photoOf = (itemId: string) => lineFor(itemId)?.images?.[0] ?? null;
   const currency = c?.currency ?? "USD";
 
   const pay = useMutation({
@@ -150,9 +157,24 @@ export default function CashCheckout() {
           <>
             <Text style={{ fontSize: 11, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700" }}>TOTAL</Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 44, color: colors.text, marginTop: spacing.xs }}>{formatMoney(c.amountCents, currency)}</Text>
-            {c.items.map((l) => (
-              <Text key={l.itemId} style={{ fontSize: 14, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{l.title || titleOf(l.itemId) || "Piece"}</Text>
-            ))}
+            {/* WHAT SHE IS SELLING, with its photograph. A total and the word "Piece" is not enough
+                to tell one open checkout from the next across a busy stall. */}
+            {c.items.map((l) => {
+              const photo = photoOf(l.itemId);
+              return (
+                <View key={l.itemId} style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.md }}>
+                  {photo ? (
+                    <Image source={{ uri: photo }} style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: colors.chip }} />
+                  ) : null}
+                  <Text style={{ flex: 1, fontSize: 15, color: colors.text }} numberOfLines={2}>
+                    {l.title || titleOf(l.itemId) || "Piece"}
+                  </Text>
+                  {l.saleCents ? (
+                    <Text style={{ fontSize: 14, color: colors.textMuted }}>{formatMoney(l.saleCents, currency)}</Text>
+                  ) : null}
+                </View>
+              );
+            })}
 
             {paid ? (
               <View style={{ marginTop: spacing.xl, backgroundColor: "rgba(31,122,92,0.12)", borderRadius: 16, padding: spacing.lg }}>

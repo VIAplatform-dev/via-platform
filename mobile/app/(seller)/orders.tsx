@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Linking, Pressable, Share, Text, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
@@ -60,8 +60,13 @@ const BUCKET: Record<Tab, string[]> = {
 export default function OrdersScreen() {
   const { storeSlug } = useAuth();
   const qc = useQueryClient();
+  // Home's "2 collections waiting" row arrives as ?filter=pickup. The URL is the tab, because this
+  // screen is a TAB that stays mounted once visited: a useState initialiser runs once, on the
+  // session's first visit, so every later arrival from Home was silently ignored. Switching tabs by
+  // hand writes back, so arriving here twice on the same filter works the second time too.
   const params = useLocalSearchParams<{ filter?: string }>();
-  const [tab, setTab] = useState<Tab>(params.filter === "pickup" ? "pickup" : "post");
+  const tab: Tab = (["post", "pickup", "transit", "done"] as const).includes(params.filter as Tab) ? (params.filter as Tab) : "post";
+  const setTab = (next: Tab) => router.setParams({ filter: next });
 
   const q = useQuery({
     queryKey: ["store", "orders"],

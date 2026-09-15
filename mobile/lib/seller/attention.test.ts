@@ -33,7 +33,7 @@ test("aging is the Inventory tile's line, never a Needs-you row; unknown ids are
   assert.deepEqual(needsYouRows(rows, { holdsShown: false, payoutsShown: false }).map((r) => r.key), ["unpriced"]);
 });
 
-test("a row that opens in the app lands on the right filter; the rest open the web workspace", () => {
+test("every row opens in the app, on the right filter", () => {
   const out = needsYouRows([
     row("pickupsWaiting", "1 collection waiting"), row("unanswered24h", "1 message waiting over a day"), row("noPhoto", "1 piece without a photo"),
     row("unpriced", "1 unpriced piece"), row("costMissing", "2 pieces with no cost"), row("lowConfidence", "1 AI price to check"), row("crossListingFailed", "1 failed"),
@@ -44,7 +44,12 @@ test("a row that opens in the app lands on the right filter; the rest open the w
   assert.deepEqual(out[3].route, { pathname: "/(seller)/inventory", params: { missing: "price" } });
   assert.deepEqual(out[4].route, { pathname: "/(seller)/inventory", params: { missing: "cost" } });
   assert.deepEqual(out[5].route, { pathname: "/(seller)/inventory", params: { missing: "confidence" } });
-  assert.equal(out[6].route, null);
+  // "N pieces failed to post" used to be the one row with no screen, so it fell through to opening
+  // the desktop cross-listing board in a browser sheet. It has its own screen now.
+  assert.deepEqual(out[6].route, { pathname: "/(seller)/cross-listing" });
+  // NOTHING falls through to the browser any more. The fallback in index.tsx is now reachable only
+  // by a row a NEWER server invents that this build has never heard of.
+  assert.equal(out.every((r) => r.route !== null), true);
 });
 
 test("urgency comes from the server, not from a second opinion here", () => {

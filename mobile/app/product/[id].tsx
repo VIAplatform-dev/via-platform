@@ -33,18 +33,6 @@ type ProductDetail = {
   storePolicies: { authenticity: string | null; shipping: string | null; returns: string | null };
 };
 
-function FloatingPill({ children, style }: { children: React.ReactNode; style?: object }) {
-  return (
-    <View
-      style={[
-        { flexDirection: "row", alignItems: "center", gap: spacing.lg, backgroundColor: "rgba(255,255,255,0.92)", borderRadius: 999, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-        style,
-      ]}
-    >
-      {children}
-    </View>
-  );
-}
 
 export default function ProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -117,6 +105,48 @@ export default function ProductScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* A REAL BAR, ABOVE THE PHOTOGRAPH.
+          These four controls used to float in pills ON the image, starting at the very top of the
+          screen. Two things went wrong with that. The photograph ran under the status bar and the
+          Dynamic Island, so the top of every piece was obscured by the clock and the battery: a
+          shot framed on the garment lost its garment. And a translucent pill over a photograph is
+          only legible against the half of photographs that happen to be dark there.
+          Cream, above the image, with the status bar reserved. The picture starts where the bar
+          ends, so nothing is cropped by hardware. */}
+      <View
+        style={{
+          flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+          paddingTop: insets.top + spacing.sm, paddingBottom: spacing.md, paddingHorizontal: spacing.lg,
+          backgroundColor: colors.bg,
+        }}
+      >
+        <Pressable hitSlop={10} accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
+          <Feather name="chevron-left" size={26} color={colors.text} />
+        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.lg }}>
+          <Link href="/(tabs)/shop" asChild>
+            <Pressable hitSlop={10} accessibilityLabel="Search"><Feather name="search" size={22} color={colors.text} /></Pressable>
+          </Link>
+          <Link href="/cart" asChild>
+            <Pressable hitSlop={10} accessibilityLabel="Bag">
+              <Feather name="shopping-bag" size={22} color={colors.text} />
+              {cart.count > 0 ? (
+                <View style={{ position: "absolute", top: -6, right: -7, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 }}>
+                  <Text style={{ color: colors.accentText, fontSize: 10, fontWeight: "600" }}>{cart.count}</Text>
+                </View>
+              ) : null}
+            </Pressable>
+          </Link>
+          <Pressable
+            hitSlop={10}
+            accessibilityLabel="Share"
+            onPress={() => { void Share.share({ message: `${p.title}: ${p.priceFormatted} at ${p.storeName} on VYA\n${API_BASE_URL}/products/${p.id}` }); }}
+          >
+            <Feather name="share" size={21} color={colors.text} />
+          </Pressable>
+        </View>
+      </View>
+
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
         <ScrollView
           horizontal
@@ -214,28 +244,6 @@ export default function ProductScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Floating over the photograph rather than above it. A nav bar here would crop the image. */}
-      <View style={{ position: "absolute", top: insets.top + spacing.sm, left: spacing.lg, right: spacing.lg, flexDirection: "row", justifyContent: "space-between" }}>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
-          <FloatingPill><Feather name="chevron-left" size={24} color={colors.text} /></FloatingPill>
-        </Pressable>
-        <FloatingPill>
-          <Link href="/(tabs)/shop" asChild><Pressable hitSlop={6}><Feather name="search" size={21} color={colors.text} /></Pressable></Link>
-          <Link href="/cart" asChild>
-            <Pressable hitSlop={6}>
-              <Feather name="shopping-bag" size={21} color={colors.text} />
-              {cart.count > 0 ? (
-                <View style={{ position: "absolute", top: -5, right: -6, width: 15, height: 15, borderRadius: 8, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
-                  <Text style={{ color: colors.accentText, fontSize: 9, fontWeight: "600" }}>{cart.count}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          </Link>
-          <Pressable hitSlop={6} onPress={() => { void Share.share({ message: `${p.title}: ${p.priceFormatted} at ${p.storeName} on VYA\n${API_BASE_URL}/products/${p.id}` }); }}>
-            <Feather name="share" size={21} color={colors.text} />
-          </Pressable>
-        </FloatingPill>
-      </View>
     </View>
   );
 }

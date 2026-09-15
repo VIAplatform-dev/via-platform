@@ -9,7 +9,7 @@ import { apiGet, ApiError, API_BASE_URL } from "../../lib/api";
 import { rentalDay, rentalsTileLine, todayDay, type Booking } from "../../lib/seller/rentals";
 import { daySchedule, appointmentsTileLine, type Appointment } from "../../lib/seller/appointments";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, pill } from "../../lib/portal-theme";
 import { agingTile, type AgingBuckets } from "../../lib/seller/aging";
 import { holdLapseRow, type HoldRow } from "../../lib/seller/holds";
 import { setupSummary, phoneRouteFor, type SetupStep } from "../../lib/seller/setup";
@@ -190,17 +190,24 @@ export default function SellerHome() {
             {me.data?.storeName ?? storeSlug}
           </Text>
         </View>
-        {/* The way back to the marketplace. A seller is also a shopper, and until this existed the
-            only route between the two sides was signing out. */}
-        <Pressable
-          onPress={() => router.push("/(tabs)")}
-          accessibilityLabel="Browse the marketplace"
-          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}
-        >
-          <Feather name="shopping-bag" size={17} color={colors.text} />
+        {/* NO SHOPPING BAG HERE.
+            It used to sit beside the bell and open the marketplace. Two problems: the tab bar
+            already has a shopping-bag glyph, and there it means her own Store, so one icon meant
+            two different shops on one screen. And leaving the workspace entirely is not a thing to
+            put one thumb-slip from the bell. The deliberate route out is Settings, "Exit to
+            Marketplace", which says where it goes in words. */}
+        <Pressable onPress={() => router.push("/(seller)/notifications")} style={{ width: 36, height: 36, borderRadius: pill, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
+          <Feather name="bell" size={17} color={colors.textMuted} />
         </Pressable>
-        <Pressable onPress={() => router.push("/(seller)/notifications")} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
-          <Feather name="bell" size={17} color={colors.text} />
+        {/* Ask VYA. The one filled control in this header, because it DOES something rather than
+            going somewhere, and because a seller who has only met the assistant on her laptop has
+            to be able to find it without being told. */}
+        <Pressable
+          onPress={() => router.push("/(seller)/assistant?from=Home")}
+          accessibilityLabel="Ask VYA"
+          style={{ width: 36, height: 36, borderRadius: pill, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center" }}
+        >
+          <Feather name="zap" size={16} color={colors.accentText} />
         </Pressable>
       </View>
 

@@ -38,7 +38,7 @@ type Home = {
     available: number; brought: number; broughtLeft: number; broughtValueCents: number;
     soldToday: number; grossTodayCents: number; cashCents: number; cardCents: number;
   };
-  inProgress: { id: string; itemId: string; amountCents: number; createdAt: string }[];
+  inProgress: { id: string; itemId: string; amountCents: number; createdAt: string; title?: string | null; image?: string | null }[];
 };
 
 function Stat({ value, label }: { value: string | number; label: string }) {
@@ -219,10 +219,21 @@ export default function MarketHome() {
                 paddingHorizontal: spacing.md, paddingVertical: spacing.md, marginTop: spacing.sm,
               }}
             >
-              <Text style={{ fontSize: 13.5, color: colors.text }}>
-                <Text style={{ fontWeight: "700" }}>{formatMoney(k.amountCents, currency)}</Text> checkout in progress
-              </Text>
-              <Text style={{ marginLeft: "auto", fontWeight: "700", color: colors.accent }}>Resume ›</Text>
+              {/* THE PIECE, not just the number. At a market there is a queue and several
+                  half-finished checkouts, and "$400 checkout in progress" cannot be told apart
+                  from the next one. The photograph can. */}
+              {k.image ? (
+                <Image source={{ uri: k.image }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: colors.chip }} />
+              ) : null}
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13.5, color: colors.text, fontWeight: "600" }} numberOfLines={1}>
+                  {k.title ?? "Checkout in progress"}
+                </Text>
+                <Text style={{ fontSize: 12.5, color: colors.textMuted, marginTop: 1 }}>
+                  {formatMoney(k.amountCents, currency)} · waiting on payment
+                </Text>
+              </View>
+              <Text style={{ fontWeight: "700", color: colors.accent }}>Resume ›</Text>
             </Pressable>
           ))}
         </View>

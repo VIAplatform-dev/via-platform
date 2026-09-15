@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ActivityIndicator, Pressable, Switch, Text, TextInput, View } from "react-native";
-import { colors, spacing, button, radius } from "../../lib/portal-theme";
+import { colors, spacing, button, radius, fonts } from "../../lib/portal-theme";
 
 // The pieces every settings screen is built from.
 //
@@ -193,22 +193,23 @@ export function Button({
       disabled={off}
       style={{
         marginTop: spacing.lg,
-        backgroundColor: primary ? colors.accent : "transparent",
+        backgroundColor: primary ? colors.accent : colors.bgCard,
         borderRadius: button.borderRadius,
         borderWidth: 1,
-        borderColor: primary ? colors.accent : colors.taupeDeep,
-        paddingVertical: spacing.lg,
+        // A secondary button is a white pill with a hairline, not an outlined transparent one:
+        // admin/ui.tsx draws it on the card colour so it reads as a control rather than a border.
+        borderColor: primary ? colors.accent : colors.border,
+        paddingVertical: spacing.md,
         alignItems: "center",
         opacity: off ? 0.6 : 1,
       }}
     >
       <Text
         style={{
-          fontFamily: button.fontFamily,
+          fontFamily: fonts.medium,
           fontSize: button.fontSize,
-          letterSpacing: button.letterSpacing,
-          textTransform: button.textTransform,
-          color: primary ? colors.accentText : colors.text,
+          fontWeight: button.fontWeight,
+          color: primary ? colors.accentText : colors.textMuted,
         }}
       >
         {busy ? (busyLabel ?? label) : label}

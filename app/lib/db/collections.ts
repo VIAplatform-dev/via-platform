@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { and, eq, inArray, sql as dsql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql as dsql } from "drizzle-orm";
 import { getDb } from "./index";
 import { collections, itemCollections, items } from "./schema";
 import type { Collection, Item } from "./schema";
@@ -94,7 +94,32 @@ export async function listCollections(sellerId: string, includeEmpty = false): P
  // The seller's own order first; anything she hasn't placed falls in behind it, alphabetically.
  .orderBy(dsql`${collections.position} NULLS LAST`, collections.title);
  const all = rows as (Collection & { itemCount: number })[];
- return includeEmpty ? all : all.filter((r) => r.itemCount > 0);
+ const visible = includeEmpty ? all : all.filter((r) => r.itemCount > 0);
+
+ // A COVER, EVEN BEFORE SHE PICKS ONE.
+ //
+ // `imageUrl` is null until a seller sets a cover by hand, and every surface that draws a
+ // collection tile drew a grey rectangle until she did: the manager on the phone, the picker, the
+ // storefront nav. A collection with two pieces in it is not a collection with no picture, so
+ // anything still blank borrows the first photograph inside it, which is what a shopper would
+ // expect the tile to show anyway. A cover she HAS chosen always wins.
+ const blank = visible.filter((c) => !c.imageUrl).map((c) => c.id);
+ if (blank.length) {
+  const firsts = await db
+   .select({ collectionId: itemCollections.collectionId, images: items.images })
+   .from(itemCollections)
+   .innerJoin(items, eq(items.id, itemCollections.itemId))
+   .where(and(inArray(itemCollections.collectionId, blank), ne(items.status, "removed")))
+   .catch(() => [] as { collectionId: string; images: unknown }[]);
+  const pick = new Map<string, string>();
+  for (const r of firsts) {
+   if (pick.has(r.collectionId)) continue;
+   const first = Array.isArray(r.images) ? (r.images as string[]).find((u) => typeof u === "string" && u) : null;
+   if (first) pick.set(r.collectionId, first);
+  }
+  for (const c of visible) if (!c.imageUrl && pick.has(c.id)) c.imageUrl = pick.get(c.id)!;
+ }
+ return visible;
 }
 
 /** Replace an item's collection membership with exactly the given collection ids. */

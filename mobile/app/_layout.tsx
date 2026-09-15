@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider } from "../lib/auth";
 import { CartProvider } from "../lib/cart";
 import { DraftProvider } from "../lib/seller/draft";
@@ -52,6 +53,10 @@ export default function RootLayout() {
   }, []);
 
   return (
+    // Gesture Handler needs its own root, and nothing had mounted one: expo-router does not, and
+    // neither does React Navigation. Without it a Gesture.Pan never activates on iOS, which is the
+    // whole of drag-to-reorder in the listing flow (components/seller/PhotoGrid.tsx).
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
@@ -71,8 +76,15 @@ export default function RootLayout() {
                   otherwise inherited that presentation and left the app in a dismissible
                   card: see the dismissAll in auth/callback. */}
               <Stack.Screen name="(tabs)" options={{ headerShown: false, presentation: "card" }} />
-              {/* The seller app. Same bundle, same sign-in; `storeSlug` routes between them. */}
-              <Stack.Screen name="(seller)" options={{ headerShown: false, presentation: "card" }} />
+              {/* The seller app. Same bundle, same sign-in; `storeSlug` routes between them.
+                  NO SWIPE-BACK OUT OF THE WORKSPACE.
+                  Everything inside (seller) is a TAB, and a tab navigator has no back gesture of
+                  its own, so an edge swipe anywhere in there fell through to THIS stack and popped
+                  the whole seller group. Swiping left on Domain, or Shipping, or Payouts did not go
+                  back one screen: it dropped her into the marketplace's Account tab, which is not
+                  a place she was, and looks like the app losing its place.
+                  The way out of the workspace is Settings, "Exit to Marketplace", which says so. */}
+              <Stack.Screen name="(seller)" options={{ headerShown: false, presentation: "card", gestureEnabled: false }} />
               {/* Market Mode takes over the screen, no tab bar, no header. */}
               <Stack.Screen name="market/index" options={{ headerShown: false }} />
               <Stack.Screen name="market/find" options={{ headerShown: false }} />
@@ -97,6 +109,7 @@ export default function RootLayout() {
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

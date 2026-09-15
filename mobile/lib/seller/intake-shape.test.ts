@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeDraft, readEstimate, costFromText, hasRealValue } from "./intake-shape.ts";
+import { normalizeDraft, readEstimate, costFromText, hasRealValue, unsureFields, CONFIDENCE_THRESHOLD } from "./intake-shape.ts";
 
 // The real response, copied from a live production call. See intake-shape.ts for why this
 // fixture is written out rather than paraphrased.
@@ -131,4 +131,50 @@ test("the phone carries the model's own price through to the pricer", () => {
   assert.equal(hint(null), null);
   assert.equal(hint(undefined), null);
   assert.equal(hint("1681"), null, "a string is not a price");
+});
+
+/* ── AI unsure. Confirm ─────────────────────────────────────────────────── */
+
+// The web marks brand/era/material "● AI unsure. Confirm" when the model filled a blank with
+// something it wasn't sure of (RISKY + THRESHOLD in add-listing/page.tsx). The phone dropped the
+// confidence numbers entirely, so a Todd Oldham dress could come back branded Chanel and read as
+// confidently as a brand off a legible tag.
+
+const risky = (value: string, confidence: number) => ({ value, confidence });
+
+test("a low-confidence guess at a blank field is queried", () => {
+  const draft = { brand: risky("Chanel", 0.4), era: risky("1990s", 0.9), material: risky("Silk", 0.2) };
+  assert.deepEqual(unsureFields(draft, {}), ["brand", "material"]);
+});
+
+test("what she typed herself is never queried, however unsure the model was", () => {
+  const draft = { brand: risky("Chanel", 0.1), era: risky("1990s", 0.1) };
+  assert.deepEqual(unsureFields(draft, { brand: "Todd Oldham" }), ["era"]);
+  assert.deepEqual(unsureFields(draft, { brand: "Todd Oldham", era: "1995" }), []);
+  // Whitespace is not an answer.
+  assert.deepEqual(unsureFields(draft, { brand: "   " }), ["brand", "era"]);
+});
+
+test("a refusal is not a low-confidence answer; there is nothing to confirm about a blank", () => {
+  assert.deepEqual(unsureFields({ brand: risky("N/A", 0.1), era: risky("Unknown", 0.2), material: risky("", 0.1) }, {}), []);
+});
+
+test("exactly at the threshold is confident enough, matching the web's strict <", () => {
+  assert.deepEqual(unsureFields({ brand: risky("Prada", CONFIDENCE_THRESHOLD) }, {}), []);
+  assert.deepEqual(unsureFields({ brand: risky("Prada", CONFIDENCE_THRESHOLD - 0.01) }, {}), ["brand"]);
+});
+
+test("only the three the web queries; a plain string carries no confidence to judge", () => {
+  // title/category/description are not on the list even when the payload wraps them.
+  assert.deepEqual(unsureFields({ title: risky("A dress", 0.1), category: risky("dresses", 0.1) }, {}), []);
+  // Fields that arrive as bare strings have no confidence, so they cannot be unsure.
+  assert.deepEqual(unsureFields({ brand: "Chanel", era: "1990s" }, {}), []);
+});
+
+test("a missing or malformed draft is not an error", () => {
+  assert.deepEqual(unsureFields(null, {}), []);
+  assert.deepEqual(unsureFields(undefined, {}), []);
+  assert.deepEqual(unsureFields("nope", {}), []);
+  assert.deepEqual(unsureFields({}, {}), []);
+  assert.deepEqual(unsureFields({ brand: risky("Chanel", 0.4) }), ["brand"]);
 });

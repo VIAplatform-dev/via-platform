@@ -1,7 +1,7 @@
 import { API_BASE_URL, getAuthToken, ApiError } from "../api";
 import { apiPost } from "../api";
 import { filledFields } from "./listing";
-import { normalizeDraft, readEstimate, costFromText, type DraftFields } from "./intake-shape";
+import { normalizeDraft, readEstimate, costFromText, unsureFields, type DraftFields } from "./intake-shape";
 
 // The listing pipeline, in one place.
 //
@@ -62,8 +62,14 @@ export async function draftListing(imageUrls: string[], typedFields: Record<stri
   // same endpoints, less evidence.
   const hint = typeof r.draft?.priceHint === "number" && r.draft.priceHint > 0 ? r.draft.priceHint * 100 : null;
 
+  // Which of those the model was NOT sure about, read off the raw payload before normalizeDraft
+  // flattens the confidences away. The web has always marked these "AI unsure. Confirm"; the phone
+  // showed a 0.4-confidence brand in the same ink as one read off a tag.
+  const unsure = unsureFields(r.draft, typedFields);
+
   return {
     fields: normalizeDraft(r.draft),
+    unsure,
     searchQuery: r.searchQuery,
     reverseComps: r.reverseComps,
     reverseTitles: r.reverseTitles,
@@ -106,6 +112,9 @@ export async function publishListing(
     consignment?: { consignorId: number };
     /** Marketplaces to fan out to when it goes live. */
     channels?: string[];
+    /** Collection TITLES, as the item PATCH and the web editor take them: the route creates one
+     *  that doesn't exist yet, so a new collection can be made from the listing flow. */
+    collections?: string[];
   },
   status: "active" | "draft",
 ) {

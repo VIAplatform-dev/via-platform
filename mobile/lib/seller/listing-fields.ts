@@ -23,33 +23,49 @@ export type ListingField = {
   numeric?: boolean;
   multiline?: boolean;
   placeholder?: string;
+  /** How it is asked. Absent means a plain box; "grade" is the condition scale, which is chips on
+   *  both screens because there is one right answer and it is on a list. */
+  control?: "grade";
 };
 
+// THE ORDER IS THE WEB'S ORDER, and both screens read it from here.
+//
+// The listing form (app/(seller)/new/review.tsx) and the piece editor (piece/[id].tsx) are the same
+// questions about the same record, and they used to ask them in two different orders with two
+// different controls: the editor put Price second and Condition in a free-text box, the new-listing
+// form put Price third and Condition on chips. A seller listing a piece and then editing it an hour
+// later was reading two forms. The sequence below is the one on
+// app/infrastructure/admin/add-listing/page.tsx: identity, then the judgement calls, then the
+// numbers, then the parcel, then the words.
 export const FIELDS: ListingField[] = [
-  { key: "title", label: "Title" },
-  { key: "price", label: "Price", numeric: true },
-  // What she paid: the one number the margin report can't do without.
-  { key: "cost", label: "Cost", numeric: true, placeholder: "what you paid" },
-  { key: "brand", label: "Brand" },
+  { key: "title", label: "Title", placeholder: "e.g. 1990s Prada nylon shoulder bag" },
+  { key: "brand", label: "Brand", placeholder: "Prada" },
   { key: "era", label: "Era", placeholder: "Late 1990s" },
   { key: "material", label: "Material", placeholder: "Re-Nylon, leather trim" },
   { key: "colour", label: "Colour", placeholder: "Chocolate brown" },
-  { key: "size", label: "Size" },
-  { key: "category", label: "Category", placeholder: "Bags" },
-  { key: "condition", label: "Condition" },
-  // Beyond the grade: her words on the wear, the same note Review and the web editor take.
+  // A grade off a fixed scale: chips on both screens, never a box to type a grade into.
+  { key: "condition", label: "Condition", control: "grade" },
+  // Beyond the grade: her words on the wear, the same note the web editor takes.
   { key: "conditionNote", label: "Condition note", placeholder: "light wear to the sole, tiny mark inside…" },
-  // One comma-separated line, like Review; stored as the list the product page prints.
+  // One comma-separated line; stored as the list the product page prints.
   { key: "flaws", label: "Flaws", placeholder: "scuffed toe, light pilling. Comma-separated" },
-  // The paragraph a shopper reads. Last of the words, and multiline so it isn't a one-line box
-  // holding two thousand characters.
-  { key: "description", label: "Description", multiline: true, placeholder: "How it feels, what it goes with, why you bought it…" },
+  { key: "size", label: "Size", placeholder: "One size" },
+  { key: "category", label: "Category", placeholder: "Bags" },
+  { key: "price", label: "Price", numeric: true, placeholder: "Your price, or leave for AI" },
+  // What she paid: the one number the margin report can't do without.
+  { key: "cost", label: "Cost", numeric: true, placeholder: "what you paid" },
   // The box is not typed. It is chosen, from the same "Ships in" list the web offers, which
   // writes lengthIn/widthIn/heightIn from the preset (see lib/seller/packaging.ts). Nobody
   // measures a mailer. The WEIGHT stays a field, because the buyer's postage is chosen by the
   // larger of weight and girth and it is the one number the box cannot supply.
   { key: "weightOz", label: "Weight", numeric: true, placeholder: "oz" },
+  // The paragraph a shopper reads. Last of the words, and multiline so it isn't a one-line box
+  // holding two thousand characters.
+  { key: "description", label: "Description", multiline: true, placeholder: "How it feels, what it goes with, why you bought it…" },
 ];
+
+/** The text and numeric rows, in order: everything that is a box rather than a picker. */
+export const TEXT_FIELDS: ListingField[] = FIELDS.filter((f) => f.control !== "grade");
 
 /** The four the shipping quote reads. Whole units; blank clears one. */
 export const PARCEL_KEYS: string[] = ["weightOz", "lengthIn", "widthIn", "heightIn"];

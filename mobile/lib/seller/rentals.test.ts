@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rentalDay, bookingLine, trackingLine, rentalsTileLine, todayDay, type Booking } from "./rentals.ts";
+import { rentalDay, bookingLine, trackingLine, rentalsTileLine, todayDay, type Booking, rentalState, filterRentalItems, countByState, fromPrice, stateLine, type RentalItem } from "./rentals.ts";
 
 const TODAY = "2026-09-11";
 const b = (over: Partial<Booking>): Booking => ({ id: "b", itemId: "i", status: "booked", shipBy: null, dueBack: null, returnedAt: null, ...over });
@@ -69,4 +69,72 @@ test("the tile leads with overdue, because that is the one that needs her", () =
 test("today is a local day, not a UTC instant", () => {
   assert.equal(todayDay(new Date(2026, 8, 11, 23, 30)), "2026-09-11");
   assert.equal(todayDay(new Date(2026, 0, 5, 0, 10)), "2026-01-05");
+});
+
+/* ── the catalogue ─────────────────────────────────────────────────────── */
+
+// The screen used to show the DAY only: bookings going out, coming back, late. A shop with
+// fourteen rentable pieces and a quiet week read "Nothing out and nothing booked", which is true
+// and answers no question a seller has. These are the pieces themselves.
+
+const CAT_TODAY = "2026-09-15";
+const item = (p: Partial<RentalItem> = {}): RentalItem => ({
+  itemId: "i1", title: "Silk slip", image: null, itemStatus: "active",
+  tiers: [{ days: 4, cents: 4500 }], replacementCents: 30000,
+  bookingStatus: null, dueBack: null, shipBy: null, ...p,
+});
+
+test("no live booking means it is available", () => {
+  assert.equal(rentalState(item(), CAT_TODAY), "available");
+  // A finished booking says nothing about the piece today.
+  assert.equal(rentalState(item({ bookingStatus: "closed" }), CAT_TODAY), "available");
+});
+
+test("promised, gone, and late are three different answers", () => {
+  assert.equal(rentalState(item({ bookingStatus: "approved" }), CAT_TODAY), "booked");
+  assert.equal(rentalState(item({ bookingStatus: "out", dueBack: "2026-09-20" }), CAT_TODAY), "out");
+  assert.equal(rentalState(item({ bookingStatus: "out", dueBack: "2026-09-12" }), CAT_TODAY), "overdue");
+  // Due back today is not late yet.
+  assert.equal(rentalState(item({ bookingStatus: "due", dueBack: CAT_TODAY }), CAT_TODAY), "out");
+});
+
+test("a piece she no longer has is never offered as available", () => {
+  assert.equal(rentalState(item({ itemStatus: "sold" }), CAT_TODAY), "unavailable");
+  assert.equal(rentalState(item({ itemStatus: "draft" }), CAT_TODAY), "unavailable");
+  // Reserved is mid-sale, not gone: it still has rental terms and still shows.
+  assert.equal(rentalState(item({ itemStatus: "reserved" }), CAT_TODAY), "available");
+});
+
+test("filtering and counting agree with each other", () => {
+  const items = [
+    item({ itemId: "a" }),
+    item({ itemId: "b", bookingStatus: "approved" }),
+    item({ itemId: "c", bookingStatus: "out", dueBack: "2026-09-20" }),
+    item({ itemId: "d", bookingStatus: "out", dueBack: "2026-09-01" }),
+  ];
+  assert.deepEqual(filterRentalItems(items, "all", CAT_TODAY).map((i) => i.itemId), ["a", "b", "c", "d"]);
+  assert.deepEqual(filterRentalItems(items, "available", CAT_TODAY).map((i) => i.itemId), ["a"]);
+  assert.deepEqual(filterRentalItems(items, "overdue", CAT_TODAY).map((i) => i.itemId), ["d"]);
+  const counts = countByState(items, CAT_TODAY);
+  assert.equal(counts.all, 4);
+  assert.equal(counts.available, 1);
+  assert.equal(counts.booked, 1);
+  assert.equal(counts.out, 1);
+  assert.equal(counts.overdue, 1);
+});
+
+test("the price is the cheapest tier, which is the one a shopper sees first", () => {
+  assert.equal(fromPrice(item({ tiers: [{ days: 8, cents: 8000 }, { days: 4, cents: 4500 }] })), "$45 for 4 days");
+  assert.equal(fromPrice(item({ tiers: [{ days: 1, cents: 2000 }] })), "$20 for 1 day");
+  // A piece with terms but no priced tier has no "from" price rather than a $0 one.
+  assert.equal(fromPrice(item({ tiers: [] })), null);
+  assert.equal(fromPrice(item({ tiers: [{ days: 4, cents: 0 }] })), null);
+});
+
+test("the line under a piece says who has it and until when", () => {
+  assert.equal(stateLine(item(), CAT_TODAY), "Available");
+  assert.equal(stateLine(item({ bookingStatus: "out", dueBack: "2026-09-20", renterName: "Mia" }), CAT_TODAY), "Out until 2026-09-20 · Mia");
+  assert.equal(stateLine(item({ bookingStatus: "out", dueBack: "2026-09-01" }), CAT_TODAY), "Overdue since 2026-09-01");
+  assert.equal(stateLine(item({ bookingStatus: "approved", shipBy: "2026-09-18" }), CAT_TODAY), "Booked · ships 2026-09-18");
+  assert.equal(stateLine(item({ itemStatus: "sold" }), CAT_TODAY), "Sold");
 });

@@ -27,6 +27,20 @@ export type BookingStatus = (typeof LIVE_STATUSES)[number] | "closed" | "cancell
 export type RequestStatus = "new" | "approved" | "declined" | "expired" | "converted";
 
 let ensured = false;
+/** One rentable piece, with its live booking if it has one. */
+export type RentalItem = {
+ itemId: string;
+ title: string | null;
+ image: string | null;
+ itemStatus: string | null;
+ tiers: { days: number; cents: number }[];
+ replacementCents: number | null;
+ bookingStatus: string | null;
+ dueBack: string | null;
+ shipBy: string | null;
+ renterName: string | null;
+};
+
 export async function ensureRentalTables(): Promise<void> {
  if (ensured) return;
  const sql = db();
@@ -280,6 +294,52 @@ export async function takenBands(itemId: string): Promise<Span[]> {
  const rows = await db()`SELECT blocked FROM rental_bookings
   WHERE item_id = ${itemId} AND status NOT IN ('closed','cancelled','expired')` as any[];
  return rows.map((r) => fromDateRange(String(r.blocked))).filter((s): s is Span => s !== null);
+}
+
+/**
+ * Every piece this shop rents out, with whatever is happening to it right now.
+ *
+ * A piece is rentable exactly when terms exist for it (see the [itemId] route), and until now the
+ * only way to ask that question was one item at a time. So the phone's Rentals screen could show
+ * the day's bookings and nothing else: a shop with fourteen rentable pieces and a quiet week read
+ * "Nothing out and nothing booked", which is true and completely useless. It could not answer
+ * "what do I even rent out".
+ *
+ * The status is the LIVE booking's, when there is one. A piece with no current booking is simply
+ * available. Finished bookings (closed, cancelled, expired) say nothing about a piece today and
+ * are excluded, or every piece ever rented would read as permanently out.
+ */
+export async function listRentalItems(sellerId: string): Promise<RentalItem[]> {
+ await ensureRentalTables();
+ const rows = await db()`
+  SELECT t.item_id::text AS item_id, i.title, i.images, i.status AS item_status,
+   t.tiers, t.replacement_cents,
+   b.status AS booking_status, b.due_back, b.ship_by, b.renter_name
+  FROM rental_terms t
+  JOIN items i ON i.id = t.item_id
+  -- The one booking that is still live. LATERAL so a piece with a history of five rentals
+  -- contributes one row, not five.
+  LEFT JOIN LATERAL (
+   SELECT status, due_back, ship_by, renter_name
+   FROM rental_bookings
+   WHERE item_id = t.item_id AND status NOT IN ('closed', 'cancelled', 'expired')
+   ORDER BY created_at DESC LIMIT 1
+  ) b ON true
+  WHERE t.seller_id = ${sellerId} AND i.status <> 'removed'
+  ORDER BY i.created_at DESC LIMIT 300
+ `.catch(() => []);
+ return (rows as Record<string, unknown>[]).map((r) => ({
+  itemId: String(r.item_id),
+  title: (r.title as string | null) ?? null,
+  image: Array.isArray(r.images) ? ((r.images[0] as string | undefined) ?? null) : null,
+  itemStatus: (r.item_status as string | null) ?? null,
+  tiers: Array.isArray(r.tiers) ? (r.tiers as { days: number; cents: number }[]) : [],
+  replacementCents: (r.replacement_cents as number | null) ?? null,
+  bookingStatus: (r.booking_status as string | null) ?? null,
+  dueBack: r.due_back ? String(r.due_back).slice(0, 10) : null,
+  shipBy: r.ship_by ? String(r.ship_by).slice(0, 10) : null,
+  renterName: (r.renter_name as string | null) ?? null,
+ }));
 }
 
 export async function listBookings(sellerId: string, statuses?: BookingStatus[]): Promise<Booking[]> {

@@ -101,3 +101,86 @@ export function rentalsTileLine(d: RentalDay): string {
   if (bits.length) return bits.join(" · ");
   return d.out.length ? `${d.out.length} out` : "Nothing out";
 }
+
+/* ── the catalogue: what this shop rents out ────────────────────────────────────────────────── */
+
+/** One rentable piece, as /api/store/rentals/terms lists them. */
+export type RentalItem = {
+  itemId: string;
+  title: string | null;
+  image: string | null;
+  itemStatus: string | null;
+  tiers: { days: number; cents: number }[];
+  replacementCents: number | null;
+  /** The LIVE booking's status, or null when nothing is happening to it. */
+  bookingStatus: string | null;
+  dueBack: string | null;
+  shipBy: string | null;
+  renterName?: string | null;
+};
+
+/**
+ * Where a rentable piece stands today.
+ *
+ * Deliberately fewer states than the booking table has. A seller does not need to know the
+ * difference between "requested" and "held"; she needs to know whether the piece is in the shop,
+ * promised to someone, or out of the building. Overdue is split from out because it is the only
+ * one that is a phone call.
+ */
+export type RentalState = "available" | "booked" | "out" | "overdue" | "unavailable";
+
+const LIVE_AWAY = new Set(["out", "due"]);
+const LIVE_PROMISED = new Set(["requested", "approved", "held", "confirmed", "paid", "booked"]);
+
+export function rentalState(item: RentalItem, today: string = todayDay()): RentalState {
+  // A piece that has sold or been drafted away cannot be rented whatever its terms say, and
+  // showing it as "available" is how a seller promises something she no longer has.
+  if (item.itemStatus && item.itemStatus !== "active" && item.itemStatus !== "reserved") return "unavailable";
+  const s = (item.bookingStatus ?? "").toLowerCase();
+  if (LIVE_AWAY.has(s)) return item.dueBack && item.dueBack < today ? "overdue" : "out";
+  if (LIVE_PROMISED.has(s)) return "booked";
+  return "available";
+}
+
+/** The chip labels, in reading order: what you have, then what is spoken for. */
+export const RENTAL_STATES: { key: RentalState | "all"; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "available", label: "Available" },
+  { key: "booked", label: "Booked" },
+  { key: "out", label: "Out" },
+  { key: "overdue", label: "Overdue" },
+];
+
+export function filterRentalItems(items: RentalItem[], state: RentalState | "all", today: string = todayDay()): RentalItem[] {
+  if (state === "all") return items;
+  return items.filter((i) => rentalState(i, today) === state);
+}
+
+/** How many sit in each state, for the counts beside the chips. */
+export function countByState(items: RentalItem[], today: string = todayDay()): Record<string, number> {
+  const out: Record<string, number> = { all: items.length };
+  for (const i of items) {
+    const s = rentalState(i, today);
+    out[s] = (out[s] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** "$45 for 4 days", the cheapest tier, which is the one a shopper sees first. */
+export function fromPrice(item: RentalItem, currency = "USD"): string | null {
+  const cheapest = item.tiers.filter((t) => t.cents > 0).sort((a, b) => a.cents - b.cents)[0];
+  if (!cheapest) return null;
+  const money = new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(cheapest.cents / 100);
+  return `${money} for ${cheapest.days} ${cheapest.days === 1 ? "day" : "days"}`;
+}
+
+/** The line under a piece: who has it and until when, or that it is free. */
+export function stateLine(item: RentalItem, today: string = todayDay()): string {
+  const state = rentalState(item, today);
+  const who = item.renterName?.trim();
+  if (state === "overdue") return `Overdue${item.dueBack ? ` since ${item.dueBack}` : ""}${who ? ` · ${who}` : ""}`;
+  if (state === "out") return `Out${item.dueBack ? ` until ${item.dueBack}` : ""}${who ? ` · ${who}` : ""}`;
+  if (state === "booked") return `Booked${item.shipBy ? ` · ships ${item.shipBy}` : ""}${who ? ` · ${who}` : ""}`;
+  if (state === "unavailable") return item.itemStatus === "sold" ? "Sold" : "Not listed";
+  return "Available";
+}

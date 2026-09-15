@@ -102,6 +102,12 @@ export default function SettingsScreen() {
     <SellerScreen title="Settings" back>
       <Text style={{ fontFamily: fonts.serif, fontSize: 24, color: colors.text }}>{me.data?.storeName ?? storeSlug}</Text>
 
+      {/* First row in the drawer, above the groups. She is asking a question, not changing a
+          setting, and a question does not belong under SELLING or STORE. */}
+      <View style={{ marginTop: spacing.lg }}>
+        <Row icon="zap" label="Ask VYA" onPress={() => router.push("/(seller)/assistant?from=Settings")} />
+      </View>
+
       <Group label="SELLING">
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
           <Feather name="shopping-bag" size={18} color={colors.text} />

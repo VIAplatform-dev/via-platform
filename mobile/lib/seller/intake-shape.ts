@@ -9,9 +9,14 @@
 //      Putting one of those objects into a <Text> throws in React Native, so the flow died on the
 //      Review screen, after the AI call had already been paid for.
 //
-// The confidence numbers are dropped on purpose. They are real and could be shown, but a seller
-// reading "Fendi (0.85)" learns nothing she can act on. She either recognises the brand or she
-// corrects it, and every row already has a Change button.
+// The confidence NUMBERS are still dropped on purpose: a seller reading "Fendi (0.85)" learns
+// nothing she can act on. What the numbers are FOR is a different question, and dropping them here
+// meant the phone threw away the only signal that says "check this one".
+//
+// A Todd Oldham dress came back branded Chanel. The model was not confident about that and said
+// so, in this very payload, and the phone showed the brand in the same flat black as a brand it
+// was certain of. The web has never done that: it marks the field "AI unsure. Confirm" and asks
+// her to tick it. See unsureFields below, which is that rule, ported.
 
 export type DraftFields = {
   title?: string;
@@ -149,4 +154,49 @@ export function readEstimate(estimate: Estimate | null | undefined): { priceCent
     priceCents: typeof cents === "number" && cents > 0 ? cents : null,
     compsCount: Array.isArray(estimate?.comps) ? estimate.comps.length : 0,
   };
+}
+
+
+/* ── what the model is not sure about ───────────────────────────────────────────────────────── */
+
+/**
+ * The three fields worth querying, and the confidence below which they get queried.
+ *
+ * Verbatim from app/infrastructure/admin/add-listing/page.tsx (RISKY, THRESHOLD). They are the
+ * fields where a wrong answer is both LIKELY and EXPENSIVE: brand and era drive the comparable
+ * search, so getting them wrong does not merely mislabel the piece, it prices it off the wrong
+ * garment entirely. Title, category and description are not on the list because a seller reads
+ * those anyway and a wrong one is obvious on sight.
+ *
+ * `condition` is deliberately absent, matching the web: it is asked on the Details screen before
+ * the AI ever runs, so it is her judgement rather than the model's guess.
+ */
+export const RISKY_FIELDS = ["brand", "era", "material"] as const;
+export type RiskyField = (typeof RISKY_FIELDS)[number];
+export const CONFIDENCE_THRESHOLD = 0.75;
+
+/**
+ * Which drafted fields to mark "AI unsure. Confirm", from the RAW intake payload.
+ *
+ * Takes the raw draft, not the normalised one: normalizeDraft flattens {value, confidence} to a
+ * string, and the confidence is the entire point here. Three conditions, all of them the web's:
+ *
+ *   · SHE DIDN'T TYPE IT. A field she filled on Details is hers and is trusted absolutely. The AI
+ *     only fills blanks, so a value she typed was never a guess to begin with.
+ *   · THE MODEL PRODUCED A REAL VALUE. "N/A" and "Unknown" are not low-confidence answers, they
+ *     are refusals, and there is nothing to confirm about a blank.
+ *   · IT IS UNDER THE THRESHOLD.
+ */
+export function unsureFields(draft: unknown, typed: Record<string, string | undefined> = {}): RiskyField[] {
+  if (!draft || typeof draft !== "object") return [];
+  const d = draft as Record<string, unknown>;
+  return RISKY_FIELDS.filter((k) => {
+    if (String(typed[k] ?? "").trim()) return false;
+    const fld = d[k];
+    if (!fld || typeof fld !== "object" || !("value" in fld) || !("confidence" in fld)) return false;
+    const { value, confidence } = fld as { value: unknown; confidence: unknown };
+    return hasRealValue(typeof value === "string" ? value : null)
+      && typeof confidence === "number"
+      && confidence < CONFIDENCE_THRESHOLD;
+  });
 }

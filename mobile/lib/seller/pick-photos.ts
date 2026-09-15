@@ -83,3 +83,39 @@ export async function pickPhotos(remaining: number): Promise<string[]> {
 export function remainingSlots(have: number, max: number): number {
   return Math.max(0, max - have);
 }
+
+/**
+ * The same two sources, returned as data URLs instead of file URIs.
+ *
+ * Ask VYA sends photographs to the model inline, base64 in the request body, because there is
+ * nowhere to upload an inspiration shot to: it is not a listing photo and it never becomes one.
+ * `pickPhotos` above can't serve that, since a `file://` URI means nothing to an API on a server.
+ *
+ * QUALITY IS LOWER THAN A LISTING'S ON PURPOSE. A modern phone shot is 3-6MB, base64 adds a third
+ * again, and the route's body is the whole conversation, every previous image included. 0.5 at
+ * 1024px is plenty for "make my storefront feel like this" and keeps a four-image turn sendable.
+ * Anything still over the cap is dropped rather than sent to be rejected.
+ */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+export async function pickImageData(remaining: number): Promise<string[]> {
+  if (remaining <= 0) return [];
+
+  const source = await askSource();
+  if (!source) return [];
+  if (!(await ensure(source))) return [];
+
+  const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], quality: 0.5, base64: true };
+  const r = source === "camera"
+    ? await ImagePicker.launchCameraAsync(opts)
+    : await ImagePicker.launchImageLibraryAsync({ ...opts, allowsMultipleSelection: true, selectionLimit: remaining });
+
+  if (r.canceled) return [];
+  return r.assets
+    .slice(0, remaining)
+    .map((a) => (a.base64 ? { data: a.base64, type: a.mimeType || "image/jpeg" } : null))
+    .filter((a): a is { data: string; type: string } => !!a)
+    // base64 is 4 characters per 3 bytes; compare decoded size against the cap.
+    .filter((a) => (a.data.length * 3) / 4 <= MAX_IMAGE_BYTES)
+    .map((a) => `data:${a.type};base64,${a.data}`);
+}
