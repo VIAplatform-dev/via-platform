@@ -110,6 +110,61 @@ export async function logPredictions(storeSlug: string, preds: PredictionInput[]
 }
 
 /**
+ * A correction made AFTER the piece was published.
+ *
+ * WHY THIS EXISTS. logCorrections only ever ran inside /api/store/intake/publish, at the instant a
+ * piece is created, comparing the AI's draft to what was published. That is one moment, and it is
+ * not the moment most correcting happens: a seller publishes what the AI drafted, sees it on her
+ * storefront, and fixes the brand an hour later. On this platform 14,950 of 16,453 live pieces have
+ * been edited since they were created, and not one of those edits ever reached the loop.
+ *
+ * The AI's original guess is recoverable because intake_predictions recorded it against the
+ * photograph at listing time. So a later edit can be compared with what the model actually said.
+ *
+ * CORRECTIONS ONLY, NEVER PREDICTIONS. The prediction log is the accuracy denominator and it has to
+ * mean "what the AI proposed, and did she keep it AT THE TIME". Re-logging a prediction six weeks
+ * later would count the same guess twice and let a late edit rewrite history. The hint loop has no
+ * such problem: "the AI said Dolce & Gabbana, the truth is Roberto Cavalli" is equally true and
+ * equally useful whenever she worked it out.
+ */
+export async function logLateCorrections(
+ storeSlug: string,
+ imageUrl: string | null | undefined,
+ finals: Record<string, string | null | undefined>,
+): Promise<number> {
+ const photo = (imageUrl || "").trim();
+ if (!photo) return 0;
+ await ensurePredictionsTable();
+ await ensureTable();
+
+ // What the model actually said about THIS photograph, most recent answer per field.
+ const rows = (await db()`
+  SELECT DISTINCT ON (field) field, ai_value
+  FROM intake_predictions
+  WHERE image_url = ${photo} AND store_slug = ${storeSlug} AND ai_value IS NOT NULL AND ai_value <> ''
+  ORDER BY field, created_at DESC
+ `.catch(() => [])) as { field: string; ai_value: string }[];
+ if (!rows.length) return 0;
+
+ const changed = rows
+  // Only fields this edit actually touched. An untouched field is not agreement OR disagreement,
+  // it is silence, and logCorrections would drop it anyway.
+  .filter((r) => typeof finals[r.field] === "string" && String(finals[r.field]).trim())
+  .map((r) => ({
+   field: r.field,
+   aiValue: r.ai_value,
+   finalValue: String(finals[r.field]).trim(),
+   imageUrl: photo,
+  }));
+ if (!changed.length) return 0;
+
+ // logCorrections does the real filtering: it keeps only rows where the seller's answer actually
+ // differs from the AI's, case-insensitively.
+ await logCorrections(storeSlug, changed).catch(() => {});
+ return changed.length;
+}
+
+/**
  * Build a compact, prompt-ready hint block from this store's correction history:
  *  • the brands they actually deal in (bias the model toward these), and
  *  • recent wrong→right brand fixes (don't repeat these mistakes).
@@ -253,7 +308,7 @@ export async function getPriceConfidenceCalibration(days = 120): Promise<PriceCo
  * this store's own catalog and return a prompt hint block. Empty until the store
  * has a corpus. Pilot-scale: scans recent items in JS (cosine); pgvector later.
  */
-export async function getVisualHints(storeSlug: string, embedding: number[]): Promise<string> {
+export async function getVisualHints(storeSlug: string, embedding: number[], brandKnown = false): Promise<string> {
  if (!embedding || embedding.length === 0) return "";
  await ensureItemsTable();
  const rows = (await db()`
@@ -273,11 +328,20 @@ export async function getVisualHints(storeSlug: string, embedding: number[]): Pr
   .slice(0, 4);
 
  if (scored.length === 0) return "";
+ // Her own catalogue, so a brand here is a far better signal than a stranger's: a seller who lists
+ // Cavalli lists Cavalli. It still only speaks when she or the web has named a house, for the same
+ // reason as the cross-store channel above. A shop that is 99% unbranded vintage (one of ours is)
+ // should never be handed a designer name by something that merely looks similar.
  const lines = scored.map((s) => {
-  const bits = s.r.title || [s.r.brand && `brand: ${s.r.brand}`, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ");
+  const bits = brandKnown
+   ? (s.r.title || [s.r.brand && `brand: ${s.r.brand}`, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · "))
+   : [s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ");
   return `• a visually similar piece this seller listed → ${bits || "(no labels)"}`;
  });
- return `\n\nVISUALLY SIMILAR PAST LISTINGS (this seller's own catalog. Strong signal; weight heavily for brand/era/material):\n${lines.join("\n")}`;
+ const weight = brandKnown
+  ? "Strong signal; weight heavily for brand/era/material"
+  : "Era, material and category only. Do not take a brand from these; leave it unbranded unless the photograph or the web search names one";
+ return `\n\nVISUALLY SIMILAR PAST LISTINGS (this seller's own catalog. ${weight}):\n${lines.join("\n")}`;
 }
 
 /**
@@ -304,9 +368,31 @@ export async function getCrossStoreSimilar(embedding: number[], brand?: string |
  .sort((a, b2) => b2.score - a.score)
  .slice(0, limit);
  if (scored.length === 0) return "";
- // Prefer the confirmed TITLE. It carries the specific model/line, which is what sharpens ID.
- const lines = scored.map((s) => `• ${s.r.title || ([s.r.brand, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ") || "(no labels)")}`);
- return `\n\nSIMILAR PIECES CONFIRMED ACROSS VYA (sellers verified these labels. Reference for era/model/category/material; do NOT invent a brand from them):\n${lines.join("\n")}`;
+
+ // WITH NO BRAND HYPOTHESIS, THESE REFERENCES CARRY NO BRAND.
+ //
+ // The title is the richest label when we already think we know the house: it names the model and
+ // the line, which is what sharpens the ID. It is the WRONG label when we do not.
+ //
+ // 128 of the 201 pieces in this corpus have no brand at all, and the corpus skews designer, so an
+ // unbranded 1920s dress was being shown four titles reading "Roberto Cavalli Dragon Print Mesh
+ // Trousers", "Y2K Fendi Zucca Shoulder Bag", "Prada S/S 2000 Heart Print Blouse" and told, in
+ // prose, not to take a brand from them. That is a filter's job being done by a sentence, and it is
+ // the likeliest source of a designer name appearing on a piece that has none.
+ //
+ // A visual match is evidence of STYLE. Evidence of IDENTITY is the reverse-image search on this
+ // exact photograph, which is a different channel (reverseImageHint) and is untouched by this: a
+ // Dior shirt that appears twice on the web still brings its brand and its prices with it.
+ const lines = scored.map((s) => {
+  const style = [s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ");
+  if (!b) return `• ${style || "(no labels)"}`;
+  return `• ${s.r.title || ([s.r.brand, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ") || "(no labels)")}`;
+ });
+ const scope = b
+  ? "Reference for era/model/category/material; do NOT invent a brand from them"
+  : // Said plainly, because the references genuinely no longer carry one.
+    "Era, material and category only. No brand is implied by these and none should be taken from them; if the photograph and the web search do not identify a house, leave the brand unbranded rather than guessing";
+ return `\n\nSIMILAR PIECES CONFIRMED ACROSS VYA (sellers verified these labels. ${scope}):\n${lines.join("\n")}`;
 }
 
 /**

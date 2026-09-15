@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logLateCorrections } from "@/app/lib/intake-memory-db";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem, markSold, removeItem, publishItem, updateItem, deleteItemForever, setCrossListChannels } from "@/app/lib/db/inventory";
@@ -133,6 +134,9 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
 // scheduled time but not move it, and nobody could assign a consignor to a piece already listed.
 // That is fine on a laptop where the listing form is the whole flow, and wrong on a phone, where
 // the piece in your hand is the thing you are looking at.
+/** The five the drafter guesses at, and the only ones a later edit can teach it about. */
+const TAUGHT_FIELDS = ["brand", "era", "material", "condition", "category"] as const;
+
 export async function PATCH(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -262,5 +266,26 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
   await createConsignmentItem({ productId: id, storeSlug: slug, consignorId, splitPct, listedPriceCents: updated.priceCents ?? null }).catch(() => {});
  }
  }
+ // A CORRECTION MADE AFTER PUBLISHING IS STILL A CORRECTION.
+ //
+ // The hint loop only ever heard about the moment a piece was created: /api/store/intake/publish
+ // compared the AI's draft to what went live, and nothing after that was recorded. But a seller
+ // typically publishes what the AI drafted, sees it on her storefront, and fixes the brand later.
+ // On this platform that is where nearly all the correcting happens, and every one of those edits
+ // was going in the bin.
+ //
+ // Keyed to the photograph, because that is what intake_predictions recorded the AI's guess
+ // against. Corrections only, never predictions: the prediction log is the accuracy denominator
+ // and has to keep meaning "what it proposed, and did she keep it at the time".
+ //
+ // /* allow-swallow */ and last: her edit is saved. A learning signal is not worth failing it over.
+ if (TAUGHT_FIELDS.some((f) => f in patch)) {
+  const photo = Array.isArray(updated.images) ? (updated.images[0] ?? null) : null;
+  await logLateCorrections(slug, photo, {
+   brand: updated.brand, era: updated.era, material: updated.material,
+   condition: updated.condition, category: updated.category,
+  }).catch(() => {});
+ }
+
  return NextResponse.json({ ok: true, item: updated });
 }
