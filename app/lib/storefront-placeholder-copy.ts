@@ -83,13 +83,141 @@ const SIMPLE: Record<string, string> = {
  price: "$48",
 };
 
-/** The FAQ rows, stored as q0/a0, q1/a1… rather than as a list. */
+/**
+ * The FAQ rows, stored as q0/a0, q1/a1… rather than as a list.
+ *
+ * KEEP EVERY LIST AT SIX OR MORE. Slots beyond the end of a list wrap around to the start, so a
+ * four-row list on a six-question layout printed "How long does delivery take?" twice on the same
+ * page, one card under the other. Six covers every FAQ block any template lays out.
+ */
 const FAQ: string[][] = [
  ["How long does delivery take?", "Most orders arrive within three to five working days."],
  ["Can I return something?", "Yes. Anything unworn can come back to us within 30 days."],
  ["How do I get in touch?", "Send us a message and we'll reply within a day."],
  ["Do you ship internationally?", "We do. Shipping is calculated at checkout."],
+ ["Where do you source from?", "Estate sales, dealers and private sellers. Everything is checked before it goes up."],
+ ["Is everything one of a kind?", "Almost always. When a piece sells, it's gone."],
 ];
+
+/**
+ * The questions that belong on a PARTICULAR page.
+ *
+ * A question block was answering "Can I return something?" on the Authentication page, because the
+ * rows were keyed by block type and every page with a question block got the same four. The page a
+ * block sits on is the whole reason it exists: an Authentication page that talks about postage is
+ * not a page a buyer can use.
+ *
+ * Matched on the page slug, like PAGE_COPY, so adding a page to a template gets sensible questions
+ * without touching this file. Anything unmatched falls back to the general set above.
+ */
+const PAGE_FAQ: { match: RegExp; rows: string[][] }[] = [
+ {
+  match: /^(authenticity|authentication|verified)$/,
+  rows: [
+   ["How do you know a piece is real?", "Every piece is checked in hand: the label, the stitching, the hardware and the way it's built, against what the house was doing that year."],
+   ["What happens when you can't be sure?", "We say so on the listing. If we can't stand behind it, it doesn't go up as designer."],
+   ["Do you ever use an outside authenticator?", "For the highest-value pieces, yes, and the certificate goes out with the order."],
+   ["What if I think something isn't right?", "Tell us within [14] days and it comes back for a full refund, shipping included."],
+   ["Can a label always be read?", "No. Labels fade and get cut out, so a piece is also dated by its construction, hardware and care tag."],
+   ["Do you sell unbranded pieces?", "Yes, and we say plainly that they're unbranded. An honest 'we don't know' beats a guess at a designer."],
+  ],
+ },
+ {
+  match: /^(shipping|delivery|returns|shipping-returns)$/,
+  rows: [
+   ["How long does delivery take?", "Most orders arrive within three to five working days."],
+   ["What does shipping cost?", "It's worked out at checkout from your address and the size of the parcel."],
+   ["Do you ship internationally?", "We do. Any duties are the buyer's to pay."],
+   ["Can I return something?", "Yes. Anything unworn can come back to us within 30 days."],
+   ["It arrived damaged.", "Send us a photograph within [7] days and we'll refund you, shipping included."],
+   ["Can I track my order?", "Yes. Tracking is emailed to you the moment it's posted."],
+  ],
+ },
+ {
+  match: /^(condition|condition-scale|grading)$/,
+  rows: [
+   ["What does excellent mean?", "Worn a handful of times, with nothing we can see wrong with it."],
+   ["What does very good mean?", "Light, honest wear. Anything you'd notice is photographed and written down."],
+   ["Do you list every flaw?", "Yes. Marks, mends, missing buttons and worn hems are all in the description."],
+   ["Is vintage sizing the same as modern?", "No, and it isn't consistent between houses either. Go by the measurements."],
+   ["Has anything been altered?", "If a piece has been taken in or shortened, the listing says so."],
+   ["Do you clean pieces before they go up?", "Everything is washed or dry-cleaned, and mended where it needs it."],
+  ],
+ },
+ {
+  match: /^(sizing|fit|measurements)$/,
+  rows: [
+   ["How do you measure?", "Flat, across the front, in inches. Double the pit-to-pit for the full chest."],
+   ["The label size and the measurements disagree.", "Trust the measurements. A vintage label is a decade's idea of a size, not yours."],
+   ["Can I ask for another measurement?", "Yes. Send us a message and we'll measure it again while it's still here."],
+   ["What if it doesn't fit?", "Compare the measurements to something you already own before you buy. Returns are open for 30 days."],
+   ["Do you model anything?", "[Say whether pieces are shown on a hanger, a form, or a person, and give their height.]"],
+   ["Is it true to size?", "We don't guess at that. The measurements are the answer."],
+  ],
+ },
+ {
+  match: /^(consign|sell-to-us|sell|sourcing-requests)$/,
+  rows: [
+   ["What do you take?", "[Designer, archival and well-kept vintage. Tell us the house and roughly when it's from.]"],
+   ["How does the split work?", "[You keep X% of what it sells for, paid once the return window closes.]"],
+   ["How do you price it?", "Against what comparable pieces have actually sold for, not what they're listed at."],
+   ["How long does it take to sell?", "[Most pieces go within X weeks. Anything still here after Y we'll talk to you about.]"],
+   ["What if it doesn't sell?", "[It comes back to you, or we agree a lower price. Your call.]"],
+   ["How do I get it to you?", "[Post it, or drop it in. Get in touch first so we know it's coming.]"],
+  ],
+ },
+];
+
+/**
+ * Three-column copy that belongs on a PARTICULAR page, same problem as the questions above.
+ *
+ * An Authentication page's three columns are its three checks. They were rendering as "Made with
+ * care / One of a kind / Fast delivery", the generic shop blurbs, because the rows were keyed by
+ * block type. A page about how you verify a garment that lists "Fast delivery" as one of its three
+ * points is not a page anyone can read.
+ *
+ * Five cells per row: title | body | image | link | button (see ITEM_SCHEMAS).
+ */
+const PAGE_COLUMNS: { match: RegExp; rows: string }[] = [
+ {
+  match: /^(authenticity|authentication|verified)$/,
+  rows: [
+   "Checked in hand | The label, the stitching, the hardware and the way it's put together, against what the house was doing that year. | | | ",
+   "Dated, not guessed | A union label, an RN number or a care tag dates a piece far better than a silhouette ever will. | | | ",
+   "Said plainly | When we can't be certain, the listing says so. We'd rather sell it as unbranded than guess at a name. | | | ",
+  ].join("\n"),
+ },
+ {
+  match: /^(shipping|delivery|returns|shipping-returns)$/,
+  rows: [
+   "Posted in [1-2] days | Packed flat, boxed when it needs it, tracked either way. | | | ",
+   "30 days to change your mind | Anything unworn can come back to us. | | | ",
+   "We ship worldwide | Shipping is worked out at checkout. Duties are the buyer's to pay. | | | ",
+  ].join("\n"),
+ },
+ {
+  match: /^(condition|condition-scale|grading)$/,
+  rows: [
+   "Measured, not estimated | Every piece is measured flat, in inches, the same way every time. | | | ",
+   "Flaws are photographed | Marks, mends and worn hems are shown, not described around. | | | ",
+   "Graded consistently | The same words mean the same thing on every listing in the shop. | | | ",
+  ].join("\n"),
+ },
+ {
+  match: /^(consign|sell-to-us|sell|sourcing-requests)$/,
+  rows: [
+   "Send us a photograph | [Tell us the house, roughly when it's from, and anything you know about it.] | | | ",
+   "We price it against real sales | Not against what other people are asking. | | | ",
+   "You're paid when it sells | [X% of the sale price, once the return window has closed.] | | | ",
+  ].join("\n"),
+ },
+];
+
+/** The question set for a page, or the general one. */
+function faqRows(page?: string): string[][] {
+ const slug = String(page || "").toLowerCase().trim();
+ return (slug && PAGE_FAQ.find((f) => f.match.test(slug))?.rows) || FAQ;
+}
 
 // Image fields, by the key each block stores them under. A template that authored an image gets the
 // placeholder; one that deliberately left a slot empty stays empty.
@@ -177,6 +305,9 @@ const PAGE_COPY: { match: RegExp; heading: Record<string, string>; body?: Record
  {
   match: /^(faq|questions|help)$/,
   heading: { text: "Questions", faq: "Frequently asked questions" },
+  // Without this, the paragraph under "Questions" was the generic one: "Tell people who you are and
+  // what you sell", which is the About page's job and reads as a mistake on an FAQ.
+  body: { text: "The things buyers ask most, answered once so nobody has to write in." },
  },
  {
   match: /^(contact|get-in-touch)$/,
@@ -226,13 +357,19 @@ export function placeholderProps(type: string, props: Record<string, string> | u
 
   const qa = qaMatch(k);
   if (qa) {
-   const row = FAQ[Number(qa[2]) % FAQ.length];
+   const rows = faqRows(page);
+   const row = rows[Number(qa[2]) % rows.length];
    out[k] = qa[1] === "q" ? row[0] : row[1];
    continue;
   }
   if (!CONTENT_KEYS.has(k)) continue;
 
-  if (k === "items") { out[k] = withItemImages(type, ITEMS[type] ?? v, seed); continue; }
+  if (k === "items") {
+   const slug = String(page || "").toLowerCase().trim();
+   const byPage = type === "columns" && slug ? PAGE_COLUMNS.find((c) => c.match.test(slug))?.rows : undefined;
+   out[k] = withItemImages(type, byPage ?? ITEMS[type] ?? v, seed);
+   continue;
+  }
   if (k === "heading") {
    const h = pageOverride(page, type, "heading") ?? HEADING[type];
    if (h !== undefined) out[k] = h;

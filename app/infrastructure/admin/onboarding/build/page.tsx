@@ -222,6 +222,15 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  ...pageOptions.filter((p) => pages.has(p.slug)).map((p) => ({ label: p.label, slug: p.slug, active: previewPage === p.slug })),
  ];
  const goPreview = (item: ChromeNav) => item.slug && setPreviewPage(item.slug);
+ /**
+  * The nav as it looks ON a given page, which is not the same as the nav on the page being edited.
+  *
+  * The Pages step draws every page at once, and all of them were handed the same nav: whichever
+  * page the single previewPage state pointed at. So the FAQ card sat there with AUTHENTICATION
+  * underlined, which is not a small blemish. The underline is the one thing telling the seller
+  * which page she is looking at.
+  */
+ const navFor = (slug: string): ChromeNav[] => navItems.map((n) => ({ ...n, active: n.slug === slug }));
 
  // The pages that actually exist on the store right now, in nav order: the two standard ones plus
  // whatever's ticked. The Pages step lays these out side by side as a filmstrip (Squarespace-style),
@@ -307,9 +316,9 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  <div className="h-[68dvh] overflow-y-auto overscroll-contain">
  <div style={{ width: 1180, zoom: 0.457 } as React.CSSProperties}>
  <div style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
- <StoreHeader storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} />
+ <StoreHeader storeName={name} logo={logo || null} nav={navFor(pg.slug)} colors={colors} headingFontFamily={ff(fonts.heading)} />
  <Blocks blocks={pageBlocks(pg.slug)} colors={colors} fonts={fonts} radius="sharp" products={SAMPLE} shopHref="#" />
- <StoreFooter storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} year={2026} newsletter={<div className="mx-auto flex max-w-sm items-center gap-2"><input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" /><span className="grid h-10 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Subscribe</span></div>} />
+ <StoreFooter storeName={name} logo={logo || null} nav={navFor(pg.slug)} colors={colors} headingFontFamily={ff(fonts.heading)} year={2026} newsletter={<div className="mx-auto flex max-w-sm items-center gap-2"><input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" /><span className="grid h-10 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Subscribe</span></div>} />
  </div>
  </div>
  </div>

@@ -138,7 +138,12 @@ function HeroSplit({ kit }: { kit: EditKit }) {
    {/* The seam itself is the handle. The comment above has described a draggable divider since
        this layout shipped, and there was never anything to drag. Only on the wide layout, where
        the split actually exists; below @lg the two panels stack. */}
-   {showMedia && <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>}
+   {/* CONTENTS, NOT BLOCK, and it is the whole layout that hangs on it. A wrapper that generates a
+       box is a GRID ITEM: this empty span took the first cell, the photograph slid into the second,
+       and the copy wrapped onto a row of its own. A split hero rendered as a picture in one corner
+       and the words underneath it, which is exactly how it looked on Editorial and on Local.
+       `display: contents` keeps the handle in the grid's coordinate space without taking a track. */}
+   {showMedia && <span className="hidden @lg:contents"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>}
    {showMedia && (
     <PhotoFrame kit={kit} className={`relative min-h-[42vh] w-full overflow-hidden @lg:min-h-[78vh] ${right ? "@lg:order-2" : ""}`} style={{ background: `${fg}0d` }}>
      {p.image && <img src={p.image} alt="" {...panBgImg(ctx, b)} className={`absolute inset-0 h-full w-full object-cover ${ctx.edit ? "cursor-grab touch-none" : ""}`} />}
