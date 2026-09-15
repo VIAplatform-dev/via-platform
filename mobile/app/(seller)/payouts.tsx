@@ -68,7 +68,7 @@ export default function PayoutsScreen() {
             <Text style={{ fontFamily: fonts.serif, fontSize: 28, color: colors.text, marginTop: spacing.sm }}>
               {p.payoutsEnabled ? "Active" : p.connected ? "Finishing setup" : "Not connected"}
             </Text>
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 19 }}>
+            <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 19 }}>
               {p.payoutsEnabled
                 ? `Paid out ${p.payoutDelayDays} days after an order settles.`
                 : p.connected
@@ -128,7 +128,7 @@ export default function PayoutsScreen() {
           )}
 
           {p.payoutNotice ? (
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.lg, lineHeight: 19 }}>{p.payoutNotice}</Text>
+            <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: spacing.lg, lineHeight: 19 }}>{p.payoutNotice}</Text>
           ) : null}
 
           <View style={{ marginTop: spacing.xl }}>
@@ -141,7 +141,7 @@ export default function PayoutsScreen() {
             </Pressable>
           </View>
 
-          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.lg, lineHeight: 18 }}>
+          <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.lg, lineHeight: 18 }}>
             Payouts wait out your return window, so a refund comes out of money still with Stripe
             rather than out of your bank. Change the window in your returns policy and this follows it.
           </Text>

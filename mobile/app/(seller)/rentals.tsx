@@ -56,11 +56,11 @@ function Section({ title, tone, items, today }: { title: string; tone?: "urgent"
               <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>
                 {b.title ?? "Piece"}
               </Text>
-              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+              <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
                 {bookingLine(b, today)}
               </Text>
               {tracking ? (
-                <Text style={{ fontSize: 12.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{tracking}</Text>
+                <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{tracking}</Text>
               ) : null}
               {b.returnLabelUrl ? (
                 <Pressable hitSlop={8} onPress={() => void Linking.openURL(b.returnLabelUrl!)} style={{ marginTop: spacing.xs }}>
@@ -173,7 +173,7 @@ export default function RentalsScreen() {
                   >
                     {stateLine(it, today)}
                   </Text>
-                  {price ? <Text style={{ fontSize: 12, color: colors.textDim, marginTop: 1 }}>{price}</Text> : null}
+                  {price ? <Text style={{ fontSize: 13, color: colors.textDim, marginTop: 1 }}>{price}</Text> : null}
                 </View>
                 <Feather name="chevron-right" size={18} color={colors.textDim} />
               </Pressable>

@@ -181,7 +181,7 @@ export default function InventoryScreen() {
       {filter !== "collections" && anyReserved(visible) ? (
         <View style={{ flexDirection: "row", gap: spacing.sm, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.md, marginBottom: spacing.sm }}>
           <Feather name="info" size={14} color={colors.textMuted} style={{ marginTop: 1 }} />
-          <Text style={{ flex: 1, fontSize: 12, color: colors.textMuted, lineHeight: 17 }}>{RESERVED_EXPLAINER}</Text>
+          <Text style={{ flex: 1, fontSize: 13.5, color: colors.textMuted, lineHeight: 17 }}>{RESERVED_EXPLAINER}</Text>
         </View>
       ) : null}
 
@@ -248,8 +248,8 @@ export default function InventoryScreen() {
                     <View style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: radius, backgroundColor: colors.chip, overflow: "hidden" }}>
                       {cover ? <Image source={{ uri: cover }} style={{ width: "100%", height: "100%" }} /> : null}
                     </View>
-                    <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600", marginTop: spacing.sm }} numberOfLines={1}>{c.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 1 }}>{itemCountLabel(c.itemCount)}</Text>
+                    <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600", marginTop: spacing.sm }} numberOfLines={1}>{c.title}</Text>
+                    <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 1 }}>{itemCountLabel(c.itemCount)}</Text>
                   </Pressable>
                 </Link>
               );
@@ -271,7 +271,7 @@ export default function InventoryScreen() {
                   <Image source={{ uri: it.images[0] }} style={{ width: "100%", height: "100%", borderRadius: radius, backgroundColor: colors.chip }} />
                 ) : (
                   <View style={{ width: "100%", height: "100%", borderRadius: radius, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center" }}>
-                    <Text style={{ fontSize: 11, color: colors.textDim, textAlign: "center", paddingHorizontal: 6 }} numberOfLines={2}>{it.title}</Text>
+                    <Text style={{ fontSize: 12.5, color: colors.textDim, textAlign: "center", paddingHorizontal: 6 }} numberOfLines={2}>{it.title}</Text>
                   </View>
                 )}
                 {/* The state dot still shows. A grid you cannot tell sold from live in is a grid
@@ -309,7 +309,7 @@ export default function InventoryScreen() {
                   <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>
                     {it.title}
                   </Text>
-                  <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+                  <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
                     {formatMoney(it.priceCents, it.currency)}
                     {it.category ? ` · ${it.category}` : ""}
                     {reservedWord(it.status, held.has(it.id)) ? ` · ${reservedWord(it.status, held.has(it.id))}` : ""}

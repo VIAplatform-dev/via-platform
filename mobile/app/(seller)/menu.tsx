@@ -52,7 +52,7 @@ function Row({
     >
       <Feather name={icon} size={18} color={colors.text} />
       <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>{label}</Text>
-      {value ? <Text style={{ fontSize: 13, color: colors.textMuted, marginRight: spacing.sm }}>{value}</Text> : null}
+      {value ? <Text style={{ fontSize: 13.5, color: colors.textMuted, marginRight: spacing.sm }}>{value}</Text> : null}
       <Feather name="chevron-right" size={18} color={colors.textDim} />
     </Pressable>
   );
@@ -164,7 +164,7 @@ export default function SettingsScreen() {
         <Row icon="log-out" label="Sign out" onPress={() => void signOut()} />
       </Group>
 
-      <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
+      <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
         Storefront design, the full profit report and bulk editing are on the desktop. They need a
         canvas or a table, not a phone.
       </Text>

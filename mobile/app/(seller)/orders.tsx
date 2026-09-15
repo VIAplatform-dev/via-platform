@@ -148,7 +148,7 @@ export default function OrdersScreen() {
                 <View style={{ flex: 1 }}>
                   {p.pieces > 1 ? (
                     <>
-                      <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: "600" }}>{p.pieces} pieces · one parcel</Text>
+                      <Text style={{ fontSize: 13.5, color: colors.textMuted, fontWeight: "600" }}>{p.pieces} pieces · one parcel</Text>
                       {p.orders.map((o) => (
                         <Text key={o.id} style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>
                           {o.itemTitle ?? `Order #${o.orderNo}`}
@@ -160,7 +160,7 @@ export default function OrdersScreen() {
                       {first.itemTitle ?? `Order #${first.orderNo}`}
                     </Text>
                   )}
-                  <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+                  <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
                     {formatMoney(p.amountCents, p.currency ?? first.currency)}
                     {p.buyerEmail ? ` · ${p.buyerEmail}` : ""}
                   </Text>
@@ -220,7 +220,7 @@ export default function OrdersScreen() {
                   it offers to spend anything. */}
               {quote?.key === p.key ? (
                 <View style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: radius, padding: spacing.md }}>
-                  <Text style={{ fontSize: 13, color: colors.text, lineHeight: 18 }}>
+                  <Text style={{ fontSize: 15, color: colors.text, lineHeight: 18 }}>
                     {labelQuoteLine(quote.quote, p.currency ?? first.currency)}
                   </Text>
                   <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.md }}>
@@ -248,7 +248,7 @@ export default function OrdersScreen() {
               ) : null}
 
               {act.isError && act.variables?.parcel.key === p.key ? (
-                <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.sm }}>Couldn&apos;t update that parcel. Try again.</Text>
+                <Text style={{ fontSize: 15, color: colors.text, marginTop: spacing.sm }}>Couldn&apos;t update that parcel. Try again.</Text>
               ) : null}
             </View>
           );

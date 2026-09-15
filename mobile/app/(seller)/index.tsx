@@ -93,7 +93,7 @@ function Row({ icon, title, subtitle, onPress }: { icon: React.ComponentProps<ty
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{title}</Text>
-        {subtitle ? <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text> : null}
+        {subtitle ? <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{subtitle}</Text> : null}
       </View>
       <Feather name="chevron-right" size={18} color={colors.textDim} />
     </Pressable>
@@ -240,7 +240,7 @@ export default function SellerHome() {
       {netProfit !== null ? (
         <Pressable onPress={() => router.push("/(seller)/analytics")} style={{ flexDirection: "row", alignItems: "baseline", gap: spacing.sm, marginTop: spacing.xs }}>
           <Text style={{ fontSize: 13, color: colors.textMuted }}>Net profit · 30d</Text>
-          <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{netProfit}</Text>
+          <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{netProfit}</Text>
         </Pressable>
       ) : null}
 
@@ -261,7 +261,7 @@ export default function SellerHome() {
               <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}>Set up your store</Text>
               <Text style={{ fontSize: 12, color: colors.textMuted }}>{sum.done} of {sum.total} done</Text>
             </View>
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>Finish these and your first sale has nowhere to go wrong.</Text>
+            <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }}>Finish these and your first sale has nowhere to go wrong.</Text>
             <View style={{ marginTop: spacing.sm }}>
               {steps.map((s) => {
                 const isNext = sum.next?.id === s.id;
@@ -302,7 +302,7 @@ export default function SellerHome() {
             {unknown(home) ?? parcelsToPostLabel(postingParcels.length)}
           </Text>
           {posting.length > 0 ? (
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{toPostSubtitle(posting.map((o) => ({ itemTitle: o.itemTitle ?? null })))}</Text>
+            <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{toPostSubtitle(posting.map((o) => ({ itemTitle: o.itemTitle ?? null })))}</Text>
           ) : null}
         </View>
         <Feather name="chevron-right" size={18} color={colors.textDim} />
@@ -313,7 +313,7 @@ export default function SellerHome() {
         <Tile onPress={() => router.push("/(seller)/inventory")} style={{ flex: 1 }}>
           <Feather name="box" size={18} color={colors.text} />
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600", marginTop: spacing.xl }}>Inventory</Text>
-          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
+          <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }}>
             {unknown(home) ?? inventoryLabel({ active: d!.inventory.live, draft: d!.inventory.drafts })}
           </Text>
           {aging ? (
@@ -330,7 +330,7 @@ export default function SellerHome() {
             ) : null}
           </View>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600", marginTop: spacing.xl }}>Consignment</Text>
-          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
+          <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }}>
             {unknown(home) ??
               (payable.length > 0 ? `${payable.length} payout${payable.length === 1 ? "" : "s"} due` : "Nothing due")}
           </Text>
@@ -344,7 +344,7 @@ export default function SellerHome() {
           <Feather name="calendar" size={18} color={colors.text} />
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }}>Appointments</Text>
-            <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
+            <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
               {home.isPending ? "…" : appointmentsTileLine(daySchedule(d?.appointments.appointments ?? [], today))}
             </Text>
           </View>
@@ -399,7 +399,7 @@ export default function SellerHome() {
               render a line of text on a tile nobody opens Home to read. The Store tab needs both
               anyway and fetches them there. What Home owes this tile is that the shop exists and
               how many people follow it. */}
-          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 3 }} numberOfLines={1}>
+          <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 3 }} numberOfLines={1}>
             {me.data?.storeFollowers ? `${me.data.storeFollowers} ${me.data.storeFollowers === 1 ? "follower" : "followers"}` : "Your shop, as buyers see it"}
           </Text>
         </View>

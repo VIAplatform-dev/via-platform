@@ -134,7 +134,7 @@ export default function CrossListingScreen() {
       )}
 
       {retry.isError ? (
-        <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.md }}>That retry didn&apos;t go through. Try again.</Text>
+        <Text style={{ fontSize: 15, color: colors.text, marginTop: spacing.md }}>That retry didn&apos;t go through. Try again.</Text>
       ) : null}
     </SellerScreen>
   );

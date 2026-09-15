@@ -130,7 +130,7 @@ export default function CollectionScreen() {
           ) : null}
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.md }}>
             <Pressable onPress={() => void coverFromLibrary()} disabled={busy || patch.isPending} style={{ flex: 1, alignItems: "center", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard, borderRadius: pill, paddingVertical: spacing.md }}>
-              <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: "500" }}>{busy ? "Uploading…" : "Choose a photo"}</Text>
+              <Text style={{ fontSize: 13.5, color: colors.textMuted, fontWeight: "500" }}>{busy ? "Uploading…" : "Choose a photo"}</Text>
             </Pressable>
             {mine?.imageUrl ? (
               <Pressable onPress={() => patch.mutate({ imageUrl: null })} disabled={patch.isPending} style={{ flex: 1, alignItems: "center", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bgCard, borderRadius: pill, paddingVertical: spacing.md }}>
@@ -158,7 +158,7 @@ export default function CollectionScreen() {
           <Text style={{ fontSize: 13, color: colors.accentInk, fontWeight: "500" }}>{renaming === null ? "Rename" : "Done"}</Text>
         </Pressable>
       </View>
-      <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm }}>{itemCountLabel(items.length)}</Text>
+      <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: spacing.sm }}>{itemCountLabel(items.length)}</Text>
 
       {/* The pieces */}
       {q.isError ? (
@@ -172,8 +172,8 @@ export default function CollectionScreen() {
               <Pressable style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderSoft }}>
                 <Image source={{ uri: i.image ?? undefined }} style={{ width: 48, height: 48, borderRadius: radiusSm, backgroundColor: colors.chip }} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, color: colors.text, fontWeight: "500" }} numberOfLines={1}>{i.title ?? "Untitled piece"}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>
+                  <Text style={{ fontSize: 15, color: colors.text, fontWeight: "500" }} numberOfLines={1}>{i.title ?? "Untitled piece"}</Text>
+                  <Text style={{ fontSize: 13, color: colors.textDim, marginTop: 2 }}>
                     {i.priceCents ? formatMoney(i.priceCents, i.currency ?? "USD") : "No price"}
                     {i.status !== "active" ? ` · ${i.status}` : ""}
                   </Text>
@@ -186,7 +186,7 @@ export default function CollectionScreen() {
       )}
 
       <Pressable onPress={remove} style={{ marginTop: spacing.xl, paddingVertical: spacing.md }}>
-        <Text style={{ fontSize: 13, color: colors.textMuted, textAlign: "center" }}>Delete collection</Text>
+        <Text style={{ fontSize: 13.5, color: colors.textMuted, textAlign: "center" }}>Delete collection</Text>
       </Pressable>
     </SellerScreen>
   );
