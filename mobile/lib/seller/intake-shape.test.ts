@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeDraft, readEstimate, costFromText, hasRealValue, unsureFields, CONFIDENCE_THRESHOLD } from "./intake-shape.ts";
+import { normalizeDraft, readEstimate, costFromText, hasRealValue, unsureFields, CONFIDENCE_THRESHOLD, declinedBrand } from "./intake-shape.ts";
 
 // The real response, copied from a live production call. See intake-shape.ts for why this
 // fixture is written out rather than paraphrased.
@@ -155,8 +155,14 @@ test("what she typed herself is never queried, however unsure the model was", ()
   assert.deepEqual(unsureFields(draft, { brand: "   " }), ["brand", "era"]);
 });
 
-test("a refusal is not a low-confidence answer; there is nothing to confirm about a blank", () => {
-  assert.deepEqual(unsureFields({ brand: risky("N/A", 0.1), era: risky("Unknown", 0.2), material: risky("", 0.1) }, {}), []);
+test("a refusal is not a low-confidence answer for era or material", () => {
+  // Nothing to confirm about a blank era: the row is empty and she fills it or she doesn't.
+  // BRAND is the exception and is deliberate: a refused brand becomes "Unbranded", which IS an
+  // answer being put on the listing, so she is asked to check the label. See declinedBrand.
+  const out = unsureFields({ brand: risky("N/A", 0.1), era: risky("Unknown", 0.2), material: risky("", 0.1) }, {});
+  assert.equal(out.includes("era"), false);
+  assert.equal(out.includes("material"), false);
+  assert.deepEqual(out, ["brand"]);
 });
 
 test("exactly at the threshold is confident enough, matching the web's strict <", () => {
@@ -165,8 +171,9 @@ test("exactly at the threshold is confident enough, matching the web's strict <"
 });
 
 test("only the three the web queries; a plain string carries no confidence to judge", () => {
-  // title/category/description are not on the list even when the payload wraps them.
-  assert.deepEqual(unsureFields({ title: risky("A dress", 0.1), category: risky("dresses", 0.1) }, {}), []);
+  // title/category/description are not on the list even when the payload wraps them. Brand is
+  // flagged here because the draft ran (it produced a title) and named no house.
+  assert.deepEqual(unsureFields({ title: risky("A dress", 0.1), category: risky("dresses", 0.1) }, {}), ["brand"]);
   // Fields that arrive as bare strings have no confidence, so they cannot be unsure.
   assert.deepEqual(unsureFields({ brand: "Chanel", era: "1990s" }, {}), []);
 });
@@ -177,4 +184,38 @@ test("a missing or malformed draft is not an error", () => {
   assert.deepEqual(unsureFields("nope", {}), []);
   assert.deepEqual(unsureFields({}, {}), []);
   assert.deepEqual(unsureFields({ brand: risky("Chanel", 0.4) }), ["brand"]);
+});
+
+/* ── a piece with no house ──────────────────────────────────────────────── */
+
+// A 1920s dress with no label and nothing on the web. The drafter is told at length that "an
+// honest 'unbranded' beats a confident wrong label" and it obeys: brand comes back null. The app
+// drew an empty box, which cannot be told apart from "we didn't get to it".
+
+test("the model declining to name a house is recognised", () => {
+  assert.equal(declinedBrand({ brand: null }, {}), true);
+  assert.equal(declinedBrand({ brand: { value: null, confidence: 0.2 } }, {}), true);
+  assert.equal(declinedBrand({ brand: { value: "N/A", confidence: 0.1 } }, {}), true);
+  assert.equal(declinedBrand({ era: "1920s" }, {}), true);
+});
+
+test("a brand it DID name is not a decline, however unsure it was", () => {
+  assert.equal(declinedBrand({ brand: { value: "Chanel", confidence: 0.3 } }, {}), false);
+  assert.equal(declinedBrand({ brand: "Prada" }, {}), false);
+});
+
+test("a brand SHE typed is never overwritten with Unbranded", () => {
+  assert.equal(declinedBrand({ brand: null }, { brand: "Roberto Cavalli" }), false);
+  assert.equal(declinedBrand({ brand: null }, { brand: "  " }), true);
+});
+
+test("a draft that never ran has no opinion", () => {
+  assert.equal(declinedBrand(null, {}), false);
+  assert.equal(declinedBrand(undefined, {}), false);
+});
+
+test("a declined brand is flagged for checking, like a low-confidence one", () => {
+  assert.deepEqual(unsureFields({ brand: null, era: { value: "1920s", confidence: 0.9 } }, {}), ["brand"]);
+  // And it does not double-count when the model both declined and there is nothing else unsure.
+  assert.deepEqual(unsureFields({ brand: { value: "", confidence: 0.1 } }, {}), ["brand"]);
 });

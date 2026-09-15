@@ -1,7 +1,7 @@
 import { API_BASE_URL, getAuthToken, ApiError } from "../api";
 import { apiPost } from "../api";
 import { filledFields } from "./listing";
-import { normalizeDraft, readEstimate, costFromText, unsureFields, type DraftFields } from "./intake-shape";
+import { normalizeDraft, readEstimate, costFromText, unsureFields, declinedBrand, UNBRANDED, type DraftFields } from "./intake-shape";
 
 // The listing pipeline, in one place.
 //
@@ -67,8 +67,13 @@ export async function draftListing(imageUrls: string[], typedFields: Record<stri
   // showed a 0.4-confidence brand in the same ink as one read off a tag.
   const unsure = unsureFields(r.draft, typedFields);
 
+  // The model looked and found no house. Say so in the field rather than leaving a blank box that
+  // reads as "we didn't get to it". Flagged as unsure alongside it, so she knows to check the label.
+  const fields = normalizeDraft(r.draft);
+  if (declinedBrand(r.draft, typedFields)) fields.brand = UNBRANDED;
+
   return {
-    fields: normalizeDraft(r.draft),
+    fields,
     unsure,
     searchQuery: r.searchQuery,
     reverseComps: r.reverseComps,
@@ -115,10 +120,22 @@ export async function publishListing(
     /** Collection TITLES, as the item PATCH and the web editor take them: the route creates one
      *  that doesn't exist yet, so a new collection can be made from the listing flow. */
     collections?: string[];
+    /**
+     * WHAT THE AI PROPOSED, so the publish can see what she changed.
+     *
+     * /api/store/intake/publish compares this against the values actually being published and
+     * writes every difference to the correction memory (logCorrections), which feeds back into the
+     * next intake as hints. The desktop has sent it since the loop was built. The phone never did,
+     * so a seller who fixed a brand, a price or a description on her phone taught the model
+     * nothing: the single richest source of corrections we have was going in the bin.
+     */
+    aiDraft?: Record<string, unknown>;
+    /** The photograph the draft was read from, so a correction is keyed to the image. */
+    photo?: string;
   },
   status: "active" | "draft",
 ) {
-  const { priceCents, cost, imageUrls, ...rest } = fields;
+  const { priceCents, cost, imageUrls, aiDraft, photo, ...rest } = fields;
   // Cost travels like price: major units, and only when she gave one. A blank must not be sent
   // as 0, which the margin report would read as free stock.
   const costMajor = costFromText(cost);
@@ -135,6 +152,9 @@ export async function publishListing(
     images: imageUrls,
     ...(typeof priceCents === "number" && priceCents > 0 ? { price: priceCents / 100 } : {}),
     ...(costMajor !== undefined ? { cost: costMajor } : {}),
+    // Sent as-is: the route reads body.aiDraft and body.photo and does the comparing.
+    ...(aiDraft ? { aiDraft } : {}),
+    ...(photo ? { photo } : {}),
     status,
   });
 }

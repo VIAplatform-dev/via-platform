@@ -5,7 +5,7 @@ import { liveCrossListPlatforms, crossListNote, crossListFootnote, type CrossLis
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost, apiPut, apiDelete, ApiError } from "../../../lib/api";
-import { uploadPhoto, draftListing } from "../../../lib/seller/intake";
+import { uploadPhoto, draftListing, priceListing } from "../../../lib/seller/intake";
 import { useAuth } from "../../../lib/auth";
 // `pill` is aliased: this screen already has a local `pill`, the status WORD ("SOLD",
 // "RESERVED"). React Native accepts a string for borderRadius (it can be a percentage), so
@@ -15,6 +15,7 @@ import { formatMoney } from "../../../lib/seller/home";
 import { daysListed } from "../../../lib/seller/aging";
 import { describeHold, HOLD_LENGTHS } from "../../../lib/seller/holds";
 import { flawsFromLine, flawsToLine, CONDITION_GRADES } from "../../../lib/seller/intake-shape";
+import { staleBrandMentions, applyBrandCorrection, describeReprice } from "../../../lib/seller/brand-change";
 import { fillBlanks, fillSummary } from "../../../lib/seller/fill";
 import { templateFor, unitFor, measurementsFromForm, measurementsToForm, formatMeasurements, MEASUREMENT_LABELS, type MeasurementKey, type Measurement } from "../../../lib/seller/measurements";
 import { SellerScreen } from "../../../components/seller/Screen";
@@ -112,6 +113,14 @@ export default function PieceScreen() {
   const [terms, setTerms] = useState<TermsForm | null>(null);
   // What the AI pass did, in a line, so a screen full of freshly filled boxes says where they came
   // from. Cleared when the edits are (saved, or discarded).
+  // A CORRECTED BRAND ON A PIECE THAT IS ALREADY LIVE.
+  //
+  // The words are rewritten the moment she leaves the field, same as anywhere else. The PRICE is
+  // offered, not taken: this piece has been listed for weeks, and the number on it may well be one
+  // she set by hand. There is nothing on the record that says which, and silently repricing a live
+  // listing on a guess is worse than asking.
+  const brandAtFocus = useRef("");
+  const [reprice, setReprice] = useState<{ brand: string; state: "offer" | "running" | "done"; note: string | null; was: string | null } | null>(null);
   const [filling, setFilling] = useState(false);
   const [filledNote, setFilledNote] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -384,6 +393,53 @@ export default function PieceScreen() {
   const isDraft = item.status === "draft";
   const chosen = cols ?? (Array.isArray(item.collections) ? item.collections : []);
   const shots = photos ?? (Array.isArray(item.images) ? item.images : []);
+  // Captured: the narrowing above does not reach inside the async handlers below.
+  const money = item.currency;
+
+  /**
+   * She left the Brand field. Correct the words it was wrong in, and offer the number.
+   *
+   * ON BLUR, NOT PER KEYSTROKE. This ran on every character once, comparing what was saved against
+   * what was in the box. Backspacing through "Dolce & Gabbana" hit "Dolce & Gabban" on the way, the
+   * title still said the full name at that moment, and it was rewritten to the half-deleted one.
+   */
+  function commitBrand() {
+    const was = brandAtFocus.current;
+    const brand = (form.brand ?? "").trim();
+    brandAtFocus.current = form.brand ?? "";
+    const words = { title: current("title"), description: current("description"), conditionNote: current("conditionNote") };
+    const fix = staleBrandMentions(was, brand, words);
+    if (fix) setForm({ ...form, brand: form.brand ?? "", ...applyBrandCorrection(words, fix) });
+    const changed = was.trim().toLowerCase() !== brand.toLowerCase();
+    setReprice(changed && brand && shots.length ? { brand, state: "offer", note: null, was: null } : null);
+  }
+
+  /** Price it again on the brand she just gave it. Her tap, never automatic: see the note above. */
+  async function runReprice(brand: string) {
+    const was = current("price");
+    setReprice({ brand, state: "running", note: null, was });
+    try {
+      const priced = await priceListing(shots, {
+        brand,
+        title: current("title"),
+        era: current("era"),
+        material: current("material"),
+        category: current("category"),
+        condition: current("condition"),
+        cost: current("cost"),
+      });
+      if (priced.priceCents == null) { setReprice(null); return; }
+      const to = String(Math.round(priced.priceCents / 100));
+      setForm({ ...form, price: to });
+      setReprice({
+        brand, state: "done", was,
+        note: describeReprice(brand, formatMoney(Math.round(Number(was) * 100), money), formatMoney(priced.priceCents, money)),
+      });
+    } catch {
+      // Quiet: the price on the piece is the one it had a moment ago.
+      setReprice(null);
+    }
+  }
 
   /** Camera or library: a piece with no photo is usually one sitting right in front of her.
    *  Uploaded immediately: the route stores URLs, never bytes. */
@@ -487,7 +543,7 @@ export default function PieceScreen() {
 
       {/* the line that says how it stands: who it is held for, or how long it has sat */}
       {hold ? (
-        <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.sm }}>{describeHold(hold)}</Text>
+        <Text style={{ fontSize: 15, color: colors.text, marginTop: spacing.sm }}>{describeHold(hold)}</Text>
       ) : live && days !== null && days >= 7 ? (
         <Text style={{ fontSize: 13, color: days >= 90 ? colors.accent : colors.textMuted, marginTop: spacing.sm }}>
           Listed {days} days ago
@@ -526,11 +582,11 @@ export default function PieceScreen() {
                 disabled={uploading}
                 style={{ width: 84, height: 84, borderRadius: 8, backgroundColor: colors.chip, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}
               >
-                <Text style={{ fontSize: 13, color: colors.text, fontWeight: "600" }}>{uploading ? "…" : "+ Add"}</Text>
+                <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }}>{uploading ? "…" : "+ Add"}</Text>
               </Pressable>
             </ScrollView>
             {shots.length > 1 ? (
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm }}>Tap a photo to make it the cover.</Text>
+              <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.sm }}>Tap a photo to make it the cover.</Text>
             ) : null}
             <View style={{ flexDirection: "row", marginTop: spacing.md }}>
               <Button
@@ -540,13 +596,13 @@ export default function PieceScreen() {
               />
             </View>
             {filledNote ? (
-              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 }}>{filledNote}</Text>
+              <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 }}>{filledNote}</Text>
             ) : shots.length === 0 ? (
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+              <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
                 Add a photo and it can fill the empty fields for you.
               </Text>
             ) : (
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+              <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
                 Fills the empty fields only. Anything you have written is left alone, and the price
                 is never touched.
               </Text>
@@ -578,12 +634,33 @@ export default function PieceScreen() {
                 </View>
               </View>
             ) : (
+              <View key={f.key}>
               <InlineField
-                key={f.key}
                 label={f.label}
                 labelWidth={92}
                 value={current(f.key)}
                 onChangeText={(v) => {
+                  // CORRECTING THE BRAND CORRECTS THE WORDS, here as in the listing form.
+                  //
+                  // This is where it matters most: almost all correcting happens AFTER a piece is
+                  // published, on this screen. Fixing the brand and leaving the description naming
+                  // the old house is how a piece ends up saying two different makers at once.
+                  //
+                  // The old brand is whatever is saved on the piece, so a second edit in the same
+                  // session compares against what she last set rather than the original draft.
+                  if (f.key === "brand") {
+                    const fix = staleBrandMentions(current("brand"), v, {
+                      title: current("title"),
+                      description: current("description"),
+                      conditionNote: current("conditionNote"),
+                    });
+                    setForm({ ...form, brand: v, ...(fix ? applyBrandCorrection({
+                      title: current("title"),
+                      description: current("description"),
+                      conditionNote: current("conditionNote"),
+                    }, fix) : {}) });
+                    return;
+                  }
                   setForm({ ...form, [f.key]: v });
                   // Typing a weight moves "Ships in" to the box that weight belongs to. She is the
                   // one holding the piece: heavier than the selected box means the box was wrong.
@@ -592,10 +669,34 @@ export default function PieceScreen() {
                     if (Number.isFinite(oz) && oz > 0) setPacking(suggestPackaging(oz));
                   }
                 }}
+                onFocus={f.key === "brand" ? () => { brandAtFocus.current = current("brand"); } : undefined}
+                onBlur={f.key === "brand" ? commitBrand : undefined}
                 keyboardType={f.numeric ? "decimal-pad" : "default"}
                 multiline={f.multiline}
                 placeholder={f.placeholder}
               />
+              {/* THE PRICE FOLLOWS THE BRAND, once she says so. A number worked out for a piece we
+                  thought was unbranded is not slightly wrong for a Dior piece, it is a different
+                  piece's price. Offered here rather than taken, because this one is already live. */}
+              {f.key === "price" && reprice ? (
+                reprice.state === "done" ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: 6 }}>
+                    <Text style={{ flex: 1, fontSize: 12.5, color: colors.accentInk, lineHeight: 18 }}>{reprice.note}</Text>
+                    <Pressable hitSlop={8} onPress={() => { if (reprice.was !== null) setForm({ ...form, price: reprice.was }); setReprice(null); }}>
+                      <Text style={{ fontSize: 12.5, color: colors.textMuted, fontWeight: "500" }}>Undo</Text>
+                    </Pressable>
+                  </View>
+                ) : reprice.state === "running" ? (
+                  <Text style={{ fontSize: 12.5, color: colors.textMuted, marginTop: 6 }}>Checking {reprice.brand} sales…</Text>
+                ) : (
+                  <Pressable hitSlop={8} onPress={() => void runReprice(reprice.brand)} style={{ marginTop: 6 }}>
+                    <Text style={{ fontSize: 12.5, color: colors.accentInk, fontWeight: "500", lineHeight: 18 }}>
+                      This price was worked out before {reprice.brand}. Price it again?
+                    </Text>
+                  </Pressable>
+                )
+              ) : null}
+              </View>
             ),
           )}
 
@@ -625,7 +726,7 @@ export default function PieceScreen() {
               }}
             />
             {packagingSummary(currentPacking, current("weightOz")) ? (
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+              <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
                 {packagingSummary(currentPacking, current("weightOz"))}
               </Text>
             ) : null}
@@ -728,7 +829,7 @@ export default function PieceScreen() {
                 onPress: () => router.push("/(seller)/consignors"),
               }}
             />
-            <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
+            <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
               {(consignors.data?.consignors ?? []).length === 0
                 ? "Nobody added yet: open this to add the person who brought it in, and their split."
                 : "Their cut comes from the split on their record. A piece that has already sold keeps the consignor it sold under."}
@@ -759,7 +860,7 @@ export default function PieceScreen() {
                   );
                 })}
               </View>
-              <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+              <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
                 {crossListFootnote(platforms)}
               </Text>
             </View>
@@ -777,7 +878,7 @@ export default function PieceScreen() {
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, color: colors.text }}>Rent it out</Text>
-                <Text style={{ fontSize: 12, color: colors.textDim, marginTop: 2 }}>
+                <Text style={{ fontSize: 13, color: colors.textDim, marginTop: 2 }}>
                   {isRentable ? (termsSummary(rentForm, item.currency) ?? "Give at least one length a price") : "Sale only"}
                 </Text>
               </View>
@@ -834,7 +935,7 @@ export default function PieceScreen() {
               <Button label="Discard changes" disabled={busy || filling} onPress={() => { setMode("view"); clearEdits(); setError(null); }} />
             ) : null}
           </View>
-          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
+          <Text style={{ fontSize: 13, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
             {save.isPending
               ? "Saving…"
               : dirty
@@ -866,7 +967,7 @@ export default function PieceScreen() {
               </Pressable>
             ))}
           </View>
-          <Text style={{ fontSize: 12.5, color: colors.textMuted, marginTop: spacing.md, lineHeight: 18 }}>
+          <Text style={{ fontSize: 13.5, color: colors.textMuted, marginTop: spacing.md, lineHeight: 18 }}>
             Shoppers see &ldquo;On hold&rdquo; instead of Buy. It goes back on sale by itself when the time is up.
           </Text>
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
@@ -907,7 +1008,7 @@ export default function PieceScreen() {
       )}
 
       {error ? (
-        <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.md }}>{error}</Text>
+        <Text style={{ fontSize: 15, color: colors.text, marginTop: spacing.md }}>{error}</Text>
       ) : null}
 
       {/* Flaws: the list shoppers see under Condition; Edit changes it as one comma-separated line. */}
@@ -915,7 +1016,7 @@ export default function PieceScreen() {
         <View style={{ marginTop: spacing.xl }}>
           <Text style={{ ...eyebrow }}>FLAWS</Text>
           {flaws.map((f, i) => (
-            <Text key={`${f}-${i}`} style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{"\u2022"} {f}</Text>
+            <Text key={`${f}-${i}`} style={{ fontSize: 15, color: colors.text, marginTop: spacing.xs }}>{"\u2022"} {f}</Text>
           ))}
         </View>
       ) : null}
@@ -923,13 +1024,13 @@ export default function PieceScreen() {
       {item.conditionNote && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
           <Text style={{ ...eyebrow }}>CONDITION NOTE</Text>
-          <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{item.conditionNote}</Text>
+          <Text style={{ fontSize: 15, color: colors.text, marginTop: spacing.xs }}>{item.conditionNote}</Text>
         </View>
       ) : null}
       {storedMeasurementsLine && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
           <Text style={{ ...eyebrow }}>MEASUREMENTS</Text>
-          <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{storedMeasurementsLine}</Text>
+          <Text style={{ fontSize: 15, color: colors.text, marginTop: spacing.xs }}>{storedMeasurementsLine}</Text>
         </View>
       ) : null}
     </SellerScreen>

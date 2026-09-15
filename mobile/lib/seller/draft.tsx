@@ -42,10 +42,23 @@ type Draft = {
   /** Collection titles this piece goes into. Titles rather than ids, as the routes take them. */
   collections: string[];
   setCollections: (c: string[]) => void;
+  /** Exactly what the AI proposed, before she touched any of it. Sent at publish so the correction
+   *  memory can see what she changed; see publishListing. */
+  aiDraft: Record<string, unknown> | null;
+  setAiDraft: (d: Record<string, unknown> | null) => void;
   imageUrls: string[];
   setImageUrls: (u: string[]) => void;
   compsCount: number | null;
   setCompsCount: (n: number | null) => void;
+  /**
+   * The evidence the drafting pass gathered for the pricer: the search query it built, the reverse
+   * image comps, the titles it found. Kept because the price can have to be worked out a SECOND
+   * time, when she corrects the brand, and re-running the pricer without that evidence is not the
+   * same call. The phone once priced a Todd Oldham dress at 16,013 against the desktop's 1,681 on
+   * the same photograph, and a short payload was the whole difference.
+   */
+  priceInputs: Record<string, unknown> | null;
+  setPriceInputs: (e: Record<string, unknown> | null) => void;
   /** Minor units, as the pricing endpoint returns them. Formatted only at the point of display. */
   priceCents: number | null;
   setPriceCents: (n: number | null) => void;
@@ -67,15 +80,17 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
   const [unsure, setUnsure] = useState<string[]>([]);
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [collections, setCollections] = useState<string[]>([]);
+  const [aiDraft, setAiDraft] = useState<Record<string, unknown> | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [compsCount, setCompsCount] = useState<number | null>(null);
+  const [priceInputs, setPriceInputs] = useState<Record<string, unknown> | null>(null);
   const [priceCents, setPriceCents] = useState<number | null>(null);
   const [itemId, setItemId] = useState<string | null>(null);
 
   const value = useMemo<Draft>(
     () => ({
-      photos, setPhotos, fields, setFields, imageUrls, setImageUrls, compsCount, setCompsCount,
-      unsure, setUnsure, confirmed, setConfirmed, collections, setCollections,
+      photos, setPhotos, fields, setFields, imageUrls, setImageUrls, compsCount, setCompsCount, priceInputs, setPriceInputs,
+      unsure, setUnsure, confirmed, setConfirmed, collections, setCollections, aiDraft, setAiDraft,
       movePhoto: (from, to) => {
         const next = movePhoto({ photos, imageUrls }, from, to);
         setPhotos(next.photos);
@@ -87,9 +102,9 @@ export function DraftProvider({ children }: { children: React.ReactNode }) {
         setImageUrls(next.imageUrls);
       },
       priceCents, setPriceCents, itemId, setItemId,
-      reset: () => { setPhotos([]); setFields({}); setImageUrls([]); setCompsCount(null); setPriceCents(null); setItemId(null); setUnsure([]); setConfirmed({}); setCollections([]); },
+      reset: () => { setPhotos([]); setFields({}); setImageUrls([]); setCompsCount(null); setPriceInputs(null); setPriceCents(null); setItemId(null); setUnsure([]); setConfirmed({}); setCollections([]); setAiDraft(null); },
     }),
-    [photos, fields, imageUrls, compsCount, priceCents, itemId, unsure, confirmed, collections],
+    [photos, fields, imageUrls, compsCount, priceInputs, priceCents, itemId, unsure, confirmed, collections, aiDraft],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -187,10 +187,49 @@ export const CONFIDENCE_THRESHOLD = 0.75;
  *     are refusals, and there is nothing to confirm about a blank.
  *   · IT IS UNDER THE THRESHOLD.
  */
+/**
+ * What a piece with no identifiable house should say.
+ *
+ * The drafter is told, at length, that "an honest 'unbranded' beats a confident wrong label", and
+ * it obeys: on a 1920s dress with no label and nothing on the web, it returns brand = null. The app
+ * then drew an EMPTY BOX, which says nothing at all. A seller cannot tell "we looked and there is
+ * no house to find" from "we didn't get to it", so she either leaves it blank or, worse, types a
+ * guess of her own.
+ *
+ * So it says Unbranded, and it says the model was unsure, and she can type over it.
+ */
+export const UNBRANDED = "Unbranded";
+
+/**
+ * Did the model look at this piece and decline to name a house?
+ *
+ * Only when it genuinely RAN. A draft that was never requested has no opinion, and marking that
+ * "unbranded" would be putting words in its mouth.
+ */
+export function declinedBrand(draft: unknown, typed: Record<string, string | undefined> = {}): boolean {
+  if (!draft || typeof draft !== "object") return false;
+  if (String(typed.brand ?? "").trim()) return false;
+  const d = draft as Record<string, unknown>;
+  // AN EMPTY DRAFT IS NOT A DECLINE. `{}` means the pass produced nothing at all, which is a failed
+  // or absent run, not the model looking at a garment and finding no house. Calling that "Unbranded"
+  // would put a word in its mouth and flag a field it never considered.
+  // Keys, not values: `{}` is a pass that produced nothing, but `{ brand: null }` is the model
+  // naming the field and answering "no house", which is exactly the decline this is looking for.
+  if (Object.keys(d).length === 0) return false;
+  const raw = d.brand;
+  const value = typeof raw === "string" ? raw : (raw && typeof raw === "object" && "value" in raw ? (raw as { value: unknown }).value : null);
+  return !hasRealValue(typeof value === "string" ? value : null);
+}
+
 export function unsureFields(draft: unknown, typed: Record<string, string | undefined> = {}): RiskyField[] {
   if (!draft || typeof draft !== "object") return [];
   const d = draft as Record<string, unknown>;
-  return RISKY_FIELDS.filter((k) => {
+  // A DECLINED BRAND IS ALSO WORTH CHECKING. The three conditions below are about a value the model
+  // produced and doubts; this is the opposite case, where it produced nothing. "Unbranded" is very
+  // often right for vintage and it is exactly the field a seller can settle by looking at the label
+  // in her hand, so it is flagged for the same reason: she is the one who can answer it.
+  const declined = declinedBrand(draft, typed) ? (["brand"] as RiskyField[]) : [];
+  return declined.concat(RISKY_FIELDS.filter((k) => {
     if (String(typed[k] ?? "").trim()) return false;
     const fld = d[k];
     if (!fld || typeof fld !== "object" || !("value" in fld) || !("confidence" in fld)) return false;
@@ -198,5 +237,5 @@ export function unsureFields(draft: unknown, typed: Record<string, string | unde
     return hasRealValue(typeof value === "string" ? value : null)
       && typeof confidence === "number"
       && confidence < CONFIDENCE_THRESHOLD;
-  });
+  }));
 }

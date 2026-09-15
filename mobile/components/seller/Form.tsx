@@ -36,10 +36,15 @@ import { colors, spacing, button, radius, pill, fonts } from "../../lib/portal-t
  */
 export function InlineField({
   label, value, onChangeText, labelWidth, placeholder, keyboardType, autoCapitalize, multiline, trailing,
+  onFocus, onBlur,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
+  /** For a field whose change has consequences: act when she LEAVES it, not per keystroke. Halfway
+   *  through retyping a brand, "Dolce & Gabban" is a half-deleted word, not a new answer. */
+  onFocus?: () => void;
+  onBlur?: () => void;
   /** Ignored. Kept so call sites that still pass it compile; the label sits ABOVE the box now. */
   labelWidth?: number;
   placeholder?: string;
@@ -61,6 +66,8 @@ export function InlineField({
         ref={box}
         value={value}
         onChangeText={onChangeText}
+        onFocus={onFocus}
+        onBlur={onBlur}
         placeholder={placeholder}
         placeholderTextColor={colors.textDim}
         keyboardType={keyboardType ?? "default"}

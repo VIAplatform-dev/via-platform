@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { GestureDetector } from "react-native-gesture-handler";
@@ -19,6 +19,7 @@ import { PACKAGING, packagingById, packedWeightOz } from "../../../lib/seller/pa
 import { liveCrossListPlatforms, crossListNote, crossListFootnote } from "../../../lib/seller/cross-listing";
 import { TIER_DAYS, tierLabel, starterTiers, formFromTiers, termsProblem, termsPayload, termsSummary, type TermsForm } from "../../../lib/seller/rental-terms";
 import { timed } from "../../../lib/seller/timing";
+import { staleBrandMentions, applyBrandCorrection, shouldReprice, describeReprice } from "../../../lib/seller/brand-change";
 import { flawsFromLine, flawsToLine, costFromText, CONDITION_GRADES, type ConditionGrade } from "../../../lib/seller/intake-shape";
 import { publishListing, draftListing, priceListing } from "../../../lib/seller/intake";
 import { fillDraftBlanks, describeFilled } from "../../../lib/seller/fill";
@@ -60,8 +61,8 @@ const CONDITION_DEFINITIONS: Record<ConditionGrade, string> = {
 export default function ReviewScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
-  const { photos, fields, setFields, imageUrls, compsCount, setCompsCount, priceCents, setPriceCents, itemId, setItemId, reset,
-          movePhoto, removePhoto, unsure, setUnsure, confirmed, setConfirmed, collections, setCollections } = useDraft();
+  const { photos, fields, setFields, imageUrls, compsCount, setCompsCount, priceInputs, setPriceInputs, priceCents, setPriceCents, itemId, setItemId, reset,
+          movePhoto, removePhoto, unsure, setUnsure, confirmed, setConfirmed, collections, setCollections, aiDraft, setAiDraft } = useDraft();
   const { storeSlug } = useAuth();
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<{ currency: string }>("/api/store/me"), enabled: !!storeSlug });
   const consignors = useQuery({
@@ -96,6 +97,23 @@ export default function ReviewScreen() {
   const [packing, setPacking] = useState<string | null>(null);
   // RENT THIS ONE OUT. Off unless she says so: a shop that rents part of its rail does not rent all
   // of it, and a piece is rentable exactly when terms exist for it.
+  // THE BRAND AS IT STOOD WHEN SHE PUT THE CURSOR IN THE BOX, so a correction knows what it is
+  // correcting FROM.
+  //
+  // She fixes the Brand field, which is the one place she is looking, and the title and the
+  // description still name the brand it got wrong. Live, that does not read as a typo: a piece
+  // labelled Roberto Cavalli whose description says Dolce & Gabbana reads as a counterfeit.
+  //
+  // READ AT FOCUS, NOT WHEN THE AI WROTE IT. Compared against the AI's brand, a second correction
+  // on the same piece found nothing to fix: the title already said Cavalli while the value being
+  // compared was still the Dolce & Gabbana of two edits ago. Focus is the one thing every route
+  // into this box shares, so it is the one value that cannot go stale.
+  const brandAtFocus = useRef("");
+  // What the reprice did, in one line under the price. Null until a corrected brand moves it.
+  const [repriceNote, setRepriceNote] = useState<string | null>(null);
+  // A price SHE typed is a decision, and a corrected brand must not overrule it. Only a pricing
+  // run clears this.
+  const [priceTypedByHer, setPriceTypedByHer] = useState(false);
   const [renting, setRenting] = useState(false);
   const [terms, setTerms] = useState<TermsForm | null>(null);
   // Typed as one line while editing; split into the list when she's done, so a comma mid-typing
@@ -160,6 +178,7 @@ export default function ReviewScreen() {
   // mode "soon" and a chip that takes a decision and discards it is worse than no chip.
   const livePlatforms = liveCrossListPlatforms(crossList.data?.platforms ?? []);
 
+
   // Typed as one shape so `note` exists on every row. A union would make it present on Price
   // only, which TypeScript rightly refuses to read off the others.
   //
@@ -215,6 +234,15 @@ export default function ReviewScreen() {
       const draft = await timed("draft (/api/store/intake)", () => draftListing(imageUrls, known));
       const { fields: next, filled } = fillDraftBlanks(draft.fields, fields);
       setFields(next);
+      // Only when the AI is the one that supplied it. A brand she typed herself was never wrong.
+      // WHAT IT PROPOSED, kept for the publish to compare against what she actually lists. Only
+      // the fields it FILLED: a field she had already written is not a prediction, and counting it
+      // as one would flatter the accuracy numbers with answers it never gave.
+      if (filled.length) {
+        const proposed: Record<string, unknown> = {};
+        for (const k of filled) proposed[k] = (next as Record<string, unknown>)[k];
+        setAiDraft({ ...(aiDraft ?? {}), ...proposed });
+      }
       // Only the blanks this pass actually filled can be newly unsure: fillDraftBlanks leaves
       // everything she already has a value for alone, so a field she has since corrected must not
       // be re-flagged by a second run.
@@ -226,21 +254,25 @@ export default function ReviewScreen() {
       // Everything the desktop sends. Three of these were once missing and the phone priced with
       // less evidence than the web on the same photo: a Todd Oldham dress came back at 16,013 here
       // and 1,681 there. See draftListing for what knowledgeHintCents is.
+      const extras = {
+        searchQuery: draft.searchQuery,
+        reverseComps: draft.reverseComps,
+        reverseTitles: draft.reverseTitles,
+        editorialTitles: draft.editorialTitles,
+        knowledgeHintCents: draft.knowledgeHintCents,
+        draftRanFull: draft.draftRanFull,
+      };
       let priced = priceCents;
       if (priceCents === null) {
         setFilling("Checking comparable sales…");
         const pricing = await timed("pricing (/api/store/intake/pricing)", () =>
-          priceListing(imageUrls, next, {
-            searchQuery: draft.searchQuery,
-            reverseComps: draft.reverseComps,
-            reverseTitles: draft.reverseTitles,
-            editorialTitles: draft.editorialTitles,
-            knowledgeHintCents: draft.knowledgeHintCents,
-            draftRanFull: draft.draftRanFull,
-          }),
+          priceListing(imageUrls, next, extras),
         );
         setCompsCount(pricing.compsCount);
         setPriceCents(pricing.priceCents);
+        setPriceTypedByHer(false);
+        // Kept so a corrected brand can price it again on the same evidence. See repriceForBrand.
+        setPriceInputs(extras);
         priced = pricing.priceCents;
       }
 
@@ -257,6 +289,44 @@ export default function ReviewScreen() {
       setError(e instanceof Error ? e.message : "Couldn't read the photos. Try again.");
     } finally {
       setFilling(null);
+    }
+  }
+
+  /**
+   * SHE CORRECTED THE BRAND. Two things follow, and neither of them is a question worth asking.
+   *
+   * THE WORDS. The title and the description were written around the old house and still name it.
+   * A listing naming Roberto Cavalli in one field and Dolce & Gabbana in the sentence underneath
+   * does not read as a typo to a shopper.
+   *
+   * THE NUMBER. A price worked out from Dolce & Gabbana sales is not a slightly wrong price for a
+   * Cavalli piece; it is a different piece's price. The case that costs her most is the plain one:
+   * a shirt with no brand on it prices at $20 because there was nothing to compare it to, she
+   * types Dior, and $20 is now the single most expensive thing on the screen to leave alone.
+   *
+   * Only ever re-run on a price WE produced. One she typed is an answer, and shouldReprice holds
+   * that line. Failure is quiet: the price already on screen is the one she had a second ago.
+   */
+  async function commitBrand() {
+    const from = brandAtFocus.current;
+    const to = (fields.brand ?? "").trim();
+    brandAtFocus.current = fields.brand ?? "";
+    const stale = staleBrandMentions(from, to, fields);
+    const next = { ...fields, ...(stale ? applyBrandCorrection(fields, stale) : {}) };
+    if (stale) setFields(next);
+
+    const changed = from.trim().toLowerCase() !== to.toLowerCase();
+    if (!shouldReprice({ brandChanged: changed, hasPhotos: imageUrls.length > 0, compsCount, priceTypedByHer })) return;
+    const was = priceCents;
+    setRepriceNote(`Checking ${to} sales…`);
+    try {
+      const priced = await priceListing(imageUrls, next, priceInputs ?? {});
+      if (priced.priceCents == null) { setRepriceNote(null); return; }
+      setCompsCount(priced.compsCount);
+      setPriceCents(priced.priceCents);
+      setRepriceNote(describeReprice(to, was != null ? formatMoney(was, currency) : null, formatMoney(priced.priceCents, currency)));
+    } catch {
+      setRepriceNote(null);
     }
   }
 
@@ -315,6 +385,8 @@ export default function ReviewScreen() {
         const made = await publishListing(
           {
             ...fields, measurements, imageUrls, priceCents,
+            // So the correction memory sees what she changed. See publishListing.
+            ...(aiDraft ? { aiDraft, photo: imageUrls[0] } : {}),
             ...(when ? { publishAt: when.toISOString() } : {}),
             ...(consignor !== null ? { consignment: { consignorId: consignor } } : {}),
             ...(channels.length ? { channels } : {}),
@@ -333,6 +405,24 @@ export default function ReviewScreen() {
       if (renting && rentalTarget && !termsProblem(rentForm)) {
         /* allow-swallow: the piece is already listed; renting can be switched on from the piece */
         await apiPut(`/api/store/rentals/terms/${rentalTarget}`, termsPayload(rentForm, true)).catch(() => {});
+      }
+
+      // WHAT SHE CHANGED, back to the model.
+      //
+      // The correction memory is how intake gets better: every field she overrides is logged
+      // against the photograph and comes back as a hint on the next piece. publish does this
+      // itself, but the AI path never reaches publish, it PATCHes the draft row saved during
+      // pricing, so corrections made on the phone were being thrown away.
+      //
+      // /* allow-swallow */ and last: the piece is listed. A learning signal is worth a lot and it
+      // is not worth failing a finished listing over.
+      if (aiDraft) {
+        await apiPost("/api/store/intake/corrections", {
+          aiDraft,
+          final: { ...fields },
+          photo: imageUrls[0] ?? null,
+          category: fields.category ?? null,
+        }).catch(() => {});
       }
 
       // The new piece has to show up wherever pieces are counted, the rental list included.
@@ -466,11 +556,13 @@ export default function ReviewScreen() {
                       // Typed in whole currency, stored in cents. The same units the pricer used.
                       const n = Number(v.replace(/[^0-9.]/g, ""));
                       setPriceCents(Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null);
+                      setPriceTypedByHer(true);
+                      setRepriceNote(null);
                     } else if (r.key === "cost") setFields({ ...fields, cost: v.replace(/[^0-9.]/g, "") });
                     else setFields({ ...fields, [r.key]: v });
                   }}
-                  onFocus={() => setFocused(r.key)}
-                  onBlur={() => { if (r.key === "flaws") commitFlaws(); setFocused(null); }}
+                  onFocus={() => { setFocused(r.key); if (r.key === "brand") brandAtFocus.current = value; }}
+                  onBlur={() => { if (r.key === "flaws") commitFlaws(); if (r.key === "brand") void commitBrand(); setFocused(null); }}
                   multiline={r.multiline}
                   keyboardType={r.key === "price" || r.key === "cost" ? "decimal-pad" : "default"}
                   placeholder={r.placeholder}
@@ -489,6 +581,24 @@ export default function ReviewScreen() {
                   }}
                 />
               </View>
+
+              {/* SAID ONCE, UNDER THE PRICE, AND ONLY ON A PRICE WE WORKED OUT.
+                  Not an apology and not a disclaimer on every screen: a seller changing a number
+                  should know the change is worth something to her, because it is. Her corrections
+                  are logged against the photograph and come back as hints on the next piece. */}
+              {/* What a corrected brand did to the number, said under the number it changed. */}
+              {r.key === "price" && repriceNote ? (
+                <Text style={{ fontSize: 12.5, color: colors.accentInk, marginTop: 6, lineHeight: 18 }}>
+                  {repriceNote}
+                </Text>
+              ) : null}
+
+              {r.key === "price" && compsCount ? (
+                <Text style={{ fontSize: 12.5, color: colors.textDim, marginTop: 6, lineHeight: 18 }}>
+                  Our pricing is still learning. Change anything that looks off: what you set teaches
+                  it, and it gets better for your shop every time.
+                </Text>
+              ) : null}
 
               {/* Price: below what she decided she must make on it. Warned, never silently
                   rewritten. A price she has seen is a decision, and this only undoes one made

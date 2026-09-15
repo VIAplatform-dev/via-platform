@@ -12,7 +12,7 @@ import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
 import { reverseImageBestOf, matchesToComps, editorialCaptions, verifyMatchesByImage, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
-import { brandConsensus, resolveBrandName, type Consensus } from "@/app/lib/brand-consensus";
+import { brandConsensus, plausibleBrandName, resolveBrandName, type Consensus } from "@/app/lib/brand-consensus";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
  // when the seller typed one, so the references are same-brand and directly instructive.
  const [visualHints, crossHints] = needDraft && embedding
  ? await Promise.all([
- getVisualHints(slug, embedding).catch(() => ""),
+ getVisualHints(slug, embedding, has("brand")).catch(() => ""),
  getCrossStoreSimilar(embedding, has("brand") ? val("brand") : null).catch(() => ""),
  ])
  : ["", ""];
@@ -249,6 +249,21 @@ export async function POST(request: NextRequest) {
  // Never blank a field the drafter filled: a null here means "nothing better to offer".
  if (resolved.brand && resolved.brand.toLowerCase() !== cur.toLowerCase()) {
   draft.brand = { value: resolved.brand, confidence: resolved.confidence };
+ } else if (!resolved.brand && cur && !plausibleBrandName(cur) && inferBrandFromTitle(cur)?.toLowerCase() !== cur.toLowerCase()) {
+  // THE ONE EXCEPTION TO "NEVER BLANK A FILLED FIELD", and the reason it exists: a Dolce & Gabbana
+  // Botticelli print shirt was listed with the brand "Venus Pixel Silk", three words lifted out of
+  // the garment's own description. Nothing above could replace it, so it stood, and it went
+  // straight into the comp search as the house to price against.
+  //
+  // A brand is not free text here. It is the search term the price is built from, so a name no
+  // house could have is worse than an empty field: the seller sees the blank and the "confirm the
+  // brand" prompt, and the pricer is not sent looking for a maker that does not exist.
+  //
+  // Unless the map knows it by that exact name. Denim Tears, Cotton Citizen and Silk Laundry are
+  // real houses whose names are made of the very words this refuses, and a brand we can look up is
+  // a brand, whatever it is called.
+  console.log(`[intake ${slug}] dropped implausible drafted brand "${cur}"`);
+  draft.brand = { value: null, confidence: 0 };
  }
  }
  // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label,

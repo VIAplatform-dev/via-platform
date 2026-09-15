@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { daysListed, AGING_THRESHOLDS } from "@/app/lib/aging-core";
 import { holdPill, HOLD_LENGTHS } from "@/app/lib/holds-core";
+import { applyBrandCorrection, describeReprice, staleBrandMentions } from "@/app/lib/brand-change";
 import { Package, Search, List, LayoutGrid, Check, X, SlidersHorizontal } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, TechEmpty, StatusPill, MetricCard, SectionLabel, TagRow, TH, TD, ConfirmDialog, cn } from "../ui";
 import DepopImportPrompt from "../DepopImportPrompt";
@@ -114,6 +115,9 @@ export default function ItemsPage() {
  const changeLayout = (v: "list" | "grid") => { setLayout(v); try { localStorage.setItem("inventory:layout", v); } catch { /* */ } };
  const [colTag, setColTag] = useState<string | null>(null); // collection filter
  const handledDeepLink = useRef<string | null>(null);
+ // The brand as it stood when the cursor went into the field, so a correction knows what it is
+ // correcting FROM. Read at focus, which is the one thing every path through the field shares.
+ const brandAtFocus = useRef("");
  const statusFilter = pathname.endsWith("/drafts") ? "draft" : pathname.endsWith("/sold") ? "sold" : null;
  const [loading, setLoading] = useState(true);
  const [authErr, setAuthErr] = useState<string | null>(null);
@@ -174,6 +178,10 @@ export default function ItemsPage() {
  const [repriceFill, setRepriceFill] = useState("");
  const [repriceErr, setRepriceErr] = useState<string | null>(null);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
+ // A corrected brand on a piece that is already live. The words are rewritten the moment she
+ // leaves the field; the PRICE is offered, never taken. This listing has been up for weeks and the
+ // number on it may well be one she set by hand, and nothing on the record says which.
+ const [reprice, setReprice] = useState<{ brand: string; state: "offer" | "running" | "done"; note: string | null; was: string | null } | null>(null);
  const [cropping, setCropping] = useState<string | null>(null); // cover photo mid-reposition: the card's crop, not a full editor
  const [uploading, setUploading] = useState(false);
  const [savingEdit, setSavingEdit] = useState(false);
@@ -419,6 +427,51 @@ export default function ItemsPage() {
  // ── Edit a single item (any status, including drafts). Full listing edit ──
  const cents2str = (c: number | null) => (c == null ? "" : (c / 100).toFixed(0));
  const num2str = (n: number | null) => (n == null ? "" : String(n));
+
+ // A corrected brand carries the rest of the listing with it.
+ //
+ // This is where most brand corrections actually happen: the piece is already live, and she is
+ // fixing what the drafter got wrong weeks ago. The title and the description were written from
+ // the old brand and still say it, and a listing naming two houses reads as a counterfeit rather
+ // than a typo. Rewritten without asking, because the name she just typed is the answer.
+ //
+ // On blur, not per keystroke: "Dolce & Gabban" mid-retype is a half-deleted word, not a brand.
+ function commitBrand() {
+ const was = brandAtFocus.current;
+ const brand = editForm.brand.trim();
+ brandAtFocus.current = editForm.brand;
+ const stale = staleBrandMentions(was, brand, editForm);
+ if (stale) setEditForm((f) => ({ ...f, ...applyBrandCorrection(f, stale) }));
+ const changed = was.trim().toLowerCase() !== brand.toLowerCase();
+ setReprice(changed && brand && editImages.length ? { brand, state: "offer", note: null, was: null } : null);
+ }
+
+ /**
+  * Price it again on the brand she just gave it. Her click, never automatic.
+  *
+  * A piece that went up unbranded was priced against nothing in particular. Once it says Dior, the
+  * old number is not slightly low, it is a different piece's price.
+  */
+ async function runReprice(brand: string) {
+ const was = editForm.price;
+ setReprice({ brand, state: "running", note: null, was });
+ try {
+ const r = await fetch(withStore("/api/store/intake/pricing"), {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify({ imageUrls: editImages, fields: { brand, title: editForm.title, era: editForm.era, material: editForm.material, category: editForm.category ?? "", condition: editForm.condition, conditionGrade: editForm.condition, cost: editForm.cost } }),
+ });
+ const d = await r.json().catch(() => null);
+ const cents = d?.estimate?.suggestedCents;
+ if (!r.ok || typeof cents !== "number") { setReprice(null); return; }
+ const to = String(Math.round(cents / 100));
+ setEditForm((f) => ({ ...f, price: to }));
+ setReprice({ brand, state: "done", was, note: describeReprice(brand, was ? `$${Number(was).toLocaleString("en-US")}` : null, `$${Number(to).toLocaleString("en-US")}`) });
+ } catch {
+ // Quiet: the price on the piece is the one it had a moment ago.
+ setReprice(null);
+ }
+ }
  function openEdit(it: Item) {
  setEditing(it);
  setEditForm({
@@ -1142,7 +1195,7 @@ export default function ItemsPage() {
  <div className="space-y-3">
  <Field label="Title" required><Input value={editForm.title} onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))} /></Field>
  <div className="grid grid-cols-2 gap-3">
- <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Fendi" /></Field>
+ <Field label="Brand"><Input value={editForm.brand} onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))} onFocus={(e) => { brandAtFocus.current = e.target.value; }} onBlur={commitBrand} placeholder="e.g. Fendi" /></Field>
  <Field label="Era"><Input value={editForm.era} onChange={(e) => setEditForm((f) => ({ ...f, era: e.target.value }))} placeholder="e.g. 1990s" /></Field>
  </div>
  <ConditionChips value={editForm.condition} onChange={(g) => setEditForm((f) => ({ ...f, condition: g }))} note={editForm.conditionNote} onNoteChange={(v) => setEditForm((f) => ({ ...f, conditionNote: v }))} />
@@ -1160,7 +1213,7 @@ export default function ItemsPage() {
  )}
  </Field>
  <div className="grid grid-cols-3 gap-3">
- <Field label="Price (USD)" required><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => setEditForm((f) => ({ ...f, price: e.target.value }))} /></Field>
+ <Field label="Price (USD)" required><Input type="number" inputMode="numeric" value={editForm.price} onChange={(e) => { setEditForm((f) => ({ ...f, price: e.target.value })); setReprice(null); }} /></Field>
  <Field label="Cost (USD)" hint="what you paid"><Input type="number" inputMode="numeric" value={editForm.cost} onChange={(e) => setEditForm((f) => ({ ...f, cost: e.target.value }))} placeholder="optional" /></Field>
  <Field label="Margin">
  {(() => {
@@ -1171,6 +1224,21 @@ export default function ItemsPage() {
  })()}
  </Field>
  </div>
+ {/* THE PRICE FOLLOWS THE BRAND, once she says so. */}
+ {reprice && (
+ reprice.state === "done" ? (
+ <p className="mt-1.5 text-[11px] font-medium text-[var(--accent-ink,#0b7a5c)]">
+ {reprice.note}{" "}
+ <button type="button" onClick={() => { if (reprice.was !== null) setEditForm((f) => ({ ...f, price: reprice.was as string })); setReprice(null); }} className="font-normal text-stone-500 underline underline-offset-2">Undo</button>
+ </p>
+ ) : reprice.state === "running" ? (
+ <p className="mt-1.5 text-[11px] text-stone-400">Checking {reprice.brand} sales…</p>
+ ) : (
+ <button type="button" onClick={() => void runReprice(reprice.brand)} className="mt-1.5 text-left text-[11px] font-medium text-[var(--accent-ink,#0b7a5c)] underline underline-offset-2">
+ This price was worked out before {reprice.brand}. Price it again?
+ </button>
+ )
+ )}
  <Field label="Description">
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>

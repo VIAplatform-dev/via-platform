@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { brandConsensus, repeatedName, consensusConfidence, resolveBrandName } from "./brand-consensus.ts";
+import { brandConsensus, repeatedName, consensusConfidence, plausibleBrandName, resolveBrandName, rankWeight } from "./brand-consensus.ts";
 
 // A stand-in for the canonical map: it knows the famous houses and, like the real one, has never
 // heard of Todd Oldham. That blindness IS the bug under test.
-const KNOWN = ["Chanel", "Prada", "Gucci", "Dior", "Versace"];
+const KNOWN = ["Chanel", "Prada", "Gucci", "Dior", "Versace", "Dolce & Gabbana"];
 const infer = (t: string) => KNOWN.find((b) => t.toLowerCase().includes(b.toLowerCase())) ?? null;
 
 /** The real shape of the Todd Oldham result: 26 of 31 name him, 5 are stray Chanel goods. */
@@ -61,11 +61,27 @@ test("a thin share is refused even when nothing competes with it", () => {
 
 test("a near-split is a split, not a winner", () => {
  // Six versus five is the web disagreeing. Picking the six is a coin toss dressed as evidence.
- const titles = [...Array(6).fill("Dior saddle bag"), ...Array(5).fill("Gucci saddle bag")];
+ //
+ // INTERLEAVED, because order is evidence now. Six Dior listed BEFORE five Gucci is not a split at
+ // all: it says the six best matches are Dior. A real disagreement is the two brands mixed through
+ // the results, which is what this builds.
+ const titles: string[] = [];
+ for (let i = 0; i < 6; i++) {
+  titles.push("Dior saddle bag");
+  if (i < 5) titles.push("Gucci saddle bag");
+ }
  const c = brandConsensus(titles, infer);
  assert.equal(c.brand, null);
  assert.equal(c.reason, "too-close");
  assert.deepEqual(c.runnerUp, { brand: "Gucci", hits: 5 });
+});
+
+test("the same counts, ordered, are not a split: the better matches agree", () => {
+ // The pair to the test above. Identical tallies, 6 against 5, and the Diors are the top matches.
+ const titles = [...Array(6).fill("Dior saddle bag"), ...Array(5).fill("Gucci saddle bag")];
+ const c = brandConsensus(titles, infer);
+ assert.equal(c.brand, "Dior");
+ assert.equal(c.reason, "agreed");
 });
 
 test("a clear winner over a runner-up is still accepted", () => {
@@ -157,4 +173,155 @@ test("an uncorroborated result never blanks a brand the drafter already had", ()
  const r = resolveBrandName({ consensus: c, draftBrand: "Moschino", draftTitle: "Moschino dress" });
  assert.equal(r.brand, "Moschino");
  assert.equal(r.source, "draft");
+});
+
+/* ── position is evidence ───────────────────────────────────────────────── */
+
+// A Roberto Cavalli leopard bustier came back branded Dolce & Gabbana. The Lens results, read off
+// SerpApi: positions 1, 2 and 3 were Roberto Cavalli listings (Sourced by Scottie, Depop,
+// Vestiaire) and the tail was other leopard tops. Counting every title equally let the tail win.
+// The seller's reading was the fix: "the first two are perfect matches, the rest aren't."
+
+const MAP: Record<string, string> = {
+ "roberto cavalli": "Roberto Cavalli",
+ "dolce": "Dolce & Gabbana",
+ "cavalli": "Roberto Cavalli",
+};
+const mapped = (t: string): string | null => {
+ const low = t.toLowerCase();
+ for (const [k, v] of Object.entries(MAP)) if (low.includes(k)) return v;
+ return null;
+};
+
+test("the near-exact matches decide the brand, not the long tail", () => {
+ const titles = [
+  "Roberto Cavalli Underwear 2000s Feather Print Bustier Cami",
+  "Roberto Cavalli corset cami top leopard mesh | Depop",
+  "Roberto Cavalli Leopard Print Bustier Top M",
+  // The tail: other leopard tops, more of them, none of them this piece.
+  "Dolce & Gabbana leopard print bustier",
+  "Dolce & Gabbana animal print corset top",
+  "Dolce & Gabbana leopard silk cami",
+  "Dolce & Gabbana leopard bodysuit",
+  "Dolce & Gabbana printed mesh top",
+ ];
+ const c = brandConsensus(titles, mapped);
+ assert.equal(c.brand, "Roberto Cavalli");
+ assert.equal(c.reason, "agreed");
+});
+
+test("weight decays with position, so the tail speaks without shouting", () => {
+ assert.equal(rankWeight(0), 1);
+ assert.ok(rankWeight(0) > rankWeight(1) && rankWeight(1) > rankWeight(5));
+ assert.ok(rankWeight(25) < 0.15);
+ // Never negative, never zero: a match at position 40 still counts for something.
+ assert.ok(rankWeight(40) > 0);
+ assert.equal(rankWeight(-3), 1);
+});
+
+test("one well-placed hit is still not a consensus", () => {
+ // Position 1 only, and nothing else agrees: the raw floor of three still applies.
+ const c = brandConsensus(
+  ["Roberto Cavalli leopard top", "some unbranded top", "another unbranded top", "a third"],
+  mapped,
+ );
+ assert.notEqual(c.reason, "agreed");
+});
+
+test("a pattern is not a designer", () => {
+ // "Leopard Print" recurs on every one of these and must never be read as the maker: it would both
+ // veto the real brand and corroborate nothing.
+ const name = repeatedName([
+  "Leopard Print Bustier Top",
+  "Leopard Print Cami Silk",
+  "Leopard Print Corset Mesh",
+  "Leopard Print Slip Dress",
+ ]);
+ assert.equal(name, null);
+});
+
+test("a real designer the map has never heard of still surfaces", () => {
+ // The Todd Oldham protection has to survive all of the above.
+ const name = repeatedName([
+  "Todd Oldham S/S 1995 Runway Black Cutout Mini Dress",
+  "Todd Oldham 1995 documented dress",
+  "Vintage Todd Oldham cutout dress",
+ ]);
+ assert.equal(name, "Todd Oldham");
+});
+
+// ── The Botticelli shirt ───────────────────────────────────────────────────────────────────────
+//
+// Forty-two web matches, every one of them naming Dolce & Gabbana, and the brand field said
+// "Venus Pixel Silk": three capitalised words lifted out of the garment's own description. It then
+// vetoed Dolce & Gabbana, and the price was worked out for a house that does not exist.
+
+const BOTTICELLI = Array(8).fill("1990s Dolce & Gabbana D&G Birth of Venus Botticelli Pixel Print Silk Shirt");
+
+test("a garment's own description is never harvested as its designer", () => {
+ const c = brandConsensus(BOTTICELLI, infer);
+ // Nothing to harvest: every one of these titles already names a house the map knows, so its
+ // capitalised words are describing the shirt, not naming its maker.
+ assert.equal(c.unknownName, null);
+ assert.equal(c.brand, "Dolce & Gabbana");
+ assert.equal(
+  resolveBrandName({ consensus: c, draftTitle: BOTTICELLI[0], draftBrand: "Venus Pixel Silk" }).brand,
+  "Dolce & Gabbana",
+ );
+});
+
+test("a fabric, a cut or a pattern in the phrase means it is not a house", () => {
+ assert.equal(plausibleBrandName("Venus Pixel Silk"), false);
+ assert.equal(plausibleBrandName("Botticelli Print"), false);
+ assert.equal(plausibleBrandName("Black Cutout Mini"), false);
+ // And the names that have to survive it.
+ assert.equal(plausibleBrandName("Todd Oldham"), true);
+ assert.equal(plausibleBrandName("Jean Paul Gaultier"), true);
+ assert.equal(plausibleBrandName("Dolce & Gabbana"), true);
+ assert.equal(plausibleBrandName(""), false);
+ // Four words is a name at the outside; five is a sentence.
+ assert.equal(plausibleBrandName("Maison Martin Margiela Artisanal Line"), false);
+});
+
+test("a phrase cannot corroborate itself through the drafter's title", () => {
+ // The drafter's title is a rewrite of these same web titles, so sharing a WORD with it is not a
+ // second source. Only the whole name is.
+ const c = { brand: null, hits: 0, total: 8, runnerUp: null, unknownName: "Venus Botticelli Pixel", reason: "unknown-designer" as const };
+ assert.equal(resolveBrandName({ consensus: c, draftTitle: "1990s Birth of Venus print shirt" }).brand, null);
+ // The same test, with a name that really is in the drafter's own words.
+ const oldham = { ...c, unknownName: "Todd Oldham" };
+ const r = resolveBrandName({ consensus: oldham, draftTitle: "Todd Oldham S/S 1995 cutout dress" });
+ assert.equal(r.brand, "Todd Oldham");
+ assert.equal(r.source, "corroborated-name");
+});
+
+test("a veto nobody corroborates gives the known brand back", () => {
+ // Five Gucci scarves and three pages naming someone the map has never heard of. The unknown name
+ // vetoes Gucci, as it should while it might be real.
+ const titles = [...Array(5).fill("Gucci silk scarf 1990s"), ...Array(3).fill("Marla Hanson scarf")];
+ const c = brandConsensus(titles, infer);
+ assert.equal(c.reason, "unknown-designer");
+ assert.equal(c.unknownName, "Marla Hanson");
+ // Corroborated by the drafter: the unknown designer wins, which is the Todd Oldham case.
+ assert.equal(resolveBrandName({ consensus: c, draftBrand: "Marla Hanson" }).brand, "Marla Hanson");
+ // Nothing corroborates it: the veto was built on a guess that did not hold, and Gucci, which
+ // passed every floor on its own, comes back.
+ const back = resolveBrandName({ consensus: c, draftTitle: "1990s silk scarf" });
+ assert.equal(back.brand, "Gucci");
+ assert.equal(back.source, "consensus");
+});
+
+test("the Chanel minority never comes back through the undone veto", () => {
+ // Five stray Chanel goods among twenty-six Todd Oldham dresses failed on share, and it has to
+ // keep failing on share even when the name that vetoed it turns out to be uncorroborated.
+ const c = brandConsensus(OLDHAM, infer);
+ assert.equal(c.vetoed, null, "a brand that could not have won is not held for a retry");
+ assert.equal(resolveBrandName({ consensus: c, draftTitle: "black cutout mini dress" }).brand, null);
+});
+
+test("junk in the brand field is worse than nothing in it", () => {
+ // The brand is not free text to a pricer: it is the search term the comps are drawn from.
+ const c = { brand: null, hits: 0, total: 4, runnerUp: null, unknownName: null, reason: "none" as const };
+ assert.equal(resolveBrandName({ consensus: c, draftBrand: "Venus Pixel Silk" }).brand, null);
+ assert.equal(resolveBrandName({ consensus: c, draftBrand: "Todd Oldham" }).brand, "Todd Oldham");
 });

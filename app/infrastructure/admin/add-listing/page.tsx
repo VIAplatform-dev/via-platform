@@ -13,6 +13,7 @@ import { PACKAGING, packagingById, packedWeightOz, suggestPackaging, weightForPa
 import { toOz, fromOz } from "@/app/lib/weight-units";
 import { assignTier } from "@/app/lib/shipping-tiers";
 import { normalizeCondition } from "@/app/lib/condition-core";
+import { applyBrandCorrection, describeReprice, shouldReprice, staleBrandMentions } from "@/app/lib/brand-change";
 import { parcelEstimateFrom, type ParcelEstimate } from "@/app/lib/parcel-core";
 import type { MeasurementKey } from "@/app/lib/measurements-core";
 
@@ -55,6 +56,10 @@ type Collection = { id: string; title: string; itemCount: number };
 const BLANK: Form = { title: "", brand: "", era: "", material: "", colour: "", condition: "", size: "", measurements: "", category: "", price: "", cost: "", description: "", weightOz: "", lengthIn: "", widthIn: "", heightIn: "" };
 
 type Flag = { level: string; message: string; marketUsd: number; pct?: number };
+// What /api/store/intake/pricing answers with. Named because two callers now read it: the AI fill
+// and a corrected brand.
+type Estimate = { suggestedCents?: number | null; marketCents?: number | null; confidence?: number | null; rationale?: string | null; lowCents?: number | null; highCents?: number | null };
+type PricingResult = { estimate?: Estimate | null; priceFlag?: Flag | null; lowConfidence?: boolean; runway?: string | null; celebrity?: string | null };
 
 // Client mirror of the server's computePriceFlag (works in whole dollars). Lets the flag update
 // instantly as the seller edits the price, once we know the item's market value. No server call.
@@ -160,10 +165,23 @@ export default function IntakePage() {
  // Which packaging she's using. Preselected from the AI's weight. The honest signal, since it
  // came from looking at the actual garment.
  const [packing, setPacking] = useState<string>("small-box");
+ // The brand as it stood when she put the cursor in the field, so a correction knows what it is
+ // correcting FROM. Read at focus rather than tracked alongside the form because every path that
+ // can change the brand (the AI fill, a retype, a second correction) goes through the same focus.
+ const brandAtFocus = useRef("");
  const fileRef = useRef<HTMLInputElement>(null);
  const dragIdx = useRef<number | null>(null);
  const [markupPct, setMarkupPct] = useState<number | null>(null);
  const [aiDraft, setAiDraft] = useState<Record<string, string | null>>({});
+ // The evidence the drafting pass gathered for the pricer: its search query, the reverse image
+ // comps, the titles it found. Kept because the price can have to be worked out a SECOND time,
+ // when she corrects the brand, and re-running the pricer without that evidence is a weaker call
+ // than the first one was.
+ const [priceInputs, setPriceInputs] = useState<Record<string, unknown> | null>(null);
+ // A price SHE typed is a decision, and a corrected brand must not overrule it.
+ const [priceTypedByHer, setPriceTypedByHer] = useState(false);
+ // What a corrected brand did to the number, in one line under it.
+ const [repriceNote, setRepriceNote] = useState<string | null>(null);
  // The cover photo these details were written from. Swap the photo and the words stay. Describing
  // a garment that is no longer on the screen, which is worse than an empty form: it looks filled in.
  const [aiPhoto, setAiPhoto] = useState<string | null>(null);
@@ -258,6 +276,39 @@ export default function IntakePage() {
  if ((RISKY as readonly string[]).includes(k)) setConfirmed((c) => ({ ...c, [k]: true })); // editing = reviewed
  }
 
+ // A corrected brand carries the rest of the listing with it.
+ //
+ // She fixes Brand from Dolce & Gabbana to Roberto Cavalli, because Brand is the field she was
+ // looking at. The title and the description were WRITTEN from the wrong brand and still say it,
+ // and a live listing naming two houses reads as a counterfeit rather than a typo. So every field
+ // that still names the old one is rewritten, without asking: the name she just typed is the answer.
+ //
+ // ON BLUR, NOT ON EVERY KEYSTROKE. Halfway through retyping, "Dolce & Gabban" looks like a brand
+ // that isn't the old one, and cascading it would rewrite the title into a half-deleted word.
+ function commitBrand() {
+ const was = brandAtFocus.current;
+ const brand = form.brand.trim();
+ brandAtFocus.current = form.brand;
+ const stale = staleBrandMentions(was, brand, { title: form.title, description: form.description, conditionNote });
+ const patch = stale ? applyBrandCorrection({ title: form.title, description: form.description, conditionNote }, stale) : {};
+ if (patch.title !== undefined || patch.description !== undefined) {
+ setForm((f) => ({
+ ...f,
+ ...(patch.title !== undefined ? { title: patch.title } : {}),
+ ...(patch.description !== undefined ? { description: patch.description } : {}),
+ }));
+ }
+ if (patch.conditionNote !== undefined) setConditionNote(patch.conditionNote);
+
+ // And the number, which is stale for the same reason the words were: it was worked out against
+ // the wrong house. rawMarketCents is the tell that a pricing run produced what is on screen;
+ // nothing else sets it.
+ const changed = was.trim().toLowerCase() !== brand.toLowerCase();
+ if (brand && shouldReprice({ brandChanged: changed, hasPhotos: photos.length > 0, compsCount: rawMarketCents, priceTypedByHer })) {
+ void repriceForBrand({ ...form, ...patch }, brand);
+ }
+ }
+
  function reorderPhoto(from: number, to: number) {
  if (from === to) return;
  setPhotos((ps) => { const a = [...ps]; const [m] = a.splice(from, 1); a.splice(to, 0, m); return a; });
@@ -346,6 +397,65 @@ export default function IntakePage() {
  setPriceFlag(d.priceFlag ?? null);
  setLowConf(!!d.lowConfidence);
  } catch { /* best-effort nudge; stay silent */ }
+ }
+
+ /**
+  * One pricing answer, applied to the screen. Returns the suggested price in whole dollars.
+  *
+  * Shared by the two callers that can produce one: the AI fill, and a corrected brand. They used
+  * to be one block inside the fill, which is why a corrected brand left every one of these
+  * readings, the band, the flag, the rationale, describing the brand it no longer is.
+  */
+ function applyPricing(d2: PricingResult): number | null {
+ const est = d2.estimate;
+ if (est?.suggestedCents) setMarketPrice(Math.round(est.suggestedCents / 100));
+ if (typeof est?.confidence === "number") setAiConfidence(est.confidence);
+ if (typeof est?.marketCents === "number") setRawMarketCents(est.marketCents);
+ if (typeof est?.rationale === "string") setPriceNote(est.rationale);
+ setPriceLow(typeof est?.lowCents === "number" ? Math.round(est.lowCents / 100) : null);
+ setPriceHigh(typeof est?.highCents === "number" ? Math.round(est.highCents / 100) : null);
+ setPriceFlag(d2.priceFlag ?? null);
+ setLowConf(!!d2.lowConfidence); // full AI pricing is usually confident; honor it if not
+ if (d2.runway) setRunway(d2.runway);
+ if (d2.celebrity) setCelebrity(d2.celebrity);
+ return est?.suggestedCents ? Math.round(est.suggestedCents / 100) : null;
+ }
+
+ /**
+  * THE PRICE FOLLOWS THE BRAND.
+  *
+  * A shirt with no brand on it prices at $20, because there was nothing to compare it against.
+  * She types Dior. The words are corrected by commitBrand; the $20 is a number worked out for a
+  * piece we thought was nobody's, and it is the one field on the screen that costs her real money
+  * to leave alone.
+  *
+  * Priced on the same evidence as the first run (priceInputs): the reverse image comps came off
+  * the photographs, not off the brand, and a second call without them is a weaker call.
+  */
+ async function repriceForBrand(next: Form, brand: string) {
+ const was = Number(form.price) > 0 ? `$${Number(form.price).toLocaleString("en-US")}` : null;
+ setRepriceNote(`Checking ${brand} sales…`);
+ try {
+ const r = await fetch(withStore("/api/store/intake/pricing"), {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ // No price in the payload, deliberately: this is a fresh reading, not a check of the old one.
+ body: JSON.stringify({
+ imageUrls: photos,
+ fields: { brand, title: next.title, era: next.era, material: next.material, category: next.category, condition: next.condition, conditionGrade: next.condition, cost: next.cost, runway: runway ?? "", celebrity: celebrity ?? "" },
+ ...(priceInputs ?? {}),
+ }),
+ });
+ const d2 = await r.json().catch(() => null);
+ if (!r.ok || !d2) { setRepriceNote(null); return; }
+ const suggested = applyPricing(d2);
+ if (suggested == null) { setRepriceNote(null); return; }
+ setForm((f) => ({ ...f, price: String(suggested) }));
+ setRepriceNote(describeReprice(brand, was, `$${suggested.toLocaleString("en-US")}`));
+ } catch {
+ // Quiet: the price already on screen is the one she had a second ago.
+ setRepriceNote(null);
+ }
  }
 
  // Fill ONLY the blank fields with AI. Whatever the seller typed is kept. Pricing always
@@ -438,27 +548,22 @@ export default function IntakePage() {
  runway: (d.runway ?? dr?.runway) || "",
  celebrity: d.celebrity || "",
  };
+ // Kept so a corrected brand can price it again on the same evidence. See repriceForBrand.
+ const inputs = { searchQuery: d.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], editorialTitles: d.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true };
+ setPriceInputs(inputs);
  const r2 = await fetch(withStore("/api/store/intake/pricing"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ imageUrls: photos, fields: resolved, searchQuery: d.searchQuery ?? dr?.searchQuery ?? null, reverseComps: d.reverseComps ?? [], reverseTitles: d.reverseTitles ?? [], editorialTitles: d.editorialTitles ?? [], knowledgeHintCents: dr?.priceHint ? dr.priceHint * 100 : null, draftRanFull: d.needDraft === true }),
+ body: JSON.stringify({ imageUrls: photos, fields: resolved, ...inputs }),
  });
  const d2 = await r2.json().catch(() => null);
  if (r2.ok && d2) {
- const est = d2.estimate;
- if (est?.suggestedCents) setMarketPrice(Math.round(est.suggestedCents / 100));
- if (typeof est?.confidence === "number") setAiConfidence(est.confidence);
- if (typeof est?.marketCents === "number") setRawMarketCents(est.marketCents);
- if (typeof est?.rationale === "string") setPriceNote(est.rationale);
- setPriceLow(typeof est?.lowCents === "number" ? Math.round(est.lowCents / 100) : null);
- setPriceHigh(typeof est?.highCents === "number" ? Math.round(est.highCents / 100) : null);
- setPriceFlag(d2.priceFlag ?? null);
- setLowConf(!!d2.lowConfidence); // full AI pricing is usually confident; honor it if not
- if (d2.runway) setRunway(d2.runway);
- if (d2.celebrity) setCelebrity(d2.celebrity);
+ const suggested = applyPricing(d2);
+ // Whether the number on screen is ours or hers: a corrected brand may re-run ours, never hers.
+ setPriceTypedByHer(!!String(filled.price ?? "").trim());
  setForm((f) => {
  if (String(f.price).trim()) return f; // seller's own price stands
- if (est?.suggestedCents) return { ...f, price: String(Math.round(est.suggestedCents / 100)) };
+ if (suggested != null) return { ...f, price: String(suggested) };
  if (dr?.priceHint) return { ...f, price: String(dr.priceHint) };
  return f;
  });
@@ -647,7 +752,13 @@ export default function IntakePage() {
  {name}
  {isFlagged && <span className="ml-2 text-[11px] font-normal text-amber-600">● AI unsure. Confirm</span>}
  </label>
- <input className={cn(input, isFlagged && !confirmed[k] && "border-amber-400 bg-amber-50/50")} value={form[k]} onChange={(e) => set(k, e.target.value)} />
+ <input
+ className={cn(input, isFlagged && !confirmed[k] && "border-amber-400 bg-amber-50/50")}
+ value={form[k]}
+ onChange={(e) => set(k, e.target.value)}
+ onFocus={k === "brand" ? (e) => { brandAtFocus.current = e.target.value; } : undefined}
+ onBlur={k === "brand" ? commitBrand : undefined}
+ />
  {isFlagged && (
  <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-stone-500">
  <input type="checkbox" checked={!!confirmed[k]} onChange={(e) => setConfirmed((c) => ({ ...c, [k]: e.target.checked }))} className="accent-[var(--accent,#0e9f76)]" />
@@ -821,7 +932,7 @@ export default function IntakePage() {
      placeholder truncated mid-word ("You set it, or AI estin") and the cost label wrapped onto two
      lines, which pushed its input below the price input. Two columns from `sm` up, where they fit. */}
  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
- <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, Math.round(rawMarketCents / 100), priceLow, priceHigh)); if (floorUsd) setBelowFloor((Number(v) || 0) > 0 && (Number(v) || 0) < floorUsd); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="Your price, or leave for AI" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
+ <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); setPriceTypedByHer(true); setRepriceNote(null); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, Math.round(rawMarketCents / 100), priceLow, priceHigh)); if (floorUsd) setBelowFloor((Number(v) || 0) > 0 && (Number(v) || 0) < floorUsd); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="Your price, or leave for AI" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
  <div><label className={label}>Cost ($) <span className="font-normal text-stone-400"> what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
  </div>
  {/* Raw market, not the suggestion. The band either side of it is built from raw market, so a
@@ -847,6 +958,21 @@ export default function IntakePage() {
  <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-[11px] text-stone-500 ring-1 ring-stone-200">
  Too few comparable sales to price this confidently. Add more detail or use Fill with AI for a firmer number.
  </div>
+ )}
+
+ {/* What a corrected brand did to the number, said under the number it changed. */}
+ {repriceNote && (
+ <p className="mt-2 text-[12px] font-medium text-emerald-800">{repriceNote}</p>
+ )}
+
+ {/* Said once, under the number it is about, and only when the number came from us.
+     Not an apology and not a disclaimer on every screen: a seller changing a price should know
+     the change is worth something to her, because it is. Her corrections are logged against the
+     photograph and come back as hints on the next piece. Same sentence as the phone's. */}
+ {rawMarketCents != null && (
+ <p className="mt-2 max-w-[60ch] text-[11px] leading-relaxed text-stone-400">
+ Our pricing is still learning. Change anything that looks off: what you set teaches it, and it gets better for your shop every time.
+ </p>
  )}
 
  <RentalPanel priceCents={Math.round((Number(form.price) || 0) * 100)} onDraftChange={setRentalDraft} />
